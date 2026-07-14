@@ -140,7 +140,8 @@ public sealed class LicenseService
         ActivationKeyCodec.ValidateRegistration(customerName, emailAddress);
         Directory.CreateDirectory(DefaultRootPath);
         var registrationPath = Path.Combine(DefaultRootPath, "registration.json");
-        if (!File.Exists(registrationPath))
+        var activationPath = Path.Combine(DefaultRootPath, "license.json");
+        if (!File.Exists(activationPath))
         {
             SaveJson(registrationPath, new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant()));
         }
