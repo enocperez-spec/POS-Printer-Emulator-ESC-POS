@@ -87,6 +87,47 @@ public sealed class ReceiptStore
         }
     }
 
+    public bool Delete(Guid id)
+    {
+        lock (_sync)
+        {
+            var job = _jobs.FirstOrDefault(candidate => candidate.Id == id);
+            if (job is null)
+            {
+                return false;
+            }
+
+            _jobs.Remove(job);
+            if (Directory.Exists(_historyDirectory))
+            {
+                foreach (var path in Directory.EnumerateFiles(_historyDirectory, $"*-{id:N}.json"))
+                {
+                    File.Delete(path);
+                }
+            }
+
+            return true;
+        }
+    }
+
+    public int Clear()
+    {
+        lock (_sync)
+        {
+            var removed = _jobs.Count;
+            _jobs.Clear();
+            if (Directory.Exists(_historyDirectory))
+            {
+                foreach (var path in Directory.EnumerateFiles(_historyDirectory, "*.json"))
+                {
+                    File.Delete(path);
+                }
+            }
+
+            return removed;
+        }
+    }
+
     private void LoadHistory()
     {
         lock (_sync)

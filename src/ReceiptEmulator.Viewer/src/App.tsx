@@ -14,13 +14,17 @@ import {
   LockKeyhole,
   Minus,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Printer,
   RotateCw,
   Search,
   Settings,
-  SlidersHorizontal,
   Sun,
+  Trash2,
   X,
 } from 'lucide-react'
 import { api } from './api'
@@ -29,13 +33,17 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus } from './types
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.1',
+  version: '0.3.01',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
     features: { history: false, exports: false, premiumFeatures: false, watermark: true },
   },
 }
+
+type ClearRequest =
+  | { kind: 'one'; id: string; label: string }
+  | { kind: 'all'; count: number }
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -59,6 +67,10 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [showLicense, setShowLicense] = useState(false)
+  const [activityCollapsed, setActivityCollapsed] = useState(() => localStorage.getItem('pos-printer-emulator-activity-collapsed') === 'true')
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(() => localStorage.getItem('pos-printer-emulator-inspector-collapsed') === 'true')
+  const [clearRequest, setClearRequest] = useState<ClearRequest>()
+  const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -66,12 +78,20 @@ function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0d1522' : '#f7f9fc')
   }, [theme])
 
+  useEffect(() => {
+    localStorage.setItem('pos-printer-emulator-activity-collapsed', String(activityCollapsed))
+  }, [activityCollapsed])
+
+  useEffect(() => {
+    localStorage.setItem('pos-printer-emulator-inspector-collapsed', String(inspectorCollapsed))
+  }, [inspectorCollapsed])
+
   const refresh = useCallback(async () => {
     try {
       const [nextStatus, nextJobs] = await Promise.all([api.status(), api.jobs()])
       setStatus(nextStatus)
       setJobs(nextJobs)
-      setSelectedId(current => current ?? nextJobs[0]?.id)
+      setSelectedId(current => current && nextJobs.some(item => item.id === current) ? current : nextJobs[0]?.id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to reach the local service.')
     }
@@ -88,7 +108,11 @@ function App() {
       setJob(undefined)
       return
     }
-    void api.job(selectedId).then(setJob).catch(cause => setError(cause.message))
+    let cancelled = false
+    void api.job(selectedId)
+      .then(nextJob => { if (!cancelled) setJob(nextJob) })
+      .catch(cause => { if (!cancelled) setError(cause.message) })
+    return () => { cancelled = true }
   }, [selectedId])
 
   const filteredJobs = useMemo(() => {
@@ -111,6 +135,41 @@ function App() {
     }
   }
 
+  function clearJob(id: string) {
+    const selected = jobs.find(item => item.id === id)
+    setClearRequest({ kind: 'one', id, label: selected?.preview ?? 'receipt job' })
+  }
+
+  function clearAllJobs() {
+    if (jobs.length > 0) setClearRequest({ kind: 'all', count: jobs.length })
+  }
+
+  async function confirmClear() {
+    if (!clearRequest) return
+    setClearing(true)
+    try {
+      if (clearRequest.kind === 'all') {
+        await api.clearJobs()
+        setJobs([])
+        setSelectedId(undefined)
+        setJob(undefined)
+      } else {
+        await api.deleteJob(clearRequest.id)
+        const remaining = jobs.filter(item => item.id !== clearRequest.id)
+        setJobs(remaining)
+        if (selectedId === clearRequest.id) {
+          setJob(undefined)
+          setSelectedId(remaining[0]?.id)
+        }
+      }
+      setClearRequest(undefined)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not clear the receipt jobs.')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <Header status={status} onSample={renderSample} busy={busy} theme={theme}
@@ -122,11 +181,20 @@ function App() {
           <button onClick={() => setError(undefined)}>Dismiss</button>
         </div>
       )}
-      <main className="workspace">
-        <ActivityRail jobs={filteredJobs} selectedId={selectedId} query={query} onQuery={setQuery}
-          onSelect={setSelectedId} historyEnabled={status.license.features.history} />
+      <main className={`workspace ${activityCollapsed ? 'activity-is-collapsed' : ''} ${inspectorCollapsed ? 'inspector-is-collapsed' : ''}`}>
+        {activityCollapsed ? (
+          <CollapsedSide side="left" label="Activity" onExpand={() => setActivityCollapsed(false)} />
+        ) : (
+          <ActivityRail jobs={filteredJobs} totalJobs={jobs.length} selectedId={selectedId} query={query} onQuery={setQuery}
+            onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
+            onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history} />
+        )}
         <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} />
-        <Inspector job={job} tab={tab} onTab={setTab} />
+        {inspectorCollapsed ? (
+          <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
+        ) : (
+          <Inspector job={job} tab={tab} onTab={setTab} onCollapse={() => setInspectorCollapsed(true)} />
+        )}
       </main>
       <footer className="status-bar">
         <span>POS Printer Emulator v{status.version} · {status.license.mode} Version</span>
@@ -143,6 +211,36 @@ function App() {
           }}
         />
       )}
+      {clearRequest && (
+        <ClearJobsDialog request={clearRequest} busy={clearing}
+          onCancel={() => setClearRequest(undefined)} onConfirm={confirmClear} />
+      )}
+    </div>
+  )
+}
+
+function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
+  request: ClearRequest
+  busy: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const isAll = request.kind === 'all'
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-jobs-title">
+        <div className="confirm-icon"><Trash2 size={24} /></div>
+        <div>
+          <h2 id="clear-jobs-title">{isAll ? `Clear all ${request.count} jobs?` : 'Clear this job?'}</h2>
+          <p>{isAll
+            ? 'Every job in Activity will be permanently removed, including saved Full-Version history.'
+            : `“${request.label}” will be permanently removed from Activity and saved history.`}</p>
+        </div>
+        <div className="confirm-actions">
+          <button onClick={onCancel} disabled={busy}>Cancel</button>
+          <button className="danger-button" onClick={onConfirm} disabled={busy}>{busy ? 'Clearing…' : isAll ? 'Clear all jobs' : 'Clear job'}</button>
+        </div>
+      </section>
     </div>
   )
 }
@@ -188,19 +286,26 @@ function Header({ status, onSample, busy, theme, onTheme, onLicense }: {
   )
 }
 
-function ActivityRail({ jobs, selectedId, query, onQuery, onSelect, historyEnabled }: {
+function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, onDelete, onClearAll, onCollapse, historyEnabled }: {
   jobs: JobSummary[]
+  totalJobs: number
   selectedId?: string
   query: string
   onQuery: (value: string) => void
   onSelect: (id: string) => void
+  onDelete: (id: string) => void
+  onClearAll: () => void
+  onCollapse: () => void
   historyEnabled: boolean
 }) {
   return (
     <aside className="activity-rail">
       <div className="pane-heading">
         <strong>Activity</strong>
-        <SlidersHorizontal size={17} />
+        <div className="pane-actions">
+          <button onClick={onClearAll} disabled={totalJobs === 0} aria-label="Clear all jobs" title="Clear all jobs"><Trash2 size={15} /></button>
+          <button onClick={onCollapse} aria-label="Collapse Activity panel" title="Collapse Activity panel"><PanelLeftClose size={17} /></button>
+        </div>
       </div>
       <label className="search-control">
         <Search size={16} />
@@ -209,15 +314,18 @@ function ActivityRail({ jobs, selectedId, query, onQuery, onSelect, historyEnabl
       <button className="filter-control"><Filter size={15} /> All sources <ChevronDown size={15} /></button>
       <div className="job-list">
         {jobs.map(item => (
-          <button key={item.id} className={`job-row ${selectedId === item.id ? 'is-selected' : ''}`} onClick={() => onSelect(item.id)}>
-            <span className={`job-dot ${item.status.toLowerCase()}`} />
-            <span className="job-time">{formatTime(item.receivedAt)}</span>
-            <span className="job-source">{item.sourceIp}</span>
-            <strong className="job-preview">{item.preview}</strong>
-            <span className="job-size">{formatBytes(item.payloadSize)}</span>
-            <span className="job-result">{item.status}</span>
-            {item.unsupportedCount > 0 && <span className="job-warning">{item.unsupportedCount} warning</span>}
-          </button>
+          <div key={item.id} className={`job-row ${selectedId === item.id ? 'is-selected' : ''}`}>
+            <button className="job-row-select" onClick={() => onSelect(item.id)} aria-label={`Open ${item.preview}`}>
+              <span className={`job-dot ${item.status.toLowerCase()}`} />
+              <span className="job-time">{formatTime(item.receivedAt)}</span>
+              <span className="job-source">{item.sourceIp}</span>
+              <strong className="job-preview">{item.preview}</strong>
+              <span className="job-size">{formatBytes(item.payloadSize)}</span>
+              <span className="job-result">{item.status}</span>
+              {item.unsupportedCount > 0 && <span className="job-warning">{item.unsupportedCount} warning</span>}
+            </button>
+            <button className="job-delete" onClick={() => onDelete(item.id)} aria-label={`Clear ${item.preview}`} title="Clear this job"><Trash2 size={14} /></button>
+          </div>
         ))}
         {jobs.length === 0 && (
           <div className="rail-empty">
@@ -420,14 +528,26 @@ function GraphicPlaceholder({ label }: { label: string }) {
   )
 }
 
-function Inspector({ job, tab, onTab }: { job?: ReceiptJob; tab: 'commands' | 'raw' | 'details'; onTab: (tab: 'commands' | 'raw' | 'details') => void }) {
+function CollapsedSide({ side, label, onExpand }: { side: 'left' | 'right'; label: string; onExpand: () => void }) {
+  return (
+    <aside className={`collapsed-side collapsed-${side}`}>
+      <button onClick={onExpand} aria-label={`Expand ${label} panel`} title={`Expand ${label} panel`}>
+        {side === 'left' ? <PanelLeftOpen size={18} /> : <PanelRightOpen size={18} />}
+        <span>{label}</span>
+      </button>
+    </aside>
+  )
+}
+
+function Inspector({ job, tab, onTab, onCollapse }: { job?: ReceiptJob; tab: 'commands' | 'raw' | 'details'; onTab: (tab: 'commands' | 'raw' | 'details') => void; onCollapse: () => void }) {
   const unsupported = job?.commands.filter(command => !command.supported).length ?? 0
   return (
     <aside className="inspector">
       <div className="inspector-tabs">
-        <button className={tab === 'commands' ? 'active' : ''} onClick={() => onTab('commands')}>Commands</button>
-        <button className={tab === 'raw' ? 'active' : ''} onClick={() => onTab('raw')}>Raw data</button>
-        <button className={tab === 'details' ? 'active' : ''} onClick={() => onTab('details')}>Job details</button>
+        <button className={`tab-button ${tab === 'commands' ? 'active' : ''}`} onClick={() => onTab('commands')}>Commands</button>
+        <button className={`tab-button ${tab === 'raw' ? 'active' : ''}`} onClick={() => onTab('raw')}>Raw data</button>
+        <button className={`tab-button ${tab === 'details' ? 'active' : ''}`} onClick={() => onTab('details')}>Job details</button>
+        <button className="inspector-collapse" onClick={onCollapse} aria-label="Collapse inspector panel" title="Collapse inspector panel"><PanelRightClose size={17} /></button>
       </div>
       {!job ? (
         <div className="inspector-empty"><Braces size={28} /><span>Select a receipt to inspect parsed commands and raw bytes.</span></div>

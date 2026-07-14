@@ -31,7 +31,7 @@ app.MapGet("/api/status", (ServiceRuntimeState runtime, LicenseService license, 
         runtime.Listening,
         $"{options.BindAddress}:{options.Port}",
         runtime.LastConnection,
-        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.1",
+        "0.3.01",
         license.GetStatus()));
 
 app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService license, ReceiptStore store) =>
@@ -69,6 +69,12 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
             Hex = Convert.ToHexString(job.RawPayload).Chunk(2).Select(chars => new string(chars)).Chunk(16).Select(row => string.Join(" ", row))
         });
 });
+
+app.MapDelete("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
+    store.Delete(id) ? Results.NoContent() : Results.NotFound());
+
+app.MapDelete("/api/jobs", (ReceiptStore store) =>
+    Results.Ok(new { Removed = store.Clear() }));
 
 app.MapPost("/api/sample", (ReceiptProcessor processor) =>
 {
