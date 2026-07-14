@@ -119,6 +119,19 @@ public sealed class EscPosParser
                     i += 3;
                     continue;
                 }
+                if (i + 2 < payload.Length && command == (byte)'p')
+                {
+                    var connector = payload[i + 2] is 1 or 49 ? 5 : 2;
+                    var length = i + 4 < payload.Length && payload[i + 3] is not Esc and not Gs
+                        ? 5
+                        : 3;
+                    var details = length == 5
+                        ? $"Connector pin {connector}; {payload[i + 3] * 2} ms on, {payload[i + 4] * 2} ms off"
+                        : $"Connector pin {connector}; timing bytes not supplied";
+                    AddCommand(i, payload.Slice(i, length), "Generate drawer pulse", details);
+                    i += length;
+                    continue;
+                }
 
                 var unknownLength = Math.Min(3, payload.Length - i);
                 AddCommand(i, payload.Slice(i, unknownLength), "Unsupported ESC command", $"Byte offset {i}", false);
@@ -129,6 +142,33 @@ public sealed class EscPosParser
             if (value == Gs && i + 1 < payload.Length)
             {
                 var command = payload[i + 1];
+                if (i + 4 < payload.Length && command == (byte)'(' && payload[i + 2] == (byte)'L')
+                {
+                    var bodyLength = payload[i + 3] + payload[i + 4] * 256;
+                    var declaredLength = 5 + bodyLength;
+                    var total = Math.Min(payload.Length - i, declaredLength);
+                    var complete = total == declaredLength;
+                    var function = bodyLength >= 2 && i + 6 < payload.Length ? payload[i + 6] : (byte)0;
+
+                    if (complete && function == 69 && bodyLength >= 6)
+                    {
+                        var keyCode = Encoding.ASCII.GetString(payload.Slice(i + 7, 2));
+                        var scaleX = payload[i + 9];
+                        var scaleY = payload[i + 10];
+                        if (line.Count > 0) FlushLine();
+                        result.Lines.Add(new ReceiptLine("center", [], "image", $"NV graphic {keyCode}"));
+                        AddCommand(i, payload.Slice(i, total), "Print NV graphic",
+                            $"Stored image {keyCode}, {scaleX}x{scaleY}; image data is stored in the physical printer", false);
+                    }
+                    else
+                    {
+                        AddCommand(i, payload.Slice(i, total), "Graphics command",
+                            complete ? $"Function {function}; {bodyLength} data bytes" : $"Truncated command; expected {declaredLength} bytes", false);
+                    }
+
+                    i += total;
+                    continue;
+                }
                 if (i + 2 < payload.Length && command == (byte)'!')
                 {
                     var size = payload[i + 2];

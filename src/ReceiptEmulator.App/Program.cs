@@ -31,7 +31,7 @@ app.MapGet("/api/status", (ServiceRuntimeState runtime, LicenseService license, 
         runtime.Listening,
         $"{options.BindAddress}:{options.Port}",
         runtime.LastConnection,
-        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.0",
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.1",
         license.GetStatus()));
 
 app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService license, ReceiptStore store) =>

@@ -52,4 +52,38 @@ public sealed class EscPosParserTests
         Assert.Equal("barcode", barcode.Kind);
         Assert.Equal("*123*", barcode.Data);
     }
+
+    [Fact]
+    public void ConsumesLengthPrefixedNvGraphicsCommandWithoutRenderingItsParametersAsText()
+    {
+        var bytes = new byte[]
+            {
+                0x1B, 0x40,
+                0x1D, 0x28, 0x4C, 0x06, 0x00, 0x30, 0x45, 0x30, 0x30, 0x01, 0x01
+            }
+            .Concat(Encoding.ASCII.GetBytes("SPECIAL OFFER\n"))
+            .ToArray();
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.DoesNotContain("0E00", receipt.PlainText);
+        Assert.Contains("SPECIAL OFFER", receipt.PlainText);
+        var image = Assert.Single(receipt.Lines, line => line.Kind == "image");
+        Assert.Equal("NV graphic 00", image.Data);
+        var warning = Assert.Single(receipt.Commands, command => !command.Supported);
+        Assert.Equal("Print NV graphic", warning.Name);
+        Assert.Equal("1D 28 4C 06 00 30 45 30 30 01 01", warning.Hex);
+    }
+
+    [Fact]
+    public void RecognizesShortDrawerPulseAsControlOnlyTraffic()
+    {
+        var bytes = new byte[] { 0x1B, 0x40, 0x1B, 0x70, 0x00, 0x1B, 0x40 };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.False(receipt.HasPrintableContent);
+        Assert.Contains(receipt.Commands, command => command.Name == "Generate drawer pulse");
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
 }

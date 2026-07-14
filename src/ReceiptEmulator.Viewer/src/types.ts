@@ -53,7 +53,7 @@ export type ReceiptSpan = {
 export type ReceiptLine = {
   alignment: 'left' | 'center' | 'right'
   spans: ReceiptSpan[]
-  kind: 'text' | 'barcode' | 'qr'
+  kind: 'text' | 'barcode' | 'qr' | 'image'
   data?: string
 }
 

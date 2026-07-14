@@ -10,6 +10,7 @@ import {
   Filter,
   FlaskConical,
   KeyRound,
+  ImageIcon,
   LockKeyhole,
   Minus,
   Moon,
@@ -28,7 +29,7 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus } from './types
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.0',
+  version: '0.3.1',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -293,6 +294,7 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
         {lines.map((line, lineIndex) => {
           if (line.kind === 'barcode') return <Barcode key={lineIndex} label={line.data ?? ''} />
           if (line.kind === 'qr') return <QrPlaceholder key={lineIndex} label={line.data ?? ''} />
+          if (line.kind === 'image') return <GraphicPlaceholder key={lineIndex} label={line.data ?? 'Printer graphic'} />
           return (
             <div key={lineIndex} className={`receipt-line align-${line.alignment}`}>
               {line.spans.map((span, spanIndex) => (
@@ -406,6 +408,16 @@ function Barcode({ label }: { label: string }) {
 
 function QrPlaceholder({ label }: { label: string }) {
   return <div className="qr-block" title={label}>{Array.from({ length: 81 }, (_, index) => <i key={index} className={(index * 17 + label.length * 7) % 5 < 2 ? 'on' : ''} />)}</div>
+}
+
+function GraphicPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="graphic-placeholder" title="The POS requested an image stored inside the physical printer.">
+      <ImageIcon size={22} />
+      <strong>{label}</strong>
+      <span>Stored printer image unavailable</span>
+    </div>
+  )
 }
 
 function Inspector({ job, tab, onTab }: { job?: ReceiptJob; tab: 'commands' | 'raw' | 'details'; onTab: (tab: 'commands' | 'raw' | 'details') => void }) {

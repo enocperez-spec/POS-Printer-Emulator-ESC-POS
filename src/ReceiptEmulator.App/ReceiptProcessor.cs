@@ -23,6 +23,13 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             return null;
         }
 
+        if (!receipt.HasPrintableContent)
+        {
+            rejection = "The connection contained printer control commands only.";
+            logger.LogDebug("Ignored control-only ESC/POS traffic from {SourceIp} ({Length} bytes)", sourceIp, payload.Length);
+            return null;
+        }
+
         if (!license.TryConsume(out _))
         {
             rejection = "Daily trial limit reached. Activate POS Printer Emulator to process more jobs.";

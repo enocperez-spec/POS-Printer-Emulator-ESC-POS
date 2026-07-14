@@ -19,6 +19,8 @@ public sealed class ParsedReceipt
 {
     public List<ReceiptLine> Lines { get; } = [];
     public List<ParsedCommand> Commands { get; } = [];
+    public bool HasPrintableContent => Lines.Any(line =>
+        line.Kind != "text" || line.Spans.Any(span => !string.IsNullOrWhiteSpace(span.Text)));
     public string PlainText => string.Join(Environment.NewLine,
         Lines.Select(line => string.Concat(line.Spans.Select(span => span.Text))));
 }

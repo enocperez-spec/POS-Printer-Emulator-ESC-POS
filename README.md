@@ -24,7 +24,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.0-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.1-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -107,7 +107,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.0-win-x64.exe`
+Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.1-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -127,7 +127,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.0 artifacts/installer/POSPrinterEmulatorSetup-0.3.0-win-x64.exe --title "POS Printer Emulator 0.3.0" --notes "Trial and Full licensing with in-app activation and persistent Full-Version history."
+gh release create v0.3.1 artifacts/installer/POSPrinterEmulatorSetup-0.3.1-win-x64.exe --title "POS Printer Emulator 0.3.1" --notes "Improved Epson graphics-command parsing and control-only connection filtering."
 ```
 
 ## Issue customer activation keys
@@ -143,7 +143,7 @@ Send the printed `PPE1-...` value to the customer. The corresponding public key 
 For unattended installation, provide the required registration fields:
 
 ```console
-POSPrinterEmulatorSetup-0.3.0-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
+POSPrinterEmulatorSetup-0.3.1-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
 ```
 
 ## Configuration
