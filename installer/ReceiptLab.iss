@@ -1,5 +1,5 @@
 #define MyAppName "Receipt Lab"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.1"
 #define MyAppPublisher "Receipt Lab"
 #define MyAppExeName "ReceiptEmulator.exe"
 #define ServiceName "ReceiptLab"
@@ -58,6 +58,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
+  ErrorDetails: AnsiString;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -67,7 +68,10 @@ begin
       (ResultCode <> 0) then
     begin
       Log(Format('Receipt Lab C# installer command failed with exit code %d.', [ResultCode]));
-      RaiseException('Receipt Lab could not configure its Windows service. Setup did not complete.');
+      if LoadStringFromFile(ExpandConstant('{app}\ReceiptLab-setup-error.txt'), ErrorDetails) then
+        RaiseException('Receipt Lab could not configure its Windows service:' + #13#10 + #13#10 + String(ErrorDetails))
+      else
+        RaiseException('Receipt Lab could not configure its Windows service. Setup did not complete.');
     end;
   end;
 end;

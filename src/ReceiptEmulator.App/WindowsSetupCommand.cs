@@ -50,12 +50,15 @@ public static class WindowsSetupCommand
             return 1;
         }
 
+        ClearSetupError();
+
         try
         {
             return await RunWindowsActionAsync(action, cancellationToken);
         }
         catch (Exception exception)
         {
+            WriteSetupError(exception);
             Console.Error.WriteLine($"Receipt Lab setup failed: {exception.Message}");
             return 1;
         }
@@ -99,33 +102,11 @@ public static class WindowsSetupCommand
         Console.WriteLine("Configuring the Receipt Lab Windows service...");
         await RemoveServiceAsync(cancellationToken);
 
-        var quotedExecutable = $"\"{executablePath}\"";
-        await RunRequiredProcessAsync(
-            GetSystemExecutable("sc.exe"),
-            [
-                "create",
-                ServiceName,
-                $"binPath= {quotedExecutable}",
-                "start= delayed-auto",
-                @"obj= NT AUTHORITY\LocalService",
-                $"DisplayName= {DisplayName}"
-            ],
-            cancellationToken);
-
-        await RunRequiredProcessAsync(
-            GetSystemExecutable("sc.exe"),
-            ["description", ServiceName, "Receives ESC/POS jobs on TCP port 9100 and serves the local Receipt Lab viewer."],
-            cancellationToken);
-
-        await RunRequiredProcessAsync(
-            GetSystemExecutable("sc.exe"),
-            ["failure", ServiceName, "reset= 86400", "actions= restart/5000/restart/15000/restart/60000"],
-            cancellationToken);
-
-        await RunRequiredProcessAsync(
-            GetSystemExecutable("sc.exe"),
-            ["failureflag", ServiceName, "1"],
-            cancellationToken);
+        WindowsServiceManager.Create(
+            ServiceName,
+            DisplayName,
+            "Receives ESC/POS jobs on TCP port 9100 and serves the local Receipt Lab viewer.",
+            executablePath);
 
         Console.WriteLine("Configuring the private/domain TCP 9100 firewall rule...");
         await RemoveFirewallRuleAsync(cancellationToken);
@@ -187,10 +168,7 @@ public static class WindowsSetupCommand
             }
         }
 
-        await RunRequiredProcessAsync(
-            GetSystemExecutable("sc.exe"),
-            ["delete", ServiceName],
-            cancellationToken);
+        WindowsServiceManager.Delete(ServiceName);
 
         var deadline = DateTimeOffset.UtcNow.AddSeconds(20);
         while (ServiceExists() && DateTimeOffset.UtcNow < deadline)
@@ -301,6 +279,48 @@ public static class WindowsSetupCommand
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.System),
             fileName);
+    }
+
+    private static void ClearSetupError()
+    {
+        try
+        {
+            var path = GetSetupErrorPath();
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // A stale diagnostic file does not prevent setup from running.
+        }
+    }
+
+    private static void WriteSetupError(Exception exception)
+    {
+        var details = $"{exception.GetType().Name}: {exception.Message}";
+        try
+        {
+            File.WriteAllText(GetSetupErrorPath(), details);
+
+            var dataDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "ReceiptLab");
+            Directory.CreateDirectory(dataDirectory);
+            File.AppendAllText(
+                Path.Combine(dataDirectory, "setup.log"),
+                $"{DateTimeOffset.Now:O} {details}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Preserve and report the original setup failure.
+        }
+    }
+
+    private static string GetSetupErrorPath()
+    {
+        return Path.Combine(AppContext.BaseDirectory, "ReceiptLab-setup-error.txt");
     }
 
     private static async Task RunRequiredProcessAsync(

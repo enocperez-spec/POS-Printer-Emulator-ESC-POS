@@ -21,7 +21,7 @@ Receipt Lab is a local Windows ESC/POS receipt emulator for testing point-of-sal
 
 Receipt Lab supports 64-bit Windows 10 and Windows 11.
 
-1. Download `ReceiptLabSetup-0.1.0-win-x64.exe` from the repository's Releases page.
+1. Download `ReceiptLabSetup-0.1.1-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Leave **Create a desktop shortcut** selected if desired.
 4. Open Receipt Lab from the Start Menu or visit `http://127.0.0.1:5187`.
@@ -90,7 +90,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\ReceiptLabSetup-0.1.0-win-x64.exe`
+Output: `artifacts\installer\ReceiptLabSetup-0.1.1-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -110,7 +110,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.1.0 artifacts/installer/ReceiptLabSetup-0.1.0-win-x64.exe --title "Receipt Lab 0.1.0" --notes "Initial Windows MVP release."
+gh release create v0.1.1 artifacts/installer/ReceiptLabSetup-0.1.1-win-x64.exe --title "Receipt Lab 0.1.1" --notes "Initial Windows MVP release."
 ```
 
 ## Configuration
