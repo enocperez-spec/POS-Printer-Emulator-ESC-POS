@@ -10,7 +10,7 @@ if (setupExitCode is not null)
 }
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Host.UseWindowsService(options => options.ServiceName = "Receipt Lab");
+builder.Host.UseWindowsService(options => options.ServiceName = "POS Printer Emulator");
 builder.WebHost.UseUrls(builder.Configuration["Viewer:Url"] ?? "http://127.0.0.1:5187");
 
 var printerOptions = builder.Configuration.GetSection("Printer").Get<PrinterOptions>() ?? new PrinterOptions();
@@ -31,7 +31,7 @@ app.MapGet("/api/status", (ServiceRuntimeState runtime, TrialGate trial, Printer
         runtime.Listening,
         $"{options.BindAddress}:{options.Port}",
         runtime.LastConnection,
-        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.1.0",
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.2.0",
         trial.GetStatus()));
 
 app.MapGet("/api/jobs", (ReceiptStore store) => store.GetSummaries());

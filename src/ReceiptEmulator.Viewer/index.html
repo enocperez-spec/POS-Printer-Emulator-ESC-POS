@@ -4,10 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f9fc" />
-    <title>Receipt Lab</title>
+    <link rel="icon" type="image/png" href="/pos-printer-emulator-icon.png" />
+    <title>POS Printer Emulator</title>
     <script>
       try {
-        document.documentElement.dataset.theme = localStorage.getItem('receipt-lab-theme') === 'dark' ? 'dark' : 'light'
+        const savedTheme = localStorage.getItem('pos-printer-emulator-theme') ?? localStorage.getItem('receipt-lab-theme')
+        document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light'
       } catch { document.documentElement.dataset.theme = 'light' }
     </script>
   </head>

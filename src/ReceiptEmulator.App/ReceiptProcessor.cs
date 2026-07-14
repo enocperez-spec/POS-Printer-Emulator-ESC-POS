@@ -25,7 +25,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Tr
 
         if (!trial.TryConsume(out _))
         {
-            rejection = "Daily trial limit reached. Activate Receipt Lab to process more jobs.";
+            rejection = "Daily trial limit reached. Activate POS Printer Emulator to process more jobs.";
             logger.LogWarning("Rejected receipt from {SourceIp}: trial limit reached", sourceIp);
             return null;
         }

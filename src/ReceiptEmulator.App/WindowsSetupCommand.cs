@@ -16,8 +16,9 @@ public enum WindowsSetupAction
 public static class WindowsSetupCommand
 {
     private const string ServiceName = "ReceiptLab";
-    private const string DisplayName = "Receipt Lab";
-    private const string FirewallRuleName = "Receipt Lab ESC-POS (TCP 9100)";
+    private const string DisplayName = "POS Printer Emulator";
+    private const string FirewallRuleName = "POS Printer Emulator ESC-POS (TCP 9100)";
+    private const string LegacyFirewallRuleName = "Receipt Lab ESC-POS (TCP 9100)";
     private const string ViewerHealthUrl = "http://127.0.0.1:5187/api/status";
 
     public static WindowsSetupAction ParseAction(IReadOnlyList<string> arguments)
@@ -46,7 +47,7 @@ public static class WindowsSetupCommand
 
         if (!OperatingSystem.IsWindows())
         {
-            Console.Error.WriteLine("Receipt Lab Windows setup commands can only run on Windows.");
+            Console.Error.WriteLine("POS Printer Emulator Windows setup commands can only run on Windows.");
             return 1;
         }
 
@@ -59,7 +60,7 @@ public static class WindowsSetupCommand
         catch (Exception exception)
         {
             WriteSetupError(exception);
-            Console.Error.WriteLine($"Receipt Lab setup failed: {exception.Message}");
+            Console.Error.WriteLine($"POS Printer Emulator setup failed: {exception.Message}");
             return 1;
         }
     }
@@ -72,7 +73,7 @@ public static class WindowsSetupCommand
         if (action == WindowsSetupAction.HealthCheck)
         {
             await WaitForViewerAsync(TimeSpan.FromSeconds(5), cancellationToken);
-            Console.WriteLine("Receipt Lab is healthy.");
+            Console.WriteLine("POS Printer Emulator is healthy.");
             return 0;
         }
 
@@ -96,20 +97,20 @@ public static class WindowsSetupCommand
         var executablePath = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
         {
-            throw new InvalidOperationException("The Receipt Lab executable path could not be determined.");
+            throw new InvalidOperationException("The POS Printer Emulator service executable path could not be determined.");
         }
 
-        Console.WriteLine("Configuring the Receipt Lab Windows service...");
+        Console.WriteLine("Configuring the POS Printer Emulator Windows service...");
         await RemoveServiceAsync(cancellationToken);
 
         WindowsServiceManager.Create(
             ServiceName,
             DisplayName,
-            "Receives ESC/POS jobs on TCP port 9100 and serves the local Receipt Lab viewer.",
+            "Receives ESC/POS jobs on TCP port 9100 and serves the local POS Printer Emulator viewer.",
             executablePath);
 
         Console.WriteLine("Configuring the private/domain TCP 9100 firewall rule...");
-        await RemoveFirewallRuleAsync(cancellationToken);
+        await RemoveFirewallRulesAsync(cancellationToken);
         await RunRequiredProcessAsync(
             GetSystemExecutable("netsh.exe"),
             [
@@ -133,17 +134,17 @@ public static class WindowsSetupCommand
         service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
 
         await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken);
-        Console.WriteLine("Receipt Lab installation completed successfully.");
+        Console.WriteLine("POS Printer Emulator installation completed successfully.");
     }
 
     [SupportedOSPlatform("windows")]
     private static async Task UninstallAsync(CancellationToken cancellationToken)
     {
-        Console.WriteLine("Removing the Receipt Lab Windows service and firewall rule...");
+        Console.WriteLine("Removing the POS Printer Emulator Windows service and firewall rule...");
         await RemoveServiceAsync(cancellationToken);
-        await RemoveFirewallRuleAsync(cancellationToken);
+        await RemoveFirewallRulesAsync(cancellationToken);
         RemoveServiceData();
-        Console.WriteLine("Receipt Lab system components were removed successfully.");
+        Console.WriteLine("POS Printer Emulator system components were removed successfully.");
     }
 
     [SupportedOSPlatform("windows")]
@@ -179,7 +180,7 @@ public static class WindowsSetupCommand
         if (ServiceExists())
         {
             throw new InvalidOperationException(
-                "The previous Receipt Lab service is pending deletion. Restart Windows and run setup again.");
+                "The previous POS Printer Emulator service is pending deletion. Restart Windows and run setup again.");
         }
     }
 
@@ -201,16 +202,19 @@ public static class WindowsSetupCommand
         }
     }
 
-    private static async Task RemoveFirewallRuleAsync(CancellationToken cancellationToken)
+    private static async Task RemoveFirewallRulesAsync(CancellationToken cancellationToken)
     {
-        var result = await RunProcessAsync(
-            GetSystemExecutable("netsh.exe"),
-            ["advfirewall", "firewall", "delete", "rule", $"name={FirewallRuleName}"],
-            cancellationToken);
-
-        if (result.ExitCode != 0)
+        foreach (var ruleName in new[] { FirewallRuleName, LegacyFirewallRuleName })
         {
-            Console.WriteLine("No existing Receipt Lab firewall rule needed removal.");
+            var result = await RunProcessAsync(
+                GetSystemExecutable("netsh.exe"),
+                ["advfirewall", "firewall", "delete", "rule", $"name={ruleName}"],
+                cancellationToken);
+
+            if (result.ExitCode != 0)
+            {
+                Console.WriteLine($"No existing '{ruleName}' firewall rule needed removal.");
+            }
         }
     }
 
@@ -241,7 +245,7 @@ public static class WindowsSetupCommand
             await Task.Delay(500, cancellationToken);
         }
 
-        throw new System.TimeoutException("The local Receipt Lab viewer did not become ready.");
+        throw new System.TimeoutException("The local POS Printer Emulator viewer did not become ready.");
     }
 
     [SupportedOSPlatform("windows")]
@@ -320,7 +324,7 @@ public static class WindowsSetupCommand
 
     private static string GetSetupErrorPath()
     {
-        return Path.Combine(AppContext.BaseDirectory, "ReceiptLab-setup-error.txt");
+        return Path.Combine(AppContext.BaseDirectory, "POSPrinterEmulator-setup-error.txt");
     }
 
     private static async Task RunRequiredProcessAsync(

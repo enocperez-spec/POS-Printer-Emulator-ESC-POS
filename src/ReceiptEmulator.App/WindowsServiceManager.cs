@@ -41,7 +41,7 @@ internal static class WindowsServiceManager
 
         if (service.IsInvalid)
         {
-            throw CreateWin32Exception("Windows could not create the Receipt Lab service");
+            throw CreateWin32Exception("Windows could not create the POS Printer Emulator service");
         }
 
         ConfigureDescription(service, description);
@@ -61,12 +61,12 @@ internal static class WindowsServiceManager
                 return;
             }
 
-            throw new Win32Exception(error, "Windows could not open the Receipt Lab service for deletion");
+            throw new Win32Exception(error, "Windows could not open the POS Printer Emulator service for deletion");
         }
 
         if (!DeleteService(service))
         {
-            throw CreateWin32Exception("Windows could not delete the Receipt Lab service");
+            throw CreateWin32Exception("Windows could not delete the POS Printer Emulator service");
         }
     }
 
@@ -89,7 +89,7 @@ internal static class WindowsServiceManager
             var configuration = new ServiceDescription { Description = descriptionPointer };
             if (!ChangeServiceDescription(service, ServiceConfigDescription, ref configuration))
             {
-                throw CreateWin32Exception("Windows could not set the Receipt Lab service description");
+                throw CreateWin32Exception("Windows could not set the POS Printer Emulator service description");
             }
         }
         finally
@@ -103,7 +103,7 @@ internal static class WindowsServiceManager
         var configuration = new ServiceDelayedAutoStartInfo { DelayedAutoStart = true };
         if (!ChangeServiceDelayedStart(service, ServiceConfigDelayedAutoStartInfo, ref configuration))
         {
-            throw CreateWin32Exception("Windows could not enable delayed startup for Receipt Lab");
+            throw CreateWin32Exception("Windows could not enable delayed startup for POS Printer Emulator");
         }
     }
 
@@ -134,13 +134,13 @@ internal static class WindowsServiceManager
 
             if (!ChangeServiceFailureActions(service, ServiceConfigFailureActions, ref failureActions))
             {
-                throw CreateWin32Exception("Windows could not configure Receipt Lab service recovery");
+                throw CreateWin32Exception("Windows could not configure POS Printer Emulator service recovery");
             }
 
             var failureFlag = new ServiceFailureActionsFlag { Enabled = true };
             if (!ChangeServiceFailureFlag(service, ServiceConfigFailureActionsFlag, ref failureFlag))
             {
-                throw CreateWin32Exception("Windows could not enable Receipt Lab failure recovery");
+                throw CreateWin32Exception("Windows could not enable POS Printer Emulator failure recovery");
             }
         }
         finally

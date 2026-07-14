@@ -24,7 +24,7 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus } from './types
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.1.0',
+  version: '0.2.0',
   trial: { mode: 'Trial', dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '' },
 }
 
@@ -52,7 +52,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    localStorage.setItem('receipt-lab-theme', theme)
+    localStorage.setItem('pos-printer-emulator-theme', theme)
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0d1522' : '#f7f9fc')
   }, [theme])
 
@@ -116,7 +116,7 @@ function App() {
         <Inspector job={job} tab={tab} onTab={setTab} />
       </main>
       <footer className="status-bar">
-        <span>Receipt Lab v{status.version}</span>
+        <span>POS Printer Emulator v{status.version}</span>
         <span>Local only. Receipt data stays on this device.</span>
         <span>Windows 10/11 · x64</span>
       </footer>
@@ -133,8 +133,10 @@ function Header({ status, onSample, busy, theme, onTheme }: {
 }) {
   return (
     <header className="app-header">
-      <div className="brand-mark" aria-hidden="true"><Printer size={18} /></div>
-      <strong className="brand-name">Receipt Lab</strong>
+      <div className="brand-mark" aria-hidden="true">
+        <img src="/pos-printer-emulator-icon.png" alt="" />
+      </div>
+      <strong className="brand-name">POS Printer Emulator</strong>
       <div className={`service-state ${status.listening ? 'is-live' : 'is-down'}`}>
         <span className="state-dot" /> {status.listening ? 'Running (listening)' : 'Listener stopped'}
       </div>

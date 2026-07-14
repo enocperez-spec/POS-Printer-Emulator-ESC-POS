@@ -9,10 +9,13 @@ internal static class ReceiptLabBuild
     private const string BuildConfiguration = "Release";
     private static readonly string Root = FindProjectRoot();
     private static readonly string AppProject = Path.Combine(Root, "src", "ReceiptEmulator.App", "ReceiptEmulator.App.csproj");
+    private static readonly string DesktopProject = Path.Combine(Root, "src", "POSPrinterEmulator.Desktop", "POSPrinterEmulator.Desktop.csproj");
     private static readonly string TestProject = Path.Combine(Root, "tests", "ReceiptEmulator.Tests", "ReceiptEmulator.Tests.csproj");
     private static readonly string ViewerDirectory = Path.Combine(Root, "src", "ReceiptEmulator.Viewer");
     private static readonly string WebRoot = Path.Combine(Root, "src", "ReceiptEmulator.App", "wwwroot");
     private static readonly string PublishDirectory = Path.Combine(Root, "artifacts", "win-x64");
+    private static readonly string PrerequisitesDirectory = Path.Combine(Root, "artifacts", "prerequisites");
+    private static readonly string WebView2Bootstrapper = Path.Combine(PrerequisitesDirectory, "MicrosoftEdgeWebview2Setup.exe");
 
     public static async Task<int> RunAsync(string[] arguments)
     {
@@ -50,27 +53,28 @@ internal static class ReceiptLabBuild
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"Receipt Lab build failed: {exception.Message}");
+            Console.Error.WriteLine($"POS Printer Emulator build failed: {exception.Message}");
             return 1;
         }
     }
 
     private static async Task BuildAsync()
     {
-        Console.WriteLine("Building the Receipt Lab viewer...");
+        Console.WriteLine("Building the POS Printer Emulator viewer...");
         DeleteDirectoryInsideWorkspace(WebRoot);
         var pnpm = FindRequiredCommand("pnpm", "pnpm.cmd", "pnpm.exe");
         await RunProcessAsync(pnpm, ["install", "--frozen-lockfile"], ViewerDirectory);
         await RunProcessAsync(pnpm, ["run", "build"], ViewerDirectory);
 
-        Console.WriteLine("Building the Receipt Lab application...");
+        Console.WriteLine("Building the POS Printer Emulator service and desktop application...");
         await RunProcessAsync("dotnet", ["build", AppProject, "-c", BuildConfiguration], Root);
+        await RunProcessAsync("dotnet", ["build", DesktopProject, "-c", BuildConfiguration], Root);
         await TestAsync();
     }
 
     private static async Task TestAsync()
     {
-        Console.WriteLine("Running Receipt Lab tests...");
+        Console.WriteLine("Running POS Printer Emulator tests...");
         await RunProcessAsync("dotnet", ["test", TestProject, "-c", BuildConfiguration], Root);
     }
 
@@ -95,6 +99,19 @@ internal static class ReceiptLabBuild
             ],
             Root);
 
+        await RunProcessAsync(
+            "dotnet",
+            [
+                "publish",
+                DesktopProject,
+                "-c", BuildConfiguration,
+                "-r", "win-x64",
+                "--self-contained", "true",
+                "-p:DebugType=None",
+                "-o", PublishDirectory
+            ],
+            Root);
+
         Console.WriteLine($"Self-contained Windows publish created at {PublishDirectory}");
     }
 
@@ -104,16 +121,39 @@ internal static class ReceiptLabBuild
         {
             await PublishAsync();
         }
-        else if (!File.Exists(Path.Combine(PublishDirectory, "ReceiptEmulator.exe")))
+        else if (!File.Exists(Path.Combine(PublishDirectory, "ReceiptEmulator.exe")) ||
+                 !File.Exists(Path.Combine(PublishDirectory, "POSPrinterEmulator.Desktop.exe")))
         {
             throw new InvalidOperationException("The published application is missing. Run the installer command without --skip-publish.");
         }
 
+        await EnsureWebView2BootstrapperAsync();
         var compiler = FindInnoSetupCompiler();
         var installerDefinition = Path.Combine(Root, "installer", "ReceiptLab.iss");
-        Console.WriteLine("Compiling the Receipt Lab Windows installer...");
+        Console.WriteLine("Compiling the POS Printer Emulator Windows installer...");
         await RunProcessAsync(compiler, [installerDefinition], Root);
         Console.WriteLine($"Installer created in {Path.Combine(Root, "artifacts", "installer")}");
+    }
+
+    private static async Task EnsureWebView2BootstrapperAsync()
+    {
+        if (File.Exists(WebView2Bootstrapper) && new FileInfo(WebView2Bootstrapper).Length > 500_000)
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(PrerequisitesDirectory);
+        var temporaryPath = WebView2Bootstrapper + ".download";
+        Console.WriteLine("Downloading the Microsoft WebView2 installer prerequisite...");
+        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        using var response = await client.GetAsync("https://go.microsoft.com/fwlink/p/?LinkId=2124703");
+        response.EnsureSuccessStatusCode();
+        await using (var output = File.Create(temporaryPath))
+        {
+            await response.Content.CopyToAsync(output);
+        }
+
+        File.Move(temporaryPath, WebView2Bootstrapper, overwrite: true);
     }
 
     private static async Task SendSampleAsync(string[] arguments)
@@ -269,7 +309,7 @@ internal static class ReceiptLabBuild
         var targetPath = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar);
         if (!targetPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"Refusing to delete a directory outside the Receipt Lab workspace: {targetPath}");
+            throw new InvalidOperationException($"Refusing to delete a directory outside the POS Printer Emulator workspace: {targetPath}");
         }
 
         if (Directory.Exists(targetPath))
@@ -295,13 +335,13 @@ internal static class ReceiptLabBuild
             }
         }
 
-        throw new DirectoryNotFoundException("The Receipt Lab project root could not be located.");
+        throw new DirectoryNotFoundException("The POS Printer Emulator project root could not be located.");
     }
 
     private static void PrintHelp()
     {
         Console.WriteLine("""
-            Receipt Lab C# build utility
+            POS Printer Emulator C# build utility
 
             Usage:
               dotnet run --project tools/ReceiptLab.Build -- <command> [options]

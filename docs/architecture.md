@@ -1,4 +1,4 @@
-# Receipt Lab architecture
+# POS Printer Emulator architecture
 
 ## Current vertical slice
 
@@ -15,14 +15,17 @@ TcpReceiptListener -> EscPosJobFramer -> ReceiptProcessor
                                       localhost ASP.NET Core API
                                                     |
                                                     v
-                                           React operations viewer
+                                      React operations viewer
+                                                    |
+                                                    v
+                                  C# WPF desktop shell (WebView2)
 ```
 
-The viewer binds to `127.0.0.1` while the printer listener binds to `0.0.0.0` by default. Trial receipts remain only in process memory. The persisted trial counter contains no receipt content.
+The viewer binds to `127.0.0.1` while the printer listener binds to `0.0.0.0` by default. The WPF application embeds the viewer in a normal desktop window through Microsoft WebView2; the local URL remains available for diagnostics. Trial receipts remain only in process memory. The persisted trial counter contains no receipt content.
 
-The self-contained C# executable also owns the Windows installation lifecycle. Inno Setup invokes its `--install-windows` and `--uninstall-windows` modes to create or remove the Windows Service, configure the private/domain TCP 9100 firewall rule, verify viewer health, and remove service-owned data.
+The self-contained C# service executable also owns the Windows installation lifecycle. Inno Setup invokes its `--install-windows` and `--uninstall-windows` modes to create or remove the Windows Service, configure the private/domain TCP 9100 firewall rule, verify viewer health, and remove service-owned data. Setup also checks for WebView2 and installs the bundled Microsoft bootstrapper when it is missing.
 
-Repository automation is provided by the `tools/ReceiptLab.Build` .NET console project. It coordinates the viewer build, application build, tests, self-contained publish, installer compilation, and sample TCP sender without PowerShell scripts.
+Repository automation is provided by the `tools/ReceiptLab.Build` .NET console project. It coordinates the viewer build, service and desktop builds, tests, self-contained publish, prerequisite packaging, installer compilation, and sample TCP sender without PowerShell scripts.
 
 ## Thermal integration boundary
 

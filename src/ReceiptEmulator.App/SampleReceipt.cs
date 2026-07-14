@@ -13,7 +13,7 @@ public static class SampleReceipt
         Command(0x1B, 0x40);
         Command(0x1B, 0x61, 0x01);
         Command(0x1D, 0x21, 0x11);
-        Text("RECEIPT LAB\n");
+        Text("POS PRINTER EMULATOR\n");
         Command(0x1D, 0x21, 0x00);
         Text("123 Market Street\nSpringfield, IL 62704\n");
         Text("------------------------------------------\n");
