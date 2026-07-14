@@ -10,6 +10,7 @@ internal static class ReceiptLabBuild
     private static readonly string Root = FindProjectRoot();
     private static readonly string AppProject = Path.Combine(Root, "src", "ReceiptEmulator.App", "ReceiptEmulator.App.csproj");
     private static readonly string DesktopProject = Path.Combine(Root, "src", "POSPrinterEmulator.Desktop", "POSPrinterEmulator.Desktop.csproj");
+    private static readonly string LicenseToolProject = Path.Combine(Root, "tools", "POSPrinterEmulator.LicenseTool", "POSPrinterEmulator.LicenseTool.csproj");
     private static readonly string TestProject = Path.Combine(Root, "tests", "ReceiptEmulator.Tests", "ReceiptEmulator.Tests.csproj");
     private static readonly string ViewerDirectory = Path.Combine(Root, "src", "ReceiptEmulator.Viewer");
     private static readonly string WebRoot = Path.Combine(Root, "src", "ReceiptEmulator.App", "wwwroot");
@@ -69,6 +70,7 @@ internal static class ReceiptLabBuild
         Console.WriteLine("Building the POS Printer Emulator service and desktop application...");
         await RunProcessAsync("dotnet", ["build", AppProject, "-c", BuildConfiguration], Root);
         await RunProcessAsync("dotnet", ["build", DesktopProject, "-c", BuildConfiguration], Root);
+        await RunProcessAsync("dotnet", ["build", LicenseToolProject, "-c", BuildConfiguration], Root);
         await TestAsync();
     }
 

@@ -1,6 +1,6 @@
 namespace ReceiptEmulator;
 
-public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, TrialGate trial, ILogger<ReceiptProcessor> logger)
+public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger)
 {
     public ReceiptJob? Process(byte[] payload, string sourceIp, out string? rejection)
     {
@@ -23,7 +23,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Tr
             return null;
         }
 
-        if (!trial.TryConsume(out _))
+        if (!license.TryConsume(out _))
         {
             rejection = "Daily trial limit reached. Activate POS Printer Emulator to process more jobs.";
             logger.LogWarning("Rejected receipt from {SourceIp}: trial limit reached", sourceIp);

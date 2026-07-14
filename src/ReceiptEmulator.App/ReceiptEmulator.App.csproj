@@ -5,11 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ReceiptEmulator</RootNamespace>
     <AssemblyName>ReceiptEmulator</AssemblyName>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\POSPrinterEmulator.Licensing\POSPrinterEmulator.Licensing.csproj" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
   </ItemGroup>

@@ -1,9 +1,21 @@
-export type TrialStatus = {
+export type FeatureStatus = {
+  history: boolean
+  exports: boolean
+  premiumFeatures: boolean
+  watermark: boolean
+}
+
+export type LicenseStatus = {
   mode: string
+  isFull: boolean
   dailyLimit: number
   usedToday: number
   remaining: number
   localDate: string
+  customerName: string
+  emailAddress: string
+  licenseId?: string
+  features: FeatureStatus
 }
 
 export type ServiceStatus = {
@@ -11,7 +23,13 @@ export type ServiceStatus = {
   listener: string
   lastConnection?: string
   version: string
-  trial: TrialStatus
+  license: LicenseStatus
+}
+
+export type ActivationRequest = {
+  customerName: string
+  emailAddress: string
+  activationKey: string
 }
 
 export type JobSummary = {

@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "POS Printer Emulator"
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -47,6 +47,41 @@ Name: "{autodesktop}\POS Printer Emulator"; Filename: "{app}\{#MyDesktopExeName}
 Filename: "{app}\{#MyDesktopExeName}"; Description: "Open POS Printer Emulator"; WorkingDir: "{app}"; Flags: postinstall skipifsilent runasoriginaluser nowait
 
 [Code]
+var
+  RegistrationPage: TInputQueryWizardPage;
+
+procedure InitializeWizard;
+begin
+  RegistrationPage := CreateInputQueryPage(wpSelectDir,
+    'Register POS Printer Emulator',
+    'Enter the customer information for this installation.',
+    'The customer or company name and email address will be tied to the activation key.');
+  RegistrationPage.Add('Customer or company name:', False);
+  RegistrationPage.Add('Email address:', False);
+  RegistrationPage.Values[0] := ExpandConstant('{param:CustomerName|}');
+  RegistrationPage.Values[1] := ExpandConstant('{param:CustomerEmail|}');
+end;
+
+function RegistrationIsValid(ShowMessage: Boolean): Boolean;
+begin
+  Result :=
+    (Trim(RegistrationPage.Values[0]) <> '') and
+    (Trim(RegistrationPage.Values[1]) <> '') and
+    (Pos('@', RegistrationPage.Values[1]) > 1) and
+    (Pos('"', RegistrationPage.Values[0]) = 0) and
+    (Pos('"', RegistrationPage.Values[1]) = 0);
+  if (not Result) and ShowMessage then
+    MsgBox('Enter a customer or company name and a valid email address. Double quotes are not allowed.',
+      mbError, MB_OK);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = RegistrationPage.ID then
+    Result := RegistrationIsValid(True);
+end;
+
 function IsWebView2Installed: Boolean;
 var
   Version: String;
@@ -63,6 +98,12 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
+  if not RegistrationIsValid(False) then
+  begin
+    Result := 'Customer or company name and a valid email address are required. For silent setup, use /CustomerName and /CustomerEmail.';
+    exit;
+  end;
+
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#ServiceName}', '', SW_HIDE,
     ewWaitUntilTerminated, ResultCode);
   Sleep(2000);
@@ -73,6 +114,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   ErrorDetails: AnsiString;
+  InstallArguments: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -86,7 +128,8 @@ begin
     end;
 
     WizardForm.StatusLabel.Caption := 'Configuring the POS Printer Emulator background service...';
-    if (not Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--install-windows',
+    InstallArguments := Format('--install-windows --customer-name "%s" --email "%s"', [Trim(RegistrationPage.Values[0]), Trim(RegistrationPage.Values[1])]);
+    if (not Exec(ExpandConstant('{app}\{#MyAppExeName}'), InstallArguments,
       ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode)) or
       (ResultCode <> 0) then
     begin

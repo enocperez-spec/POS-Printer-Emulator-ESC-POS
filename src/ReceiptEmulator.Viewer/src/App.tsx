@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   AlertTriangle,
   Braces,
+  CheckCircle2,
   ChevronDown,
   CircleStop,
   Download,
   FileText,
   Filter,
   FlaskConical,
+  KeyRound,
+  LockKeyhole,
   Minus,
   Moon,
   Plus,
@@ -17,6 +20,7 @@ import {
   Settings,
   SlidersHorizontal,
   Sun,
+  X,
 } from 'lucide-react'
 import { api } from './api'
 import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus } from './types'
@@ -24,8 +28,12 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus } from './types
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.2.0',
-  trial: { mode: 'Trial', dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '' },
+  version: '0.3.0',
+  license: {
+    mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
+    customerName: '', emailAddress: '',
+    features: { history: false, exports: false, premiumFeatures: false, watermark: true },
+  },
 }
 
 function formatBytes(value: number) {
@@ -49,6 +57,7 @@ function App() {
   const [zoom, setZoom] = useState(100)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [showLicense, setShowLicense] = useState(false)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -103,7 +112,9 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header status={status} onSample={renderSample} busy={busy} theme={theme} onTheme={() => setTheme(current => current === 'light' ? 'dark' : 'light')} />
+      <Header status={status} onSample={renderSample} busy={busy} theme={theme}
+        onTheme={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
+        onLicense={() => setShowLicense(true)} />
       {error && (
         <div className="error-banner" role="alert">
           <AlertTriangle size={16} /> {error}
@@ -111,25 +122,37 @@ function App() {
         </div>
       )}
       <main className="workspace">
-        <ActivityRail jobs={filteredJobs} selectedId={selectedId} query={query} onQuery={setQuery} onSelect={setSelectedId} />
-        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} />
+        <ActivityRail jobs={filteredJobs} selectedId={selectedId} query={query} onQuery={setQuery}
+          onSelect={setSelectedId} historyEnabled={status.license.features.history} />
+        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} />
         <Inspector job={job} tab={tab} onTab={setTab} />
       </main>
       <footer className="status-bar">
-        <span>POS Printer Emulator v{status.version}</span>
+        <span>POS Printer Emulator v{status.version} · {status.license.mode} Version</span>
         <span>Local only. Receipt data stays on this device.</span>
         <span>Windows 10/11 · x64</span>
       </footer>
+      {showLicense && (
+        <LicenseDialog
+          status={status}
+          onClose={() => setShowLicense(false)}
+          onActivated={license => {
+            setStatus(current => ({ ...current, license }))
+            void refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function Header({ status, onSample, busy, theme, onTheme }: {
+function Header({ status, onSample, busy, theme, onTheme, onLicense }: {
   status: ServiceStatus
   onSample: () => void
   busy: boolean
   theme: 'light' | 'dark'
   onTheme: () => void
+  onLicense: () => void
 }) {
   return (
     <header className="app-header">
@@ -141,9 +164,12 @@ function Header({ status, onSample, busy, theme, onTheme }: {
         <span className="state-dot" /> {status.listening ? 'Running (listening)' : 'Listener stopped'}
       </div>
       <div className="header-fact"><span>Listener</span> {status.listener}</div>
-      <div className="header-fact"><span>Trial jobs remaining</span> <strong>{status.trial.remaining}</strong></div>
+      <div className={`license-badge ${status.license.isFull ? 'is-full' : 'is-trial'}`}>
+        {status.license.isFull ? <CheckCircle2 size={14} /> : <LockKeyhole size={14} />}
+        {status.license.isFull ? 'Full Version' : `Trial · ${status.license.remaining} jobs left`}
+      </div>
       <div className="header-actions">
-        <button className="sample-button" onClick={onSample} disabled={busy || status.trial.remaining === 0}>
+        <button className="sample-button" onClick={onSample} disabled={busy || (!status.license.isFull && status.license.remaining === 0)}>
           <FlaskConical size={16} /> {busy ? 'Rendering…' : 'Test receipt'}
         </button>
         <button
@@ -155,18 +181,19 @@ function Header({ status, onSample, busy, theme, onTheme }: {
           {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
           {theme === 'light' ? 'Dark mode' : 'Light mode'}
         </button>
-        <button className="icon-text-button"><Settings size={17} /> Settings</button>
+        <button className="license-button" onClick={onLicense}><Settings size={17} /> License</button>
       </div>
     </header>
   )
 }
 
-function ActivityRail({ jobs, selectedId, query, onQuery, onSelect }: {
+function ActivityRail({ jobs, selectedId, query, onQuery, onSelect, historyEnabled }: {
   jobs: JobSummary[]
   selectedId?: string
   query: string
   onQuery: (value: string) => void
   onSelect: (id: string) => void
+  historyEnabled: boolean
 }) {
   return (
     <aside className="activity-rail">
@@ -199,12 +226,20 @@ function ActivityRail({ jobs, selectedId, query, onQuery, onSelect }: {
           </div>
         )}
       </div>
-      <div className="rail-footer">Showing {jobs.length} session job{jobs.length === 1 ? '' : 's'}</div>
+      <div className="rail-footer">
+        {historyEnabled ? `Showing ${jobs.length} saved job${jobs.length === 1 ? '' : 's'}` : `Showing ${jobs.length} session job${jobs.length === 1 ? '' : 's'} · History requires Full`}
+      </div>
     </aside>
   )
 }
 
-function PreviewPane({ job, zoom, onZoom, onSample }: { job?: ReceiptJob; zoom: number; onZoom: (value: number) => void; onSample: () => void }) {
+function PreviewPane({ job, zoom, onZoom, onSample, license }: {
+  job?: ReceiptJob
+  zoom: number
+  onZoom: (value: number) => void
+  onSample: () => void
+  license: ServiceStatus['license']
+}) {
   return (
     <section className="preview-pane">
       <div className="pane-heading"><strong>Receipt preview</strong></div>
@@ -216,14 +251,22 @@ function PreviewPane({ job, zoom, onZoom, onSample }: { job?: ReceiptJob; zoom: 
         </div>
         <button onClick={() => onZoom(100)}><RotateCw size={16} /> Actual size</button>
         <span className="toolbar-spacer" />
-        {job && <a className="toolbar-link" href={`/api/jobs/${job.id}/text`}><FileText size={16} /> Text</a>}
-        {job && <a className="toolbar-link" href={`/api/jobs/${job.id}/raw`}><Download size={16} /> Raw</a>}
-        <button onClick={() => window.print()}><Printer size={16} /> Print / PDF</button>
+        {job && (license.features.exports
+          ? <a className="toolbar-link" href={`/api/jobs/${job.id}/text`}><FileText size={16} /> Text</a>
+          : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Text</button>)}
+        {job && (license.features.exports
+          ? <a className="toolbar-link" href={`/api/jobs/${job.id}/raw`}><Download size={16} /> Raw</a>
+          : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Raw</button>)}
+        <button onClick={() => window.print()} disabled={!license.features.premiumFeatures}
+          className={!license.features.premiumFeatures ? 'premium-disabled' : ''}
+          title={!license.features.premiumFeatures ? 'Available in the Full Version' : undefined}>
+          {!license.features.premiumFeatures && <LockKeyhole size={15} />}<Printer size={16} /> Print / PDF
+        </button>
       </div>
       <div className="preview-canvas">
         {job ? (
           <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})` }}>
-            <ReceiptPaper lines={job.lines} />
+            <ReceiptPaper lines={job.lines} watermark={license.features.watermark} />
           </div>
         ) : (
           <div className="preview-empty">
@@ -238,12 +281,14 @@ function PreviewPane({ job, zoom, onZoom, onSample }: { job?: ReceiptJob; zoom: 
   )
 }
 
-function ReceiptPaper({ lines }: { lines: ReceiptLine[] }) {
+function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: boolean }) {
   return (
     <article className="receipt-paper">
-      <div className="trial-watermark" aria-hidden="true">
-        {Array.from({ length: 8 }, (_, index) => <span key={index}>TRIAL · NOT FOR PRODUCTION USE</span>)}
-      </div>
+      {watermark && (
+        <div className="trial-watermark" aria-hidden="true">
+          {Array.from({ length: 8 }, (_, index) => <span key={index}>TRIAL · NOT FOR PRODUCTION USE</span>)}
+        </div>
+      )}
       <div className="receipt-content">
         {lines.map((line, lineIndex) => {
           if (line.kind === 'barcode') return <Barcode key={lineIndex} label={line.data ?? ''} />
@@ -264,6 +309,88 @@ function ReceiptPaper({ lines }: { lines: ReceiptLine[] }) {
         })}
       </div>
     </article>
+  )
+}
+
+function LicenseDialog({ status, onClose, onActivated }: {
+  status: ServiceStatus
+  onClose: () => void
+  onActivated: (license: ServiceStatus['license']) => void
+}) {
+  const [customerName, setCustomerName] = useState(status.license.customerName)
+  const [emailAddress, setEmailAddress] = useState(status.license.emailAddress)
+  const [activationKey, setActivationKey] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string>()
+  const [activated, setActivated] = useState(status.license.isFull)
+
+  async function activate(event: FormEvent) {
+    event.preventDefault()
+    setBusy(true)
+    setMessage(undefined)
+    try {
+      const license = await api.activate({ customerName, emailAddress, activationKey })
+      setActivated(true)
+      setActivationKey('')
+      onActivated(license)
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'The activation key could not be validated.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="license-dialog" role="dialog" aria-modal="true" aria-labelledby="license-title">
+        <button className="dialog-close" onClick={onClose} aria-label="Close license window"><X size={19} /></button>
+        <div className={`license-hero ${activated ? 'is-full' : ''}`}>
+          <div className="license-hero-icon">{activated ? <CheckCircle2 size={27} /> : <KeyRound size={27} />}</div>
+          <div>
+            <h2 id="license-title">{activated ? 'Full Version activated' : 'Activate the Full Version'}</h2>
+            <p>{activated
+              ? 'This installation has unlimited print jobs and access to every feature.'
+              : `Trial Mode includes five emulated print jobs per day. ${status.license.remaining} remain today.`}</p>
+          </div>
+        </div>
+
+        <div className="feature-comparison" aria-label="License features">
+          <div><CheckCircle2 size={16} /><span>Unlimited print jobs</span><small>Full</small></div>
+          <div><CheckCircle2 size={16} /><span>Persistent job history</span><small>Full</small></div>
+          <div><CheckCircle2 size={16} /><span>No receipt watermark</span><small>Full</small></div>
+          <div><CheckCircle2 size={16} /><span>Exports and premium features</span><small>Full</small></div>
+        </div>
+
+        {activated ? (
+          <div className="registered-details">
+            <div><span>Registered to</span><strong>{status.license.customerName}</strong></div>
+            <div><span>Email</span><strong>{status.license.emailAddress}</strong></div>
+            {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
+          </div>
+        ) : (
+          <form className="activation-form" onSubmit={activate}>
+            <label>
+              Customer or company name
+              <input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" />
+            </label>
+            <label>
+              Email address
+              <input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" />
+            </label>
+            <label className="key-field">
+              Activation key
+              <textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)}
+                placeholder="PPE1-…" spellCheck={false} />
+            </label>
+            {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
+            <button className="activate-button" type="submit" disabled={busy}>
+              <KeyRound size={17} /> {busy ? 'Validating…' : 'Validate and activate'}
+            </button>
+            <p className="activation-note">Activation happens immediately and does not require a reinstall or another download.</p>
+          </form>
+        )}
+      </section>
+    </div>
   )
 }
 

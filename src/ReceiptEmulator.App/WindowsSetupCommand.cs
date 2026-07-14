@@ -55,7 +55,7 @@ public static class WindowsSetupCommand
 
         try
         {
-            return await RunWindowsActionAsync(action, cancellationToken);
+            return await RunWindowsActionAsync(action, arguments, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -68,6 +68,7 @@ public static class WindowsSetupCommand
     [SupportedOSPlatform("windows")]
     private static async Task<int> RunWindowsActionAsync(
         WindowsSetupAction action,
+        IReadOnlyList<string> arguments,
         CancellationToken cancellationToken)
     {
         if (action == WindowsSetupAction.HealthCheck)
@@ -81,7 +82,9 @@ public static class WindowsSetupCommand
 
         if (action == WindowsSetupAction.Install)
         {
-            await InstallAsync(cancellationToken);
+            var customerName = GetRequiredOption(arguments, "--customer-name");
+            var emailAddress = GetRequiredOption(arguments, "--email");
+            await InstallAsync(customerName, emailAddress, cancellationToken);
         }
         else
         {
@@ -92,13 +95,24 @@ public static class WindowsSetupCommand
     }
 
     [SupportedOSPlatform("windows")]
-    private static async Task InstallAsync(CancellationToken cancellationToken)
+    private static async Task InstallAsync(
+        string customerName,
+        string emailAddress,
+        CancellationToken cancellationToken)
     {
         var executablePath = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
         {
             throw new InvalidOperationException("The POS Printer Emulator service executable path could not be determined.");
         }
+
+        Console.WriteLine("Registering the POS Printer Emulator installation...");
+        Directory.CreateDirectory(LicenseService.DefaultRootPath);
+        await RunRequiredProcessAsync(
+            GetSystemExecutable("icacls.exe"),
+            [LicenseService.DefaultRootPath, "/grant", "*S-1-5-19:(OI)(CI)M", "/T", "/C"],
+            cancellationToken);
+        LicenseService.RegisterInstallationAtDefaultPath(customerName, emailAddress);
 
         Console.WriteLine("Configuring the POS Printer Emulator Windows service...");
         await RemoveServiceAsync(cancellationToken);
@@ -265,6 +279,7 @@ public static class WindowsSetupCommand
         var commonApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var dataDirectories = new[]
         {
+            LicenseService.DefaultRootPath,
             Path.Combine(windowsDirectory, "ServiceProfiles", "LocalService", "AppData", "Local", "ReceiptLab"),
             Path.Combine(commonApplicationData, "ReceiptLab")
         };
@@ -283,6 +298,26 @@ public static class WindowsSetupCommand
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.System),
             fileName);
+    }
+
+    private static string GetRequiredOption(IReadOnlyList<string> arguments, string name)
+    {
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            if (!string.Equals(arguments[index], name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (index + 1 < arguments.Count && !string.IsNullOrWhiteSpace(arguments[index + 1]))
+            {
+                return arguments[index + 1];
+            }
+
+            break;
+        }
+
+        throw new ArgumentException($"{name} is required during installation.");
     }
 
     private static void ClearSetupError()

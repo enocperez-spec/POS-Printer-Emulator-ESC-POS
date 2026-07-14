@@ -8,6 +8,8 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 - RAW TCP/IP listener on `0.0.0.0:9100` with cut-command and idle-timeout job framing.
 - Receipt preview with persistent Light and Dark viewing modes.
+- Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
+- Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features without reinstalling.
 - ESC/POS text, alignment, emphasis, underline, character sizing, feeds, cuts, basic barcodes, QR command tracking, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
 - Maximum job-size protection and interrupted-connection recovery.
@@ -22,10 +24,11 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.2.0-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.0-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
-3. Leave **Create a desktop shortcut** selected if desired.
-4. Open **POS Printer Emulator** from the Start Menu or desktop shortcut.
+3. Enter the customer or company name and email address that will be used for licensing.
+4. Leave **Create a desktop shortcut** selected if desired.
+5. Open **POS Printer Emulator** from the Start Menu or desktop shortcut.
 
 Setup installs POS Printer Emulator and its desktop HTML component under Program Files, starts its background service, and permits inbound TCP `9100` traffic on private and domain networks. Public-network access is intentionally not enabled. The local viewer remains available at `http://127.0.0.1:5187` for diagnostics.
 
@@ -40,6 +43,19 @@ Configure the POS system as a RAW or network receipt printer using:
 - **Protocol:** RAW TCP/IP
 
 The diagnostic viewer remains local to the Windows computer at `http://127.0.0.1:5187`.
+
+## Trial and Full versions
+
+Every new installation begins in **Trial Mode**. Trial Mode permits five completed emulated print jobs per local calendar day. Trial jobs remain available only for the current service session, every receipt displays a visible trial watermark, and exports and premium controls are locked.
+
+After purchase, open **License** in the application and enter the customer/company name, email address, and activation key. A valid key immediately enables the **Full Version** with:
+
+- unlimited emulated print jobs;
+- persistent print-job history of up to 500 jobs;
+- watermark-free receipt previews;
+- text and raw-data exports, Print/PDF, and all premium controls.
+
+Activation is validated offline using a public-key signature. The customer does not reinstall the application or download another package. Activation keys are tied to the registered customer/company name and email address.
 
 ## Uninstall
 
@@ -91,7 +107,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.2.0-win-x64.exe`
+Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.0-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -111,7 +127,23 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.2.0 artifacts/installer/POSPrinterEmulatorSetup-0.2.0-win-x64.exe --title "POS Printer Emulator 0.2.0" --notes "Desktop HTML application and new POS Printer Emulator branding."
+gh release create v0.3.0 artifacts/installer/POSPrinterEmulatorSetup-0.3.0-win-x64.exe --title "POS Printer Emulator 0.3.0" --notes "Trial and Full licensing with in-app activation and persistent Full-Version history."
+```
+
+## Issue customer activation keys
+
+The vendor private key is intentionally stored outside this Git repository and must never be included in the application or installer. Back it up securely before selling licenses. Issue a key with the exact registration details supplied by the customer:
+
+```console
+dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "..\License Keys\vendor-private-key.pem" --customer "Customer or Company Name" --email "customer@example.com"
+```
+
+Send the printed `PPE1-...` value to the customer. The corresponding public key is embedded in the application and can validate the key without internet access.
+
+For unattended installation, provide the required registration fields:
+
+```console
+POSPrinterEmulatorSetup-0.3.0-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
 ```
 
 ## Configuration
@@ -126,7 +158,7 @@ Development settings are stored in `src/ReceiptEmulator.App/appsettings.json`:
 
 ## Current MVP limitations
 
-The current build uses session-only receipt storage and a persisted five-completed-jobs-per-day trial counter. Licensing activation, SQLite licensed history, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
+The current build stores Full-Version history as local JSON job records with a 500-job retention limit. SQLite migrations, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
 
 See [the architecture notes](docs/architecture.md) for implementation details and the production roadmap.
 

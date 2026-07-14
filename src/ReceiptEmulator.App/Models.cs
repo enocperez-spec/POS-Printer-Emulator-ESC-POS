@@ -45,11 +45,27 @@ public sealed record JobSummary(
     int UnsupportedCount,
     string Preview);
 
-public sealed record TrialStatus(string Mode, int DailyLimit, int UsedToday, int Remaining, DateOnly LocalDate);
+public sealed record RegistrationInfo(string CustomerName, string EmailAddress);
+
+public sealed record FeatureStatus(bool History, bool Exports, bool PremiumFeatures, bool Watermark);
+
+public sealed record LicenseStatus(
+    string Mode,
+    bool IsFull,
+    int DailyLimit,
+    int UsedToday,
+    int Remaining,
+    DateOnly LocalDate,
+    string CustomerName,
+    string EmailAddress,
+    Guid? LicenseId,
+    FeatureStatus Features);
+
+public sealed record ActivationRequest(string CustomerName, string EmailAddress, string ActivationKey);
 
 public sealed record ServiceStatus(
     bool Listening,
     string Listener,
     DateTimeOffset? LastConnection,
     string Version,
-    TrialStatus Trial);
+    LicenseStatus License);
