@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, ReceiptJob, ServiceStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, ReceiptJob, ServiceStatus, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -29,4 +29,5 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   }),
+  checkUpdates: (force = false) => json<UpdateStatus>(`/api/updates/check?force=${force}`),
 }

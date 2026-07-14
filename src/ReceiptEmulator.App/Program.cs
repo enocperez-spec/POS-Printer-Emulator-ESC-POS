@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text;
 using ReceiptEmulator;
 
@@ -10,6 +9,8 @@ if (setupExitCode is not null)
 }
 
 var builder = WebApplication.CreateBuilder(args);
+var supportLogs = new SupportLogProvider();
+builder.Logging.AddProvider(supportLogs);
 builder.Host.UseWindowsService(options => options.ServiceName = "POS Printer Emulator");
 builder.WebHost.UseUrls(builder.Configuration["Viewer:Url"] ?? "http://127.0.0.1:5187");
 
@@ -20,7 +21,17 @@ builder.Services.AddSingleton<ReceiptStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<ReceiptProcessor>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
+builder.Services.AddSingleton(supportLogs);
+builder.Services.AddHttpClient<UpdateService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.github.com/repos/enocperez-spec/Desktop-Web-Base-POS-Emulator/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("POS-Printer-Emulator/0.3.03");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+    client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddHostedService<TcpReceiptListener>();
+builder.Services.AddHostedService<PeriodicUpdateChecker>();
 
 var app = builder.Build();
 app.UseDefaultFiles();
@@ -31,8 +42,39 @@ app.MapGet("/api/status", (ServiceRuntimeState runtime, LicenseService license, 
         runtime.Listening,
         $"{options.BindAddress}:{options.Port}",
         runtime.LastConnection,
-        "0.3.02",
+        ProductInfo.Version,
         license.GetStatus()));
+
+app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, CancellationToken cancellationToken) =>
+    Results.Ok(await updates.CheckAsync(force == true, cancellationToken)));
+
+app.MapGet("/api/updates/status", (UpdateService updates) =>
+    updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
+
+app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
+    ReceiptStore store, SupportLogProvider logs) =>
+{
+    var status = license.GetStatus();
+    var report = new StringBuilder()
+        .AppendLine("POS Printer Emulator Support Diagnostics")
+        .AppendLine($"Generated: {DateTimeOffset.Now:O}")
+        .AppendLine($"Application version: {ProductInfo.Version}")
+        .AppendLine($"Operating system: {Environment.OSVersion}")
+        .AppendLine($"Runtime: {Environment.Version}")
+        .AppendLine($"64-bit process: {Environment.Is64BitProcess}")
+        .AppendLine($"Listener: {options.BindAddress}:{options.Port}")
+        .AppendLine($"Listening: {runtime.Listening}")
+        .AppendLine($"Last connection: {runtime.LastConnection?.ToString("O") ?? "None"}")
+        .AppendLine($"License mode: {status.Mode}")
+        .AppendLine($"License ID: {status.LicenseId?.ToString() ?? "None"}")
+        .AppendLine($"Receipt jobs currently listed: {store.GetSummaries().Count}")
+        .AppendLine()
+        .AppendLine("Application log")
+        .AppendLine("---------------")
+        .Append(logs.ReadLog())
+        .ToString();
+    return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+});
 
 app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService license, ReceiptStore store) =>
 {

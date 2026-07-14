@@ -2,6 +2,13 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+## v0.3.03
+
+- Added a Settings menu with License, Check for Updates, and Support sections.
+- Moved license status and activation management from the application header into Settings.
+- Added manual and automatic GitHub Releases update checks with new-version notifications and desktop installer launch.
+- Added downloadable support diagnostics with rolling application logs and system status information.
+
 ## v0.3.02
 
 - Updated the built-in Test Receipt with the Atlanta address, Check label, and E. Perez server name.

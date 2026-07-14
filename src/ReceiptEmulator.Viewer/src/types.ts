@@ -32,6 +32,17 @@ export type ActivationRequest = {
   activationKey: string
 }
 
+export type UpdateStatus = {
+  currentVersion: string
+  latestVersion?: string
+  updateAvailable: boolean
+  checkSucceeded: boolean
+  releaseUrl?: string
+  downloadUrl?: string
+  checkedAt: string
+  message: string
+}
+
 export type JobSummary = {
   id: string
   receivedAt: string

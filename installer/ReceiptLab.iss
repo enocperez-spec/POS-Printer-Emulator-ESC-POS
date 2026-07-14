@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.02"
+#define MyAppVersion "0.3.03"
 #define MyAppPublisher "POS Printer Emulator"
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"

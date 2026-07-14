@@ -4,12 +4,15 @@ import {
   Braces,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   CircleStop,
   Download,
+  ExternalLink,
   FileText,
   Filter,
   FlaskConical,
   KeyRound,
+  LifeBuoy,
   ImageIcon,
   LockKeyhole,
   Minus,
@@ -20,6 +23,7 @@ import {
   PanelRightOpen,
   Plus,
   Printer,
+  RefreshCw,
   RotateCw,
   Search,
   Settings,
@@ -28,12 +32,12 @@ import {
   X,
 } from 'lucide-react'
 import { api } from './api'
-import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus } from './types'
+import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, UpdateStatus } from './types'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.02',
+  version: '0.3.03',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -44,6 +48,8 @@ const emptyStatus: ServiceStatus = {
 type ClearRequest =
   | { kind: 'one'; id: string; label: string }
   | { kind: 'all'; count: number }
+
+type SettingsSection = 'license' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -66,7 +72,9 @@ function App() {
   const [zoom, setZoom] = useState(100)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
-  const [showLicense, setShowLicense] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>()
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>()
+  const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false)
   const [activityCollapsed, setActivityCollapsed] = useState(() => localStorage.getItem('pos-printer-emulator-activity-collapsed') === 'true')
   const [inspectorCollapsed, setInspectorCollapsed] = useState(() => localStorage.getItem('pos-printer-emulator-inspector-collapsed') === 'true')
   const [clearRequest, setClearRequest] = useState<ClearRequest>()
@@ -97,11 +105,27 @@ function App() {
     }
   }, [])
 
+  const checkForUpdates = useCallback(async (force = false) => {
+    const result = await api.checkUpdates(force)
+    setUpdateStatus(result)
+    if (result.updateAvailable) setUpdateNoticeDismissed(false)
+    return result
+  }, [])
+
   useEffect(() => {
     void refresh()
     const timer = window.setInterval(() => void refresh(), 1500)
     return () => window.clearInterval(timer)
   }, [refresh])
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => void checkForUpdates(false).catch(() => undefined), 5000)
+    const periodic = window.setInterval(() => void checkForUpdates(false).catch(() => undefined), 4 * 60 * 60 * 1000)
+    return () => {
+      window.clearTimeout(initial)
+      window.clearInterval(periodic)
+    }
+  }, [checkForUpdates])
 
   useEffect(() => {
     if (!selectedId) {
@@ -174,11 +198,19 @@ function App() {
     <div className="app-shell">
       <Header status={status} onSample={renderSample} busy={busy} theme={theme}
         onTheme={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
-        onLicense={() => setShowLicense(true)} />
+        onSettings={setSettingsSection} />
       {error && (
         <div className="error-banner" role="alert">
           <AlertTriangle size={16} /> {error}
           <button onClick={() => setError(undefined)}>Dismiss</button>
+        </div>
+      )}
+      {updateStatus?.updateAvailable && !updateNoticeDismissed && (
+        <div className="update-banner" role="status">
+          <RefreshCw size={16} />
+          <span><strong>Update available:</strong> POS Printer Emulator {updateStatus.latestVersion}</span>
+          <button onClick={() => setSettingsSection('updates')}>View update</button>
+          <button className="banner-dismiss" onClick={() => setUpdateNoticeDismissed(true)} aria-label="Dismiss update notification"><X size={15} /></button>
         </div>
       )}
       <main className={`workspace ${activityCollapsed ? 'activity-is-collapsed' : ''} ${inspectorCollapsed ? 'inspector-is-collapsed' : ''}`}>
@@ -201,10 +233,13 @@ function App() {
         <span>Local only. Receipt data stays on this device.</span>
         <span>Windows 10/11 · x64</span>
       </footer>
-      {showLicense && (
-        <LicenseDialog
+      {settingsSection && (
+        <SettingsDialog
           status={status}
-          onClose={() => setShowLicense(false)}
+          initialSection={settingsSection}
+          updateStatus={updateStatus}
+          onCheckUpdates={checkForUpdates}
+          onClose={() => setSettingsSection(undefined)}
           onActivated={license => {
             setStatus(current => ({ ...current, license }))
             void refresh()
@@ -245,14 +280,21 @@ function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
   )
 }
 
-function Header({ status, onSample, busy, theme, onTheme, onLicense }: {
+function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   status: ServiceStatus
   onSample: () => void
   busy: boolean
   theme: 'light' | 'dark'
   onTheme: () => void
-  onLicense: () => void
+  onSettings: (section: SettingsSection) => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  function openSettings(section: SettingsSection) {
+    setMenuOpen(false)
+    onSettings(section)
+  }
+
   return (
     <header className="app-header">
       <div className="brand-mark" aria-hidden="true">
@@ -263,10 +305,6 @@ function Header({ status, onSample, busy, theme, onTheme, onLicense }: {
         <span className="state-dot" /> {status.listening ? 'Running (listening)' : 'Listener stopped'}
       </div>
       <div className="header-fact"><span>Listener</span> {status.listener}</div>
-      <div className={`license-badge ${status.license.isFull ? 'is-full' : 'is-trial'}`}>
-        {status.license.isFull ? <CheckCircle2 size={14} /> : <LockKeyhole size={14} />}
-        {status.license.isFull ? 'Full Version' : `Trial · ${status.license.remaining} jobs left`}
-      </div>
       <div className="header-actions">
         <button className="sample-button" onClick={onSample} disabled={busy || (!status.license.isFull && status.license.remaining === 0)}>
           <FlaskConical size={16} /> {busy ? 'Rendering…' : 'Test receipt'}
@@ -280,7 +318,24 @@ function Header({ status, onSample, busy, theme, onTheme, onLicense }: {
           {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
           {theme === 'light' ? 'Dark mode' : 'Light mode'}
         </button>
-        <button className="license-button" onClick={onLicense}><Settings size={17} /> License</button>
+        <div className="settings-menu-wrap">
+          <button className="settings-button" onClick={() => setMenuOpen(current => !current)} aria-haspopup="menu" aria-expanded={menuOpen}>
+            <Settings size={17} /> Settings <ChevronDown size={14} />
+          </button>
+          {menuOpen && (
+            <div className="settings-dropdown" role="menu">
+              <button role="menuitem" onClick={() => openSettings('license')}>
+                <KeyRound size={17} /><span><strong>License</strong><small>{status.license.isFull ? 'Full Version' : `Trial · ${status.license.remaining} jobs left`}</small></span><ChevronRight size={15} />
+              </button>
+              <button role="menuitem" onClick={() => openSettings('updates')}>
+                <RefreshCw size={17} /><span><strong>Check for Updates</strong><small>Version and installer updates</small></span><ChevronRight size={15} />
+              </button>
+              <button role="menuitem" onClick={() => openSettings('support')}>
+                <LifeBuoy size={17} /><span><strong>Support</strong><small>Diagnostics and application logs</small></span><ChevronRight size={15} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )
@@ -422,9 +477,43 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
   )
 }
 
-function LicenseDialog({ status, onClose, onActivated }: {
+function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, onClose, onActivated }: {
   status: ServiceStatus
+  initialSection: SettingsSection
+  updateStatus?: UpdateStatus
+  onCheckUpdates: (force?: boolean) => Promise<UpdateStatus>
   onClose: () => void
+  onActivated: (license: ServiceStatus['license']) => void
+}) {
+  const [section, setSection] = useState<SettingsSection>(initialSection)
+  const labels: Record<SettingsSection, string> = { license: 'License', updates: 'Check for Updates', support: 'Support' }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header className="settings-dialog-header">
+          <div><Settings size={20} /><div><h2 id="settings-title">Settings</h2><p>{labels[section]}</p></div></div>
+          <button className="dialog-close" onClick={onClose} aria-label="Close settings"><X size={19} /></button>
+        </header>
+        <div className="settings-layout">
+          <nav className="settings-nav" aria-label="Settings sections">
+            <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
+            <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')}><RefreshCw size={18} /><span>Check for Updates</span><ChevronRight size={15} /></button>
+            <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
+          </nav>
+          <div className="settings-content">
+            {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
+            {section === 'updates' && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
+            {section === 'support' && <SupportSettings status={status} />}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function LicenseSettings({ status, onActivated }: {
+  status: ServiceStatus
   onActivated: (license: ServiceStatus['license']) => void
 }) {
   const [customerName, setCustomerName] = useState(status.license.customerName)
@@ -432,7 +521,6 @@ function LicenseDialog({ status, onClose, onActivated }: {
   const [activationKey, setActivationKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
-  const [activated, setActivated] = useState(status.license.isFull)
 
   async function activate(event: FormEvent) {
     event.preventDefault()
@@ -440,7 +528,6 @@ function LicenseDialog({ status, onClose, onActivated }: {
     setMessage(undefined)
     try {
       const license = await api.activate({ customerName, emailAddress, activationKey })
-      setActivated(true)
       setActivationKey('')
       onActivated(license)
     } catch (cause) {
@@ -451,57 +538,114 @@ function LicenseDialog({ status, onClose, onActivated }: {
   }
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="license-dialog" role="dialog" aria-modal="true" aria-labelledby="license-title">
-        <button className="dialog-close" onClick={onClose} aria-label="Close license window"><X size={19} /></button>
-        <div className={`license-hero ${activated ? 'is-full' : ''}`}>
-          <div className="license-hero-icon">{activated ? <CheckCircle2 size={27} /> : <KeyRound size={27} />}</div>
-          <div>
-            <h2 id="license-title">{activated ? 'Full Version activated' : 'Activate the Full Version'}</h2>
-            <p>{activated
-              ? 'This installation has unlimited print jobs and access to every feature.'
-              : `Trial Mode includes five emulated print jobs per day. ${status.license.remaining} remain today.`}</p>
-          </div>
+    <div className="settings-panel license-settings">
+      <div className={`license-hero ${status.license.isFull ? 'is-full' : ''}`}>
+        <div className="license-hero-icon">{status.license.isFull ? <CheckCircle2 size={27} /> : <KeyRound size={27} />}</div>
+        <div>
+          <h2>{status.license.isFull ? 'Full Version activated' : 'Trial Version'}</h2>
+          <p>{status.license.isFull
+            ? 'Unlimited receipt jobs, saved history, exports, and all premium features are unlocked.'
+            : `${status.license.remaining} of ${status.license.dailyLimit} emulated print jobs remain today.`}</p>
         </div>
+      </div>
 
-        <div className="feature-comparison" aria-label="License features">
-          <div><CheckCircle2 size={16} /><span>Unlimited print jobs</span><small>Full</small></div>
-          <div><CheckCircle2 size={16} /><span>Persistent job history</span><small>Full</small></div>
-          <div><CheckCircle2 size={16} /><span>No receipt watermark</span><small>Full</small></div>
-          <div><CheckCircle2 size={16} /><span>Exports and premium features</span><small>Full</small></div>
+      <div className="license-summary">
+        <div><span>Status</span><strong>{status.license.isFull ? 'Activated · Full Version' : 'Trial Version'}</strong></div>
+        <div><span>Activation key</span><strong>{status.license.isFull ? 'Validated and stored securely' : 'No activation key installed'}</strong></div>
+        {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
+      </div>
+
+      {status.license.isFull ? (
+        <div className="registered-details">
+          <div><span>Registered to</span><strong>{status.license.customerName}</strong></div>
+          <div><span>Email</span><strong>{status.license.emailAddress}</strong></div>
+          <p className="settings-note">Your activation key is never included in support diagnostics.</p>
         </div>
-
-        {activated ? (
-          <div className="registered-details">
-            <div><span>Registered to</span><strong>{status.license.customerName}</strong></div>
-            <div><span>Email</span><strong>{status.license.emailAddress}</strong></div>
-            {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
-          </div>
-        ) : (
-          <form className="activation-form" onSubmit={activate}>
-            <label>
-              Customer or company name
-              <input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" />
-            </label>
-            <label>
-              Email address
-              <input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" />
-            </label>
-            <label className="key-field">
-              Activation key
-              <textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)}
-                placeholder="PPE1-…" spellCheck={false} />
-            </label>
-            {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
-            <button className="activate-button" type="submit" disabled={busy}>
-              <KeyRound size={17} /> {busy ? 'Validating…' : 'Validate and activate'}
-            </button>
-            <p className="activation-note">Activation happens immediately and does not require a reinstall or another download.</p>
-          </form>
-        )}
-      </section>
+      ) : (
+        <form className="activation-form" onSubmit={activate}>
+          <label>Customer or company name<input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" /></label>
+          <label>Email address<input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" /></label>
+          <label className="key-field">Activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
+          {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
+          <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : 'Validate and activate'}</button>
+          <p className="activation-note">Activation unlocks the Full Version immediately without reinstalling.</p>
+        </form>
+      )}
     </div>
   )
+}
+
+function UpdatesSettings({ status, updateStatus, onCheckUpdates }: {
+  status: ServiceStatus
+  updateStatus?: UpdateStatus
+  onCheckUpdates: (force?: boolean) => Promise<UpdateStatus>
+}) {
+  const [checking, setChecking] = useState(false)
+  const [result, setResult] = useState(updateStatus)
+
+  async function checkNow() {
+    setChecking(true)
+    try {
+      setResult(await onCheckUpdates(true))
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const available = result?.updateAvailable === true
+  return (
+    <div className="settings-panel update-settings">
+      <div className={`settings-status-card ${available ? 'update-available' : result?.checkSucceeded ? 'is-current' : ''}`}>
+        <div className="settings-status-icon">{available ? <Download size={25} /> : <RefreshCw size={25} />}</div>
+        <div>
+          <h2>{available ? `Version ${result.latestVersion} is available` : 'Application updates'}</h2>
+          <p>{result?.message ?? 'Check for the latest POS Printer Emulator release.'}</p>
+        </div>
+      </div>
+      <dl className="update-details">
+        <div><dt>Installed version</dt><dd>{status.version}</dd></div>
+        <div><dt>Latest version</dt><dd>{result?.latestVersion ?? 'Not checked'}</dd></div>
+        <div><dt>Last checked</dt><dd>{result ? new Date(result.checkedAt).toLocaleString() : 'Never'}</dd></div>
+        <div><dt>Automatic checks</dt><dd>Enabled · every 4 hours</dd></div>
+      </dl>
+      <div className="settings-actions">
+        <button className="secondary-action" onClick={checkNow} disabled={checking}><RefreshCw size={16} className={checking ? 'spin' : ''} /> {checking ? 'Checking…' : 'Check now'}</button>
+        {available && result?.downloadUrl && (
+          <button className="primary-action" onClick={() => launchUpdate(result.downloadUrl!)}><Download size={16} /> Download and install</button>
+        )}
+        {available && result?.releaseUrl && <a href={result.releaseUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Release details</a>}
+      </div>
+      <p className="settings-note">Automatic checks use the official POS Printer Emulator GitHub Releases feed. Installation always asks for Windows confirmation.</p>
+    </div>
+  )
+}
+
+function SupportSettings({ status }: { status: ServiceStatus }) {
+  return (
+    <div className="settings-panel support-settings">
+      <div className="settings-status-card">
+        <div className="settings-status-icon"><LifeBuoy size={25} /></div>
+        <div><h2>Support diagnostics</h2><p>Save a text report and send it to support when you need help.</p></div>
+      </div>
+      <div className="support-detail-grid">
+        <div><span>Application</span><strong>POS Printer Emulator {status.version}</strong></div>
+        <div><span>Listener</span><strong>{status.listener}</strong></div>
+        <div><span>Service</span><strong>{status.listening ? 'Running' : 'Stopped'}</strong></div>
+        <div><span>License</span><strong>{status.license.mode} Version</strong></div>
+      </div>
+      <a className="download-diagnostics" href="/api/support/diagnostics" download><Download size={17} /> Download diagnostic log</a>
+      <div className="privacy-callout"><LockKeyhole size={17} /><p>The report includes application events, version, service status, and basic system details. It does not include receipt contents or activation keys.</p></div>
+    </div>
+  )
+}
+
+function launchUpdate(url: string) {
+  const desktop = (window as Window & { chrome?: { webview?: { postMessage: (message: unknown) => void } } }).chrome?.webview
+  if (desktop) {
+    desktop.postMessage({ type: 'install-update', url })
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
 }
 
 function Barcode({ label }: { label: string }) {
