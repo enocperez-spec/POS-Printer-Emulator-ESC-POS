@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/node_modules/
+artifacts/
+.docx-review/
+src/ReceiptEmulator.App/wwwroot/
+*.tsbuildinfo
+*.user
+*.suo
