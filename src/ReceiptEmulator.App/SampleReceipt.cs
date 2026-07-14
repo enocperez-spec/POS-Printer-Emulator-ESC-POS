@@ -15,13 +15,13 @@ public static class SampleReceipt
         Command(0x1D, 0x21, 0x11);
         Text("POS PRINTER EMULATOR\n");
         Command(0x1D, 0x21, 0x00);
-        Text("123 Market Street\nSpringfield, IL 62704\n");
+        Text("1234 Main Street\nAtlanta, GA 30342\n");
         Text("------------------------------------------\n");
         Command(0x1B, 0x45, 0x01);
-        Text("ORDER #1198\n");
+        Text("CHECK #1198\n");
         Command(0x1B, 0x45, 0x00);
         Command(0x1B, 0x61, 0x00);
-        Text("Date: Jul 14, 2026  14:32\nServer: Alex             POS: 01\n");
+        Text("Date: Jul 14, 2026  14:32\nServer: E. Perez         POS: 01\n");
         Text("------------------------------------------\n");
         Text("Latte                 1    $4.75\nCappuccino            1    $4.50\nBlueberry Muffin      1    $2.95\n");
         Text("------------------------------------------\n");

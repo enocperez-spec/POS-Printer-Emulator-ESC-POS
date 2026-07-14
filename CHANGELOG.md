@@ -2,6 +2,10 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+## v0.3.02
+
+- Updated the built-in Test Receipt with the Atlanta address, Check label, and E. Perez server name.
+
 ## v0.3.01
 
 - Added collapse and restore controls for the left Activity panel and right receipt inspector.
@@ -10,6 +14,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 - Added Epson `GS ( L` stored-graphics parsing without leaking binary parameters into receipt text.
 - Added filtering for control-only initialization and cash-drawer connections.
 - Added the vendor-only C# License Manager desktop interface.
+- Launched the responsive `posprinteremulator.com` product, licensing, support, and installer-download website.
 
 ## v0.3.00
 
