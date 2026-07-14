@@ -1,6 +1,7 @@
 **/bin/
 **/obj/
 **/node_modules/
+**/.vs/
 artifacts/
 .docx-review/
 src/ReceiptEmulator.App/wwwroot/

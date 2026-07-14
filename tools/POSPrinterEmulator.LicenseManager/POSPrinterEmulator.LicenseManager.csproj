@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>POSPrinterEmulator.LicenseManager</AssemblyName>
+    <RootNamespace>POSPrinterEmulator.LicenseManager</RootNamespace>
+    <Version>0.3.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\POSPrinterEmulator.Licensing\POSPrinterEmulator.Licensing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\assets\branding\pos-printer-emulator-logo.png" Link="Branding\pos-printer-emulator-logo.png" />
+    <Resource Include="..\..\assets\branding\pos-printer-emulator-icon.png" Link="Branding\pos-printer-emulator-icon.png" />
+  </ItemGroup>
+</Project>

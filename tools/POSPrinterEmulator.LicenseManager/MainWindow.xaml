@@ -1,0 +1,94 @@
+<Window x:Class="POSPrinterEmulator.LicenseManager.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="POS Printer Emulator — License Manager"
+        Icon="Branding/pos-printer-emulator-icon.png"
+        Width="860"
+        Height="760"
+        MinWidth="720"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Background="#F3F7FB">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0" Background="White" BorderBrush="#DDE6EF" BorderThickness="0,0,0,1" Padding="34,20">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Image Source="Branding/pos-printer-emulator-icon.png" Width="56" Height="56" Stretch="UniformToFill" />
+        <StackPanel Grid.Column="1" Margin="16,2,0,0">
+          <TextBlock Text="License Manager" FontFamily="Segoe UI Semibold" FontSize="24" Foreground="{StaticResource NavyBrush}" />
+          <TextBlock Text="Generate signed Full Version activation keys" FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
+        </StackPanel>
+        <Border Grid.Column="2" Background="#E7F9FC" CornerRadius="15" Padding="12,6" VerticalAlignment="Center">
+          <TextBlock Text="VENDOR TOOL" FontFamily="Segoe UI Semibold" FontSize="11" Foreground="#007C98" />
+        </Border>
+      </Grid>
+    </Border>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+      <Border Margin="34,28" Padding="30" Background="White" BorderBrush="#DDE6EF" BorderThickness="1" CornerRadius="14">
+        <StackPanel>
+          <TextBlock Text="Create activation key" FontFamily="Segoe UI Semibold" FontSize="20" Foreground="{StaticResource NavyBrush}" />
+          <TextBlock Text="Use the exact customer information entered during installation. The key will only activate with matching details."
+                     FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,24" />
+
+          <TextBlock Text="Private signing key" FontFamily="Segoe UI Semibold" FontSize="13" Foreground="{StaticResource NavyBrush}" Margin="0,0,0,7" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="PrivateKeyPathTextBox" IsReadOnly="True" ToolTip="Your vendor-private-key.pem file" />
+            <Button Grid.Column="1" Content="Browse…" Click="BrowsePrivateKey_Click" Margin="10,0,0,0"
+                    Background="White" Foreground="{StaticResource BlueBrush}" BorderBrush="#AFCBE5" />
+          </Grid>
+          <TextBlock Text="The private key stays on this computer and is never included in the activation key."
+                     FontFamily="Segoe UI" FontSize="12" Foreground="#73859B" Margin="0,7,0,20" />
+
+          <TextBlock Text="Customer or company name" FontFamily="Segoe UI Semibold" FontSize="13" Foreground="{StaticResource NavyBrush}" Margin="0,0,0,7" />
+          <TextBox x:Name="CustomerNameTextBox" MaxLength="160" Margin="0,0,0,20" />
+
+          <TextBlock Text="Email address" FontFamily="Segoe UI Semibold" FontSize="13" Foreground="{StaticResource NavyBrush}" Margin="0,0,0,7" />
+          <TextBox x:Name="EmailTextBox" MaxLength="254" Margin="0,0,0,22" />
+
+          <Button x:Name="GenerateButton" Content="Generate activation key" Click="Generate_Click"
+                  HorizontalAlignment="Left" Background="{StaticResource BlueBrush}" Foreground="White" BorderBrush="{StaticResource BlueBrush}" />
+
+          <Border x:Name="ResultPanel" Visibility="Collapsed" Background="#F0FAF7" BorderBrush="#A9DCCE" BorderThickness="1"
+                  CornerRadius="10" Padding="20" Margin="0,24,0,0">
+            <StackPanel>
+              <TextBlock Text="Activation key created" FontFamily="Segoe UI Semibold" FontSize="16" Foreground="#12624F" />
+              <TextBlock x:Name="IssuedToTextBlock" FontFamily="Segoe UI" FontSize="12" Foreground="#4E746A" Margin="0,4,0,12" />
+              <TextBox x:Name="ActivationKeyTextBox" IsReadOnly="True" TextWrapping="Wrap" MinHeight="76"
+                       FontFamily="Cascadia Mono, Consolas" FontSize="13" Background="White" />
+              <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                <Button Content="Copy activation key" Click="Copy_Click" Background="#0877D1" Foreground="White" BorderBrush="#0877D1" />
+                <Button Content="Create another" Click="CreateAnother_Click" Margin="10,0,0,0" Background="White"
+                        Foreground="{StaticResource BlueBrush}" BorderBrush="#AFCBE5" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border x:Name="ErrorPanel" Visibility="Collapsed" Background="#FFF2F2" BorderBrush="#F0B5B5" BorderThickness="1"
+                  CornerRadius="8" Padding="14" Margin="0,18,0,0">
+            <TextBlock x:Name="ErrorTextBlock" TextWrapping="Wrap" FontFamily="Segoe UI" FontSize="13" Foreground="#A22A2A" />
+          </Border>
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="#EAF1F7" BorderBrush="#D7E1EB" BorderThickness="0,1,0,0" Padding="34,13">
+      <TextBlock Text="Keep vendor-private-key.pem private and maintain an encrypted backup. Only send customers the generated PPE1 activation key."
+                 FontFamily="Segoe UI" FontSize="12" Foreground="#536A83" TextWrapping="Wrap" />
+    </Border>
+  </Grid>
+</Window>

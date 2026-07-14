@@ -11,6 +11,7 @@ internal static class ReceiptLabBuild
     private static readonly string AppProject = Path.Combine(Root, "src", "ReceiptEmulator.App", "ReceiptEmulator.App.csproj");
     private static readonly string DesktopProject = Path.Combine(Root, "src", "POSPrinterEmulator.Desktop", "POSPrinterEmulator.Desktop.csproj");
     private static readonly string LicenseToolProject = Path.Combine(Root, "tools", "POSPrinterEmulator.LicenseTool", "POSPrinterEmulator.LicenseTool.csproj");
+    private static readonly string LicenseManagerProject = Path.Combine(Root, "tools", "POSPrinterEmulator.LicenseManager", "POSPrinterEmulator.LicenseManager.csproj");
     private static readonly string TestProject = Path.Combine(Root, "tests", "ReceiptEmulator.Tests", "ReceiptEmulator.Tests.csproj");
     private static readonly string ViewerDirectory = Path.Combine(Root, "src", "ReceiptEmulator.Viewer");
     private static readonly string WebRoot = Path.Combine(Root, "src", "ReceiptEmulator.App", "wwwroot");
@@ -40,6 +41,9 @@ internal static class ReceiptLabBuild
                     break;
                 case "send-sample":
                     await SendSampleAsync(arguments.Skip(1).ToArray());
+                    break;
+                case "license-manager":
+                    await PublishLicenseManagerAsync();
                     break;
                 case "help":
                 case "--help":
@@ -71,7 +75,30 @@ internal static class ReceiptLabBuild
         await RunProcessAsync("dotnet", ["build", AppProject, "-c", BuildConfiguration], Root);
         await RunProcessAsync("dotnet", ["build", DesktopProject, "-c", BuildConfiguration], Root);
         await RunProcessAsync("dotnet", ["build", LicenseToolProject, "-c", BuildConfiguration], Root);
+        await RunProcessAsync("dotnet", ["build", LicenseManagerProject, "-c", BuildConfiguration], Root);
         await TestAsync();
+    }
+
+    private static async Task PublishLicenseManagerAsync()
+    {
+        var output = Path.Combine(Root, "artifacts", "license-manager", "win-x64");
+        DeleteDirectoryInsideWorkspace(output);
+        Console.WriteLine("Publishing the POS Printer Emulator License Manager...");
+        await RunProcessAsync(
+            "dotnet",
+            [
+                "publish",
+                LicenseManagerProject,
+                "-c", BuildConfiguration,
+                "-r", "win-x64",
+                "--self-contained", "true",
+                "-p:PublishSingleFile=true",
+                "-p:IncludeNativeLibrariesForSelfExtract=true",
+                "-p:DebugType=None",
+                "-o", output
+            ],
+            Root);
+        Console.WriteLine($"License Manager created at {output}");
     }
 
     private static async Task TestAsync()
@@ -354,6 +381,7 @@ internal static class ReceiptLabBuild
               publish                       Create the self-contained win-x64 application
               installer                     Build the complete Windows installer
               installer --skip-publish      Repackage the existing publish output
+              license-manager               Publish the vendor License Manager UI
               send-sample                   Send a sample ESC/POS job to localhost:9100
               send-sample --host HOST --port PORT --title TITLE
               help                          Show this help
