@@ -171,6 +171,7 @@ internal static class ReceiptLabBuild
         var installerDefinition = Path.Combine(Root, "installer", "ReceiptLab.iss");
         Console.WriteLine("Compiling the POS Printer Emulator Windows installer...");
         await RunProcessAsync(compiler, [installerDefinition], Root);
+        SynchronizeReleaseVersion(checkOnly: false);
         Console.WriteLine($"Installer created in {Path.Combine(Root, "artifacts", "installer")}");
     }
 
@@ -258,6 +259,12 @@ internal static class ReceiptLabBuild
         }
 
         var displayVersion = versionMatch.Groups["version"].Value;
+        var installerPath = Path.Combine(
+            Root,
+            "artifacts",
+            "installer",
+            $"POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe");
+        var installer = File.Exists(installerPath) ? new FileInfo(installerPath) : null;
         var changed = new List<string>();
 
         foreach (var websitePage in Directory.EnumerateFiles(
@@ -267,13 +274,7 @@ internal static class ReceiptLabBuild
         {
             SynchronizeFile(
                 websitePage,
-                text => Regex.Replace(
-                    Regex.Replace(
-                        Regex.Replace(text, "POSPrinterEmulatorSetup-[0-9]+\\.[0-9]+\\.[0-9]+-win-x64\\.exe", $"POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe"),
-                        "\"softwareVersion\"\\s*:\\s*\"[0-9]+\\.[0-9]+\\.[0-9]+\"",
-                        $"\"softwareVersion\": \"{displayVersion}\""),
-                    "Version [0-9]+\\.[0-9]+\\.[0-9]+",
-                    $"Version {displayVersion}"),
+                text => SynchronizeWebsiteReleaseText(text, displayVersion, installer),
                 checkOnly,
                 changed);
         }
@@ -287,6 +288,33 @@ internal static class ReceiptLabBuild
         Console.WriteLine(changed.Count == 0
             ? $"Website release details match application version {displayVersion}."
             : $"Synchronized release {displayVersion}: {string.Join(", ", changed)}");
+    }
+
+    private static string SynchronizeWebsiteReleaseText(string text, string displayVersion, FileInfo? installer)
+    {
+        var updated = Regex.Replace(
+            Regex.Replace(
+                Regex.Replace(text, "POSPrinterEmulatorSetup-[0-9]+\\.[0-9]+\\.[0-9]+-win-x64\\.exe", $"POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe"),
+                "\"softwareVersion\"\\s*:\\s*\"[0-9]+\\.[0-9]+\\.[0-9]+\"",
+                $"\"softwareVersion\": \"{displayVersion}\""),
+            "Version [0-9]+\\.[0-9]+\\.[0-9]+",
+            $"Version {displayVersion}");
+
+        updated = Regex.Replace(
+            updated,
+            "(\"releaseNotes\"\\s*:\\s*\"https://github\\.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v)[0-9]+\\.[0-9]+\\.[0-9]+(\")",
+            match => $"{match.Groups[1].Value}{displayVersion}{match.Groups[2].Value}");
+
+        if (installer is null)
+        {
+            return updated;
+        }
+
+        var releaseDate = installer.LastWriteTimeUtc.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        updated = Regex.Replace(updated, "\"fileSize\"\\s*:\\s*\"[^\"]+\"", $"\"fileSize\": \"{installer.Length} bytes\"");
+        updated = Regex.Replace(updated, "\"datePublished\"\\s*:\\s*\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"", $"\"datePublished\": \"{releaseDate}\"");
+        updated = Regex.Replace(updated, "\"dateModified\"\\s*:\\s*\"[0-9]{4}-[0-9]{2}-[0-9]{2}\"", $"\"dateModified\": \"{releaseDate}\"");
+        return updated;
     }
 
     private static void SynchronizeFile(
@@ -377,7 +405,7 @@ internal static class ReceiptLabBuild
         }
 
         var homepage = File.ReadAllText(Path.Combine(websiteDirectory, "index.html"));
-        foreach (var requiredSoftwareProperty in new[] { "SoftwareApplication", "softwareVersion", "downloadUrl", "screenshot", "featureList", "publisher" })
+        foreach (var requiredSoftwareProperty in new[] { "SoftwareApplication", "softwareVersion", "downloadUrl", "screenshot", "featureList", "publisher", "offers", "fileSize", "datePublished", "releaseNotes", "softwareRequirements" })
         {
             if (!homepage.Contains(requiredSoftwareProperty, StringComparison.Ordinal))
             {
