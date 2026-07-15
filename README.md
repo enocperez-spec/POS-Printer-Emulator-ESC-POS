@@ -1,2 +1,2 @@
-# Desktop Web Base POS Emulator
-Desktop Web Base POS Emulator
+# POS Printer Emulator ESC/POS
+Desktop POS Emulator ESC/POS
