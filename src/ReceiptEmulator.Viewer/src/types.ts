@@ -110,6 +110,11 @@ export type ReceiptSpan = {
   underline: boolean
   width: number
   height: number
+  inverted?: boolean
+  rotated?: boolean
+  upsideDown?: boolean
+  color?: 'black' | 'red'
+  font?: 'A' | 'B'
 }
 
 export type ReceiptLine = {

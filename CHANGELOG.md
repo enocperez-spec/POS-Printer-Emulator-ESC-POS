@@ -2,6 +2,14 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+## v0.3.12
+
+- Expanded ESC/POS compatibility for configured QR codes and barcode dimensions, symbology, and human-readable text placement.
+- Added legacy `ESC *` bit-image conversion so older POS logo commands render in the receipt preview.
+- Added text Font A/B, reverse, red/black, 90-degree rotation, upside-down, horizontal-tab, and absolute/relative positioning support.
+- Replaced the QR placeholder with a standards-based QR renderer while preserving compatibility with existing saved receipts.
+- Improved command diagnostics with decoded barcode types, QR settings, positioning values, and image dimensions.
+
 ## v0.3.11
 
 - Added a Printer State panel under Settings with Ready, Paper Low, Paper Out, Cover Open, Cutter Error, and Offline scenarios.

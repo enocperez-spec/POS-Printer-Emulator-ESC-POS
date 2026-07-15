@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 return await ReceiptLabBuild.RunAsync(args);
 
@@ -48,6 +50,9 @@ internal static class ReceiptLabBuild
                     break;
                 case "sync-release":
                     SynchronizeReleaseVersion(arguments.Skip(1).Contains("--check", StringComparer.OrdinalIgnoreCase));
+                    break;
+                case "check-seo":
+                    CheckWebsiteSeo();
                     break;
                 case "help":
                 case "--help":
@@ -304,6 +309,125 @@ internal static class ReceiptLabBuild
         }
     }
 
+    private static void CheckWebsiteSeo()
+    {
+        var websiteDirectory = Path.Combine(Root, "website");
+        var sitemapPath = Path.Combine(websiteDirectory, "sitemap.xml");
+        var failures = new List<string>();
+        var sitemap = XDocument.Load(sitemapPath);
+        var urls = sitemap.Descendants()
+            .Where(element => element.Name.LocalName == "loc")
+            .Select(element => element.Value.Trim())
+            .ToArray();
+
+        if (urls.Length == 0)
+        {
+            failures.Add("sitemap.xml contains no public URLs");
+        }
+        if (urls.Distinct(StringComparer.OrdinalIgnoreCase).Count() != urls.Length)
+        {
+            failures.Add("sitemap.xml contains duplicate URLs");
+        }
+
+        foreach (var publicUrl in urls)
+        {
+            if (!Uri.TryCreate(publicUrl, UriKind.Absolute, out var uri) ||
+                !string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(uri.Host, "www.posprinteremulator.com", StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add($"sitemap URL is not canonical HTTPS/www: {publicUrl}");
+                continue;
+            }
+            if (uri.AbsolutePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add($"sitemap URL contains .html: {publicUrl}");
+            }
+
+            var slug = uri.AbsolutePath.Trim('/');
+            var fileName = slug.Length == 0 ? "index.html" : slug + ".html";
+            var htmlPath = Path.Combine(websiteDirectory, fileName);
+            if (!File.Exists(htmlPath))
+            {
+                failures.Add($"sitemap URL has no matching HTML file: {publicUrl}");
+                continue;
+            }
+
+            var html = File.ReadAllText(htmlPath);
+            var title = MatchContent(html, "<title>(?<content>.*?)</title>");
+            var description = MatchContent(html, "<meta\\s+name=\"description\"\\s+content=\"(?<content>[^\"]+)\"");
+            var canonical = MatchContent(html, "<link\\s+rel=\"canonical\"\\s+href=\"(?<content>[^\"]+)\"");
+            var h1Count = Regex.Matches(html, "<h1(?:\\s[^>]*)?>", RegexOptions.IgnoreCase).Count;
+            if (string.IsNullOrWhiteSpace(title)) failures.Add($"{fileName} is missing a title");
+            if (string.IsNullOrWhiteSpace(description)) failures.Add($"{fileName} is missing a meta description");
+            if (!string.Equals(canonical, publicUrl, StringComparison.OrdinalIgnoreCase)) failures.Add($"{fileName} canonical does not match its sitemap URL");
+            if (h1Count != 1) failures.Add($"{fileName} must contain exactly one H1 (found {h1Count})");
+            if (slug.Length > 0 && slug != "privacy" && !html.Contains("class=\"breadcrumbs\"", StringComparison.OrdinalIgnoreCase)) failures.Add($"{fileName} is missing visible breadcrumbs");
+
+            foreach (Match jsonLd in Regex.Matches(html, "<script\\s+type=\"application/ld\\+json\"[^>]*>(?<json>.*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Singleline))
+            {
+                try
+                {
+                    using var _ = JsonDocument.Parse(jsonLd.Groups["json"].Value);
+                }
+                catch (JsonException exception)
+                {
+                    failures.Add($"{fileName} contains invalid JSON-LD: {exception.Message}");
+                }
+            }
+        }
+
+        var homepage = File.ReadAllText(Path.Combine(websiteDirectory, "index.html"));
+        foreach (var requiredSoftwareProperty in new[] { "SoftwareApplication", "softwareVersion", "downloadUrl", "screenshot", "featureList", "publisher" })
+        {
+            if (!homepage.Contains(requiredSoftwareProperty, StringComparison.Ordinal))
+            {
+                failures.Add($"homepage SoftwareApplication data is missing {requiredSoftwareProperty}");
+            }
+        }
+
+        var htaccess = File.ReadAllText(Path.Combine(websiteDirectory, ".htaccess"));
+        if (!htaccess.Contains("https://www.posprinteremulator.com%{REQUEST_URI}", StringComparison.Ordinal) ||
+            !htaccess.Contains("RewriteRule ^(.+)\\.html$", StringComparison.Ordinal))
+        {
+            failures.Add(".htaccess is missing canonical host or extensionless redirects");
+        }
+
+        CheckMaximumFileSize(Path.Combine(websiteDirectory, "assets", "favicon.png"), 10_000, failures);
+        CheckMaximumFileSize(Path.Combine(websiteDirectory, "assets", "product-app.webp"), 150_000, failures);
+        var indexNowKey = File.ReadAllText(Path.Combine(websiteDirectory, "indexnow-key.txt")).Trim();
+        if (indexNowKey.Length is < 8 or > 128 || indexNowKey.Any(character => !Uri.IsHexDigit(character)))
+        {
+            failures.Add("indexnow-key.txt must contain an 8-128 character hexadecimal key");
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new InvalidOperationException("SEO validation failed:" + Environment.NewLine + "- " + string.Join(Environment.NewLine + "- ", failures));
+        }
+
+        Console.WriteLine($"SEO validation passed for {urls.Length} canonical public pages.");
+    }
+
+    private static string? MatchContent(string input, string pattern)
+    {
+        var match = Regex.Match(input, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        return match.Success ? System.Net.WebUtility.HtmlDecode(match.Groups["content"].Value.Trim()) : null;
+    }
+
+    private static void CheckMaximumFileSize(string path, long maximumBytes, ICollection<string> failures)
+    {
+        if (!File.Exists(path))
+        {
+            failures.Add($"required performance asset is missing: {Path.GetFileName(path)}");
+            return;
+        }
+        var length = new FileInfo(path).Length;
+        if (length > maximumBytes)
+        {
+            failures.Add($"{Path.GetFileName(path)} is {length:N0} bytes; maximum is {maximumBytes:N0}");
+        }
+    }
+
     private static async Task RunProcessAsync(string executable, IReadOnlyList<string> arguments, string workingDirectory)
     {
         var isCommandScript = OperatingSystem.IsWindows() &&
@@ -453,6 +577,7 @@ internal static class ReceiptLabBuild
               license-manager               Publish the vendor License Manager UI
               sync-release                  Sync ProductInfo.Version to website labels and download links
               sync-release --check          Fail if the public website version is stale (used by GitHub)
+              check-seo                     Validate canonical URLs, metadata, structured data, sitemap, and performance assets
               send-sample                   Send a sample ESC/POS job to localhost:9100
               send-sample --host HOST --port PORT --title TITLE
               help                          Show this help

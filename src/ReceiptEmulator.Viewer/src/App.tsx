@@ -33,6 +33,8 @@ import {
   X,
 } from 'lucide-react'
 import { api } from './api'
+import { QRCodeSVG } from 'qrcode.react'
+import BarcodeRenderer from 'react-barcode'
 import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
 import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, UpdateStatus } from './types'
@@ -40,7 +42,7 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, UpdateStatus }
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.11',
+  version: '0.3.12',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -436,8 +438,8 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
       )}
       <div className="receipt-content">
         {lines.map((line, lineIndex) => {
-          if (line.kind === 'barcode') return <Barcode key={lineIndex} label={line.data ?? ''} />
-          if (line.kind === 'qr') return <QrPlaceholder key={lineIndex} label={line.data ?? ''} />
+          if (line.kind === 'barcode') return <BarcodePreview key={lineIndex} data={line.data ?? ''} />
+          if (line.kind === 'qr') return <QrCode key={lineIndex} data={line.data ?? ''} />
           if (line.kind === 'image') {
             const imageData = line.data ?? ''
             return imageData.startsWith('raster-v1:')
@@ -452,6 +454,13 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
                   textDecoration: span.underline ? 'underline' : undefined,
                   fontSize: `${12 * Math.min(span.height, 3)}px`,
                   letterSpacing: span.width > 1 ? `${span.width - 1}px` : undefined,
+                  color: span.color === 'red' ? '#b3261e' : undefined,
+                  background: span.inverted ? '#111' : undefined,
+                  padding: span.inverted ? '0 2px' : undefined,
+                  display: span.rotated || span.upsideDown ? 'inline-block' : undefined,
+                  transform: span.rotated ? 'rotate(90deg)' : span.upsideDown ? 'rotate(180deg)' : undefined,
+                  fontFamily: span.font === 'B' ? '"Arial Narrow", "Cascadia Mono", monospace' : undefined,
+                  fontSizeAdjust: span.font === 'B' ? '0.85' : undefined,
                 }}>{span.text}</span>
               ))}
               {line.spans.length === 0 && <span>&nbsp;</span>}
@@ -638,18 +647,62 @@ function launchUpdate(url: string) {
   }
 }
 
-function Barcode({ label }: { label: string }) {
-  const bars = Array.from(label || 'RECEIPT', (char, index) => ((char.charCodeAt(0) + index * 7) % 4) + 1)
+type BarcodeFormat = 'UPC' | 'EAN13' | 'EAN8' | 'CODE39' | 'ITF' | 'codabar' | 'CODE128'
+type BarcodeData = { label: string; format: BarcodeFormat; width: number; height: number; hri: number }
+
+function barcodeFormat(mode: number): BarcodeFormat {
+  if (mode === 0 || mode === 1 || mode === 65 || mode === 66) return 'UPC'
+  if (mode === 2 || mode === 67) return 'EAN13'
+  if (mode === 3 || mode === 68) return 'EAN8'
+  if (mode === 4 || mode === 69) return 'CODE39'
+  if (mode === 5 || mode === 70) return 'ITF'
+  if (mode === 6 || mode === 71) return 'codabar'
+  return 'CODE128'
+}
+
+function decodeBarcode(data: string): BarcodeData {
+  try {
+    const parts = data.split(':')
+    if (parts.length === 6 && parts[0] === 'barcode-v1') {
+      const mode = Number(parts[1])
+      const format = barcodeFormat(mode)
+      const decoded = atob(parts[5])
+      return {
+        label: format === 'CODE39' ? decoded.replace(/^\*|\*$/g, '') : decoded,
+        format,
+        width: Math.min(6, Math.max(2, Number(parts[2]) || 2)),
+        height: Math.min(110, Math.max(24, Math.round((Number(parts[3]) || 162) * 0.5))),
+        hri: Math.min(3, Math.max(0, Number(parts[4]) || 0)),
+      }
+    }
+  } catch { /* Preserve compatibility with older saved receipts. */ }
+  return { label: data.replace(/^\*|\*$/g, ''), format: 'CODE39', width: 2, height: 55, hri: 2 }
+}
+
+function BarcodePreview({ data }: { data: string }) {
+  const barcode = decodeBarcode(data)
+  const showText = barcode.hri !== 0
   return (
-    <div className="barcode-block">
-      <div className="barcode-bars">{bars.flatMap((width, index) => [<i key={`${index}-a`} style={{ width }} />, <b key={`${index}-b`} style={{ width: (index % 3) + 1 }} />])}</div>
-      <span>{label}</span>
+    <div className={`barcode-block hri-${barcode.hri}`}>
+      <BarcodeRenderer value={barcode.label || 'RECEIPT'} format={barcode.format} width={barcode.width} height={barcode.height} displayValue={showText} textPosition={barcode.hri === 1 ? 'top' : 'bottom'} margin={0} background="#fff" lineColor="#111" />
     </div>
   )
 }
 
-function QrPlaceholder({ label }: { label: string }) {
-  return <div className="qr-block" title={label}>{Array.from({ length: 81 }, (_, index) => <i key={index} className={(index * 17 + label.length * 7) % 5 < 2 ? 'on' : ''} />)}</div>
+function QrCode({ data }: { data: string }) {
+  let label = data
+  let moduleSize = 3
+  let level: 'L' | 'M' | 'Q' | 'H' = 'L'
+  try {
+    const parts = data.split(':')
+    if (parts.length === 5 && parts[0] === 'qr-v1') {
+      label = atob(parts[4])
+      moduleSize = Math.min(8, Math.max(1, Number(parts[2]) || 3))
+      level = ({ 48: 'L', 49: 'M', 50: 'Q', 51: 'H' } as const)[Number(parts[3]) as 48 | 49 | 50 | 51] ?? 'L'
+    }
+  } catch { /* Preserve compatibility with older saved receipts. */ }
+  const size = Math.min(220, Math.max(84, moduleSize * 29))
+  return <div className="qr-block" title={label}><QRCodeSVG value={label || 'POS Printer Emulator'} size={size} level={level} marginSize={2} /></div>
 }
 
 type RasterGraphicData = {

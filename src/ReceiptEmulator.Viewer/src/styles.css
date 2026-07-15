@@ -256,12 +256,10 @@ button { color: inherit; }
 .align-right { text-align: right; }
 .trial-watermark { position: absolute; inset: -50px; z-index: 0; display: flex; flex-direction: column; justify-content: space-around; transform: rotate(-28deg); pointer-events: none; }
 .trial-watermark span { white-space: nowrap; color: rgb(30 99 179 / 8%); font: 800 13px/1 ui-sans-serif, sans-serif; letter-spacing: .08em; }
-.barcode-block { position: relative; z-index: 1; display: grid; justify-items: center; gap: 5px; margin: 17px auto 5px; font: 700 12px "Cascadia Mono", monospace; }
-.barcode-bars { height: 55px; display: flex; align-items: stretch; gap: 1px; }
-.barcode-bars i { display: block; background: #111; }
-.barcode-bars b { display: block; background: transparent; }
-.qr-block { width: 108px; height: 108px; display: grid; grid-template-columns: repeat(9, 1fr); gap: 1px; padding: 4px; margin: 16px auto; background: #fff; border: 4px solid #111; }
-.qr-block i.on { background: #111; }
+.barcode-block { position: relative; z-index: 1; display: flex; justify-content: center; margin: 17px auto 5px; overflow: hidden; }
+.barcode-block svg { display: block; max-width: 100%; height: auto; }
+.qr-block { display: flex; justify-content: center; margin: 16px auto; }
+.qr-block svg { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
 .raster-graphic { display: flex; width: 100%; margin: 0 auto 10px; }
 .raster-graphic.align-left { justify-content: flex-start; }
 .raster-graphic.align-center { justify-content: center; }

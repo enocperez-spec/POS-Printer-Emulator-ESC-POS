@@ -1,6 +1,16 @@
 namespace ReceiptEmulator;
 
-public sealed record ReceiptSpan(string Text, bool Bold, bool Underline, int Width, int Height);
+public sealed record ReceiptSpan(
+    string Text,
+    bool Bold,
+    bool Underline,
+    int Width,
+    int Height,
+    bool Inverted = false,
+    bool Rotated = false,
+    bool UpsideDown = false,
+    string Color = "black",
+    string Font = "A");
 
 public sealed record ReceiptLine(
     string Alignment,

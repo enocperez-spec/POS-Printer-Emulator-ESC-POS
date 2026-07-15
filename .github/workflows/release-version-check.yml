@@ -3,6 +3,8 @@ name: Release version check
 on:
   push:
   pull_request:
+  release:
+    types: [published]
 
 jobs:
   version-sync:
@@ -14,3 +16,5 @@ jobs:
           dotnet-version: 8.0.x
       - name: Verify public website matches the application release version
         run: dotnet run --project tools/ReceiptLab.Build -- sync-release --check
+      - name: Validate public website SEO
+        run: dotnet run --project tools/ReceiptLab.Build -- check-seo

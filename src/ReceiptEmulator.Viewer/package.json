@@ -11,7 +11,9 @@
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
+    "qrcode.react": "^4.2.0",
     "react": "latest",
+    "react-barcode": "^1.6.1",
     "react-dom": "latest",
     "vite": "latest"
   },

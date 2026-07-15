@@ -26,7 +26,7 @@ public sealed class EscPosParserTests
     public void ReportsUnknownCommandAtOriginalByteOffsetAndContinues()
     {
         var bytes = Encoding.ASCII.GetBytes("OK")
-            .Concat(new byte[] { 0x1B, 0x7B, 0x01 })
+            .Concat(new byte[] { 0x1B, 0x71, 0x01 })
             .Concat(Encoding.ASCII.GetBytes("AFTER\n"))
             .ToArray();
 
@@ -34,7 +34,7 @@ public sealed class EscPosParserTests
         var unsupported = Assert.Single(receipt.Commands, command => !command.Supported);
 
         Assert.Equal(2, unsupported.Offset);
-        Assert.Equal("1B 7B 01", unsupported.Hex);
+        Assert.Equal("1B 71 01", unsupported.Hex);
         Assert.Contains("OKAFTER", receipt.PlainText);
     }
 
@@ -50,7 +50,78 @@ public sealed class EscPosParserTests
 
         var barcode = Assert.Single(receipt.Lines);
         Assert.Equal("barcode", barcode.Kind);
-        Assert.Equal("*123*", barcode.Data);
+        Assert.StartsWith("barcode-v1:4:2:162:2:", barcode.Data);
+        Assert.EndsWith(Convert.ToBase64String(Encoding.UTF8.GetBytes("*123*")), barcode.Data);
+    }
+
+    [Fact]
+    public void AppliesBarcodeDimensionsAndHumanReadableTextSettings()
+    {
+        var bytes = new byte[] { 0x1D, 0x77, 0x04, 0x1D, 0x68, 0x50, 0x1D, 0x48, 0x03, 0x1D, 0x6B, 0x49, 0x03 }
+            .Concat(Encoding.ASCII.GetBytes("ABC"))
+            .ToArray();
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.Equal("barcode-v1:73:4:80:3:QUJD", Assert.Single(receipt.Lines).Data);
+        Assert.Contains(receipt.Commands, command => command.Name == "Set barcode width");
+        Assert.Contains(receipt.Commands, command => command.Name == "Set barcode height");
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
+
+    [Fact]
+    public void ParsesQrModelSizeErrorCorrectionAndPayload()
+    {
+        var bytes = new byte[]
+        {
+            0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
+            0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06,
+            0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x32,
+            0x1D, 0x28, 0x6B, 0x08, 0x00, 0x31, 0x50, 0x30, 0x48, 0x45, 0x4C, 0x4C, 0x4F,
+            0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30
+        };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.Equal("qr-v1:2:6:50:SEVMTE8=", Assert.Single(receipt.Lines).Data);
+        Assert.Contains(receipt.Commands, command => command.Name == "Print QR code" && command.Details.Contains("module 6"));
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
+
+    [Fact]
+    public void ConvertsLegacyColumnBitImageToRasterPreview()
+    {
+        var bytes = new byte[] { 0x1B, 0x2A, 0x00, 0x02, 0x00, 0x80, 0x40 };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        var image = Assert.Single(receipt.Lines);
+        Assert.Equal("image", image.Kind);
+        Assert.Equal("raster-v1:2:8:2:1:gEAAAAAAAAA=", image.Data);
+        Assert.Contains(receipt.Commands, command => command.Name == "Print legacy bit image" && command.Supported);
+    }
+
+    [Fact]
+    public void PreservesExtendedTextModesAndPositioning()
+    {
+        var bytes = new byte[]
+            {
+                0x1D, 0x42, 0x01,
+                0x1B, 0x72, 0x01,
+                0x1B, 0x4D, 0x01,
+                0x1B, 0x24, 0x18, 0x00
+            }
+            .Concat(Encoding.ASCII.GetBytes("SALE\n"))
+            .ToArray();
+
+        var receipt = new EscPosParser().Parse(bytes);
+        var span = Assert.Single(Assert.Single(receipt.Lines).Spans);
+
+        Assert.Equal("  SALE", span.Text);
+        Assert.True(span.Inverted);
+        Assert.Equal("red", span.Color);
+        Assert.Equal("B", span.Font);
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
     }
 
     [Fact]

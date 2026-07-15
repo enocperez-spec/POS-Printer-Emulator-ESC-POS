@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Xml.Linq;
 using Renci.SshNet;
 
 const string HostVariable = "PPE_SFTP_HOST";
@@ -13,6 +15,9 @@ const string DatabaseNameVariable = "PPE_DB_NAME";
 const string AdminUserVariable = "PPE_ADMIN_USER";
 const string AdminPasswordVariable = "PPE_ADMIN_PASSWORD";
 const string LicensePrivateKeyPathVariable = "PPE_LICENSE_PRIVATE_KEY_PATH";
+const string GoogleVerificationVariable = "PPE_GOOGLE_SITE_VERIFICATION";
+const string BingVerificationVariable = "PPE_BING_SITE_AUTH_TOKEN";
+const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
 {
@@ -59,7 +64,11 @@ try
                 throw new ArgumentException("The publish command requires a local source directory.");
             }
 
-            Publish(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
+            var localDirectory = Path.GetFullPath(args[1]);
+            var remoteDirectory = args.Length > 2 ? args[2] : ".";
+            Publish(client, localDirectory, remoteDirectory);
+            UploadWebmasterVerification(client, remoteDirectory);
+            SubmitIndexNow(localDirectory);
             break;
         case "configure":
             if (args.Length < 2)
@@ -233,6 +242,83 @@ static void UploadText(SftpClient client, string remotePath, string content)
 {
     using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
     client.UploadFile(stream, remotePath, true);
+}
+
+static void UploadWebmasterVerification(SftpClient client, string remoteDirectory)
+{
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    if (Environment.GetEnvironmentVariable(GoogleVerificationVariable) is { Length: > 0 } googleToken)
+    {
+        googleToken = googleToken.Trim().Replace(".html", string.Empty, StringComparison.OrdinalIgnoreCase);
+        ValidateWebmasterToken(googleToken, GoogleVerificationVariable);
+        UploadText(client, CombineRemote(remoteRoot, $"{googleToken}.html"), $"google-site-verification: {googleToken}.html");
+        Console.WriteLine("Uploaded Google Search Console verification file.");
+    }
+
+    if (Environment.GetEnvironmentVariable(BingVerificationVariable) is { Length: > 0 } bingToken)
+    {
+        bingToken = bingToken.Trim();
+        ValidateWebmasterToken(bingToken, BingVerificationVariable);
+        var document = new XDocument(new XElement("users", new XElement("user", bingToken)));
+        UploadText(client, CombineRemote(remoteRoot, "BingSiteAuth.xml"), document.ToString(SaveOptions.DisableFormatting));
+        Console.WriteLine("Uploaded Bing Webmaster Tools verification file.");
+    }
+}
+
+static void ValidateWebmasterToken(string token, string variableName)
+{
+    if (token.Length is < 8 or > 128 || token.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
+    {
+        throw new InvalidOperationException($"{variableName} contains an invalid webmaster verification token.");
+    }
+}
+
+static void SubmitIndexNow(string localDirectory)
+{
+    var keyPath = Path.Combine(localDirectory, "indexnow-key.txt");
+    var sitemapPath = Path.Combine(localDirectory, "sitemap.xml");
+    if (!File.Exists(keyPath) || !File.Exists(sitemapPath))
+    {
+        Console.WriteLine("IndexNow notification skipped because the key or sitemap is missing.");
+        return;
+    }
+
+    var key = File.ReadAllText(keyPath).Trim();
+    ValidateWebmasterToken(key, "indexnow-key.txt");
+    var urls = XDocument.Load(sitemapPath)
+        .Descendants()
+        .Where(element => element.Name.LocalName == "loc")
+        .Select(element => element.Value.Trim())
+        .Where(url => url.StartsWith(WebsiteBaseUrl, StringComparison.OrdinalIgnoreCase))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    if (urls.Length == 0)
+    {
+        Console.WriteLine("IndexNow notification skipped because the sitemap has no public URLs.");
+        return;
+    }
+
+    var payload = JsonSerializer.Serialize(new
+    {
+        host = new Uri(WebsiteBaseUrl).Host,
+        key,
+        keyLocation = $"{WebsiteBaseUrl}/indexnow-key.txt",
+        urlList = urls
+    });
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+    using var response = http.PostAsync("https://api.indexnow.org/indexnow", content).GetAwaiter().GetResult();
+    if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.Accepted)
+    {
+        throw new HttpRequestException($"IndexNow rejected the sitemap URLs with HTTP {(int)response.StatusCode}.");
+    }
+
+    Console.WriteLine($"Submitted {urls.Length} public URLs to IndexNow (HTTP {(int)response.StatusCode}).");
 }
 
 static string PhpString(string value) =>
