@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260715-images">
+  <link rel="stylesheet" href="styles.css?v=20260715-impact">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -143,6 +143,25 @@
       </div>
     </section>
 
+    <section class="impact-section section" id="impact" aria-labelledby="impact-title">
+      <div class="shell impact-layout">
+        <div class="section-heading reveal">
+          <span class="section-kicker">Digital testing, measurable impact</span>
+          <h2 id="impact-title">Test receipts. Save thermal paper.</h2>
+          <p>Every receipt tested in the emulator can replace a physical test print—reducing paper use, thermal-coating waste, and the lifecycle emissions associated with printing.</p>
+        </div>
+        <div class="impact-data reveal reveal-late" data-impact aria-live="polite">
+          <div class="impact-metrics" role="list" aria-label="Estimated environmental impact">
+            <article role="listitem"><strong data-impact-receipts>—</strong><span>test receipts kept digital</span></article>
+            <article role="listitem"><strong data-impact-paper>—</strong><span>of receipt paper avoided</span></article>
+            <article role="listitem"><strong data-impact-co2>—</strong><span>estimated CO₂ avoided</span></article>
+          </div>
+          <p class="impact-note" data-impact-status>Loading the community impact total…</p>
+          <p class="impact-assumption">Illustrative estimate based on one 12-inch receipt and 2.5 g CO₂ per receipt. Actual receipt length, paper production, and disposal impacts vary. Many thermal-paper coatings can also complicate recycling.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="seo-overview section" aria-labelledby="seo-overview-title">
       <div class="shell seo-overview-grid">
         <div class="section-heading reveal">
@@ -225,6 +244,6 @@
     </div>
     <div class="shell footer-bottom"><span>© 2026 POS Printer Emulator.</span><span>Local tools for better receipt testing.</span></div>
   </footer>
-  <script src="script.js" type="module"></script>
+  <script src="script.js?v=20260715-impact" type="module"></script>
 </body>
 </html>
