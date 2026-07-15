@@ -2,6 +2,14 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+## v0.3.13
+
+- Added a Stored Logos library under Settings for importing PNG, JPEG, or WebP images and assigning them to two-character Epson NV graphic keys.
+- Receipt previews now substitute an imported logo whenever a POS job requests the matching printer-resident image key.
+- Added local, persistent C# storage with replace and confirmed-delete controls; imported logo files remain on the customer computer.
+- Corrected recognized `GS ( L` NV print commands so missing printer-resident image data is informational instead of an unsupported-command warning.
+- Added regression coverage for stored NV graphics and the QR command order used by the supplied customer receipt.
+
 ## v0.3.12
 
 - Expanded ESC/POS compatibility for configured QR codes and barcode dimensions, symbology, and human-readable text placement.

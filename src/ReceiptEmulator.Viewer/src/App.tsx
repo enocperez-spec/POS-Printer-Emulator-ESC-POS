@@ -37,12 +37,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import BarcodeRenderer from 'react-barcode'
 import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
-import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, UpdateStatus } from './types'
+import { StoredGraphicsSettings } from './StoredGraphicsSettings'
+import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.12',
+  version: '0.3.13',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -54,7 +55,7 @@ type ClearRequest =
   | { kind: 'one'; id: string; label: string }
   | { kind: 'all'; count: number }
 
-type SettingsSection = 'license' | 'printer' | 'state' | 'updates' | 'support'
+type SettingsSection = 'license' | 'printer' | 'logos' | 'state' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -84,6 +85,7 @@ function App() {
   const [inspectorCollapsed, setInspectorCollapsed] = useState(() => localStorage.getItem('pos-printer-emulator-inspector-collapsed') === 'true')
   const [clearRequest, setClearRequest] = useState<ClearRequest>()
   const [clearing, setClearing] = useState(false)
+  const [storedGraphics, setStoredGraphics] = useState<StoredGraphic[]>([])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -117,11 +119,19 @@ function App() {
     return result
   }, [])
 
+  const refreshStoredGraphics = useCallback(async () => {
+    setStoredGraphics(await api.storedGraphics())
+  }, [])
+
   useEffect(() => {
     void refresh()
     const timer = window.setInterval(() => void refresh(), 1500)
     return () => window.clearInterval(timer)
   }, [refresh])
+
+  useEffect(() => {
+    void refreshStoredGraphics().catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load stored printer logos.'))
+  }, [refreshStoredGraphics])
 
   useEffect(() => {
     const initial = window.setTimeout(() => void checkForUpdates(false).catch(() => undefined), 5000)
@@ -226,7 +236,7 @@ function App() {
             onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
             onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history} />
         )}
-        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} />
+        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics} />
         {inspectorCollapsed ? (
           <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
         ) : (
@@ -244,6 +254,8 @@ function App() {
           initialSection={settingsSection}
           updateStatus={updateStatus}
           onCheckUpdates={checkForUpdates}
+          storedGraphics={storedGraphics}
+          onStoredGraphicsChanged={refreshStoredGraphics}
           onClose={() => setSettingsSection(undefined)}
           onActivated={license => {
             setStatus(current => ({ ...current, license }))
@@ -380,13 +392,15 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
   )
 }
 
-function PreviewPane({ job, zoom, onZoom, onSample, license }: {
+function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics }: {
   job?: ReceiptJob
   zoom: number
   onZoom: (value: number) => void
   onSample: () => void
   license: ServiceStatus['license']
+  storedGraphics: StoredGraphic[]
 }) {
+  const storedGraphicMap = useMemo(() => new Map(storedGraphics.map(graphic => [graphic.keyCode, graphic])), [storedGraphics])
   return (
     <section className="preview-pane">
       <div className="pane-heading"><strong>Receipt preview</strong></div>
@@ -413,7 +427,7 @@ function PreviewPane({ job, zoom, onZoom, onSample, license }: {
       <div className="preview-canvas">
         {job ? (
           <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})` }}>
-            <ReceiptPaper lines={job.lines} watermark={license.features.watermark} />
+            <ReceiptPaper lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} />
           </div>
         ) : (
           <div className="preview-empty">
@@ -428,7 +442,7 @@ function PreviewPane({ job, zoom, onZoom, onSample, license }: {
   )
 }
 
-function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: boolean }) {
+function ReceiptPaper({ lines, watermark, storedGraphics }: { lines: ReceiptLine[]; watermark: boolean; storedGraphics: Map<string, StoredGraphic> }) {
   return (
     <article className="receipt-paper">
       {watermark && (
@@ -442,9 +456,17 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
           if (line.kind === 'qr') return <QrCode key={lineIndex} data={line.data ?? ''} />
           if (line.kind === 'image') {
             const imageData = line.data ?? ''
-            return imageData.startsWith('raster-v1:')
-              ? <RasterGraphic key={lineIndex} data={imageData} alignment={line.alignment} />
-              : <GraphicPlaceholder key={lineIndex} label={imageData || 'Printer graphic'} />
+            if (imageData.startsWith('raster-v1:')) {
+              return <RasterGraphic key={lineIndex} data={imageData} alignment={line.alignment} />
+            }
+            if (imageData.startsWith('stored-v1:') || imageData.startsWith('NV graphic ')) {
+              const keyCode = storedGraphicKey(imageData)
+              const graphic = keyCode ? storedGraphics.get(keyCode) : undefined
+              return graphic
+                ? <StoredGraphicPreview key={lineIndex} graphic={graphic} alignment={line.alignment} />
+                : <StoredGraphicNotice key={lineIndex} data={imageData} />
+            }
+            return <GraphicPlaceholder key={lineIndex} label={imageData || 'Printer graphic'} />
           }
           return (
             <div key={lineIndex} className={`receipt-line align-${line.alignment}`}>
@@ -472,16 +494,18 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
   )
 }
 
-function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, onClose, onActivated }: {
+function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, onStoredGraphicsChanged, onClose, onActivated }: {
   status: ServiceStatus
   initialSection: SettingsSection
   updateStatus?: UpdateStatus
   onCheckUpdates: (force?: boolean) => Promise<UpdateStatus>
+  storedGraphics: StoredGraphic[]
+  onStoredGraphicsChanged: () => Promise<void>
   onClose: () => void
   onActivated: (license: ServiceStatus['license']) => void
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection)
-  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -494,6 +518,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
             <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
+            <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')}><ImageIcon size={18} /><span>Stored Logos</span><ChevronRight size={15} /></button>
             <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')}><Gauge size={18} /><span>Printer State</span><ChevronRight size={15} /></button>
             <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')}><RefreshCw size={18} /><span>Check for Updates</span><ChevronRight size={15} /></button>
             <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
@@ -501,6 +526,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
+            {section === 'logos' && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && <PrinterStateSettings />}
             {section === 'updates' && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
             {section === 'support' && <SupportSettings status={status} />}
@@ -782,6 +808,34 @@ function GraphicPlaceholder({ label }: { label: string }) {
       <span>Stored printer image unavailable</span>
     </div>
   )
+}
+
+function StoredGraphicNotice({ data }: { data: string }) {
+  const keyCode = storedGraphicKey(data) ?? 'unknown'
+  return (
+    <div
+      className="stored-graphic-notice"
+      title="This command prints a logo stored in the physical printer. The print job contains only its storage key, not the logo pixels."
+    >
+      <ImageIcon size={20} />
+      <strong>Stored printer logo {keyCode}</strong>
+      <span>Logo data is not included in this print job</span>
+    </div>
+  )
+}
+
+function StoredGraphicPreview({ graphic, alignment }: { graphic: StoredGraphic; alignment: ReceiptLine['alignment'] }) {
+  return (
+    <div className={`stored-graphic-preview align-${alignment}`} role="img" aria-label={`Stored printer logo ${graphic.keyCode}: ${graphic.name}`}>
+      <img src={graphic.contentUrl} alt={graphic.name} />
+    </div>
+  )
+}
+
+function storedGraphicKey(data: string) {
+  const parts = data.split(':')
+  const value = parts[0] === 'stored-v1' ? parts[1] : data.replace(/^NV graphic\s*/i, '')
+  return /^[A-Z0-9]{2}$/i.test(value) ? value.toUpperCase() : undefined
 }
 
 function CollapsedSide({ side, label, onExpand }: { side: 'left' | 'right'; label: string; onExpand: () => void }) {

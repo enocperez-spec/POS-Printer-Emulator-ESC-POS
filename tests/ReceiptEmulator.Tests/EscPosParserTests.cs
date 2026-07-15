@@ -89,6 +89,32 @@ public sealed class EscPosParserTests
     }
 
     [Fact]
+    public void ParsesQrPayloadWhenCustomerPosSendsDataBeforeItsSettings()
+    {
+        const string url = "https://go.quby.link/api/v3.6/urls/2419-384?src=&sid=11503&oid=6a5749708a7456fe12f1d679";
+        var data = Encoding.ASCII.GetBytes(url);
+        var bodyLength = data.Length + 3;
+        var bytes = new byte[]
+            {
+                0x1D, 0x28, 0x6B, (byte)(bodyLength & 0xFF), (byte)(bodyLength >> 8), 0x31, 0x50, 0x30
+            }
+            .Concat(data)
+            .Concat(new byte[]
+            {
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30,
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x07,
+                0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
+                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30
+            })
+            .ToArray();
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.Equal($"qr-v1:2:7:48:{Convert.ToBase64String(Encoding.UTF8.GetBytes(url))}", Assert.Single(receipt.Lines).Data);
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
+
+    [Fact]
     public void ConvertsLegacyColumnBitImageToRasterPreview()
     {
         var bytes = new byte[] { 0x1B, 0x2A, 0x00, 0x02, 0x00, 0x80, 0x40 };
@@ -161,10 +187,12 @@ public sealed class EscPosParserTests
         Assert.DoesNotContain("0E00", receipt.PlainText);
         Assert.Contains("SPECIAL OFFER", receipt.PlainText);
         var image = Assert.Single(receipt.Lines, line => line.Kind == "image");
-        Assert.Equal("NV graphic 00", image.Data);
-        var warning = Assert.Single(receipt.Commands, command => !command.Supported);
-        Assert.Equal("Print NV graphic", warning.Name);
-        Assert.Equal("1D 28 4C 06 00 30 45 30 30 01 01", warning.Hex);
+        Assert.Equal("stored-v1:00:1:1", image.Data);
+        var command = Assert.Single(receipt.Commands, command => command.Name == "Print NV graphic");
+        Assert.True(command.Supported);
+        Assert.Contains("not included in this print job", command.Details);
+        Assert.Equal("1D 28 4C 06 00 30 45 30 30 01 01", command.Hex);
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
     }
 
     [Fact]

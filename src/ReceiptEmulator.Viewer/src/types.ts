@@ -43,6 +43,16 @@ export type UpdateStatus = {
   message: string
 }
 
+export type StoredGraphic = {
+  keyCode: string
+  name: string
+  fileName: string
+  contentType: string
+  size: number
+  updatedAt: string
+  contentUrl: string
+}
+
 export type PrinterSetupStatus = {
   isWindows: boolean
   driverInstalled: boolean

@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, UpdateStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -38,4 +38,12 @@ export const api = {
     body: JSON.stringify(state),
   }),
   resetPrinterState: () => json<PrinterStateStatus>('/api/printer-state/reset', { method: 'POST' }),
+  storedGraphics: () => json<StoredGraphic[]>('/api/stored-graphics'),
+  importStoredGraphic: (keyCode: string, name: string, file: File) => {
+    const form = new FormData()
+    form.set('name', name)
+    form.set('file', file)
+    return json<StoredGraphic>(`/api/stored-graphics/${encodeURIComponent(keyCode)}`, { method: 'POST', body: form })
+  },
+  deleteStoredGraphic: (keyCode: string) => request(`/api/stored-graphics/${encodeURIComponent(keyCode)}`, { method: 'DELETE' }),
 }

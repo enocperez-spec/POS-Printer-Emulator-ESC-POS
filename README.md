@@ -12,6 +12,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
+- Stored Logo imports that map local PNG, JPEG, or WebP artwork to Epson NV graphic keys used by POS receipts.
 - Maximum job-size protection and interrupted-connection recovery.
 - Text and raw-data exports plus Print-to-PDF.
 - Native C# desktop window hosting the HTML viewer through Microsoft WebView2, with no browser address bar.
@@ -30,7 +31,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.12-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.13-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -41,6 +42,8 @@ Setup installs POS Printer Emulator and its desktop HTML component under Program
 After installation, open **Settings → Printer Setup Wizard**. The wizard asks where the POS software runs, chooses `127.0.0.1:9100` automatically for a same-computer setup, verifies the Epson driver, and installs the Windows printer after one administrator confirmation. Customers do not need to open Windows printer settings, create a port, visit Epson's website, or select a driver manually.
 
 Open **Settings → Printer State** to simulate Ready, Paper Low, Paper Out, Cover Open, Cutter Error, Offline, and custom error conditions. Connected POS clients receive Epson-compatible `DLE EOT` real-time responses and `GS a` Automatic Status Back notifications whenever the simulated state changes.
+
+Open **Settings → Stored Logos** when a receipt references an image saved inside the physical printer rather than sending its pixels. Import a PNG, JPEG, or WebP image, enter the two-character Epson storage key shown by the command inspector (for example, `00`), and matching receipts will render that local logo automatically.
 
 > The current development installer is not code-signed, so Windows SmartScreen may show a warning. Production releases should be signed with a trusted Windows code-signing certificate.
 
@@ -69,7 +72,7 @@ Activation is validated offline using a public-key signature. The customer does 
 
 ## License and usage dashboard
 
-Version 0.3.12 reports installation registration, Trial or Full status, application version, launch counts, emulated print-job counts, and last-seen time to the HTTPS telemetry API at `posprinteremulator.com`. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, and rendered receipt images are never uploaded.
+Version 0.3.13 reports installation registration, Trial or Full status, application version, launch counts, emulated print-job counts, and last-seen time to the HTTPS telemetry API at `posprinteremulator.com`. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, and rendered receipt images are never uploaded.
 
 The protected owner portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The portal includes the usage dashboard and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
@@ -125,7 +128,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.12-win-x64.exe`
+Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.13-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -145,7 +148,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.12 artifacts/installer/POSPrinterEmulatorSetup-0.3.12-win-x64.exe --title "POS Printer Emulator 0.3.12" --notes "Expanded ESC/POS support for configured QR codes and barcodes, legacy bit-image logos, text modes, positioning, and clearer diagnostics."
+gh release create v0.3.13 artifacts/installer/POSPrinterEmulatorSetup-0.3.13-win-x64.exe --title "POS Printer Emulator 0.3.13" --notes "Adds local Stored Logo imports for Epson NV graphic keys and corrects false unsupported warnings for printer-resident images."
 ```
 
 ## Issue customer activation keys
@@ -161,7 +164,7 @@ Send the printed `PPE1-...` value to the customer. The corresponding public key 
 For unattended installation, provide the required registration fields:
 
 ```console
-POSPrinterEmulatorSetup-0.3.12-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
+POSPrinterEmulatorSetup-0.3.13-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
 ```
 
 ## Configuration

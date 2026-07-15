@@ -22,6 +22,7 @@ builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<ReceiptProcessor>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
 builder.Services.AddSingleton<PrinterStateService>();
+builder.Services.AddSingleton<StoredGraphicService>();
 builder.Services.AddSingleton(supportLogs);
 builder.Services.AddHttpClient("UsageTelemetry");
 builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTelemetryService(
@@ -73,8 +74,39 @@ app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStat
 
 app.MapPost("/api/printer-state/reset", (PrinterStateService printerState) => Results.Ok(printerState.Reset()));
 
+app.MapGet("/api/stored-graphics", (StoredGraphicService graphics) => Results.Ok(graphics.List()));
+
+app.MapGet("/api/stored-graphics/{keyCode}/content", (string keyCode, StoredGraphicService graphics) =>
+    graphics.TryRead(keyCode, out var content, out var contentType)
+        ? Results.File(content, contentType)
+        : Results.NotFound());
+
+app.MapPost("/api/stored-graphics/{keyCode}", async (string keyCode, HttpRequest request, StoredGraphicService graphics, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        if (!request.HasFormContentType) return Results.Problem("Choose an image file to import.", statusCode: 400);
+        var form = await request.ReadFormAsync(cancellationToken);
+        var file = form.Files.GetFile("file");
+        if (file is null || file.Length == 0) return Results.Problem("Choose an image file to import.", statusCode: 400);
+        if (file.Length > StoredGraphicService.MaximumFileBytes) return Results.Problem("Logo files must be 2 MB or smaller.", statusCode: 400);
+        await using var stream = file.OpenReadStream();
+        return Results.Ok(await graphics.ImportAsync(keyCode, form["name"].FirstOrDefault(), file.FileName, stream, cancellationToken));
+    }
+    catch (ArgumentException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
+});
+
+app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGraphicService graphics, CancellationToken cancellationToken) =>
+{
+    try { return await graphics.DeleteAsync(keyCode, cancellationToken) ? Results.NoContent() : Results.NotFound(); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
 app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
-    ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState) =>
+    ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState, StoredGraphicService graphics) =>
 {
     var status = license.GetStatus();
     var report = new StringBuilder()
@@ -90,6 +122,7 @@ app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseServ
         .AppendLine($"License mode: {status.Mode}")
         .AppendLine($"License ID: {status.LicenseId?.ToString() ?? "None"}")
         .AppendLine($"Receipt jobs currently listed: {store.GetSummaries().Count}")
+        .AppendLine($"Stored printer logos: {graphics.List().Count}")
         .AppendLine($"Simulated printer state: {printerState.GetStatus().Summary}")
         .AppendLine($"Printer status responses sent: {printerState.GetStatus().ResponsesSent}")
         .AppendLine()

@@ -313,9 +313,9 @@ public sealed class EscPosParser
                         var scaleX = payload[i + 9];
                         var scaleY = payload[i + 10];
                         if (line.Count > 0) FlushLine();
-                        result.Lines.Add(new ReceiptLine("center", [], "image", $"NV graphic {keyCode}"));
+                        result.Lines.Add(new ReceiptLine("center", [], "image", $"stored-v1:{keyCode}:{scaleX}:{scaleY}"));
                         AddCommand(i, payload.Slice(i, total), "Print NV graphic",
-                            $"Stored image {keyCode}, {scaleX}x{scaleY}; image data is stored in the physical printer", false);
+                            $"Stored image {keyCode}, {scaleX}x{scaleY}; logo data is resident in the physical printer and is not included in this print job");
                     }
                     else
                     {
