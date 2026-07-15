@@ -25,6 +25,13 @@
 @media (max-width:1100px){.site-nav{gap:16px}.audience-grid{grid-template-columns:1fr}.audience-grid article{min-height:0}.audience-number{margin-bottom:26px}}
 @media (max-width:780px){.audience-grid{margin-top:40px}.audience-grid article{padding:28px}.footer-top nav{grid-template-columns:1fr 1fr}}
 
+/* Preserve the application screenshot's natural 1717:919 ratio and keep the
+   subtle perspective treatment after the reveal animation completes. */
+.product-stage>img{width:100%;height:auto;aspect-ratio:1717/919;object-fit:contain}
+.product-stage.reveal{transform:perspective(1400px) translateY(24px) rotateY(-5deg) rotateX(1.4deg) rotateZ(-.25deg)}
+.product-stage.reveal.visible{transform:perspective(1400px) rotateY(-5deg) rotateX(1.4deg) rotateZ(-.25deg)}
+@media (max-width:1100px){.product-stage.reveal,.product-stage.reveal.visible{transform:none}}
+
 /* Search-focused product overview */
 .seo-overview{background:#f7fafc}
 .seo-overview-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:80px;align-items:start}
