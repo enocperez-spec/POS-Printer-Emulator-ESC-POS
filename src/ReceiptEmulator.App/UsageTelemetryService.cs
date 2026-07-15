@@ -20,6 +20,7 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
     private readonly string _statePath;
     private readonly Uri? _endpoint;
     private readonly bool _enabled;
+    private readonly TimeSpan _retryDelay;
     private TelemetryState _state;
 
     public UsageTelemetryService(
@@ -45,6 +46,7 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
                    configuration.GetValue("Telemetry:Enabled", true) &&
                    Uri.TryCreate(configuration["Telemetry:Endpoint"], UriKind.Absolute, out _endpoint) &&
                    _endpoint.Scheme == Uri.UriSchemeHttps;
+        _retryDelay = TimeSpan.FromSeconds(Math.Max(0.01, configuration.GetValue("Telemetry:RetryDelaySeconds", 60d)));
         _httpClient.Timeout = TimeSpan.FromSeconds(15);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
     }
@@ -73,6 +75,8 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         }
 
         var launchPending = true;
+        var printJobsPending = 0;
+        var activationPending = false;
         var nextHeartbeat = DateTimeOffset.UtcNow.AddHours(12);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -88,8 +92,34 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
 
             if (launchPending)
             {
-                await SendEventAsync("launch", 1, stoppingToken);
-                launchPending = false;
+                launchPending = !await SendEventAsync("launch", 1, stoppingToken);
+                if (launchPending)
+                {
+                    await Task.Delay(_retryDelay, stoppingToken);
+                }
+                continue;
+            }
+
+            if (printJobsPending > 0)
+            {
+                if (await SendEventAsync("print_job", printJobsPending, stoppingToken))
+                {
+                    printJobsPending = 0;
+                }
+                else
+                {
+                    await Task.Delay(_retryDelay, stoppingToken);
+                }
+                continue;
+            }
+
+            if (activationPending)
+            {
+                activationPending = !await SendEventAsync("activation", 1, stoppingToken);
+                if (activationPending)
+                {
+                    await Task.Delay(_retryDelay, stoppingToken);
+                }
                 continue;
             }
 
@@ -111,21 +141,10 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
                 break;
             }
 
-            var printJobs = 0;
-            var activated = false;
             while (_events.Reader.TryRead(out var telemetryEvent))
             {
-                printJobs += telemetryEvent == TelemetryEvent.PrintJob ? 1 : 0;
-                activated |= telemetryEvent == TelemetryEvent.Activation;
-            }
-
-            if (printJobs > 0)
-            {
-                await SendEventAsync("print_job", printJobs, stoppingToken);
-            }
-            if (activated)
-            {
-                await SendEventAsync("activation", 1, stoppingToken);
+                printJobsPending += telemetryEvent == TelemetryEvent.PrintJob ? 1 : 0;
+                activationPending |= telemetryEvent == TelemetryEvent.Activation;
             }
         }
     }
@@ -175,11 +194,11 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         return false;
     }
 
-    private async Task SendEventAsync(string eventName, int count, CancellationToken cancellationToken)
+    private async Task<bool> SendEventAsync(string eventName, int count, CancellationToken cancellationToken)
     {
         if (_endpoint is null || string.IsNullOrWhiteSpace(_state.Token))
         {
-            return;
+            return false;
         }
 
         try
@@ -195,9 +214,10 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
             {
                 _state = new TelemetryState(Guid.NewGuid(), null);
                 SaveState();
-                return;
+                return false;
             }
             response.EnsureSuccessStatusCode();
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -205,7 +225,8 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         }
         catch (Exception exception)
         {
-            _logger.LogDebug(exception, "Could not report {TelemetryEvent}; receipt emulation is unaffected", eventName);
+            _logger.LogWarning(exception, "Could not report {TelemetryEvent}; it will be retried", eventName);
+            return false;
         }
     }
 

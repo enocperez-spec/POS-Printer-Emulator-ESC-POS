@@ -2,6 +2,12 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+## v0.3.14
+
+- Fixed aggregate usage reporting so completed emulated print jobs reach the dashboard through the canonical HTTPS telemetry endpoint.
+- Retained and retried pending print-job totals when the telemetry service is temporarily unavailable instead of dropping the count.
+- Changed the website canonical redirect to preserve POST methods where the hosting platform permits it.
+
 ## v0.3.13
 
 - Added a Stored Logos library under Settings for importing PNG, JPEG, or WebP images and assigning them to two-character Epson NV graphic keys.
