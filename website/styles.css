@@ -50,6 +50,7 @@ img{height:auto}
 .impact-metrics span{display:block;margin-top:10px;color:#d7e4ef;font-size:14px;line-height:1.45}
 .impact-note{margin:24px 0 0;padding-top:20px;border-top:1px solid rgba(255,255,255,.12);color:#b9dff0;font-size:13px}
 .impact-assumption{margin:10px 0 0;color:#8fa7bc;font-size:12px;line-height:1.55}
+.impact-method-link{display:inline-flex;align-items:center;gap:8px;margin-top:18px;color:var(--cyan-2);font-size:13px;font-weight:700}.impact-method-link span{transition:transform .2s}.impact-method-link:hover span{transform:translateX(4px)}
 @media (max-width:980px){.impact-layout{grid-template-columns:1fr;gap:44px}}
 @media (max-width:650px){.impact-data{padding:25px}.impact-metrics{grid-template-columns:1fr}.impact-metrics article,.impact-metrics article:first-child,.impact-metrics article:last-child{padding:18px 0;border-right:0;border-bottom:1px solid rgba(255,255,255,.12)}.impact-metrics article:first-child{padding-top:0}.impact-metrics article:last-child{padding-bottom:0;border-bottom:0}.impact-metrics strong{font-size:38px}}
 
