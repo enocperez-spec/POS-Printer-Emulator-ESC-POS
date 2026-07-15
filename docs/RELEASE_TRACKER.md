@@ -12,7 +12,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.15**
+**Current public release: v0.3.16**
 
 ## Completed releases
 
@@ -36,10 +36,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.13 | Released | Imported Stored Logos and Epson NV graphic substitution |
 | v0.3.14 | Released | Reliable dashboard print-job telemetry and canonical endpoint reporting |
 | v0.3.15 | Released | Portable capture packages, safe import, export, and replay |
+| v0.3.16 | Released | In-place Text, Raw, and Capture download correction |
 
 ## Scheduled releases
 
-The scheduled order is dependency-driven: capture and replay creates reusable test data; profiles define printer behavior; multiple listeners reuse profiles; comparison uses deterministic captures and profiles; enhanced diagnostics can then report across the complete system.
+The scheduled order is dependency-driven: capture and replay creates reusable test data; profiles define printer behavior; multiple listeners reuse profiles; comparison uses deterministic captures and profiles; enhanced diagnostics can then report across the complete system. v0.3.16 was used for the completed BUG-005 maintenance correction, so the remaining feature releases advance by one version.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -59,7 +60,23 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** A supplied binary receipt can be imported, rendered, exported, re-imported, and replayed with identical bytes and output; malformed files fail safely with useful logs.
 
-### v0.3.16 — Printer profiles
+### v0.3.16 — In-place receipt export correction
+
+**Status:** Released
+
+**Purpose:** Correct the v0.3.15 desktop export failure without delaying a customer-facing fix until the larger printer-profile feature was complete.
+
+**Released scope:**
+
+- Download Text, Raw, and Capture files without navigating the WebView away from the selected receipt.
+- Open a native Windows Save dialog from the desktop application for receipt exports.
+- Keep an already-loaded viewer visible if WebView2 reports `ConnectionAborted` for an attachment navigation.
+- Show download progress and plain-language failures while retaining the established export formats.
+- Record and release BUG-005 with production builds, automated tests, endpoint checks, and rendered-viewer verification.
+
+**Complete when:** All three export actions save their expected attachment types, the receipt and viewer URL remain unchanged, and the installed desktop application no longer replaces the viewer with a startup error.
+
+### v0.3.17 — Printer profiles
 
 **Status:** Next
 
@@ -77,7 +94,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** The same captured job can be replayed against two profiles and the viewer consistently shows the expected rendering and capability differences.
 
-### v0.3.17 — Multiple printer listeners
+### v0.3.18 — Multiple printer listeners
 
 **Status:** Planned
 
@@ -96,7 +113,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** At least two listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart.
 
-### v0.3.18 — Receipt comparison and automated validation
+### v0.3.19 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -115,7 +132,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.19 — Enhanced support package and connection diagnostics
+### v0.3.20 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 

@@ -4,6 +4,13 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.16
+
+- Fixed BUG-005 so Text, Raw, and Capture exports download without navigating the desktop WebView away from the selected receipt.
+- Added a native Windows Save dialog for receipt exports in the desktop application.
+- Kept the loaded viewer visible when WebView2 reports an attachment-navigation `ConnectionAborted` event after startup.
+- Added in-progress feedback and plain-language download errors while preserving the existing `.txt`, `.bin`, and `.ppecapture` formats.
+
 ## v0.3.15
 
 - Added portable `.ppecapture` export packages containing the exact ESC/POS payload, capture metadata, renderer version, parsed-command summary, and a SHA-256 integrity checksum.

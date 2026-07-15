@@ -40,34 +40,61 @@ ensure_dev_support_schema();
 
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
-    "UPDATE development_roadmap
-     SET status = 'Released', completed_at = COALESCE(completed_at, UTC_TIMESTAMP(6))
-     WHERE item_key = 'v0.3.15' AND status IN ('Next', 'Planned', 'In progress')"
+    "INSERT INTO development_roadmap
+        (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria, completed_at)
+     VALUES
+        ('v0.3.16', 'v0.3.16', 'Release', 'In-place receipt export correction', 'Released', 316,
+         'Correct the v0.3.15 desktop export failure without delaying the customer fix.',
+         'Blob-based Text, Raw, and Capture downloads, native Windows Save dialog, resilient post-startup WebView navigation handling, progress, and errors.',
+         'Customers must be able to save receipt artifacts without leaving the selected receipt.',
+         'All three formats download, the viewer remains visible, and the desktop no longer shows a ConnectionAborted startup error.', UTC_TIMESTAMP(6)),
+        ('v0.3.17', 'v0.3.17', 'Release', 'Printer profiles', 'Next', 317,
+         'Model differences between printer configurations explicitly.',
+         'Built-in and custom profiles for paper width, dots, code pages, fonts, cutter, drawer, images, barcode and QR features, status behavior, import, and export.',
+         'Profiles define behavior before multiple endpoints depend on it.',
+         'One capture replayed against two profiles shows deterministic expected capability and rendering differences.', NULL),
+        ('v0.3.18', 'v0.3.18', 'Release', 'Multiple printer listeners', 'Planned', 318,
+         'Emulate multiple receipt printers from one computer.',
+         'Independent listener names, ports, addresses, profiles, state, counters, filtering, conflict detection, firewall setup, and fault isolation.',
+         'Multiple listeners reuse the profile model and enable multi-station testing.',
+         'Two simultaneous listeners receive jobs, apply different profiles, restart safely, and remain independently controllable.', NULL),
+        ('v0.3.19', 'v0.3.19', 'Release', 'Receipt comparison and automated validation', 'Planned', 319,
+         'Provide repeatable compatibility and regression testing.',
+         'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
+         'Deterministic captures and profiles are required for meaningful comparisons.',
+         'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
+        ('v0.3.20', 'v0.3.20', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 320,
+         'Guide nontechnical customers through connection problems and support collection.',
+         'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
+         'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
+         'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL)
+     ON DUPLICATE KEY UPDATE
+        version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
+        status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
+        planned_scope = VALUES(planned_scope), priority_reason = VALUES(priority_reason),
+        completion_criteria = VALUES(completion_criteria),
+        completed_at = IF(VALUES(status) = 'Released', COALESCE(completed_at, UTC_TIMESTAMP(6)), NULL)"
 );
 $releaseSync->execute();
-$nextSync = database()->prepare(
-    "UPDATE development_roadmap
-     SET status = 'Next'
-     WHERE item_key = 'v0.3.16' AND status = 'Planned'"
-);
-$nextSync->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
         (bug_key, title, severity, status, affected_versions, target_release, fixed_version, customer_impact,
          expected_behavior, actual_behavior, reproduction_steps, verification, resolved_at)
      VALUES
         ('BUG-005', 'Receipt exports replaced the desktop viewer with a ConnectionAborted error',
-         'Medium', 'Fixed locally', 'v0.3.15', 'v0.3.16', NULL,
+         'Medium', 'Released', 'v0.3.15', 'v0.3.16', 'v0.3.16',
          'Full-Version customers could not save Text, Raw, or Capture files without leaving the desktop receipt viewer.',
          'Selecting an export should open a Save dialog, download the file, and keep the current receipt visible.',
          'Direct attachment links were treated as main-frame WebView navigation and the aborted navigation was displayed as a startup failure.',
          'Select a receipt in the v0.3.15 desktop application and choose Text, Raw, or Capture.',
          'Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors.',
-         NULL)
+         UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
-        status = IF(status IN ('Reported', 'Confirmed', 'In progress'), VALUES(status), status),
+        status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
         target_release = COALESCE(target_release, VALUES(target_release)),
-        verification = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(verification), verification)"
+        fixed_version = COALESCE(fixed_version, VALUES(fixed_version)),
+        verification = IF(status <> 'Closed - not a bug', VALUES(verification), verification),
+        resolved_at = IF(status = 'Released', COALESCE(resolved_at, UTC_TIMESTAMP(6)), resolved_at)"
 );
 $bugSync->execute();
 

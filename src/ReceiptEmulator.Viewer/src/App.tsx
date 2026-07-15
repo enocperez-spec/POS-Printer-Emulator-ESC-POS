@@ -46,7 +46,7 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic,
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.15',
+  version: '0.3.16',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',

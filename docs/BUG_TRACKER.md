@@ -27,9 +27,7 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 
 ## Open bugs
 
-| Bug ID | Severity | Summary | Affected version(s) | Target release | Status | Verification |
-| --- | --- | --- | --- | --- | --- | --- |
-| BUG-005 | Medium | Text, Raw, and Capture exports navigated the desktop WebView away from the receipt viewer and displayed a `ConnectionAborted` startup error instead of saving in place. | v0.3.15 | v0.3.16 | Fixed locally | Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors. |
+There are currently no documented open bugs. New reports must be entered here before implementation begins.
 
 ## Resolved bugs
 
@@ -39,6 +37,7 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 | BUG-002 | Medium | Existing registration values were requested again during an upgrade instead of being reused or prefilled. | v0.3.06 and earlier installer implementation | v0.3.07 | Released | Valid saved registration skips the page; partial saved registration is prefilled. |
 | BUG-003 | Medium | Recognized Epson NV graphic print commands were reported as unsupported when printer-resident image data was unavailable. | v0.3.12 and earlier parser behavior | v0.3.13 | Released | Recognized missing stored images are informational and matching imported logos render correctly. |
 | BUG-004 | High | Completed emulated print-job totals did not reliably reach the owner dashboard through the canonical telemetry endpoint. | v0.3.13 telemetry implementation | v0.3.14 | Released | Reports use the canonical HTTPS endpoint and pending totals are retained and retried after temporary failures. |
+| BUG-005 | Medium | Text, Raw, and Capture exports navigated the desktop WebView away from the receipt viewer and displayed a `ConnectionAborted` startup error instead of saving in place. | v0.3.15 | v0.3.16 | Released | Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors. |
 
 ## Bug record template
 
