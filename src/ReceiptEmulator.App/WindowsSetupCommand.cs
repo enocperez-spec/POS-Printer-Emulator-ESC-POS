@@ -10,7 +10,9 @@ public enum WindowsSetupAction
     None,
     Install,
     Uninstall,
-    HealthCheck
+    HealthCheck,
+    InstallPrinter,
+    PrintPrinterTest
 }
 
 public static class WindowsSetupCommand
@@ -33,6 +35,8 @@ public static class WindowsSetupCommand
             "--install-windows" => WindowsSetupAction.Install,
             "--uninstall-windows" => WindowsSetupAction.Uninstall,
             "--health-check" => WindowsSetupAction.HealthCheck,
+            "--install-printer" => WindowsSetupAction.InstallPrinter,
+            "--print-printer-test" => WindowsSetupAction.PrintPrinterTest,
             _ => WindowsSetupAction.None
         };
     }
@@ -79,6 +83,19 @@ public static class WindowsSetupCommand
         }
 
         EnsureAdministrator();
+
+        if (action == WindowsSetupAction.InstallPrinter)
+        {
+            return await PrinterSetupManager.InstallFromFilesAsync(
+                GetRequiredOption(arguments, "--request"),
+                GetRequiredOption(arguments, "--result"),
+                cancellationToken);
+        }
+
+        if (action == WindowsSetupAction.PrintPrinterTest)
+        {
+            return PrinterSetupManager.PrintTestReceipt(GetRequiredOption(arguments, "--printer-name"));
+        }
 
         if (action == WindowsSetupAction.Install)
         {

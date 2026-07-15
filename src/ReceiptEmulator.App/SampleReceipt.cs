@@ -4,6 +4,8 @@ namespace ReceiptEmulator;
 
 public static class SampleReceipt
 {
+    private const string LogoResourceName = "ReceiptEmulator.TestReceiptLogo";
+
     public static byte[] Create()
     {
         var bytes = new List<byte>();
@@ -12,10 +14,12 @@ public static class SampleReceipt
 
         Command(0x1B, 0x40);
         Command(0x1B, 0x61, 0x01);
+        bytes.AddRange(LoadLogoCommand());
+        Text("\n");
         Command(0x1D, 0x21, 0x11);
         Text("POS PRINTER EMULATOR\n");
         Command(0x1D, 0x21, 0x00);
-        Text("1234 Main Street\nAtlanta, GA 30342\n");
+        Text("1234 Glenridge Rd. NW\nAtlanta, GA 30342\n");
         Text("------------------------------------------\n");
         Command(0x1B, 0x45, 0x01);
         Text("CHECK #1198\n");
@@ -38,5 +42,14 @@ public static class SampleReceipt
         Text("\n\n");
         Command(0x1D, 0x56, 0x42, 0x18);
         return bytes.ToArray();
+    }
+
+    private static byte[] LoadLogoCommand()
+    {
+        using var stream = typeof(SampleReceipt).Assembly.GetManifestResourceStream(LogoResourceName)
+            ?? throw new InvalidOperationException("The Test Receipt logo resource is missing.");
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
     }
 }

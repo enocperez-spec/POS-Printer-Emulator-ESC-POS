@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, ReceiptJob, ServiceStatus, UpdateStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, PrinterSetupStatus, ReceiptJob, ServiceStatus, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -30,4 +30,5 @@ export const api = {
     body: JSON.stringify(request),
   }),
   checkUpdates: (force = false) => json<UpdateStatus>(`/api/updates/check?force=${force}`),
+  printerSetupStatus: () => json<PrinterSetupStatus>('/api/printer-setup/status'),
 }

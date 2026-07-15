@@ -22,10 +22,19 @@ builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<ReceiptProcessor>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
 builder.Services.AddSingleton(supportLogs);
+builder.Services.AddHttpClient("UsageTelemetry");
+builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTelemetryService(
+    services.GetRequiredService<IHttpClientFactory>().CreateClient("UsageTelemetry"),
+    services.GetRequiredService<LicenseService>(),
+    services.GetRequiredService<IConfiguration>(),
+    services.GetRequiredService<IHostEnvironment>(),
+    services.GetRequiredService<ILogger<UsageTelemetryService>>()));
+builder.Services.AddSingleton<IUsageTelemetry>(services => services.GetRequiredService<UsageTelemetryService>());
+builder.Services.AddHostedService(services => services.GetRequiredService<UsageTelemetryService>());
 builder.Services.AddHttpClient<UpdateService>(client =>
 {
-    client.BaseAddress = new Uri("https://api.github.com/repos/enocperez-spec/Desktop-Web-Base-POS-Emulator/");
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("POS-Printer-Emulator/0.3.03");
+    client.BaseAddress = new Uri("https://api.github.com/repos/enocperez-spec/POS-Printer-Emulator-ESC-POS/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
     client.Timeout = TimeSpan.FromSeconds(15);
@@ -51,6 +60,8 @@ app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, Canc
 app.MapGet("/api/updates/status", (UpdateService updates) =>
     updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
 
+app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
+
 app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
     ReceiptStore store, SupportLogProvider logs) =>
 {
@@ -71,17 +82,22 @@ app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseServ
         .AppendLine()
         .AppendLine("Application log")
         .AppendLine("---------------")
-        .Append(logs.ReadLog())
+        .AppendLine(logs.ReadLog())
+        .AppendLine()
+        .AppendLine("Printer setup log")
+        .AppendLine("-----------------")
+        .Append(PrinterSetupManager.ReadLog())
         .ToString();
     return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
 });
 
-app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService license, ReceiptStore store) =>
+app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService license, ReceiptStore store, IUsageTelemetry telemetry) =>
 {
     try
     {
         var status = license.Activate(request.CustomerName, request.EmailAddress, request.ActivationKey);
         store.EnableFullHistory();
+        telemetry.RecordActivation();
         return Results.Ok(status);
     }
     catch (InvalidOperationException exception)

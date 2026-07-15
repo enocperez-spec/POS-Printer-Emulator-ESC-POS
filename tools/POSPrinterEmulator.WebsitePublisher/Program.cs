@@ -1,0 +1,300 @@
+using System.Security.Cryptography;
+using Renci.SshNet;
+
+const string HostVariable = "PPE_SFTP_HOST";
+const string UserVariable = "PPE_SFTP_USER";
+const string PasswordVariable = "PPE_SFTP_PASSWORD";
+const string FingerprintVariable = "PPE_SFTP_HOST_KEY_SHA256";
+const string DatabaseHostVariable = "PPE_DB_HOST";
+const string DatabasePortVariable = "PPE_DB_PORT";
+const string DatabaseUserVariable = "PPE_DB_USER";
+const string DatabasePasswordVariable = "PPE_DB_PASSWORD";
+const string DatabaseNameVariable = "PPE_DB_NAME";
+const string AdminUserVariable = "PPE_ADMIN_USER";
+const string AdminPasswordVariable = "PPE_ADMIN_PASSWORD";
+const string LicensePrivateKeyPathVariable = "PPE_LICENSE_PRIVATE_KEY_PATH";
+
+if (args.Length == 0 || args[0] is "-h" or "--help")
+{
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  website-publisher list [remote-directory]");
+    Console.WriteLine("  website-publisher publish <local-directory> [remote-directory]");
+    Console.WriteLine("  website-publisher configure <schema-file> [remote-directory]");
+    Console.WriteLine();
+    Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
+    return 0;
+}
+
+var host = RequiredEnvironmentVariable(HostVariable);
+var username = RequiredEnvironmentVariable(UserVariable);
+var password = RequiredEnvironmentVariable(PasswordVariable);
+var expectedFingerprint = RequiredEnvironmentVariable(FingerprintVariable);
+
+using var client = new SftpClient(host, 22, username, password);
+client.HostKeyReceived += (_, eventArgs) =>
+{
+    var actual = "SHA256:" + Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+    eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+        System.Text.Encoding.ASCII.GetBytes(actual),
+        System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+
+    if (!eventArgs.CanTrust)
+    {
+        Console.Error.WriteLine($"SFTP host-key mismatch. Received {actual}");
+    }
+};
+
+client.Connect();
+
+try
+{
+    switch (args[0].ToLowerInvariant())
+    {
+        case "list":
+            ListDirectory(client, args.Length > 1 ? args[1] : ".");
+            break;
+        case "publish":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The publish command requires a local source directory.");
+            }
+
+            Publish(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
+            break;
+        case "configure":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The configure command requires a schema file.");
+            }
+
+            Configure(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
+            break;
+        default:
+            throw new ArgumentException($"Unknown command: {args[0]}");
+    }
+}
+finally
+{
+    client.Disconnect();
+}
+
+return 0;
+
+static string RequiredEnvironmentVariable(string name) =>
+    Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
+        ? value
+        : throw new InvalidOperationException($"Required environment variable {name} is not set.");
+
+static void ListDirectory(SftpClient client, string remoteDirectory)
+{
+    var resolvedDirectory = ResolveRemotePath(client, remoteDirectory);
+    Console.WriteLine($"Remote directory: {resolvedDirectory}");
+    foreach (var entry in client.ListDirectory(resolvedDirectory).Where(item => item.Name is not "." and not ".."))
+    {
+        Console.WriteLine($"{(entry.IsDirectory ? "directory" : "file"),-9} {entry.Length,12:N0}  {entry.Name}");
+    }
+}
+
+static void Publish(SftpClient client, string localDirectory, string remoteDirectory)
+{
+    if (!Directory.Exists(localDirectory))
+    {
+        throw new DirectoryNotFoundException(localDirectory);
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    var files = Directory.EnumerateFiles(localDirectory, "*", SearchOption.AllDirectories)
+        .Where(path => !path.EndsWith("README.md", StringComparison.OrdinalIgnoreCase))
+        .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.vite{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        .Order(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    var createdDirectories = new HashSet<string>(StringComparer.Ordinal);
+    long uploadedBytes = 0;
+    var skippedFiles = 0;
+
+    foreach (var localFile in files)
+    {
+        var relative = Path.GetRelativePath(localDirectory, localFile).Replace('\\', '/');
+        var remoteFile = CombineRemote(remoteRoot, relative);
+        var parent = remoteFile[..remoteFile.LastIndexOf('/')];
+        EnsureDirectory(client, parent, createdDirectories);
+
+        using var input = File.OpenRead(localFile);
+        var remoteLength = client.Exists(remoteFile) ? client.GetAttributes(remoteFile).Size : 0;
+        if (remoteLength == input.Length &&
+            (input.Length > 1_000_000 || RemotePrefixMatches(client, remoteFile, input, input.Length)))
+        {
+            Console.WriteLine($"Verified  {relative} ({input.Length:N0} bytes)");
+            skippedFiles++;
+            continue;
+        }
+
+        var matchingPrefixLength = remoteLength > 0 && remoteLength < input.Length
+            ? RemoteMatchingPrefixLength(client, remoteFile, input, remoteLength)
+            : 0;
+        if (matchingPrefixLength > 0)
+        {
+            Console.WriteLine($"Resuming  {relative} at verified byte {matchingPrefixLength:N0} of {input.Length:N0}");
+            input.Position = matchingPrefixLength;
+            using var output = client.Open(remoteFile, FileMode.OpenOrCreate, FileAccess.Write);
+            if (output.Length != matchingPrefixLength)
+            {
+                output.SetLength(matchingPrefixLength);
+            }
+            output.Position = matchingPrefixLength;
+            input.CopyTo(output);
+        }
+        else
+        {
+            Console.WriteLine($"Uploading {relative} ({input.Length:N0} bytes)");
+            client.UploadFile(input, remoteFile, true);
+        }
+
+        var remoteAttributes = client.GetAttributes(remoteFile);
+        if (remoteAttributes.Size != input.Length)
+        {
+            throw new IOException($"Size verification failed for {relative}: local {input.Length}, remote {remoteAttributes.Size}.");
+        }
+
+        uploadedBytes += input.Length - Math.Min(remoteLength, input.Length);
+    }
+
+    Console.WriteLine($"Published {files.Length} files ({skippedFiles} already current, {uploadedBytes:N0} bytes transferred) to {remoteRoot}.");
+}
+
+static void Configure(SftpClient client, string schemaPath, string remoteDirectory)
+{
+    if (!File.Exists(schemaPath))
+    {
+        throw new FileNotFoundException("Schema file was not found.", schemaPath);
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    var privateDirectory = CombineRemote(remoteRoot, "private");
+    EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
+
+    var salt = RandomNumberGenerator.GetBytes(24);
+    var passwordHash = Rfc2898DeriveBytes.Pbkdf2(
+        RequiredEnvironmentVariable(AdminPasswordVariable),
+        salt,
+        210_000,
+        HashAlgorithmName.SHA256,
+        32);
+    var databasePort = uint.TryParse(Environment.GetEnvironmentVariable(DatabasePortVariable), out var port) ? port : 3306;
+    var config = $"""
+        <?php
+        declare(strict_types=1);
+
+        return [
+            'database' => [
+                'host' => {PhpString(RequiredEnvironmentVariable(DatabaseHostVariable))},
+                'port' => {databasePort},
+                'username' => {PhpString(RequiredEnvironmentVariable(DatabaseUserVariable))},
+                'password' => {PhpString(RequiredEnvironmentVariable(DatabasePasswordVariable))},
+                'name' => {PhpString(Environment.GetEnvironmentVariable(DatabaseNameVariable) ?? string.Empty)},
+            ],
+            'admin' => [
+                'username' => {PhpString(RequiredEnvironmentVariable(AdminUserVariable))},
+                'salt' => {PhpString(Convert.ToBase64String(salt))},
+                'password_hash' => {PhpString(Convert.ToBase64String(passwordHash))},
+                'iterations' => 210000,
+            ],
+        ];
+        """;
+
+    UploadText(client, CombineRemote(privateDirectory, "config.php"), config);
+    using var schema = File.OpenRead(schemaPath);
+    client.UploadFile(schema, CombineRemote(privateDirectory, "schema.sql"), true);
+    if (Environment.GetEnvironmentVariable(LicensePrivateKeyPathVariable) is { Length: > 0 } privateKeyPath)
+    {
+        privateKeyPath = Path.GetFullPath(privateKeyPath);
+        if (!File.Exists(privateKeyPath))
+        {
+            throw new FileNotFoundException("The license signing key was not found.", privateKeyPath);
+        }
+        using var privateKey = File.OpenRead(privateKeyPath);
+        client.UploadFile(privateKey, CombineRemote(privateDirectory, "vendor-private-key.pem"), true);
+    }
+    Console.WriteLine("Uploaded protected database configuration and schema. No secrets were written to the project directory.");
+}
+
+static void UploadText(SftpClient client, string remotePath, string content)
+{
+    using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+    client.UploadFile(stream, remotePath, true);
+}
+
+static string PhpString(string value) =>
+    "'" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal) + "'";
+
+static void EnsureDirectory(SftpClient client, string directory, HashSet<string> createdDirectories)
+{
+    if (directory is "" or "/" || !createdDirectories.Add(directory))
+    {
+        return;
+    }
+
+    var parent = directory[..directory.LastIndexOf('/')];
+    EnsureDirectory(client, parent, createdDirectories);
+
+    if (!client.Exists(directory))
+    {
+        client.CreateDirectory(directory);
+    }
+}
+
+static string CombineRemote(string root, string relative) =>
+    root == "/" ? "/" + relative : root + "/" + relative;
+
+static bool RemotePrefixMatches(SftpClient client, string remoteFile, FileStream localFile, long length)
+    => RemoteMatchingPrefixLength(client, remoteFile, localFile, length) == length;
+
+static long RemoteMatchingPrefixLength(SftpClient client, string remoteFile, FileStream localFile, long length)
+{
+    using var remoteFileStream = client.OpenRead(remoteFile);
+    var localBuffer = new byte[64 * 1024];
+    var remoteBuffer = new byte[64 * 1024];
+    long compared = 0;
+
+    while (compared < length)
+    {
+        var requested = (int)Math.Min(localBuffer.Length, length - compared);
+        var localRead = localFile.Read(localBuffer, 0, requested);
+        var remoteRead = remoteFileStream.Read(remoteBuffer, 0, requested);
+        if (localRead != requested || remoteRead != requested ||
+            !localBuffer.AsSpan(0, requested).SequenceEqual(remoteBuffer.AsSpan(0, requested)))
+        {
+            localFile.Position = 0;
+            return compared;
+        }
+
+        compared += requested;
+    }
+
+    localFile.Position = 0;
+    return compared;
+}
+
+static string ResolveRemotePath(SftpClient client, string path)
+{
+    if (path.StartsWith('/'))
+    {
+        return path;
+    }
+
+    var workingDirectory = string.IsNullOrEmpty(client.WorkingDirectory)
+        ? "/"
+        : client.WorkingDirectory.TrimEnd('/');
+    return path is "." or "" ? workingDirectory : CombineRemote(workingDirectory, path);
+}

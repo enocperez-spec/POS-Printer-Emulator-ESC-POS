@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   AlertTriangle,
   Braces,
@@ -32,12 +32,13 @@ import {
   X,
 } from 'lucide-react'
 import { api } from './api'
+import { PrinterSetupWizard } from './PrinterSetupWizard'
 import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, UpdateStatus } from './types'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.03',
+  version: '0.3.10',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -49,7 +50,7 @@ type ClearRequest =
   | { kind: 'one'; id: string; label: string }
   | { kind: 'all'; count: number }
 
-type SettingsSection = 'license' | 'updates' | 'support'
+type SettingsSection = 'license' | 'printer' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -288,13 +289,6 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   onTheme: () => void
   onSettings: (section: SettingsSection) => void
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  function openSettings(section: SettingsSection) {
-    setMenuOpen(false)
-    onSettings(section)
-  }
-
   return (
     <header className="app-header">
       <div className="brand-mark" aria-hidden="true">
@@ -318,24 +312,9 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
           {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
           {theme === 'light' ? 'Dark mode' : 'Light mode'}
         </button>
-        <div className="settings-menu-wrap">
-          <button className="settings-button" onClick={() => setMenuOpen(current => !current)} aria-haspopup="menu" aria-expanded={menuOpen}>
-            <Settings size={17} /> Settings <ChevronDown size={14} />
-          </button>
-          {menuOpen && (
-            <div className="settings-dropdown" role="menu">
-              <button role="menuitem" onClick={() => openSettings('license')}>
-                <KeyRound size={17} /><span><strong>License</strong><small>{status.license.isFull ? 'Full Version' : `Trial · ${status.license.remaining} jobs left`}</small></span><ChevronRight size={15} />
-              </button>
-              <button role="menuitem" onClick={() => openSettings('updates')}>
-                <RefreshCw size={17} /><span><strong>Check for Updates</strong><small>Version and installer updates</small></span><ChevronRight size={15} />
-              </button>
-              <button role="menuitem" onClick={() => openSettings('support')}>
-                <LifeBuoy size={17} /><span><strong>Support</strong><small>Diagnostics and application logs</small></span><ChevronRight size={15} />
-              </button>
-            </div>
-          )}
-        </div>
+        <button className="settings-button" onClick={() => onSettings('license')} aria-haspopup="dialog">
+          <Settings size={17} /> Settings
+        </button>
       </div>
     </header>
   )
@@ -457,7 +436,12 @@ function ReceiptPaper({ lines, watermark }: { lines: ReceiptLine[]; watermark: b
         {lines.map((line, lineIndex) => {
           if (line.kind === 'barcode') return <Barcode key={lineIndex} label={line.data ?? ''} />
           if (line.kind === 'qr') return <QrPlaceholder key={lineIndex} label={line.data ?? ''} />
-          if (line.kind === 'image') return <GraphicPlaceholder key={lineIndex} label={line.data ?? 'Printer graphic'} />
+          if (line.kind === 'image') {
+            const imageData = line.data ?? ''
+            return imageData.startsWith('raster-v1:')
+              ? <RasterGraphic key={lineIndex} data={imageData} alignment={line.alignment} />
+              : <GraphicPlaceholder key={lineIndex} label={imageData || 'Printer graphic'} />
+          }
           return (
             <div key={lineIndex} className={`receipt-line align-${line.alignment}`}>
               {line.spans.map((span, spanIndex) => (
@@ -486,7 +470,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   onActivated: (license: ServiceStatus['license']) => void
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection)
-  const labels: Record<SettingsSection, string> = { license: 'License', updates: 'Check for Updates', support: 'Support' }
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', updates: 'Check for Updates', support: 'Support' }
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -498,11 +482,13 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
         <div className="settings-layout">
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
+            <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
             <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')}><RefreshCw size={18} /><span>Check for Updates</span><ChevronRight size={15} /></button>
             <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
           </nav>
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
+            {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
             {section === 'updates' && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
             {section === 'support' && <SupportSettings status={status} />}
           </div>
@@ -660,6 +646,75 @@ function Barcode({ label }: { label: string }) {
 
 function QrPlaceholder({ label }: { label: string }) {
   return <div className="qr-block" title={label}>{Array.from({ length: 81 }, (_, index) => <i key={index} className={(index * 17 + label.length * 7) % 5 < 2 ? 'on' : ''} />)}</div>
+}
+
+type RasterGraphicData = {
+  width: number
+  height: number
+  scaleX: number
+  scaleY: number
+  bytes: Uint8Array
+}
+
+function decodeRasterGraphic(data: string): RasterGraphicData | undefined {
+  try {
+    const parts = data.split(':')
+    if (parts.length !== 6 || parts[0] !== 'raster-v1') return undefined
+
+    const width = Number(parts[1])
+    const height = Number(parts[2])
+    const scaleX = Number(parts[3])
+    const scaleY = Number(parts[4])
+    if (![width, height, scaleX, scaleY].every(Number.isInteger)
+      || width < 1 || width > 4096 || height < 1 || height > 4096
+      || scaleX < 1 || scaleX > 2 || scaleY < 1 || scaleY > 2) return undefined
+
+    const binary = atob(parts[5])
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
+    if (bytes.length !== Math.ceil(width / 8) * height) return undefined
+    return { width, height, scaleX, scaleY, bytes }
+  } catch {
+    return undefined
+  }
+}
+
+function RasterGraphic({ data, alignment }: { data: string; alignment: ReceiptLine['alignment'] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const raster = useMemo(() => decodeRasterGraphic(data), [data])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !raster) return
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    const image = context.createImageData(raster.width, raster.height)
+    const rowBytes = Math.ceil(raster.width / 8)
+    for (let y = 0; y < raster.height; y += 1) {
+      for (let x = 0; x < raster.width; x += 1) {
+        if ((raster.bytes[y * rowBytes + Math.floor(x / 8)] & (0x80 >> (x % 8))) === 0) continue
+        const pixel = (y * raster.width + x) * 4
+        image.data[pixel] = 16
+        image.data[pixel + 1] = 16
+        image.data[pixel + 2] = 16
+        image.data[pixel + 3] = 255
+      }
+    }
+    context.clearRect(0, 0, raster.width, raster.height)
+    context.putImageData(image, 0, 0)
+  }, [raster])
+
+  if (!raster) return <GraphicPlaceholder label="Invalid raster image" />
+  return (
+    <div className={`raster-graphic align-${alignment}`} role="img" aria-label="Printed receipt logo">
+      <canvas
+        ref={canvasRef}
+        width={raster.width}
+        height={raster.height}
+        style={{ width: raster.width * raster.scaleX, height: raster.height * raster.scaleY }}
+      />
+    </div>
+  )
 }
 
 function GraphicPlaceholder({ label }: { label: string }) {

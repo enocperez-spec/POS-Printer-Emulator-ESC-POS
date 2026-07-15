@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 
 return await ReceiptLabBuild.RunAsync(args);
 
@@ -44,6 +45,9 @@ internal static class ReceiptLabBuild
                     break;
                 case "license-manager":
                     await PublishLicenseManagerAsync();
+                    break;
+                case "sync-release":
+                    SynchronizeReleaseVersion(arguments.Skip(1).Contains("--check", StringComparer.OrdinalIgnoreCase));
                     break;
                 case "help":
                 case "--help":
@@ -146,6 +150,7 @@ internal static class ReceiptLabBuild
 
     private static async Task InstallerAsync(bool skipPublish)
     {
+        SynchronizeReleaseVersion(checkOnly: false);
         if (!skipPublish)
         {
             await PublishAsync();
@@ -233,6 +238,64 @@ internal static class ReceiptLabBuild
         }
 
         return null;
+    }
+
+    private static void SynchronizeReleaseVersion(bool checkOnly)
+    {
+        var productInfoPath = Path.Combine(Root, "src", "ReceiptEmulator.App", "ProductInfo.cs");
+        var productInfo = File.ReadAllText(productInfoPath);
+        var versionMatch = Regex.Match(
+            productInfo,
+            "public\\s+const\\s+string\\s+Version\\s*=\\s*\"(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)\"");
+        if (!versionMatch.Success)
+        {
+            throw new InvalidOperationException("The release version could not be read from ProductInfo.cs.");
+        }
+
+        var displayVersion = versionMatch.Groups["version"].Value;
+        var changed = new List<string>();
+
+        SynchronizeFile(
+            Path.Combine(Root, "website", "index.html"),
+            text => Regex.Replace(
+                Regex.Replace(
+                    Regex.Replace(text, "POSPrinterEmulatorSetup-[0-9]+\\.[0-9]+\\.[0-9]+-win-x64\\.exe", $"POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe"),
+                    "\"softwareVersion\"\\s*:\\s*\"[0-9]+\\.[0-9]+\\.[0-9]+\"",
+                    $"\"softwareVersion\": \"{displayVersion}\""),
+                "Version [0-9]+\\.[0-9]+\\.[0-9]+",
+                $"Version {displayVersion}"),
+            checkOnly,
+            changed);
+
+        if (checkOnly && changed.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Release {displayVersion} is not synchronized in: {string.Join(", ", changed)}. Run the sync-release command and commit the results.");
+        }
+
+        Console.WriteLine(changed.Count == 0
+            ? $"Website release details match application version {displayVersion}."
+            : $"Synchronized release {displayVersion}: {string.Join(", ", changed)}");
+    }
+
+    private static void SynchronizeFile(
+        string path,
+        Func<string, string> transform,
+        bool checkOnly,
+        ICollection<string> changed)
+    {
+        var current = File.ReadAllText(path);
+        var updated = transform(current);
+        if (string.Equals(current, updated, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        changed.Add(Path.GetRelativePath(Root, path));
+        if (!checkOnly)
+        {
+            File.WriteAllText(path, updated, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
     }
 
     private static async Task RunProcessAsync(string executable, IReadOnlyList<string> arguments, string workingDirectory)
@@ -382,6 +445,8 @@ internal static class ReceiptLabBuild
               installer                     Build the complete Windows installer
               installer --skip-publish      Repackage the existing publish output
               license-manager               Publish the vendor License Manager UI
+              sync-release                  Sync ProductInfo.Version to website labels and download links
+              sync-release --check          Fail if the public website version is stale (used by GitHub)
               send-sample                   Send a sample ESC/POS job to localhost:9100
               send-sample --host HOST --port PORT --title TITLE
               help                          Show this help

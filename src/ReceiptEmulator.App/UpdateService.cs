@@ -45,7 +45,7 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
                         ProductInfo.Version,
                         false,
                         true,
-                        "https://github.com/enocperez-spec/Desktop-Web-Base-POS-Emulator/releases",
+                        "https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases",
                         null,
                         checkedAt,
                         "You already have the latest version installed. No newer public release is available.");

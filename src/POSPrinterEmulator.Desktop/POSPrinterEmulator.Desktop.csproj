@@ -7,7 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>POSPrinterEmulator.Desktop</AssemblyName>
     <RootNamespace>POSPrinterEmulator.Desktop</RootNamespace>
-    <Version>0.3.1</Version>
+    <Version>0.3.10</Version>
+    <ApplicationIcon>..\..\assets\branding\pos-printer-emulator.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

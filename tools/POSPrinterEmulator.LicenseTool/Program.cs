@@ -30,6 +30,17 @@ try
         var activationKey = ActivationKeyCodec.Issue(File.ReadAllText(privateKeyPath), customer, email);
         Console.WriteLine(activationKey);
     }
+    else if (command == "verify")
+    {
+        var activationKey = GetRequiredOption(args, "--key");
+        var customer = GetRequiredOption(args, "--customer");
+        var email = GetRequiredOption(args, "--email");
+        if (!ActivationKeyCodec.TryValidate(activationKey, customer, email, out var license, out var error))
+        {
+            throw new InvalidOperationException(error);
+        }
+        Console.WriteLine($"Valid activation key. License ID: {license!.LicenseId}; issued: {license.IssuedAt:u}");
+    }
     else
     {
         Console.WriteLine("""
@@ -40,6 +51,9 @@ try
 
             Issue a customer activation key:
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "C:\secure\license-keys\vendor-private-key.pem" --customer "Company Name" --email "customer@example.com"
+
+            Verify any activation key against the public key built into the application:
+              dotnet run --project tools/POSPrinterEmulator.LicenseTool -- verify --key "PPE1-..." --customer "Company Name" --email "customer@example.com"
             """);
     }
 

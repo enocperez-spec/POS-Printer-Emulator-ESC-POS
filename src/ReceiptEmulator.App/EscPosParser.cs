@@ -26,8 +26,18 @@ public sealed class EscPosParser
             line.Clear();
         }
 
-        void AddCommand(int offset, ReadOnlySpan<byte> bytes, string name, string details, bool supported = true) =>
-            result.Commands.Add(new ParsedCommand(offset, Convert.ToHexString(bytes).Chunk(2).Select(chars => new string(chars)).Aggregate((a, b) => a + " " + b), name, details, supported));
+        void AddCommand(int offset, ReadOnlySpan<byte> bytes, string name, string details, bool supported = true)
+        {
+            const int hexPreviewLimit = 96;
+            var preview = bytes.Length > hexPreviewLimit ? bytes[..hexPreviewLimit] : bytes;
+            var hex = string.Join(" ", Convert.ToHexString(preview).Chunk(2).Select(chars => new string(chars)));
+            if (preview.Length < bytes.Length)
+            {
+                hex += $" … ({bytes.Length - preview.Length} more bytes)";
+            }
+
+            result.Commands.Add(new ParsedCommand(offset, hex, name, details, supported));
+        }
 
         void AddText(string text)
         {
@@ -142,6 +152,49 @@ public sealed class EscPosParser
             if (value == Gs && i + 1 < payload.Length)
             {
                 var command = payload[i + 1];
+                if (i + 7 < payload.Length && command == (byte)'v' && payload[i + 2] == (byte)'0')
+                {
+                    var mode = payload[i + 3];
+                    var normalizedMode = mode >= 48 ? mode - 48 : mode;
+                    var widthBytes = payload[i + 4] + payload[i + 5] * 256;
+                    var heightDots = payload[i + 6] + payload[i + 7] * 256;
+                    var dataLength = (long)widthBytes * heightDots;
+                    var declaredLength = 8L + dataLength;
+                    var availableLength = payload.Length - i;
+                    var total = (int)Math.Min(availableLength, Math.Min(declaredLength, int.MaxValue));
+                    var complete = widthBytes > 0 && heightDots > 0 && declaredLength <= availableLength;
+
+                    if (complete)
+                    {
+                        var scaleX = normalizedMode is 1 or 3 ? 2 : 1;
+                        var scaleY = normalizedMode is 2 or 3 ? 2 : 1;
+                        var raster = payload.Slice(i + 8, (int)dataLength);
+                        if (line.Count > 0) FlushLine();
+                        result.Lines.Add(new ReceiptLine(
+                            alignment,
+                            [],
+                            "image",
+                            $"raster-v1:{widthBytes * 8}:{heightDots}:{scaleX}:{scaleY}:{Convert.ToBase64String(raster)}"));
+                        AddCommand(
+                            i,
+                            payload.Slice(i, total),
+                            "Print raster image",
+                            $"{widthBytes * 8} x {heightDots} dots, {scaleX}x width, {scaleY}x height",
+                            normalizedMode is >= 0 and <= 3);
+                    }
+                    else
+                    {
+                        AddCommand(
+                            i,
+                            payload.Slice(i, total),
+                            "Print raster image",
+                            $"Truncated raster; expected {declaredLength} bytes",
+                            false);
+                    }
+
+                    i += total;
+                    continue;
+                }
                 if (i + 4 < payload.Length && command == (byte)'(' && payload[i + 2] == (byte)'L')
                 {
                     var bodyLength = payload[i + 3] + payload[i + 4] * 256;

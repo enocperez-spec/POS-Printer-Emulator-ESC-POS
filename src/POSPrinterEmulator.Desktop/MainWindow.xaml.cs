@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
+using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 
@@ -92,6 +94,14 @@ public partial class MainWindow : Window
                 {
                     await DownloadAndLaunchUpdateAsync(updateUri);
                 }
+                else if (request?.Type == "install-printer" && request.Printer is not null)
+                {
+                    await RunPrinterSetupAsync(request.Printer);
+                }
+                else if (request?.Type == "print-printer-test" && !string.IsNullOrWhiteSpace(request.PrinterName))
+                {
+                    await RunPrinterTestAsync(request.PrinterName);
+                }
             }
             catch (Exception exception)
             {
@@ -130,19 +140,109 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("The update link was not a trusted GitHub installer.");
         }
 
-        var downloadDirectory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "Updates");
+        var downloadDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "POSPrinterEmulator",
+            "Updates",
+            $"{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(downloadDirectory);
         var installerPath = Path.Combine(downloadDirectory, Path.GetFileName(updateUri.LocalPath));
+        var partialPath = installerPath + ".download";
         using var updateClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         using var response = await updateClient.GetAsync(updateUri, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
-        await using (var output = File.Create(installerPath))
+        await using (var output = new FileStream(
+            partialPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 81920,
+            FileOptions.Asynchronous | FileOptions.SequentialScan))
         {
             await response.Content.CopyToAsync(output);
+            await output.FlushAsync();
         }
 
+        File.Move(partialPath, installerPath);
         Process.Start(new ProcessStartInfo(installerPath) { UseShellExecute = true });
     }
+
+    private async Task RunPrinterSetupAsync(PrinterInstallRequest request)
+    {
+        var operationDirectory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "PrinterSetup", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(operationDirectory);
+        var requestPath = Path.Combine(operationDirectory, "request.json");
+        var resultPath = Path.Combine(operationDirectory, "result.json");
+        await File.WriteAllTextAsync(requestPath, JsonSerializer.Serialize(request, JsonOptions));
+
+        try
+        {
+            var process = StartElevatedHelper("--install-printer", "--request", requestPath, "--result", resultPath);
+            await process.WaitForExitAsync();
+            if (!File.Exists(resultPath))
+            {
+                throw new InvalidOperationException("The printer installer did not return a result.");
+            }
+
+            var resultJson = await File.ReadAllTextAsync(resultPath);
+            Browser.CoreWebView2.PostWebMessageAsJson($"{{\"type\":\"printer-install-result\",\"result\":{resultJson}}}");
+        }
+        catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
+        {
+            PostPrinterError("Printer installation was canceled before Windows administrator approval was granted.");
+        }
+        catch (Exception exception)
+        {
+            PostPrinterError($"The printer installation could not be started: {exception.Message}");
+        }
+        finally
+        {
+            try { Directory.Delete(operationDirectory, recursive: true); } catch { }
+        }
+    }
+
+    private async Task RunPrinterTestAsync(string printerName)
+    {
+        try
+        {
+            using var process = StartElevatedHelper("--print-printer-test", "--printer-name", printerName);
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0) throw new InvalidOperationException("Windows did not accept the test receipt.");
+            Browser.CoreWebView2.PostWebMessageAsJson("{\"type\":\"printer-test-result\",\"success\":true}");
+        }
+        catch (Exception exception)
+        {
+            Browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+            {
+                type = "printer-test-result",
+                success = false,
+                message = exception.Message
+            }, JsonOptions));
+        }
+    }
+
+    private static Process StartElevatedHelper(params string[] arguments)
+    {
+        var serviceExecutable = Path.Combine(AppContext.BaseDirectory, "ReceiptEmulator.exe");
+        if (!File.Exists(serviceExecutable))
+            throw new FileNotFoundException("The POS Printer Emulator setup component is missing.", serviceExecutable);
+
+        var startInfo = new ProcessStartInfo(serviceExecutable)
+        {
+            UseShellExecute = true,
+            Verb = "runas",
+            WorkingDirectory = AppContext.BaseDirectory,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        return Process.Start(startInfo) ?? throw new InvalidOperationException("Windows could not start the printer setup component.");
+    }
+
+    private void PostPrinterError(string message) => Browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+    {
+        type = "printer-install-result",
+        result = new { success = false, message, technicalDetails = message }
+    }, JsonOptions));
 
     private void ShowLoading(string message)
     {
@@ -180,5 +280,7 @@ public partial class MainWindow : Window
     private void OpenBrowser_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo(ViewerUri.AbsoluteUri) { UseShellExecute = true });
 
-    private sealed record DesktopMessage(string Type, string? Url);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private sealed record DesktopMessage(string Type, string? Url, PrinterInstallRequest? Printer, string? PrinterName);
+    private sealed record PrinterInstallRequest(string PrinterName, string IpAddress, int Port, bool SameComputer);
 }

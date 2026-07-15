@@ -43,6 +43,34 @@ export type UpdateStatus = {
   message: string
 }
 
+export type PrinterSetupStatus = {
+  isWindows: boolean
+  driverInstalled: boolean
+  apdVersion?: string
+  driverVersion?: string
+  statusApiVersion?: string
+  driverName: string
+  recommendedApdVersion: string
+  recommendedDriverVersion: string
+  recommendedStatusApiVersion: string
+  driverPackageAvailable: boolean
+  message: string
+}
+
+export type PrinterInstallRequest = {
+  printerName: string
+  ipAddress: string
+  port: number
+  sameComputer: boolean
+}
+
+export type PrinterInstallResult = PrinterInstallRequest & {
+  success: boolean
+  message: string
+  driverName: string
+  technicalDetails?: string
+}
+
 export type JobSummary = {
   id: string
   receivedAt: string

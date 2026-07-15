@@ -1,6 +1,6 @@
 namespace ReceiptEmulator;
 
-public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger)
+public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger, IUsageTelemetry? telemetry = null)
 {
     public ReceiptJob? Process(byte[] payload, string sourceIp, out string? rejection)
     {
@@ -47,6 +47,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             Status = "Completed"
         };
         store.Add(job);
+        telemetry?.RecordPrintJob();
         logger.LogInformation("Captured receipt {ReceiptId} from {SourceIp} ({Length} bytes)", job.Id, sourceIp, payload.Length);
         return job;
     }

@@ -54,6 +54,27 @@ public sealed class EscPosParserTests
     }
 
     [Fact]
+    public void RendersStandardRasterImageData()
+    {
+        var bytes = new byte[]
+        {
+            0x1B, 0x61, 0x01,
+            0x1D, 0x76, 0x30, 0x00, 0x01, 0x00, 0x02, 0x00,
+            0xAA, 0x55
+        };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        var image = Assert.Single(receipt.Lines);
+        Assert.Equal("center", image.Alignment);
+        Assert.Equal("image", image.Kind);
+        Assert.Equal("raster-v1:8:2:1:1:qlU=", image.Data);
+        var command = Assert.Single(receipt.Commands, item => item.Name == "Print raster image");
+        Assert.True(command.Supported);
+        Assert.Contains("8 x 2 dots", command.Details);
+    }
+
+    [Fact]
     public void ConsumesLengthPrefixedNvGraphicsCommandWithoutRenderingItsParametersAsText()
     {
         var bytes = new byte[]
