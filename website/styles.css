@@ -27,10 +27,14 @@
 
 /* Preserve the application screenshot's natural 1717:919 ratio and keep the
    subtle perspective treatment after the reveal animation completes. */
+img{height:auto}
 .product-stage>img{width:100%;height:auto;aspect-ratio:1717/919;object-fit:contain}
 .product-stage.reveal{transform:perspective(1400px) translateY(24px) rotateY(-5deg) rotateX(1.4deg) rotateZ(-.25deg)}
 .product-stage.reveal.visible{transform:perspective(1400px) rotateY(-5deg) rotateX(1.4deg) rotateZ(-.25deg)}
+.download-visual.reveal{transform:perspective(1400px) translateY(24px) rotateY(4deg) rotateX(1.2deg) rotateZ(.2deg)}
+.download-visual.reveal.visible{transform:perspective(1400px) rotateY(4deg) rotateX(1.2deg) rotateZ(.2deg)}
 @media (max-width:1100px){.product-stage.reveal,.product-stage.reveal.visible{transform:none}}
+@media (max-width:1100px){.download-visual.reveal,.download-visual.reveal.visible{transform:none}}
 
 /* Search-focused product overview */
 .seo-overview{background:#f7fafc}
