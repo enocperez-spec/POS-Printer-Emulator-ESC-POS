@@ -75,7 +75,11 @@ public sealed class ReceiptStore
                 job.PayloadSize,
                 job.Status,
                 job.UnsupportedCount,
-                FirstUsefulLine(job.Receipt))).ToArray();
+                FirstUsefulLine(job.Receipt),
+                job.Origin,
+                job.RendererVersion,
+                job.ParentJobId,
+                job.ImportedFileName)).ToArray();
         }
     }
 
@@ -197,7 +201,13 @@ public sealed class ReceiptStore
         List<ReceiptLine> Lines,
         List<ParsedCommand> Commands,
         string Status,
-        string? Error)
+        string? Error,
+        string? Origin = null,
+        string? RendererVersion = null,
+        DateTimeOffset? OriginalReceivedAt = null,
+        string? OriginalSourceIp = null,
+        Guid? ParentJobId = null,
+        string? ImportedFileName = null)
     {
         public static StoredJob From(ReceiptJob job) => new(
             job.Id,
@@ -207,7 +217,13 @@ public sealed class ReceiptStore
             [.. job.Receipt.Lines],
             [.. job.Receipt.Commands],
             job.Status,
-            job.Error);
+            job.Error,
+            job.Origin,
+            job.RendererVersion,
+            job.OriginalReceivedAt,
+            job.OriginalSourceIp,
+            job.ParentJobId,
+            job.ImportedFileName);
 
         public ReceiptJob ToReceiptJob()
         {
@@ -222,7 +238,13 @@ public sealed class ReceiptStore
                 RawPayload = RawPayload,
                 Receipt = receipt,
                 Status = Status,
-                Error = Error
+                Error = Error,
+                Origin = string.IsNullOrWhiteSpace(Origin) ? JobOrigins.Live : Origin,
+                RendererVersion = string.IsNullOrWhiteSpace(RendererVersion) ? "Legacy" : RendererVersion,
+                OriginalReceivedAt = OriginalReceivedAt ?? ReceivedAt,
+                OriginalSourceIp = string.IsNullOrWhiteSpace(OriginalSourceIp) ? SourceIp : OriginalSourceIp,
+                ParentJobId = ParentJobId,
+                ImportedFileName = ImportedFileName
             };
         }
     }

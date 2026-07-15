@@ -2,6 +2,17 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
+
+## v0.3.15
+
+- Added portable `.ppecapture` export packages containing the exact ESC/POS payload, capture metadata, renderer version, parsed-command summary, and a SHA-256 integrity checksum.
+- Added Full-Version import for raw `.bin` receipts and validated POS Printer Emulator capture packages directly from Activity.
+- Added safe replay through the normal parser and renderer without consuming a Trial print-job allowance or reporting replayed jobs as live usage.
+- Added Live, Imported, and Replayed origin badges plus original source, time, parent-job, imported-file, and renderer details.
+- Added strict archive-entry, schema, file-size, payload-length, and checksum validation so malformed or unsafe packages fail without being extracted or executed.
+- Preserved compatibility with existing saved job history while recording the new capture metadata for future jobs.
+
 ## v0.3.14
 
 - Fixed aggregate usage reporting so completed emulated print jobs reach the dashboard through the canonical HTTPS telemetry endpoint.

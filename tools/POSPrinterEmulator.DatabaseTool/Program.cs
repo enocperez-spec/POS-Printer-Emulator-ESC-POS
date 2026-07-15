@@ -42,7 +42,7 @@ if (command == "smoke-test")
             installationId,
             customerName = "Deployment Smoke Test",
             emailAddress = "smoke-test@posprinteremulator.com",
-            appVersion = "0.3.14",
+            appVersion = "0.3.15",
             licenseMode = "Trial",
             licenseId = (string?)null
         });
@@ -61,7 +61,7 @@ if (command == "smoke-test")
                 count = 1,
                 customerName = "Deployment Smoke Test",
                 emailAddress = "smoke-test@posprinteremulator.com",
-                appVersion = "0.3.14",
+                appVersion = "0.3.15",
                 licenseMode = "Trial",
                 licenseId = (string?)null
             })

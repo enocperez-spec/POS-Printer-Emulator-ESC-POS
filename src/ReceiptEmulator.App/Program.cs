@@ -20,6 +20,7 @@ builder.Services.AddSingleton<EscPosParser>();
 builder.Services.AddSingleton<ReceiptStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<ReceiptProcessor>();
+builder.Services.AddSingleton<CapturePackageService>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
 builder.Services.AddSingleton<PrinterStateService>();
 builder.Services.AddSingleton<StoredGraphicService>();
@@ -167,6 +168,12 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
             job.PayloadSize,
             job.Status,
             job.UnsupportedCount,
+            job.Origin,
+            job.RendererVersion,
+            job.OriginalReceivedAt,
+            job.OriginalSourceIp,
+            job.ParentJobId,
+            job.ImportedFileName,
             job.Receipt.Lines,
             job.Receipt.Commands,
             job.Receipt.PlainText,
@@ -184,6 +191,74 @@ app.MapPost("/api/sample", (ReceiptProcessor processor) =>
 {
     var job = processor.Process(SampleReceipt.Create(), "127.0.0.1", out var rejection);
     return job is null ? Results.Problem(rejection, statusCode: 429) : Results.Ok(new { job.Id });
+});
+
+app.MapPost("/api/captures/import", async (
+    HttpRequest request,
+    LicenseService license,
+    CapturePackageService captures,
+    ReceiptProcessor processor,
+    PrinterOptions options,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.IsFullVersion)
+        return Results.Problem("Capture import is available in the Full Version.", statusCode: 403);
+    try
+    {
+        if (!request.HasFormContentType)
+            return Results.Problem("Choose a .bin or .ppecapture receipt file to import.", statusCode: 400);
+        var form = await request.ReadFormAsync(cancellationToken);
+        var file = form.Files.GetFile("file");
+        if (file is null || file.Length == 0)
+            return Results.Problem("Choose a .bin or .ppecapture receipt file to import.", statusCode: 400);
+        if (file.Length > options.MaximumJobBytes + CapturePackageService.PackageOverheadLimit)
+            return Results.Problem("The receipt capture is larger than the configured limit.", statusCode: 400);
+        await using var stream = file.OpenReadStream();
+        var imported = await captures.ImportAsync(stream, file.FileName, options.MaximumJobBytes, cancellationToken);
+        var job = processor.Import(
+            imported.Payload,
+            imported.FileName,
+            imported.OriginalReceivedAt,
+            imported.OriginalSourceIp,
+            imported.CapturedJobId,
+            out var rejection);
+        return job is null
+            ? Results.Problem(rejection, statusCode: 400)
+            : Results.Ok(new { job.Id, job.Origin });
+    }
+    catch (InvalidDataException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
+    catch (FormatException)
+    {
+        return Results.Problem("The capture package integrity value is invalid.", statusCode: 400);
+    }
+});
+
+app.MapPost("/api/jobs/{id:guid}/replay", (Guid id, ReceiptStore store, ReceiptProcessor processor, LicenseService license) =>
+{
+    if (!license.IsFullVersion)
+        return Results.Problem("Receipt replay is available in the Full Version.", statusCode: 403);
+    var source = store.Get(id);
+    if (source is null) return Results.NotFound();
+    var replayed = processor.Replay(source, out var rejection);
+    return replayed is null
+        ? Results.Problem(rejection, statusCode: 400)
+        : Results.Ok(new { replayed.Id, replayed.Origin });
+});
+
+app.MapGet("/api/jobs/{id:guid}/capture", (Guid id, ReceiptStore store, CapturePackageService captures, LicenseService license) =>
+{
+    if (!license.IsFullVersion)
+        return Results.Problem("Capture-package export is available in the Full Version.", statusCode: 403);
+    var job = store.Get(id);
+    return job is null
+        ? Results.NotFound()
+        : Results.File(
+            captures.Export(job),
+            "application/vnd.pos-printer-emulator.capture+zip",
+            $"receipt-{id:N}{CapturePackageService.FileExtension}");
 });
 
 app.MapGet("/api/jobs/{id:guid}/raw", (Guid id, ReceiptStore store, LicenseService license) =>

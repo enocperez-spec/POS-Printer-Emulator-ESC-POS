@@ -112,6 +112,10 @@ export type JobSummary = {
   status: string
   unsupportedCount: number
   preview: string
+  origin: 'Live' | 'Imported' | 'Replayed'
+  rendererVersion: string
+  parentJobId?: string
+  importedFileName?: string
 }
 
 export type ReceiptSpan = {
@@ -147,4 +151,6 @@ export type ReceiptJob = JobSummary & {
   commands: ParsedCommand[]
   plainText: string
   hex: string[]
+  originalReceivedAt?: string
+  originalSourceIp?: string
 }

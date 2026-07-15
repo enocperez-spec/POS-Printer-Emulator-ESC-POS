@@ -50,9 +50,16 @@ Keeping the Rust renderer out-of-process initially prevents a parser failure fro
 
 ## Next production increments
 
-1. Service-to-viewer authentication and installer repair mode.
-2. SQLite history, retention controls, deletion, and migrations.
-3. Optional online activation revocation and license transfer workflow.
-4. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-5. PNG export and deterministic PDF generation.
-6. Production code-signing and expanded unattended deployment validation.
+Detailed scope, completion criteria, priority reasons, and current status are maintained in the [release tracker](RELEASE_TRACKER.md).
+
+1. **v0.3.15 — Capture, import, export, and replay.** Preserve complete ESC/POS sessions, import external binary jobs, export portable capture packages, and replay captured jobs through the processing pipeline.
+2. **v0.3.16 — Printer profiles.** Model paper width, code pages, supported commands, status behavior, and rendering defaults as selectable printer configurations.
+3. **v0.3.17 — Multiple printer listeners.** Host independently configured printer endpoints with separate names, ports, profiles, status state, and activity filtering.
+4. **v0.3.18 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+5. **v0.3.19 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
+6. Service-to-viewer authentication and installer repair mode.
+7. SQLite history, retention controls, deletion, and migrations.
+8. Optional online activation revocation and license transfer workflow.
+9. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+10. PNG export and deterministic PDF generation.
+11. Production code-signing and expanded unattended deployment validation.

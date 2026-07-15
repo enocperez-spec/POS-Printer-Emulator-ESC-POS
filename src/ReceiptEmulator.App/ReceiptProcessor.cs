@@ -3,6 +3,37 @@ namespace ReceiptEmulator;
 public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger, IUsageTelemetry? telemetry = null)
 {
     public ReceiptJob? Process(byte[] payload, string sourceIp, out string? rejection)
+        => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, out rejection);
+
+    public ReceiptJob? Import(
+        byte[] payload,
+        string fileName,
+        DateTimeOffset? originalReceivedAt,
+        string? originalSourceIp,
+        Guid? capturedJobId,
+        out string? rejection)
+        => ProcessCore(payload, originalSourceIp ?? "Imported file", JobOrigins.Imported, false, false,
+            originalReceivedAt, originalSourceIp, capturedJobId, Path.GetFileName(fileName), out rejection);
+
+    public ReceiptJob? Replay(ReceiptJob source, out string? rejection)
+        => ProcessCore(source.RawPayload, source.SourceIp, JobOrigins.Replayed, false, false,
+            source.OriginalReceivedAt ?? source.ReceivedAt,
+            source.OriginalSourceIp ?? source.SourceIp,
+            source.Id,
+            source.ImportedFileName,
+            out rejection);
+
+    private ReceiptJob? ProcessCore(
+        byte[] payload,
+        string sourceIp,
+        string origin,
+        bool consumeTrial,
+        bool recordTelemetry,
+        DateTimeOffset? originalReceivedAt,
+        string? originalSourceIp,
+        Guid? parentJobId,
+        string? importedFileName,
+        out string? rejection)
     {
         rejection = null;
         if (payload.Length == 0)
@@ -30,25 +61,35 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             return null;
         }
 
-        if (!license.TryConsume(out _))
+        if (consumeTrial && !license.TryConsume(out _))
         {
             rejection = "Daily trial limit reached. Activate POS Printer Emulator to process more jobs.";
             logger.LogWarning("Rejected receipt from {SourceIp}: trial limit reached", sourceIp);
             return null;
         }
 
+        var receivedAt = DateTimeOffset.Now;
         var job = new ReceiptJob
         {
             Id = Guid.NewGuid(),
-            ReceivedAt = DateTimeOffset.Now,
+            ReceivedAt = receivedAt,
             SourceIp = sourceIp,
             RawPayload = payload,
             Receipt = receipt,
-            Status = "Completed"
+            Status = "Completed",
+            Origin = origin,
+            RendererVersion = ProductInfo.Version,
+            OriginalReceivedAt = originalReceivedAt ?? receivedAt,
+            OriginalSourceIp = originalSourceIp ?? sourceIp,
+            ParentJobId = parentJobId,
+            ImportedFileName = importedFileName
         };
         store.Add(job);
-        telemetry?.RecordPrintJob();
-        logger.LogInformation("Captured receipt {ReceiptId} from {SourceIp} ({Length} bytes)", job.Id, sourceIp, payload.Length);
+        if (recordTelemetry)
+        {
+            telemetry?.RecordPrintJob();
+        }
+        logger.LogInformation("Stored {Origin} receipt {ReceiptId} from {SourceIp} ({Length} bytes)", origin, job.Id, sourceIp, payload.Length);
         return job;
     }
 }

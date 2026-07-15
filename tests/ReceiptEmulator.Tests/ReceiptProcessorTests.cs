@@ -25,6 +25,36 @@ public sealed class ReceiptProcessorTests
         Assert.Equal(LicenseService.TrialDailyLimit, license.GetStatus().Remaining);
     }
 
+    [Fact]
+    public void ImportAndReplayDoNotConsumeTrialAllowance()
+    {
+        var license = new LicenseService(new TestEnvironment());
+        var store = new ReceiptStore(license);
+        var processor = new ReceiptProcessor(new EscPosParser(), store, license, NullLogger<ReceiptProcessor>.Instance);
+        var originalReceivedAt = new DateTimeOffset(2026, 7, 1, 10, 0, 0, TimeSpan.Zero);
+
+        var imported = processor.Import(
+            System.Text.Encoding.ASCII.GetBytes("IMPORTED RECEIPT\n"),
+            "customer.bin",
+            originalReceivedAt,
+            "192.0.2.44",
+            Guid.NewGuid(),
+            out var importRejection);
+        var replayed = processor.Replay(imported!, out var replayRejection);
+
+        Assert.Null(importRejection);
+        Assert.Null(replayRejection);
+        Assert.NotNull(imported);
+        Assert.NotNull(replayed);
+        Assert.Equal(JobOrigins.Imported, imported.Origin);
+        Assert.Equal("customer.bin", imported.ImportedFileName);
+        Assert.Equal(originalReceivedAt, imported.OriginalReceivedAt);
+        Assert.Equal(JobOrigins.Replayed, replayed.Origin);
+        Assert.Equal(imported.Id, replayed.ParentJobId);
+        Assert.Equal(2, store.GetSummaries().Count);
+        Assert.Equal(LicenseService.TrialDailyLimit, license.GetStatus().Remaining);
+    }
+
     private sealed class TestEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = "Testing";

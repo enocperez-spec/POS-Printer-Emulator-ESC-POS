@@ -24,6 +24,12 @@ export const api = {
   deleteJob: (id: string) => request(`/api/jobs/${id}`, { method: 'DELETE' }),
   clearJobs: () => request('/api/jobs', { method: 'DELETE' }),
   sample: () => json<{ id: string }>('/api/sample', { method: 'POST' }),
+  importCapture: (file: File) => {
+    const form = new FormData()
+    form.set('file', file)
+    return json<{ id: string; origin: string }>('/api/captures/import', { method: 'POST', body: form })
+  },
+  replayJob: (id: string) => json<{ id: string; origin: string }>(`/api/jobs/${id}/replay`, { method: 'POST' }),
   activate: (request: ActivationRequest) => json<LicenseStatus>('/api/license/activate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

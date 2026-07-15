@@ -235,6 +235,12 @@ button { color: inherit; }
 .job-preview { grid-area: preview; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
 .job-size { grid-area: size; font-size: 11px; color: var(--muted); }
 .job-result { grid-area: result; font-size: 11px; color: var(--green); }
+.job-result { display: flex; align-items: center; gap: 6px; }
+.job-origin, .detail-origin { display: inline-flex; align-items: center; min-height: 18px; padding: 1px 6px; border: 1px solid; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: .02em; }
+.job-origin.live, .detail-origin.live { color: #175fae; background: #edf6ff; border-color: #b6d5f5; }
+.job-origin.imported, .detail-origin.imported { color: #7a4b00; background: #fff7df; border-color: #e7c776; }
+.job-origin.replayed, .detail-origin.replayed { color: #6a3aa5; background: #f6efff; border-color: #cdb3eb; }
+.capture-file-input { position: fixed; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .job-warning { grid-area: warning; font-size: 10px; color: var(--amber); }
 .rail-empty { height: 100%; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 24px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .rail-empty strong { color: #314157; font-size: 13px; }
@@ -535,6 +541,9 @@ html[data-theme="dark"] .empty-receipt { color: #91a8c2; background: #172438; bo
 html[data-theme="dark"] .command-table td,
 html[data-theme="dark"] .job-row,
 html[data-theme="dark"] .job-details div { border-bottom-color: #24344a; }
+html[data-theme="dark"] .job-origin.live, html[data-theme="dark"] .detail-origin.live { color: #a9d4ff; background: #163a5e; border-color: #2d689d; }
+html[data-theme="dark"] .job-origin.imported, html[data-theme="dark"] .detail-origin.imported { color: #ffd98b; background: #4b3610; border-color: #8e681b; }
+html[data-theme="dark"] .job-origin.replayed, html[data-theme="dark"] .detail-origin.replayed { color: #dfc2ff; background: #382451; border-color: #72509b; }
 html[data-theme="dark"] .raw-view span { color: #75869e; }
 html[data-theme="dark"] .preview-canvas { scrollbar-color: #41526a var(--canvas); }
 html[data-theme="dark"] .receipt-paper { color: #101010; background: #fff; }

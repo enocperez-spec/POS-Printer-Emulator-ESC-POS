@@ -1,13 +1,9 @@
-Options -Indexes
 DirectoryIndex index.php
 
-<IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+<IfModule mod_autoindex.c>
+    Options -Indexes
 </IfModule>
 
-<IfModule mod_headers.c>
-  Header always set X-Content-Type-Options "nosniff"
-  Header always set Referrer-Policy "no-referrer"
-  Header always set X-Frame-Options "DENY"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-</IfModule>
+<FilesMatch "^(config\.php|purchase-site\.php|schema\.sql|two-factor\.json|vendor-private-key\.pem)$">
+    Require all denied
+</FilesMatch>

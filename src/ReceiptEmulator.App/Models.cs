@@ -44,8 +44,21 @@ public sealed class ReceiptJob
     public required ParsedReceipt Receipt { get; init; }
     public required string Status { get; init; }
     public string? Error { get; init; }
+    public string Origin { get; init; } = JobOrigins.Live;
+    public string RendererVersion { get; init; } = ProductInfo.Version;
+    public DateTimeOffset? OriginalReceivedAt { get; init; }
+    public string? OriginalSourceIp { get; init; }
+    public Guid? ParentJobId { get; init; }
+    public string? ImportedFileName { get; init; }
     public int PayloadSize => RawPayload.Length;
     public int UnsupportedCount => Receipt.Commands.Count(command => !command.Supported);
+}
+
+public static class JobOrigins
+{
+    public const string Live = "Live";
+    public const string Imported = "Imported";
+    public const string Replayed = "Replayed";
 }
 
 public sealed record JobSummary(
@@ -55,7 +68,11 @@ public sealed record JobSummary(
     int PayloadSize,
     string Status,
     int UnsupportedCount,
-    string Preview);
+    string Preview,
+    string Origin,
+    string RendererVersion,
+    Guid? ParentJobId,
+    string? ImportedFileName);
 
 public sealed record RegistrationInfo(string CustomerName, string EmailAddress);
 

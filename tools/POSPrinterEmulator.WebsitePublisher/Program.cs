@@ -25,6 +25,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher list [remote-directory]");
     Console.WriteLine("  website-publisher publish <local-directory> [remote-directory]");
     Console.WriteLine("  website-publisher configure <schema-file> [remote-directory]");
+    Console.WriteLine("  website-publisher upload-schema <schema-file> [remote-directory]");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
     return 0;
@@ -77,6 +78,14 @@ try
             }
 
             Configure(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
+            break;
+        case "upload-schema":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The upload-schema command requires a schema file.");
+            }
+
+            UploadSchema(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
             break;
         default:
             throw new ArgumentException($"Unknown command: {args[0]}");
@@ -236,6 +245,26 @@ static void Configure(SftpClient client, string schemaPath, string remoteDirecto
         client.UploadFile(privateKey, CombineRemote(privateDirectory, "vendor-private-key.pem"), true);
     }
     Console.WriteLine("Uploaded protected database configuration and schema. No secrets were written to the project directory.");
+}
+
+static void UploadSchema(SftpClient client, string schemaPath, string remoteDirectory)
+{
+    if (!File.Exists(schemaPath))
+    {
+        throw new FileNotFoundException("Schema file was not found.", schemaPath);
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    var privateDirectory = CombineRemote(remoteRoot, "private");
+    EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
+    using var schema = File.OpenRead(schemaPath);
+    client.UploadFile(schema, CombineRemote(privateDirectory, "schema.sql"), true);
+    Console.WriteLine("Uploaded the protected database schema without changing server credentials.");
 }
 
 static void UploadText(SftpClient client, string remotePath, string content)

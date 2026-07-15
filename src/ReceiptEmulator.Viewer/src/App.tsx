@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   AlertTriangle,
   Braces,
@@ -22,6 +22,8 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Package,
+  Play,
   Plus,
   Printer,
   RefreshCw,
@@ -30,6 +32,7 @@ import {
   Settings,
   Sun,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react'
 import { api } from './api'
@@ -43,7 +46,7 @@ import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic,
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.14',
+  version: '0.3.15',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -86,6 +89,8 @@ function App() {
   const [clearRequest, setClearRequest] = useState<ClearRequest>()
   const [clearing, setClearing] = useState(false)
   const [storedGraphics, setStoredGraphics] = useState<StoredGraphic[]>([])
+  const [captureBusy, setCaptureBusy] = useState(false)
+  const captureFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -157,7 +162,7 @@ function App() {
   const filteredJobs = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return jobs
-    return jobs.filter(item => `${item.sourceIp} ${item.preview} ${item.status}`.toLowerCase().includes(needle))
+    return jobs.filter(item => `${item.sourceIp} ${item.preview} ${item.status} ${item.origin} ${item.importedFileName ?? ''}`.toLowerCase().includes(needle))
   }, [jobs, query])
 
   async function renderSample() {
@@ -171,6 +176,38 @@ function App() {
       setError(cause instanceof Error ? cause.message : 'Could not render the sample receipt.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function importCapture(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setCaptureBusy(true)
+    setError(undefined)
+    try {
+      const created = await api.importCapture(file)
+      setSelectedId(created.id)
+      await refresh()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The receipt capture could not be imported.')
+    } finally {
+      setCaptureBusy(false)
+    }
+  }
+
+  async function replayJob() {
+    if (!selectedId) return
+    setCaptureBusy(true)
+    setError(undefined)
+    try {
+      const created = await api.replayJob(selectedId)
+      setSelectedId(created.id)
+      await refresh()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The receipt capture could not be replayed.')
+    } finally {
+      setCaptureBusy(false)
     }
   }
 
@@ -228,15 +265,18 @@ function App() {
           <button className="banner-dismiss" onClick={() => setUpdateNoticeDismissed(true)} aria-label="Dismiss update notification"><X size={15} /></button>
         </div>
       )}
+      <input ref={captureFileRef} className="capture-file-input" type="file" accept=".bin,.ppecapture,application/octet-stream,application/vnd.pos-printer-emulator.capture+zip" onChange={importCapture} />
       <main className={`workspace ${activityCollapsed ? 'activity-is-collapsed' : ''} ${inspectorCollapsed ? 'inspector-is-collapsed' : ''}`}>
         {activityCollapsed ? (
           <CollapsedSide side="left" label="Activity" onExpand={() => setActivityCollapsed(false)} />
         ) : (
           <ActivityRail jobs={filteredJobs} totalJobs={jobs.length} selectedId={selectedId} query={query} onQuery={setQuery}
             onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
-            onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history} />
+            onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history}
+            onImport={() => captureFileRef.current?.click()} importEnabled={status.license.features.premiumFeatures} importing={captureBusy} />
         )}
-        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics} />
+        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics}
+          onReplay={replayJob} replaying={captureBusy} />
         {inspectorCollapsed ? (
           <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
         ) : (
@@ -336,7 +376,7 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   )
 }
 
-function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, onDelete, onClearAll, onCollapse, historyEnabled }: {
+function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, onDelete, onClearAll, onCollapse, historyEnabled, onImport, importEnabled, importing }: {
   jobs: JobSummary[]
   totalJobs: number
   selectedId?: string
@@ -347,12 +387,16 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
   onClearAll: () => void
   onCollapse: () => void
   historyEnabled: boolean
+  onImport: () => void
+  importEnabled: boolean
+  importing: boolean
 }) {
   return (
     <aside className="activity-rail">
       <div className="pane-heading">
         <strong>Activity</strong>
         <div className="pane-actions">
+          <button onClick={onImport} disabled={!importEnabled || importing} aria-label="Import receipt capture" title={importEnabled ? 'Import .bin or .ppecapture receipt' : 'Capture import requires the Full Version'}><Upload size={15} /></button>
           <button onClick={onClearAll} disabled={totalJobs === 0} aria-label="Clear all jobs" title="Clear all jobs"><Trash2 size={15} /></button>
           <button onClick={onCollapse} aria-label="Collapse Activity panel" title="Collapse Activity panel"><PanelLeftClose size={17} /></button>
         </div>
@@ -371,7 +415,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
               <span className="job-source">{item.sourceIp}</span>
               <strong className="job-preview">{item.preview}</strong>
               <span className="job-size">{formatBytes(item.payloadSize)}</span>
-              <span className="job-result">{item.status}</span>
+              <span className="job-result"><b className={`job-origin ${item.origin.toLowerCase()}`}>{item.origin}</b>{item.status}</span>
               {item.unsupportedCount > 0 && <span className="job-warning">{item.unsupportedCount} warning</span>}
             </button>
             <button className="job-delete" onClick={() => onDelete(item.id)} aria-label={`Clear ${item.preview}`} title="Clear this job"><Trash2 size={14} /></button>
@@ -392,13 +436,15 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
   )
 }
 
-function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics }: {
+function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onReplay, replaying }: {
   job?: ReceiptJob
   zoom: number
   onZoom: (value: number) => void
   onSample: () => void
   license: ServiceStatus['license']
   storedGraphics: StoredGraphic[]
+  onReplay: () => void
+  replaying: boolean
 }) {
   const storedGraphicMap = useMemo(() => new Map(storedGraphics.map(graphic => [graphic.keyCode, graphic])), [storedGraphics])
   return (
@@ -418,6 +464,14 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics }: {
         {job && (license.features.exports
           ? <a className="toolbar-link" href={`/api/jobs/${job.id}/raw`}><Download size={16} /> Raw</a>
           : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Raw</button>)}
+        {job && (license.features.exports
+          ? <a className="toolbar-link" href={`/api/jobs/${job.id}/capture`}><Package size={16} /> Capture</a>
+          : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Capture</button>)}
+        {job && <button onClick={onReplay} disabled={!license.features.premiumFeatures || replaying}
+          className={!license.features.premiumFeatures ? 'premium-disabled' : ''}
+          title={!license.features.premiumFeatures ? 'Available in the Full Version' : 'Replay this receipt without sending it from the POS again'}>
+          {!license.features.premiumFeatures && <LockKeyhole size={15} />}<Play size={15} /> {replaying ? 'Replaying…' : 'Replay'}
+        </button>}
         <button onClick={() => window.print()} disabled={!license.features.premiumFeatures}
           className={!license.features.premiumFeatures ? 'premium-disabled' : ''}
           title={!license.features.premiumFeatures ? 'Available in the Full Version' : undefined}>
@@ -891,6 +945,12 @@ function Inspector({ job, tab, onTab, onCollapse }: { job?: ReceiptJob; tab: 'co
           <div><dt>Receipt ID</dt><dd>{job.id}</dd></div>
           <div><dt>Received</dt><dd>{new Date(job.receivedAt).toLocaleString()}</dd></div>
           <div><dt>Source address</dt><dd>{job.sourceIp}</dd></div>
+          <div><dt>Job origin</dt><dd><span className={`detail-origin ${job.origin.toLowerCase()}`}>{job.origin}</span></dd></div>
+          <div><dt>Renderer version</dt><dd>{job.rendererVersion}</dd></div>
+          {job.originalReceivedAt && <div><dt>Original received</dt><dd>{new Date(job.originalReceivedAt).toLocaleString()}</dd></div>}
+          {job.originalSourceIp && <div><dt>Original source</dt><dd>{job.originalSourceIp}</dd></div>}
+          {job.importedFileName && <div><dt>Imported file</dt><dd>{job.importedFileName}</dd></div>}
+          {job.parentJobId && <div><dt>Parent job</dt><dd>{job.parentJobId}</dd></div>}
           <div><dt>Payload</dt><dd>{formatBytes(job.payloadSize)}</dd></div>
           <div><dt>Processing result</dt><dd className="success-text">{job.status}</dd></div>
           <div><dt>Unsupported commands</dt><dd>{job.unsupportedCount}</dd></div>
