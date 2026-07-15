@@ -68,6 +68,18 @@ function formatTime(value: string) {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value))
 }
 
+function saveDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+}
+
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
@@ -90,6 +102,7 @@ function App() {
   const [clearing, setClearing] = useState(false)
   const [storedGraphics, setStoredGraphics] = useState<StoredGraphic[]>([])
   const [captureBusy, setCaptureBusy] = useState(false)
+  const [exporting, setExporting] = useState<'text' | 'raw' | 'capture'>()
   const captureFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -211,6 +224,21 @@ function App() {
     }
   }
 
+  async function downloadJob(format: 'text' | 'raw' | 'capture') {
+    if (!job || exporting) return
+    setError(undefined)
+    setExporting(format)
+    try {
+      const blob = await api.downloadJob(job.id, format)
+      const extension = format === 'text' ? 'txt' : format === 'raw' ? 'bin' : 'ppecapture'
+      saveDownload(blob, `receipt-${job.id.replaceAll('-', '')}.${extension}`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The receipt could not be downloaded.')
+    } finally {
+      setExporting(undefined)
+    }
+  }
+
   function clearJob(id: string) {
     const selected = jobs.find(item => item.id === id)
     setClearRequest({ kind: 'one', id, label: selected?.preview ?? 'receipt job' })
@@ -276,7 +304,7 @@ function App() {
             onImport={() => captureFileRef.current?.click()} importEnabled={status.license.features.premiumFeatures} importing={captureBusy} />
         )}
         <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics}
-          onReplay={replayJob} replaying={captureBusy} />
+          onReplay={replayJob} replaying={captureBusy} onDownload={downloadJob} exporting={exporting} />
         {inspectorCollapsed ? (
           <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
         ) : (
@@ -436,7 +464,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
   )
 }
 
-function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onReplay, replaying }: {
+function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onReplay, replaying, onDownload, exporting }: {
   job?: ReceiptJob
   zoom: number
   onZoom: (value: number) => void
@@ -445,6 +473,8 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onR
   storedGraphics: StoredGraphic[]
   onReplay: () => void
   replaying: boolean
+  onDownload: (format: 'text' | 'raw' | 'capture') => void
+  exporting?: 'text' | 'raw' | 'capture'
 }) {
   const storedGraphicMap = useMemo(() => new Map(storedGraphics.map(graphic => [graphic.keyCode, graphic])), [storedGraphics])
   return (
@@ -459,13 +489,13 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onR
         <button onClick={() => onZoom(100)}><RotateCw size={16} /> Actual size</button>
         <span className="toolbar-spacer" />
         {job && (license.features.exports
-          ? <a className="toolbar-link" href={`/api/jobs/${job.id}/text`}><FileText size={16} /> Text</a>
+          ? <button className="toolbar-link" onClick={() => onDownload('text')} disabled={exporting !== undefined}><FileText size={16} /> {exporting === 'text' ? 'Saving…' : 'Text'}</button>
           : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Text</button>)}
         {job && (license.features.exports
-          ? <a className="toolbar-link" href={`/api/jobs/${job.id}/raw`}><Download size={16} /> Raw</a>
+          ? <button className="toolbar-link" onClick={() => onDownload('raw')} disabled={exporting !== undefined}><Download size={16} /> {exporting === 'raw' ? 'Saving…' : 'Raw'}</button>
           : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Raw</button>)}
         {job && (license.features.exports
-          ? <a className="toolbar-link" href={`/api/jobs/${job.id}/capture`}><Package size={16} /> Capture</a>
+          ? <button className="toolbar-link" onClick={() => onDownload('capture')} disabled={exporting !== undefined}><Package size={16} /> {exporting === 'capture' ? 'Saving…' : 'Capture'}</button>
           : <button className="premium-disabled" disabled title="Available in the Full Version"><LockKeyhole size={15} /> Capture</button>)}
         {job && <button onClick={onReplay} disabled={!license.features.premiumFeatures || replaying}
           className={!license.features.premiumFeatures ? 'premium-disabled' : ''}

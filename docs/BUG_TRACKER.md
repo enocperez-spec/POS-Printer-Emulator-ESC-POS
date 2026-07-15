@@ -27,7 +27,9 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 
 ## Open bugs
 
-There are currently no documented open bugs. New reports must be entered here before implementation begins.
+| Bug ID | Severity | Summary | Affected version(s) | Target release | Status | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| BUG-005 | Medium | Text, Raw, and Capture exports navigated the desktop WebView away from the receipt viewer and displayed a `ConnectionAborted` startup error instead of saving in place. | v0.3.15 | v0.3.16 | Fixed locally | Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors. |
 
 ## Resolved bugs
 

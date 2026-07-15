@@ -41,7 +41,7 @@ ensure_dev_support_schema();
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "UPDATE development_roadmap
-     SET status = 'Released', resolved_at = COALESCE(resolved_at, UTC_TIMESTAMP(6))
+     SET status = 'Released', completed_at = COALESCE(completed_at, UTC_TIMESTAMP(6))
      WHERE item_key = 'v0.3.15' AND status IN ('Next', 'Planned', 'In progress')"
 );
 $releaseSync->execute();
@@ -51,6 +51,25 @@ $nextSync = database()->prepare(
      WHERE item_key = 'v0.3.16' AND status = 'Planned'"
 );
 $nextSync->execute();
+$bugSync = database()->prepare(
+    "INSERT INTO development_bugs
+        (bug_key, title, severity, status, affected_versions, target_release, fixed_version, customer_impact,
+         expected_behavior, actual_behavior, reproduction_steps, verification, resolved_at)
+     VALUES
+        ('BUG-005', 'Receipt exports replaced the desktop viewer with a ConnectionAborted error',
+         'Medium', 'Fixed locally', 'v0.3.15', 'v0.3.16', NULL,
+         'Full-Version customers could not save Text, Raw, or Capture files without leaving the desktop receipt viewer.',
+         'Selecting an export should open a Save dialog, download the file, and keep the current receipt visible.',
+         'Direct attachment links were treated as main-frame WebView navigation and the aborted navigation was displayed as a startup failure.',
+         'Select a receipt in the v0.3.15 desktop application and choose Text, Raw, or Capture.',
+         'Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors.',
+         NULL)
+     ON DUPLICATE KEY UPDATE
+        status = IF(status IN ('Reported', 'Confirmed', 'In progress'), VALUES(status), status),
+        target_release = COALESCE(target_release, VALUES(target_release)),
+        verification = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(verification), verification)"
+);
+$bugSync->execute();
 
 $roadmapStatuses = ['Released', 'Next', 'Planned', 'In progress', 'Deferred'];
 $bugStatuses = ['Reported', 'Confirmed', 'In progress', 'Fixed locally', 'Released', 'Deferred', 'Closed - not a bug'];

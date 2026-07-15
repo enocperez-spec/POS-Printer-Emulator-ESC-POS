@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Win32;
 
 namespace POSPrinterEmulator.Desktop;
 
@@ -14,6 +15,7 @@ public partial class MainWindow : Window
     private static readonly Uri HealthUri = new("http://127.0.0.1:5187/api/status");
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
     private bool _webViewInitialized;
+    private bool _viewerReady;
 
     public MainWindow()
     {
@@ -114,17 +116,54 @@ public partial class MainWindow : Window
             eventArgs.Handled = true;
             Process.Start(new ProcessStartInfo(eventArgs.Uri) { UseShellExecute = true });
         };
+        Browser.CoreWebView2.DownloadStarting += (_, eventArgs) =>
+        {
+            var suggestedName = Path.GetFileName(eventArgs.ResultFilePath);
+            var dialog = new SaveFileDialog
+            {
+                Title = "Save receipt file",
+                FileName = string.IsNullOrWhiteSpace(suggestedName) ? "receipt-download" : suggestedName,
+                InitialDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Downloads"),
+                AddExtension = true,
+                OverwritePrompt = true,
+                Filter = "Receipt files|*.txt;*.bin;*.ppecapture|All files|*.*"
+            };
+
+            eventArgs.Handled = true;
+            if (dialog.ShowDialog(this) == true)
+            {
+                eventArgs.ResultFilePath = dialog.FileName;
+            }
+            else
+            {
+                eventArgs.Cancel = true;
+            }
+        };
         Browser.NavigationCompleted += (_, eventArgs) =>
         {
             if (eventArgs.IsSuccess)
             {
+                if (Browser.Source == ViewerUri)
+                {
+                    _viewerReady = true;
+                }
                 LoadingPanel.Visibility = Visibility.Collapsed;
                 ErrorPanel.Visibility = Visibility.Collapsed;
                 Browser.Visibility = Visibility.Visible;
             }
-            else
+            else if (!_viewerReady)
             {
                 ShowError($"The local viewer could not be opened ({eventArgs.WebErrorStatus}).");
+            }
+            else
+            {
+                // Attachment downloads can report ConnectionAborted for the attempted
+                // document navigation. Keep the already loaded viewer visible.
+                LoadingPanel.Visibility = Visibility.Collapsed;
+                ErrorPanel.Visibility = Visibility.Collapsed;
+                Browser.Visibility = Visibility.Visible;
             }
         };
 

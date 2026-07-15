@@ -17,6 +17,15 @@ async function request(url: string, init?: RequestInit): Promise<void> {
   }
 }
 
+async function download(url: string): Promise<Blob> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    const problem = await response.json().catch(() => null)
+    throw new Error(problem?.detail ?? `Download failed (${response.status})`)
+  }
+  return response.blob()
+}
+
 export const api = {
   status: () => json<ServiceStatus>('/api/status'),
   jobs: () => json<JobSummary[]>('/api/jobs'),
@@ -30,6 +39,7 @@ export const api = {
     return json<{ id: string; origin: string }>('/api/captures/import', { method: 'POST', body: form })
   },
   replayJob: (id: string) => json<{ id: string; origin: string }>(`/api/jobs/${id}/replay`, { method: 'POST' }),
+  downloadJob: (id: string, format: 'text' | 'raw' | 'capture') => download(`/api/jobs/${id}/${format}`),
   activate: (request: ActivationRequest) => json<LicenseStatus>('/api/license/activate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
