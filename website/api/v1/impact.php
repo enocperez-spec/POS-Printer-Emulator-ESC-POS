@@ -9,7 +9,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     exit;
 }
 
-const AVERAGE_RECEIPT_LENGTH_INCHES = 12.0;
+const RECEIPT_WIDTH_INCHES = 3.125;
+const AVERAGE_RECEIPT_LENGTH_INCHES = 6.0;
 const CO2_PER_RECEIPT_GRAMS = 2.5;
 
 try {
@@ -18,12 +19,15 @@ try {
     )->fetchColumn();
 
     $paperFeet = ($jobs * AVERAGE_RECEIPT_LENGTH_INCHES) / 12;
+    $paperSquareFeet = ($jobs * RECEIPT_WIDTH_INCHES * AVERAGE_RECEIPT_LENGTH_INCHES) / 144;
     $response = [
         'receiptsAvoided' => $jobs,
         'paperFeetAvoided' => round($paperFeet, 1),
+        'paperSquareFeetAvoided' => round($paperSquareFeet, 1),
         'co2GramsAvoided' => round($jobs * CO2_PER_RECEIPT_GRAMS, 1),
         'updatedAt' => gmdate(DATE_ATOM),
         'assumptions' => [
+            'receiptWidthInches' => RECEIPT_WIDTH_INCHES,
             'averageReceiptLengthInches' => AVERAGE_RECEIPT_LENGTH_INCHES,
             'co2PerReceiptGrams' => CO2_PER_RECEIPT_GRAMS,
         ],

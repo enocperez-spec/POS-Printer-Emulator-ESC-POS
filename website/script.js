@@ -56,7 +56,7 @@ if (impactSection) {
       ? `${number.format(grams / 1000)} kg`
       : `${number.format(grams)} g`;
 
-  fetch('api/v1/impact.php', { headers: { Accept: 'application/json' } })
+  fetch('api/v1/impact.php?v=methodology-1.1', { headers: { Accept: 'application/json' } })
     .then((response) => {
       if (!response.ok) throw new Error('Impact service unavailable');
       return response.json();
@@ -65,6 +65,8 @@ if (impactSection) {
       impactSection.querySelector('[data-impact-receipts]').textContent = number.format(impact.receiptsAvoided);
       impactSection.querySelector('[data-impact-paper]').textContent = formatPaper(impact.paperFeetAvoided);
       impactSection.querySelector('[data-impact-co2]').textContent = formatCo2(impact.co2GramsAvoided);
+      const area = impactSection.querySelector('[data-impact-area]');
+      if (area) area.textContent = number.format(impact.paperSquareFeetAvoided);
       impactSection.querySelector('[data-impact-status]').textContent = 'Based on anonymized emulated print-job totals. No receipt contents are collected.';
     })
     .catch(() => {
