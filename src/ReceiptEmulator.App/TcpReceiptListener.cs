@@ -6,6 +6,7 @@ namespace ReceiptEmulator;
 public sealed class TcpReceiptListener(
     PrinterOptions options,
     ReceiptProcessor processor,
+    PrinterStateService printerState,
     ServiceRuntimeState state,
     ILogger<TcpReceiptListener> logger) : BackgroundService
 {
@@ -43,10 +44,43 @@ public sealed class TcpReceiptListener(
             var source = (client.Client.RemoteEndPoint as IPEndPoint)?.Address.ToString() ?? "unknown";
             var collected = new List<byte>();
             var buffer = new byte[8192];
+            var asbMask = 0;
+            var asbActive = false;
+            var writeGate = new SemaphoreSlim(1, 1);
+            Action<PrinterStateSnapshot>? stateChangedHandler = null;
 
             try
             {
                 await using var stream = client.GetStream();
+                async Task SendAsync(string command, byte[] response, CancellationToken cancellationToken)
+                {
+                    await writeGate.WaitAsync(cancellationToken);
+                    try
+                    {
+                        await stream.WriteAsync(response, cancellationToken);
+                        await stream.FlushAsync(cancellationToken);
+                        printerState.RecordResponse(command, source);
+                    }
+                    finally { writeGate.Release(); }
+                }
+
+                void OnPrinterStateChanged(PrinterStateSnapshot snapshot)
+                {
+                    if (Volatile.Read(ref asbMask) == 0) return;
+                    _ = SendAutomaticStatusBackAsync(snapshot);
+                }
+
+                async Task SendAutomaticStatusBackAsync(PrinterStateSnapshot snapshot)
+                {
+                    try { await SendAsync("GS a state change", printerState.BuildAutomaticStatusBack(snapshot), stoppingToken); }
+                    catch (Exception exception) when (exception is IOException or ObjectDisposedException or OperationCanceledException)
+                    {
+                        logger.LogDebug("Automatic status connection to {SourceIp} closed", source);
+                    }
+                }
+
+                stateChangedHandler = OnPrinterStateChanged;
+                printerState.Changed += stateChangedHandler;
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     using var idle = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
@@ -61,6 +95,17 @@ public sealed class TcpReceiptListener(
                         logger.LogWarning("Rejected oversized print job from {SourceIp}", source);
                         return;
                     }
+                    var statusResult = EscPosStatusProtocol.Extract(collected, asbMask, printerState);
+                    var wasActive = asbMask != 0;
+                    asbMask = statusResult.AsbMask;
+                    var isActive = asbMask != 0;
+                    if (wasActive != isActive)
+                    {
+                        printerState.SetAsbConnectionActive(isActive);
+                        asbActive = isActive;
+                    }
+                    foreach (var response in statusResult.Responses)
+                        await SendAsync(response.Command, response.Bytes, stoppingToken);
 
                     foreach (var jobBytes in EscPosJobFramer.ExtractCutJobs(collected))
                         processor.Process(jobBytes, source, out _);
@@ -68,10 +113,17 @@ public sealed class TcpReceiptListener(
 
                 if (collected.Count > 0)
                     processor.Process(collected.ToArray(), source, out _);
+
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Interrupted print connection from {SourceIp}", source);
+            }
+            finally
+            {
+                if (stateChangedHandler is not null) printerState.Changed -= stateChangedHandler;
+                if (asbActive) printerState.SetAsbConnectionActive(false);
+                writeGate.Dispose();
             }
         }
     }

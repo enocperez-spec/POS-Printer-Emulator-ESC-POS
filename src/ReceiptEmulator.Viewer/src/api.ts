@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, PrinterSetupStatus, ReceiptJob, ServiceStatus, UpdateStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -31,4 +31,11 @@ export const api = {
   }),
   checkUpdates: (force = false) => json<UpdateStatus>(`/api/updates/check?force=${force}`),
   printerSetupStatus: () => json<PrinterSetupStatus>('/api/printer-setup/status'),
+  printerState: () => json<PrinterStateStatus>('/api/printer-state'),
+  updatePrinterState: (state: PrinterStateUpdate) => json<PrinterStateStatus>('/api/printer-state', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state),
+  }),
+  resetPrinterState: () => json<PrinterStateStatus>('/api/printer-state/reset', { method: 'POST' }),
 }

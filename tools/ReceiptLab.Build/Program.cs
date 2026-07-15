@@ -255,17 +255,23 @@ internal static class ReceiptLabBuild
         var displayVersion = versionMatch.Groups["version"].Value;
         var changed = new List<string>();
 
-        SynchronizeFile(
-            Path.Combine(Root, "website", "index.html"),
-            text => Regex.Replace(
-                Regex.Replace(
-                    Regex.Replace(text, "POSPrinterEmulatorSetup-[0-9]+\\.[0-9]+\\.[0-9]+-win-x64\\.exe", $"POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe"),
-                    "\"softwareVersion\"\\s*:\\s*\"[0-9]+\\.[0-9]+\\.[0-9]+\"",
-                    $"\"softwareVersion\": \"{displayVersion}\""),
-                "Version [0-9]+\\.[0-9]+\\.[0-9]+",
-                $"Version {displayVersion}"),
-            checkOnly,
-            changed);
+        foreach (var websitePage in Directory.EnumerateFiles(
+                     Path.Combine(Root, "website"),
+                     "*.html",
+                     SearchOption.TopDirectoryOnly))
+        {
+            SynchronizeFile(
+                websitePage,
+                text => Regex.Replace(
+                    Regex.Replace(
+                        Regex.Replace(text, "POSPrinterEmulatorSetup-[0-9]+\\.[0-9]+\\.[0-9]+-win-x64\\.exe", $"POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe"),
+                        "\"softwareVersion\"\\s*:\\s*\"[0-9]+\\.[0-9]+\\.[0-9]+\"",
+                        $"\"softwareVersion\": \"{displayVersion}\""),
+                    "Version [0-9]+\\.[0-9]+\\.[0-9]+",
+                    $"Version {displayVersion}"),
+                checkOnly,
+                changed);
+        }
 
         if (checkOnly && changed.Count > 0)
         {

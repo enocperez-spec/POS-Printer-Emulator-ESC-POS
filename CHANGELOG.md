@@ -2,6 +2,14 @@
 
 Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The feature number advances from `01` through `99`; the next release after `v0.3.99` is `v0.4.00`.
 
+## v0.3.11
+
+- Added a Printer State panel under Settings with Ready, Paper Low, Paper Out, Cover Open, Cutter Error, and Offline scenarios.
+- Added custom simulation controls for recoverable, unrecoverable, and automatically recoverable errors plus cash-drawer state.
+- Added Epson `DLE EOT` real-time printer, offline-cause, error-cause, and paper-sensor status responses.
+- Added Epson `GS a` Automatic Status Back with immediate state-change notifications to connected POS clients.
+- Added `DLE ENQ` recovery handling, status-response counters, support diagnostics, and protocol-level automated tests.
+
 ## v0.3.10
 
 - Added a six-step Printer Setup Wizard under Settings for same-computer and network POS configurations.

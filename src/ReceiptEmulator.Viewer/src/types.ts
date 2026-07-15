@@ -71,6 +71,29 @@ export type PrinterInstallResult = PrinterInstallRequest & {
   technicalDetails?: string
 }
 
+export type PaperStatus = 'Ready' | 'Low' | 'Out'
+
+export type PrinterStateUpdate = {
+  online: boolean
+  paperStatus: PaperStatus
+  coverOpen: boolean
+  cutterError: boolean
+  recoverableError: boolean
+  unrecoverableError: boolean
+  autoRecoverableError: boolean
+  drawerOpen: boolean
+}
+
+export type PrinterStateStatus = PrinterStateUpdate & {
+  effectiveOnline: boolean
+  summary: string
+  responsesSent: number
+  asbConnections: number
+  lastStatusQuery?: string
+  dleEotSupported: boolean
+  asbSupported: boolean
+}
+
 export type JobSummary = {
   id: string
   receivedAt: string

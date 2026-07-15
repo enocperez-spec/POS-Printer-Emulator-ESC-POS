@@ -359,6 +359,44 @@ button { color: inherit; }
 .privacy-callout svg { flex: 0 0 auto; color: var(--green); }
 .privacy-callout p { margin: 0; }
 
+.printer-state-loading { display: flex; align-items: center; gap: 10px; padding: 32px; color: var(--muted); font-size: 12px; }
+.printer-state-settings { display: grid; gap: 24px; }
+.printer-state-hero.has-fault { border-color: #e7bd67; background: #fff9ec; }
+.printer-state-hero.has-fault .settings-status-icon { color: #b96b00; }
+.state-section { display: grid; gap: 13px; }
+.state-section-heading h3 { margin: 0 0 4px; font-size: 14px; }
+.state-section-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+.state-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.state-presets button { min-height: 62px; display: grid; gap: 4px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; }
+.state-presets button:hover { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 6%, var(--surface)); }
+.state-presets strong { font-size: 12px; }
+.state-presets span { color: var(--muted); font-size: 10px; line-height: 1.35; }
+.state-control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.state-select, .state-toggle { min-height: 58px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.state-select { display: grid; grid-template-columns: 1fr 115px; align-items: center; gap: 10px; padding: 9px 11px; color: var(--text); font-size: 11px; font-weight: 750; }
+.state-select select { height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface-muted); }
+.state-toggle { display: grid; grid-template-columns: 22px minmax(0, 1fr) 34px; align-items: center; gap: 8px; padding: 9px 11px; color: var(--text); text-align: left; cursor: pointer; }
+.state-toggle > span:nth-child(2) { display: grid; gap: 3px; }
+.state-toggle strong { font-size: 11px; }
+.state-toggle small { color: var(--muted); font-size: 9px; }
+.state-toggle-icon { color: var(--muted); }
+.state-toggle.active .state-toggle-icon { color: var(--green); }
+.state-toggle i { width: 31px; height: 18px; position: relative; border-radius: 99px; background: var(--border); }
+.state-toggle i::after { content: ''; width: 12px; height: 12px; position: absolute; top: 3px; left: 3px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(20 35 50 / 24%); transition: transform 130ms ease; }
+.state-toggle.active i { background: var(--green); }
+.state-toggle.active i::after { transform: translateX(13px); }
+.state-error { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 7px; color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); font-size: 11px; }
+.state-actions { margin-top: 1px; }
+.state-protocol { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 14px; border-radius: 9px; color: var(--muted); background: var(--surface-muted); }
+.state-protocol > svg { color: var(--blue); }
+.state-protocol > div { display: grid; gap: 3px; }
+.state-protocol strong { color: var(--text); font-size: 11px; }
+.state-protocol span { font-size: 9px; }
+.state-protocol dl { display: flex; gap: 18px; margin: 0; }
+.state-protocol dl div { display: grid; gap: 2px; text-align: right; }
+.state-protocol dt { font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.state-protocol dd { margin: 0; color: var(--text); font-size: 12px; font-weight: 800; }
+
 .printer-wizard { min-height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; padding: 22px 28px 0; }
 .wizard-progress { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
 .wizard-progress span { height: 4px; border-radius: 99px; background: var(--border); }
@@ -480,6 +518,7 @@ html[data-theme="dark"] .confirm-icon { color: #ff8c82; background: #3b2225; }
 html[data-theme="dark"] .update-banner { color: #b8d8fb; border-color: #315d86; background: #142942; }
 html[data-theme="dark"] .settings-status-card.update-available { border-color: #315d86; background: #142942; }
 html[data-theme="dark"] .settings-status-card.is-current { border-color: #2c6941; background: #173022; }
+html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; background: #302516; }
 
 @media (max-width: 1050px) {
   .workspace { grid-template-columns: 260px minmax(390px, 1fr); }
@@ -527,6 +566,10 @@ html[data-theme="dark"] .settings-status-card.is-current { border-color: #2c6941
   .settings-panel .activation-form { margin: 0 -18px -20px; }
   .license-summary { grid-template-columns: 1fr; margin-inline: -18px; }
   .support-detail-grid { grid-template-columns: 1fr; }
+  .state-presets { grid-template-columns: 1fr 1fr; }
+  .state-control-grid { grid-template-columns: 1fr; }
+  .state-protocol { grid-template-columns: 25px 1fr; }
+  .state-protocol dl { grid-column: 1 / 3; justify-content: flex-end; }
   .feature-comparison, .activation-form { grid-template-columns: 1fr; }
   .activation-form label, .key-field, .activation-error, .activate-button, .activation-note { grid-column: 1; }
 }

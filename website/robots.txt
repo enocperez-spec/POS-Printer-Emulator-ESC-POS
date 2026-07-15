@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://posprinteremulator.com/sitemap.xml
+Sitemap: https://www.posprinteremulator.com/sitemap.xml

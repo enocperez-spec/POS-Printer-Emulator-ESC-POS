@@ -11,6 +11,7 @@ import {
   FileText,
   Filter,
   FlaskConical,
+  Gauge,
   KeyRound,
   LifeBuoy,
   ImageIcon,
@@ -33,12 +34,13 @@ import {
 } from 'lucide-react'
 import { api } from './api'
 import { PrinterSetupWizard } from './PrinterSetupWizard'
+import { PrinterStateSettings } from './PrinterStateSettings'
 import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, UpdateStatus } from './types'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.10',
+  version: '0.3.11',
   license: {
     mode: 'Trial', isFull: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -50,7 +52,7 @@ type ClearRequest =
   | { kind: 'one'; id: string; label: string }
   | { kind: 'all'; count: number }
 
-type SettingsSection = 'license' | 'printer' | 'updates' | 'support'
+type SettingsSection = 'license' | 'printer' | 'state' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -470,7 +472,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   onActivated: (license: ServiceStatus['license']) => void
 }) {
   const [section, setSection] = useState<SettingsSection>(initialSection)
-  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', updates: 'Check for Updates', support: 'Support' }
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -483,12 +485,14 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
             <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
+            <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')}><Gauge size={18} /><span>Printer State</span><ChevronRight size={15} /></button>
             <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')}><RefreshCw size={18} /><span>Check for Updates</span><ChevronRight size={15} /></button>
             <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
           </nav>
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
+            {section === 'state' && <PrinterStateSettings />}
             {section === 'updates' && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
             {section === 'support' && <SupportSettings status={status} />}
           </div>

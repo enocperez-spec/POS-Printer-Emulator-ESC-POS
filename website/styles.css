@@ -24,3 +24,14 @@
 .audience-grid p{margin:0;color:var(--muted);font-size:15px}
 @media (max-width:1100px){.site-nav{gap:16px}.audience-grid{grid-template-columns:1fr}.audience-grid article{min-height:0}.audience-number{margin-bottom:26px}}
 @media (max-width:780px){.audience-grid{margin-top:40px}.audience-grid article{padding:28px}.footer-top nav{grid-template-columns:1fr 1fr}}
+
+/* Search-focused product overview */
+.seo-overview{background:#f7fafc}
+.seo-overview-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:80px;align-items:start}
+.seo-link-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.seo-link-grid a{min-height:170px;padding:28px;border:1px solid #d5e2eb;border-radius:14px;background:#fff;box-shadow:0 14px 38px rgba(6,30,54,.07);transition:transform .2s,border-color .2s}
+.seo-link-grid a:hover{transform:translateY(-3px);border-color:var(--cyan)}
+.seo-link-grid strong{display:block;margin-bottom:10px;font-size:18px}
+.seo-link-grid span{color:var(--muted);font-size:14px}
+@media (max-width:1100px){.seo-overview-grid{grid-template-columns:1fr;gap:45px}}
+@media (max-width:680px){.seo-link-grid{grid-template-columns:1fr}.seo-link-grid a{min-height:0}}

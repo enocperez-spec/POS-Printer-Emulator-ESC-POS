@@ -21,6 +21,7 @@ builder.Services.AddSingleton<ReceiptStore>();
 builder.Services.AddSingleton<LicenseService>();
 builder.Services.AddSingleton<ReceiptProcessor>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
+builder.Services.AddSingleton<PrinterStateService>();
 builder.Services.AddSingleton(supportLogs);
 builder.Services.AddHttpClient("UsageTelemetry");
 builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTelemetryService(
@@ -62,8 +63,18 @@ app.MapGet("/api/updates/status", (UpdateService updates) =>
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
 
+app.MapGet("/api/printer-state", (PrinterStateService printerState) => Results.Ok(printerState.GetStatus()));
+
+app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStateService printerState) =>
+{
+    try { return Results.Ok(printerState.Update(request)); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/printer-state/reset", (PrinterStateService printerState) => Results.Ok(printerState.Reset()));
+
 app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
-    ReceiptStore store, SupportLogProvider logs) =>
+    ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState) =>
 {
     var status = license.GetStatus();
     var report = new StringBuilder()
@@ -79,6 +90,8 @@ app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseServ
         .AppendLine($"License mode: {status.Mode}")
         .AppendLine($"License ID: {status.LicenseId?.ToString() ?? "None"}")
         .AppendLine($"Receipt jobs currently listed: {store.GetSummaries().Count}")
+        .AppendLine($"Simulated printer state: {printerState.GetStatus().Summary}")
+        .AppendLine($"Printer status responses sent: {printerState.GetStatus().ResponsesSent}")
         .AppendLine()
         .AppendLine("Application log")
         .AppendLine("---------------")
