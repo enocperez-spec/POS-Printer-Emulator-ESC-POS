@@ -54,13 +54,16 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 
 1. **v0.3.15 — Capture, import, export, and replay.** Preserve complete ESC/POS sessions, import external binary jobs, export portable capture packages, and replay captured jobs through the processing pipeline.
 2. **v0.3.16 — In-place receipt export correction.** Save Text, Raw, and Capture files without replacing the loaded desktop viewer or showing an attachment-navigation startup error.
-3. **v0.3.17 — Printer profiles.** Model paper width, code pages, supported commands, status behavior, and rendering defaults as selectable printer configurations.
-4. **v0.3.18 — Multiple printer listeners.** Host independently configured printer endpoints with separate names, ports, profiles, status state, and activity filtering.
-5. **v0.3.19 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-6. **v0.3.20 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
-7. Service-to-viewer authentication and installer repair mode.
-8. SQLite history, retention controls, deletion, and migrations.
-9. Optional online activation revocation and license transfer workflow.
-10. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-11. PNG export and deterministic PDF generation.
-12. Production code-signing and expanded unattended deployment validation.
+3. **v0.3.17 — License tiers and Pro feature gates.** Establish Trial, Pro, and Enterprise licensing with paid-feature authorization boundaries.
+4. **v0.3.18 — Admin Portal and tier-aware purchase pricing.** Manage separate Pro and Enterprise prices, purchases, fulfillment, and activation keys.
+5. **v0.3.19 — Printer profiles.** Model paper width, code pages, supported commands, status behavior, and rendering defaults as selectable printer configurations.
+6. **v0.3.20 — Multiple printer listeners.** Host independently configured printer endpoints with separate names, ports, profiles, status state, and activity filtering.
+7. **v0.3.21 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+8. **v0.3.22 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
+9. **v0.3.23 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+10. Service-to-viewer authentication and installer repair mode.
+11. SQLite history, retention controls, deletion, and migrations.
+12. Optional online activation revocation and license transfer workflow.
+13. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+14. PNG export and deterministic PDF generation.
+15. Production code-signing and expanded unattended deployment validation.

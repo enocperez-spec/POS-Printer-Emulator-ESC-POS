@@ -195,6 +195,7 @@ The permanent status list for every completed, scheduled, and future release is 
 - **v0.3.20 — Multiple printer listeners:** Run and manage multiple independently named printer endpoints with separate ports, profiles, status, and activity views.
 - **v0.3.21 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
 - **v0.3.22 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
+- **v0.3.23 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, SQLite history and migrations, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

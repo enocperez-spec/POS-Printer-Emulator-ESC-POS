@@ -77,7 +77,12 @@ $releaseSync = database()->prepare(
          'Guide nontechnical customers through connection problems and support collection.',
          'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
          'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
-         'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL)
+         'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
+        ('v0.3.23', 'v0.3.23', 'Release', 'Guided update installation and restart', 'Planned', 323,
+         'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
+         'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
+         'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
+         'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL)
      ON DUPLICATE KEY UPDATE
         version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
         status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
@@ -86,6 +91,9 @@ $releaseSync = database()->prepare(
         completed_at = IF(VALUES(status) = 'Released', COALESCE(completed_at, UTC_TIMESTAMP(6)), NULL)"
 );
 $releaseSync->execute();
+database()->prepare(
+    "UPDATE development_roadmap SET github_url = ? WHERE item_key = 'v0.3.23' AND (github_url IS NULL OR github_url = '')"
+)->execute(['https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3']);
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
         (bug_key, title, severity, status, affected_versions, target_release, fixed_version, customer_impact,

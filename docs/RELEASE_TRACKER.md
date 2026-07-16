@@ -187,9 +187,35 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
+### v0.3.23 — Guided update installation and restart
+
+**Status:** Planned
+
+**GitHub:** [Issue #3 — Guided update installation and restart](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3)
+
+**Purpose:** Make application updates reliable and understandable by closing the running application cleanly before the installer replaces its files, then returning the customer to the updated application.
+
+**Planned scope:**
+
+- Download an available installer in the background while the application remains usable.
+- Verify the completed download against the release checksum and trusted publisher signature before offering installation.
+- Replace the current update action with a clear **Install and Restart** confirmation that explains the listener will be briefly unavailable.
+- Provide **Install and Restart**, **Install Later**, and **Cancel** choices without closing the application unexpectedly.
+- Detect an active incoming print job, finish or preserve it safely, and stop accepting new jobs before shutdown.
+- Save the selected receipt, window state, settings, registration, activation, profiles, stored logos, and local history.
+- Stop the listener and background service cleanly, launch a separate updater process, and exit every application process that could lock installed files.
+- Wait for file locks to clear, run the installer with minimal prompts, preserve existing registration data, and relaunch POS Printer Emulator automatically.
+- Show the installed version and a success confirmation after restart.
+- Keep the existing version recoverable when installation fails, record update diagnostics in the support log, and show plain-language recovery instructions.
+- Add an optional automatic-download preference while always requiring confirmation before closing and installing.
+
+**Why this priority:** The external updater and controlled shutdown eliminate the remaining class of self-update file-lock failures while preventing unexpected listener downtime or loss of customer state.
+
+**Complete when:** From Settings, a customer can download an update, choose Install and Restart, see the listener stop cleanly, complete the installation with no locked-file error, relaunch automatically on the new version, and retain registration, licensing, settings, stored data, and the previously selected receipt; cancel and failure paths leave the current installation usable.
+
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.22.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.23.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 
