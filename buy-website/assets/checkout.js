@@ -1,6 +1,10 @@
 const body = document.body;
 const form = document.querySelector('#purchase-form');
 const errorBox = document.querySelector('#form-error');
+const tierInputs = [...document.querySelectorAll('input[name="licenseTier"]')];
+const selectedTierPill = document.querySelector('#selected-tier-pill');
+const selectedPrice = document.querySelector('#selected-price');
+const selectedCurrency = document.querySelector('#selected-currency');
 
 const showError = (message) => {
   errorBox.textContent = message;
@@ -14,6 +18,7 @@ const createOrder = async () => {
     body: JSON.stringify({
       customerName: form.customerName.value,
       email: form.email.value,
+      licenseTier: form.licenseTier.value,
     }),
   });
   const data = await response.json();
@@ -25,6 +30,18 @@ const createOrder = async () => {
   }
   return data.orderId;
 };
+
+const updateSelectedTier = () => {
+  const selected = tierInputs.find((input) => input.checked);
+  if (!selected) return;
+  const currency = selected.dataset.currency || 'USD';
+  if (selectedTierPill) selectedTierPill.textContent = `${selected.value} License`;
+  if (selectedPrice) selectedPrice.textContent = currency === 'USD' ? `$${Number(selected.dataset.price).toFixed(2)}` : selected.dataset.price;
+  if (selectedCurrency) selectedCurrency.textContent = `${currency} · one-time`;
+};
+
+tierInputs.forEach((input) => input.addEventListener('change', updateSelectedTier));
+updateSelectedTier();
 
 if (body.dataset.checkoutReady === 'true') {
   const waitForPayPal = async () => {

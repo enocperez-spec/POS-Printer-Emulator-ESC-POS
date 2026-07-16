@@ -129,6 +129,7 @@ static void Publish(SftpClient client, string localDirectory, string remoteDirec
     var files = Directory.EnumerateFiles(localDirectory, "*", SearchOption.AllDirectories)
         .Where(path => !path.EndsWith("README.md", StringComparison.OrdinalIgnoreCase))
         .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.vite{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        .Where(path => !IsServerOwnedPrivateFile(localDirectory, path))
         .Order(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
@@ -184,6 +185,19 @@ static void Publish(SftpClient client, string localDirectory, string remoteDirec
     }
 
     Console.WriteLine($"Published {files.Length} files ({skippedFiles} already current, {uploadedBytes:N0} bytes transferred) to {remoteRoot}.");
+}
+
+static bool IsServerOwnedPrivateFile(string localRoot, string path)
+{
+    var relative = Path.GetRelativePath(localRoot, path).Replace('\\', '/');
+    if (!relative.StartsWith("private/", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    var fileName = Path.GetFileName(relative);
+    return !fileName.Equals(".htaccess", StringComparison.OrdinalIgnoreCase) &&
+           !fileName.EndsWith(".example.php", StringComparison.OrdinalIgnoreCase);
 }
 
 static void Configure(SftpClient client, string schemaPath, string remoteDirectory)

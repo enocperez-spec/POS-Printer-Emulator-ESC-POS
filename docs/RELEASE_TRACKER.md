@@ -12,7 +12,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.17**
+**Current public release: v0.3.18**
 
 ## Completed releases
 
@@ -38,6 +38,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.15 | Released | Portable capture packages, safe import, export, and replay |
 | v0.3.16 | Released | In-place Text, Raw, and Capture download correction |
 | v0.3.17 | Released | Trial, Pro, and Enterprise license tiers and Pro feature gates |
+| v0.3.18 | Released | Admin Portal branding and separate Pro and Enterprise purchase pricing |
 
 ## Scheduled releases
 
@@ -94,7 +95,24 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** Trial users see all four settings as locked and receive HTTP 403 from their APIs, while Pro and Enterprise keys immediately unlock them and legacy paid keys still validate as Pro.
 
-### v0.3.18 — Printer profiles
+### v0.3.18 — Admin Portal and tier-aware purchase pricing
+
+**Status:** Released
+
+**Purpose:** Give the business one clearly named administration area and let it price and sell Pro and Enterprise licenses independently.
+
+**Released scope:**
+
+- Brand `admin.posprinteremulator.com` consistently as the POS Printer Emulator Admin Portal.
+- Add separate Pro and Enterprise price controls to Purchase Pricing.
+- Display both license choices and their server-controlled prices on the purchase website.
+- Carry the selected tier through PayPal order creation, payment verification, order approval, activation-key issuance, and email delivery.
+- Preserve all existing orders as Pro orders during the automatic purchase-database migration.
+- Prevent website deployments from overwriting server-owned credentials, purchase records, pricing settings, and signing keys.
+
+**Complete when:** The Admin Portal shows two independently saved prices, the purchase page changes tiers and amounts without reload, and an approved order receives the same tier of activation key that the customer purchased.
+
+### v0.3.19 — Printer profiles
 
 **Status:** Next
 
@@ -112,7 +130,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** The same captured job can be replayed against two profiles and the viewer consistently shows the expected rendering and capability differences.
 
-### v0.3.19 — Multiple printer listeners
+### v0.3.20 — Multiple printer listeners
 
 **Status:** Planned
 
@@ -131,7 +149,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** At least two listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart.
 
-### v0.3.20 — Receipt comparison and automated validation
+### v0.3.21 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -150,7 +168,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.21 — Enhanced support package and connection diagnostics
+### v0.3.22 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -171,7 +189,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.20.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.22.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 

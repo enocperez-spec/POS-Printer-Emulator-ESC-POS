@@ -11,7 +11,7 @@ $allowedStatuses = ['PAID_AWAITING_APPROVAL','APPROVED','EMAILED','EMAIL_FAILED'
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $status = (string)($_GET['status'] ?? 'PAID_AWAITING_APPROVAL');
     if (!in_array($status, $allowedStatuses, true)) json_response(['error'=>'Invalid order status.'],422);
-    $query = db()->prepare('SELECT public_id,customer_name,email,paypal_order_id,paypal_capture_id,amount,currency,status,license_id,created_at,paid_at,approved_at,emailed_at,last_error FROM orders WHERE status=? ORDER BY COALESCE(paid_at,created_at) DESC LIMIT 200');
+    $query = db()->prepare('SELECT public_id,customer_name,email,license_tier,paypal_order_id,paypal_capture_id,amount,currency,status,license_id,created_at,paid_at,approved_at,emailed_at,last_error FROM orders WHERE status=? ORDER BY COALESCE(paid_at,created_at) DESC LIMIT 200');
     $query->execute([$status]);
     json_response(['orders'=>$query->fetchAll(),'status'=>$status]);
 }
@@ -26,7 +26,7 @@ if ($action === 'approve' && $order['status'] !== 'PAID_AWAITING_APPROVAL') json
 if ($action === 'retry_email' && $order['status'] !== 'EMAIL_FAILED') json_response(['error'=>'Only a failed activation email can be retried.'],409);
 
 if ($action === 'approve') {
-    $license = issue_activation_key($order['customer_name'],$order['email']);
+    $license = issue_activation_key($order['customer_name'],$order['email'],(string)($order['license_tier'] ?? 'Pro'));
     $update = db()->prepare("UPDATE orders SET activation_key=?,license_id=?,status='APPROVED',approved_at=? WHERE id=? AND status='PAID_AWAITING_APPROVAL'");
     $update->execute([$license['activation_key'],$license['license_id'],now_utc(),$order['id']]);
     if ($update->rowCount() !== 1) json_response(['error'=>'The order was already processed. Refresh the order list.'],409);

@@ -6,7 +6,8 @@ return [
     'environment' => 'production',
     'license' => [
         'product_name' => 'POS Printer Emulator Pro Version',
-        'price' => '0.00', // Set the approved one-time price before enabling checkout.
+        'pro_price' => '0.00', // The Admin Portal can override this value.
+        'enterprise_price' => '0.00', // The Admin Portal can override this value.
         'currency' => 'USD',
     ],
     'paypal' => [

@@ -53,22 +53,27 @@ $releaseSync = database()->prepare(
          'Tier-aware activation keys, legacy-key compatibility, Pro feature gates for Stored Logos, Printer State, Updates, and Support, telemetry, database migration, and admin issuance.',
          'A stable commercial boundary must precede additional paid and Enterprise functionality.',
          'Trial requests are locked in the UI and APIs while Pro, Enterprise, and legacy paid keys receive the correct access.', UTC_TIMESTAMP(6)),
-        ('v0.3.18', 'v0.3.18', 'Release', 'Printer profiles', 'Next', 318,
+        ('v0.3.18', 'v0.3.18', 'Release', 'Admin Portal and tier-aware purchase pricing', 'Released', 318,
+         'Give the business one clearly named administration area and sell Pro and Enterprise licenses independently.',
+         'Admin Portal branding, separate Pro and Enterprise prices, tier-aware PayPal orders, approval, activation-key issuance, email delivery, backward-compatible order migration, and safe private-file deployment filtering.',
+         'Commercial license tiers require matching server-controlled purchase pricing and fulfillment.',
+         'Both prices save independently and every approved order receives the tier purchased by the customer.', UTC_TIMESTAMP(6)),
+        ('v0.3.19', 'v0.3.19', 'Release', 'Printer profiles', 'Next', 319,
          'Model differences between printer configurations explicitly.',
          'Built-in and custom profiles for paper width, dots, code pages, fonts, cutter, drawer, images, barcode and QR features, status behavior, import, and export.',
          'Profiles define behavior before multiple endpoints depend on it.',
          'One capture replayed against two profiles shows deterministic expected capability and rendering differences.', NULL),
-        ('v0.3.19', 'v0.3.19', 'Release', 'Multiple printer listeners', 'Planned', 319,
+        ('v0.3.20', 'v0.3.20', 'Release', 'Multiple printer listeners', 'Planned', 320,
          'Emulate multiple receipt printers from one computer.',
          'Independent listener names, ports, addresses, profiles, state, counters, filtering, conflict detection, firewall setup, and fault isolation.',
          'Multiple listeners reuse the profile model and enable multi-station testing.',
          'Two simultaneous listeners receive jobs, apply different profiles, restart safely, and remain independently controllable.', NULL),
-        ('v0.3.20', 'v0.3.20', 'Release', 'Receipt comparison and automated validation', 'Planned', 320,
+        ('v0.3.21', 'v0.3.21', 'Release', 'Receipt comparison and automated validation', 'Planned', 321,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Deterministic captures and profiles are required for meaningful comparisons.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.21', 'v0.3.21', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 321,
+        ('v0.3.22', 'v0.3.22', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 322,
          'Guide nontechnical customers through connection problems and support collection.',
          'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
          'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
@@ -261,9 +266,9 @@ function lines(string $value): array
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dev Support | POS Printer Emulator</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/dev-support.css?v=20260715-1"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
-<body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator</span></a><form method="post" action="/logout.php" class="logout-form"><span>Owner Account</span><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><button>Log out</button></form></header>
+<body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator <small>Admin Portal</small></span></a><form method="post" action="/logout.php" class="logout-form"><span>Admin Account</span><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><button>Log out</button></form></header>
 <aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a class="active" href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a></nav><p>GitHub and Dev Support statuses must stay aligned.</p></aside>
-<main class="dev-support-main"><div class="page-heading"><div><h1>Dev Support</h1><p>Track product releases and defects from one protected owner workspace.</p></div></div>
+<main class="dev-support-main"><div class="page-heading"><div><h1>Dev Support</h1><p>Track product releases and defects from the protected Admin Portal.</p></div></div>
 <?php if ($notice !== ''): ?><div class="dev-notice" role="status"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="dev-error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <nav class="dev-tabs" aria-label="Dev Support sections"><a class="<?= $tab === 'releases' ? 'active' : '' ?>" href="?tab=releases" aria-current="<?= $tab === 'releases' ? 'page' : 'false' ?>">Release Tracker <span><?= $scheduledCount ?></span></a><a class="<?= $tab === 'bugs' ? 'active' : '' ?>" href="?tab=bugs" aria-current="<?= $tab === 'bugs' ? 'page' : 'false' ?>">Bug Tracker <span><?= $openBugCount ?></span></a></nav>

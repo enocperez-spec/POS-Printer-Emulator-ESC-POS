@@ -4,6 +4,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.18
+
+- Renamed the protected administration website to the POS Printer Emulator Admin Portal throughout its interface and documentation.
+- Added independent Pro and Enterprise price controls to Purchase Pricing.
+- Added Pro and Enterprise license selection to the purchase page with live price updates.
+- Preserved the purchased tier through PayPal order creation, approval, activation-key generation, and customer email delivery.
+- Added a backward-compatible purchase-database migration that treats existing orders as Pro orders.
+- Prevented website publishing from overwriting server-owned private configuration, purchase data, pricing settings, and signing keys.
+
 ## v0.3.17
 
 - Added explicit Trial, Pro, and Enterprise license levels across the desktop application, activation-key format, telemetry, database schema, and owner dashboard.

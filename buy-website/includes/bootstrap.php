@@ -41,6 +41,7 @@ function db(): PDO
         public_id TEXT NOT NULL UNIQUE,
         customer_name TEXT NOT NULL,
         email TEXT NOT NULL,
+        license_tier TEXT NOT NULL DEFAULT 'Pro',
         paypal_order_id TEXT UNIQUE,
         paypal_capture_id TEXT UNIQUE,
         amount TEXT NOT NULL,
@@ -54,6 +55,10 @@ function db(): PDO
         emailed_at TEXT,
         last_error TEXT
     )");
+    $orderColumns = $db->query('PRAGMA table_info(orders)')->fetchAll();
+    if (!in_array('license_tier', array_column($orderColumns, 'name'), true)) {
+        $db->exec("ALTER TABLE orders ADD COLUMN license_tier TEXT NOT NULL DEFAULT 'Pro'");
+    }
     $db->exec("CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id INTEGER NOT NULL,
@@ -148,22 +153,51 @@ function clean_email(string $value): string
 function now_utc(): string { return gmdate('Y-m-d H:i:s'); }
 function random_public_id(): string { return strtoupper(bin2hex(random_bytes(8))); }
 
-function license_offer(): array
+function clean_license_tier(string $tier): string
 {
-    $offer = [
-        'price' => number_format((float) config('license.price'), 2, '.', ''),
-        'currency' => strtoupper((string) config('license.currency')),
-    ];
-    $rows = db()->query("SELECT setting_key,setting_value FROM site_settings WHERE setting_key IN ('license_price','license_currency')")->fetchAll();
-    foreach ($rows as $row) {
-        if ($row['setting_key'] === 'license_price') $offer['price'] = $row['setting_value'];
-        if ($row['setting_key'] === 'license_currency') $offer['currency'] = $row['setting_value'];
+    $tier = ucfirst(strtolower(trim($tier)));
+    if (!in_array($tier, ['Pro', 'Enterprise'], true)) {
+        throw new InvalidArgumentException('Select a valid license level.');
     }
-    return $offer;
+    return $tier;
 }
 
-function update_license_offer(string $price, string $currency): array
+function license_offers(): array
 {
+    $currency = strtoupper((string) config('license.currency'));
+    $offers = [
+        'Pro' => [
+            'tier' => 'Pro',
+            'price' => number_format((float) (config('license.pro_price') ?? config('license.price')), 2, '.', ''),
+            'currency' => $currency,
+        ],
+        'Enterprise' => [
+            'tier' => 'Enterprise',
+            'price' => number_format((float) (config('license.enterprise_price') ?? 0), 2, '.', ''),
+            'currency' => $currency,
+        ],
+    ];
+    $rows = db()->query("SELECT setting_key,setting_value FROM site_settings WHERE setting_key IN ('license_price','pro_license_price','enterprise_license_price','license_currency')")->fetchAll();
+    $settings = [];
+    foreach ($rows as $row) $settings[$row['setting_key']] = $row['setting_value'];
+    $offers['Pro']['price'] = $settings['pro_license_price'] ?? $settings['license_price'] ?? $offers['Pro']['price'];
+    $offers['Enterprise']['price'] = $settings['enterprise_license_price'] ?? $offers['Enterprise']['price'];
+    if (isset($settings['license_currency'])) {
+        $offers['Pro']['currency'] = $settings['license_currency'];
+        $offers['Enterprise']['currency'] = $settings['license_currency'];
+    }
+    return $offers;
+}
+
+function license_offer(string $tier = 'Pro'): array
+{
+    $tier = clean_license_tier($tier);
+    return license_offers()[$tier];
+}
+
+function update_license_offer(string $tier, string $price, string $currency): array
+{
+    $tier = clean_license_tier($tier);
     $price = trim($price);
     $currency = strtoupper(trim($currency));
     if (!preg_match('/^\d{1,6}(?:\.\d{1,2})?$/', $price) || (float)$price < 0.50 || (float)$price > 999999.99) {
@@ -172,16 +206,21 @@ function update_license_offer(string $price, string $currency): array
     if ($currency !== 'USD') throw new InvalidArgumentException('USD is currently the supported checkout currency.');
     $normalized = number_format((float)$price, 2, '.', '');
     $savedAt = now_utc();
+    $priceKey = strtolower($tier) . '_license_price';
     db()->beginTransaction();
     try {
         $q = db()->prepare('INSERT INTO site_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at');
-        $q->execute(['license_price', $normalized, $savedAt]);
+        $q->execute([$priceKey, $normalized, $savedAt]);
         $q->execute(['license_currency', $currency, $savedAt]);
         $audit = db()->prepare('INSERT INTO admin_audit(event,details,created_at) VALUES(?,?,?)');
-        $audit->execute(['LICENSE_PRICE_UPDATED', json_encode(['price'=>$normalized,'currency'=>$currency]), $savedAt]);
+        $audit->execute(['LICENSE_PRICE_UPDATED', json_encode(['tier'=>$tier,'price'=>$normalized,'currency'=>$currency]), $savedAt]);
         db()->commit();
     } catch (Throwable $e) { if (db()->inTransaction()) db()->rollBack(); throw $e; }
-    return ['price'=>$normalized, 'currency'=>$currency];
+    return [
+        'tier' => $tier,
+        'price' => $normalized,
+        'currency' => $currency,
+    ];
 }
 
 function audit(int $orderId, string $event, ?string $details = null): void
