@@ -49,7 +49,11 @@ public sealed class CapturePackageService
             payloadHash,
             job.Receipt.Commands.Count,
             job.UnsupportedCount,
-            commands);
+            commands,
+            job.ProfileId,
+            job.ProfileName,
+            job.ProfilePaperWidthMm,
+            job.ProfilePrintableDots);
 
         using var output = new MemoryStream();
         using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -72,7 +76,7 @@ public sealed class CapturePackageService
         {
             var rawPayload = await ReadLimitedAsync(input, maximumPayloadBytes, cancellationToken);
             EnsurePayload(rawPayload);
-            return new ImportedCapture(rawPayload, Path.GetFileName(fileName), null, null, null);
+            return new ImportedCapture(rawPayload, Path.GetFileName(fileName), null, null, null, null);
         }
         if (!extension.Equals(FileExtension, StringComparison.OrdinalIgnoreCase))
         {
@@ -121,7 +125,8 @@ public sealed class CapturePackageService
             Path.GetFileName(fileName),
             manifest.OriginalReceivedAt,
             manifest.OriginalSourceIp,
-            manifest.JobId);
+            manifest.JobId,
+            manifest.ProfileId);
     }
 
     private static ZipArchiveEntry SingleEntry(ZipArchive archive, string name)
@@ -188,7 +193,8 @@ public sealed record ImportedCapture(
     string FileName,
     DateTimeOffset? OriginalReceivedAt,
     string? OriginalSourceIp,
-    Guid? CapturedJobId);
+    Guid? CapturedJobId,
+    string? CapturedProfileId);
 
 public sealed record CaptureCommandSummary(string Name, int Count, int UnsupportedCount);
 
@@ -210,4 +216,8 @@ public sealed record CaptureManifest(
     string PayloadSha256,
     int ParsedCommandCount,
     int UnsupportedCommandCount,
-    IReadOnlyList<CaptureCommandSummary> Commands);
+    IReadOnlyList<CaptureCommandSummary> Commands,
+    string? ProfileId = null,
+    string? ProfileName = null,
+    int? ProfilePaperWidthMm = null,
+    int? ProfilePrintableDots = null);

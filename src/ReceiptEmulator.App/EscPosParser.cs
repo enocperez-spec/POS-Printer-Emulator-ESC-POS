@@ -7,7 +7,7 @@ public sealed class EscPosParser
     private const byte Esc = 0x1B;
     private const byte Gs = 0x1D;
 
-    public ParsedReceipt Parse(ReadOnlySpan<byte> payload)
+    public ParsedReceipt Parse(ReadOnlySpan<byte> payload, int defaultCodePage = 437)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var result = new ParsedReceipt();
@@ -17,7 +17,7 @@ public sealed class EscPosParser
         var underline = false;
         var width = 1;
         var height = 1;
-        var codePage = 437;
+        var codePage = defaultCodePage;
         var qrData = string.Empty;
         var inverted = false;
         var rotated = false;
@@ -100,7 +100,7 @@ public sealed class EscPosParser
                 var command = payload[i + 1];
                 if (command == (byte)'@')
                 {
-                    alignment = "left"; bold = false; underline = false; width = 1; height = 1; codePage = 437;
+                    alignment = "left"; bold = false; underline = false; width = 1; height = 1; codePage = defaultCodePage;
                     inverted = false; rotated = false; upsideDown = false; color = "black"; font = "A";
                     AddCommand(i, payload.Slice(i, 2), "Initialize printer", "ESC @");
                     i += 2;

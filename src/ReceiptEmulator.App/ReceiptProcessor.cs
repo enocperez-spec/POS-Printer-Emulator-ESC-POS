@@ -1,9 +1,9 @@
 namespace ReceiptEmulator;
 
-public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger, IUsageTelemetry? telemetry = null)
+public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger, IUsageTelemetry? telemetry = null, PrinterProfileService? profiles = null)
 {
     public ReceiptJob? Process(byte[] payload, string sourceIp, out string? rejection)
-        => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, out rejection);
+        => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, null, out rejection);
 
     public ReceiptJob? Import(
         byte[] payload,
@@ -12,8 +12,18 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
         string? originalSourceIp,
         Guid? capturedJobId,
         out string? rejection)
+        => Import(payload, fileName, originalReceivedAt, originalSourceIp, capturedJobId, null, out rejection);
+
+    public ReceiptJob? Import(
+        byte[] payload,
+        string fileName,
+        DateTimeOffset? originalReceivedAt,
+        string? originalSourceIp,
+        Guid? capturedJobId,
+        string? capturedProfileId,
+        out string? rejection)
         => ProcessCore(payload, originalSourceIp ?? "Imported file", JobOrigins.Imported, false, false,
-            originalReceivedAt, originalSourceIp, capturedJobId, Path.GetFileName(fileName), out rejection);
+            originalReceivedAt, originalSourceIp, capturedJobId, Path.GetFileName(fileName), capturedProfileId, out rejection);
 
     public ReceiptJob? Replay(ReceiptJob source, out string? rejection)
         => ProcessCore(source.RawPayload, source.SourceIp, JobOrigins.Replayed, false, false,
@@ -21,6 +31,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             source.OriginalSourceIp ?? source.SourceIp,
             source.Id,
             source.ImportedFileName,
+            source.CapturedProfileId ?? source.ProfileId,
             out rejection);
 
     private ReceiptJob? ProcessCore(
@@ -33,6 +44,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
         string? originalSourceIp,
         Guid? parentJobId,
         string? importedFileName,
+        string? capturedProfileId,
         out string? rejection)
     {
         rejection = null;
@@ -42,10 +54,14 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             return null;
         }
 
+        var profile = profiles?.GetSelected() ?? new PrinterProfile(
+            PrinterProfileService.EpsonTmT88VId, "EPSON TM-T88V Receipt5", string.Empty, true, 80, 576, 576, 2304, 437,
+            [437, 850, 852, 855, 857, 858, 860, 862, 863, 864, 865, 866, 874, 1252], 48, 64,
+            new PrinterCapabilities(true, true, true, true, true, true, true, true, true));
         ParsedReceipt receipt;
         try
         {
-            receipt = parser.Parse(payload);
+            receipt = parser.Parse(payload, profile.DefaultCodePage);
         }
         catch (Exception ex)
         {
@@ -53,6 +69,8 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             rejection = "The ESC/POS payload could not be parsed safely.";
             return null;
         }
+
+        profiles?.ApplyCapabilities(receipt, profile);
 
         if (!receipt.HasPrintableContent)
         {
@@ -82,7 +100,12 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             OriginalReceivedAt = originalReceivedAt ?? receivedAt,
             OriginalSourceIp = originalSourceIp ?? sourceIp,
             ParentJobId = parentJobId,
-            ImportedFileName = importedFileName
+            ImportedFileName = importedFileName,
+            ProfileId = profile.Id,
+            ProfileName = profile.Name,
+            ProfilePaperWidthMm = profile.PaperWidthMm,
+            ProfilePrintableDots = profile.PrintableDots,
+            CapturedProfileId = capturedProfileId
         };
         store.Add(job);
         if (recordTelemetry)

@@ -1,1 +1,208 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>POS Printer Emulator Documentation</title><meta name="description" content="Set up POS Printer Emulator on Windows, configure TCP/IP port 9100, test ESC/POS receipts, inspect jobs, and activate the Pro Version."><link rel="canonical" href="https://www.posprinteremulator.com/documentation"><link rel="icon" href="assets/favicon.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css?v=20260715"><link rel="stylesheet" href="seo-pages.css?v=20260715"></head><body><header class="site-header"><div class="shell header-inner"><a class="brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator"></a><button class="menu-toggle" aria-expanded="false" aria-controls="site-nav" data-menu-toggle><span></span><span></span><span></span></button><nav class="site-nav" id="site-nav" data-nav><a href="/">Home</a><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a class="button button-small" href="pos-printer-emulator-download">Download</a></nav></div></header><main id="main"><section class="page-hero"><div class="shell"><div class="breadcrumbs"><a href="/">Home</a><span>/</span><span>Documentation</span></div><h1>POS Printer Emulator Documentation</h1><p>Install the Windows application, connect your POS over TCP/IP, inspect ESC/POS receipts, manage jobs, and activate the Pro Version.</p></div></section><section class="page-body"><div class="shell article-layout"><article class="article-content"><h2>Quick start</h2><ol class="numbered-steps"><li>Download and run the all-in-one Windows installer as an administrator.</li><li>Launch the application and confirm <strong>Running (listening)</strong> appears beside port 9100.</li><li>Select <strong>Test receipt</strong> to confirm receipt rendering.</li><li>Point the POS at the Windows PC’s IP address with RAW TCP/IP port 9100.</li><li>Send a receipt and select the job in Activity to inspect it.</li></ol><h2>Application areas</h2><h3>Activity</h3><p>Shows received print jobs with time, source, size, status, and warnings. Select a job to inspect it. Use the trash controls to remove one job or clear all jobs. Collapse the panel when you need more preview space.</p><h3>Receipt preview</h3><p>Displays the rendered thermal receipt. Zoom, return to actual size, view extracted text or raw content, and use Pro Version print/PDF tools. Trial previews include a watermark.</p><h3>Commands, Raw data, and Job details</h3><p>The Commands tab decodes ESC/POS instructions with byte offsets and explanations. Raw data displays the original payload. Job details lists receipt ID, time, source address, payload size, result, and unsupported-command count. The right panel can be collapsed.</p><h2>Connecting a POS</h2><p>Use direct RAW TCP/IP when your POS supports a network printer: enter the emulator PC’s IPv4 address and port <code>9100</code>. For a POS that requires a Windows printer, open Settings → Printer Setup and use the guided wizard. A <a href="how-to-create-a-windows-tcp-ip-printer-port">manual Windows port guide</a> is also available.</p><h2>Registration and activation</h2><p>Enter the customer or company name and email requested during setup. Every installation begins in Trial Mode. To activate, open Settings, enter the unique activation key supplied after purchase, and validate it. The Pro Version unlocks immediately without another download.</p><h2>Trial limits</h2><ul><li>Five emulated print jobs per calendar day.</li><li>No historical print-job data beyond the current session.</li><li>TRIAL watermark across the receipt viewer.</li><li>Premium features, including exports, unavailable.</li></ul><h2>Troubleshooting</h2><ul><li><strong>Listener not running:</strong> restart the application or Windows service and confirm port 9100 is not used by another process.</li><li><strong>No incoming job:</strong> verify IP address, RAW protocol, port 9100, network profile, and firewall access.</li><li><strong>Unexpected formatting:</strong> check Commands and warnings for unsupported or vendor-specific instructions.</li><li><strong>Activation rejected:</strong> verify the customer details and key exactly match the issued license.</li></ul></article><aside class="sidebar-card"><h2>Documentation links</h2><p>Version 0.3.18</p><a class="button button-primary" href="downloads/POSPrinterEmulatorSetup-0.3.18-win-x64.exe" download>Download for Windows</a><ul class="sidebar-links"><li><a href="#main">Quick start</a></li><li><a href="how-to-test-pos-receipts-without-a-printer">Receipt testing guide</a></li><li><a href="how-to-create-a-windows-tcp-ip-printer-port">TCP/IP printer port</a></li><li><a href="faq">Frequently asked questions</a></li></ul></aside></div></section></main><footer class="site-footer"><div class="shell footer-top"><a class="brand footer-brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator"></a><nav><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a href="privacy.html">Privacy</a></nav></div><div class="shell footer-bottom"><span>© 2026 POS Printer Emulator.</span><span>Local tools for better receipt testing.</span></div></footer><script src="script.js" type="module"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>POS Printer Emulator Documentation</title>
+    <meta
+      name="description"
+      content="Set up POS Printer Emulator on Windows, configure TCP/IP port 9100, test ESC/POS receipts, inspect jobs, and activate the Pro Version."
+    />
+    <link
+      rel="canonical"
+      href="https://www.posprinteremulator.com/documentation"
+    />
+    <link rel="icon" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260715" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260715" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/"
+          ><img src="assets/logo-web.png" alt="POS Printer Emulator" /></a
+        ><button
+          class="menu-toggle"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          data-menu-toggle
+        >
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="site-nav" id="site-nav" data-nav>
+          <a href="/">Home</a><a href="documentation">Documentation</a
+          ><a href="pricing">Pricing</a><a href="faq">FAQ</a
+          ><a class="button button-small" href="pos-printer-emulator-download"
+            >Download</a
+          >
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero">
+        <div class="shell">
+          <div class="breadcrumbs">
+            <a href="/">Home</a><span>/</span><span>Documentation</span>
+          </div>
+          <h1>POS Printer Emulator Documentation</h1>
+          <p>
+            Install the Windows application, connect your POS over TCP/IP,
+            inspect ESC/POS receipts, manage jobs, and activate the Pro Version.
+          </p>
+        </div>
+      </section>
+      <section class="page-body">
+        <div class="shell article-layout">
+          <article class="article-content">
+            <h2>Quick start</h2>
+            <ol class="numbered-steps">
+              <li>
+                Download and run the all-in-one Windows installer as an
+                administrator.
+              </li>
+              <li>
+                Launch the application and confirm
+                <strong>Running (listening)</strong> appears beside port 9100.
+              </li>
+              <li>
+                Select <strong>Test receipt</strong> to confirm receipt
+                rendering.
+              </li>
+              <li>
+                Point the POS at the Windows PC’s IP address with RAW TCP/IP
+                port 9100.
+              </li>
+              <li>
+                Send a receipt and select the job in Activity to inspect it.
+              </li>
+            </ol>
+            <h2>Application areas</h2>
+            <h3>Activity</h3>
+            <p>
+              Shows received print jobs with time, source, size, status, and
+              warnings. Select a job to inspect it. Use the trash controls to
+              remove one job or clear all jobs. Collapse the panel when you need
+              more preview space.
+            </p>
+            <h3>Receipt preview</h3>
+            <p>
+              Displays the rendered thermal receipt. Zoom, return to actual
+              size, view extracted text or raw content, and use Pro Version
+              print/PDF tools. Trial previews include a watermark.
+            </p>
+            <h3>Commands, Raw data, and Job details</h3>
+            <p>
+              The Commands tab decodes ESC/POS instructions with byte offsets
+              and explanations. Raw data displays the original payload. Job
+              details lists receipt ID, time, source address, payload size,
+              result, and unsupported-command count. The right panel can be
+              collapsed.
+            </p>
+            <h2>Connecting a POS</h2>
+            <p>
+              Use direct RAW TCP/IP when your POS supports a network printer:
+              enter the emulator PC’s IPv4 address and port <code>9100</code>.
+              For a POS that requires a Windows printer, open Settings → Printer
+              Setup and use the guided wizard. A
+              <a href="how-to-create-a-windows-tcp-ip-printer-port"
+                >manual Windows port guide</a
+              >
+              is also available.
+            </p>
+            <h2>Printer Profiles</h2>
+            <p>
+              Pro and Enterprise customers can open Settings → Printer Profiles
+              to select a built-in Epson TM-T88V or generic ESC/POS profile,
+              create custom profiles, and import or export
+              <code>.ppeprofile</code> files. Profiles define paper width,
+              printable dots, code pages, image limits, and supported printer
+              capabilities so receipts can be validated against the target
+              printer. Printer Profiles are locked in the Trial License.
+            </p>
+            <h2>Registration and activation</h2>
+            <p>
+              Enter the customer or company name and email requested during
+              setup. Every installation begins in Trial Mode. To activate, open
+              Settings, enter the unique activation key supplied after purchase,
+              and validate it. The Pro Version unlocks immediately without
+              another download.
+            </p>
+            <h2>Trial limits</h2>
+            <ul>
+              <li>Five emulated print jobs per calendar day.</li>
+              <li>No historical print-job data beyond the current session.</li>
+              <li>TRIAL watermark across the receipt viewer.</li>
+              <li>Premium features, including exports, unavailable.</li>
+            </ul>
+            <h2>Troubleshooting</h2>
+            <ul>
+              <li>
+                <strong>Listener not running:</strong> restart the application
+                or Windows service and confirm port 9100 is not used by another
+                process.
+              </li>
+              <li>
+                <strong>No incoming job:</strong> verify IP address, RAW
+                protocol, port 9100, network profile, and firewall access.
+              </li>
+              <li>
+                <strong>Unexpected formatting:</strong> check Commands and
+                warnings for unsupported or vendor-specific instructions.
+              </li>
+              <li>
+                <strong>Activation rejected:</strong> verify the customer
+                details and key exactly match the issued license.
+              </li>
+            </ul>
+          </article>
+          <aside class="sidebar-card">
+            <h2>Documentation links</h2>
+            <p>Version 0.3.19</p>
+            <a
+              class="button button-primary"
+              href="downloads/POSPrinterEmulatorSetup-0.3.19-win-x64.exe"
+              download
+              >Download for Windows</a
+            >
+            <ul class="sidebar-links">
+              <li><a href="#main">Quick start</a></li>
+              <li>
+                <a href="how-to-test-pos-receipts-without-a-printer"
+                  >Receipt testing guide</a
+                >
+              </li>
+              <li>
+                <a href="how-to-create-a-windows-tcp-ip-printer-port"
+                  >TCP/IP printer port</a
+                >
+              </li>
+              <li><a href="faq">Frequently asked questions</a></li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-top">
+        <a class="brand footer-brand" href="/"
+          ><img src="assets/logo-web.png" alt="POS Printer Emulator"
+        /></a>
+        <nav>
+          <a href="documentation">Documentation</a><a href="pricing">Pricing</a
+          ><a href="faq">FAQ</a><a href="privacy.html">Privacy</a>
+        </nav>
+      </div>
+      <div class="shell footer-bottom">
+        <span>© 2026 POS Printer Emulator.</span
+        ><span>Local tools for better receipt testing.</span>
+      </div>
+    </footer>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>

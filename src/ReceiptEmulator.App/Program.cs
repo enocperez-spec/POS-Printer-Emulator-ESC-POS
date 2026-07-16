@@ -19,6 +19,7 @@ builder.Services.AddSingleton(printerOptions);
 builder.Services.AddSingleton<EscPosParser>();
 builder.Services.AddSingleton<ReceiptStore>();
 builder.Services.AddSingleton<LicenseService>();
+builder.Services.AddSingleton<PrinterProfileService>();
 builder.Services.AddSingleton<ReceiptProcessor>();
 builder.Services.AddSingleton<CapturePackageService>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
@@ -69,22 +70,96 @@ app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
 
-app.MapGet("/api/printer-state", (PrinterStateService printerState, LicenseService license) =>
+app.MapGet("/api/printer-profiles", (PrinterProfileService profiles, LicenseService license) =>
     !license.HasProAccess
-        ? Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403)
-        : Results.Ok(printerState.GetStatus()));
+        ? Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403)
+        : Results.Ok(profiles.GetStatus()));
 
-app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStateService printerState, LicenseService license) =>
+app.MapPost("/api/printer-profiles", (PrinterProfileInput request, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
-    try { return Results.Ok(printerState.Update(request)); }
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try { return Results.Ok(profiles.Create(request)); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
-app.MapPost("/api/printer-state/reset", (PrinterStateService printerState, LicenseService license) =>
-    !license.HasProAccess
-        ? Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403)
-        : Results.Ok(printerState.Reset()));
+app.MapPut("/api/printer-profiles/{id}", (string id, PrinterProfileInput request, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try { return Results.Ok(profiles.Update(id, request)); }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/printer-profiles/{id}/duplicate", (string id, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try { return Results.Ok(profiles.Duplicate(id)); }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/printer-profiles/select", (PrinterProfileSelection request, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try { return Results.Ok(profiles.Select(request.ProfileId)); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapDelete("/api/printer-profiles/{id}", (string id, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try { return profiles.Delete(id) ? Results.NoContent() : Results.NotFound(); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapGet("/api/printer-profiles/{id}/export", (string id, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try { return Results.File(profiles.Export(id), "application/vnd.pos-printer-emulator.profile+json", $"{id}{PrinterProfileService.FileExtension}"); }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
+});
+
+app.MapPost("/api/printer-profiles/import", async (HttpRequest request, PrinterProfileService profiles, LicenseService license, CancellationToken cancellationToken) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    try
+    {
+        if (!request.HasFormContentType) return Results.Problem($"Choose a {PrinterProfileService.FileExtension} profile file.", statusCode: 400);
+        var form = await request.ReadFormAsync(cancellationToken);
+        var file = form.Files.GetFile("file");
+        if (file is null || file.Length == 0) return Results.Problem($"Choose a {PrinterProfileService.FileExtension} profile file.", statusCode: 400);
+        if (file.Length > PrinterProfileService.MaximumImportBytes) return Results.Problem("Printer profile files must be 128 KB or smaller.", statusCode: 400);
+        await using var stream = file.OpenReadStream();
+        return Results.Ok(await profiles.ImportAsync(stream, cancellationToken));
+    }
+    catch (InvalidDataException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapGet("/api/printer-state", (PrinterStateService printerState, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
+    var capabilities = profiles.GetSelected().Capabilities;
+    return Results.Ok(printerState.GetStatus() with { DleEotSupported = capabilities.DleEotStatus, AsbSupported = capabilities.AutomaticStatusBack });
+});
+
+app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStateService printerState, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
+    try
+    {
+        var capabilities = profiles.GetSelected().Capabilities;
+        return Results.Ok(printerState.Update(request) with { DleEotSupported = capabilities.DleEotStatus, AsbSupported = capabilities.AutomaticStatusBack });
+    }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/printer-state/reset", (PrinterStateService printerState, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
+    var capabilities = profiles.GetSelected().Capabilities;
+    return Results.Ok(printerState.Reset() with { DleEotSupported = capabilities.DleEotStatus, AsbSupported = capabilities.AutomaticStatusBack });
+});
 
 app.MapGet("/api/stored-graphics", (StoredGraphicService graphics, LicenseService license) =>
     !license.HasProAccess
@@ -125,10 +200,11 @@ app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGra
 });
 
 app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
-    ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState, StoredGraphicService graphics) =>
+    ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState, StoredGraphicService graphics, PrinterProfileService profiles) =>
 {
     if (!license.HasProAccess) return Results.Problem("Support requires a Pro or Enterprise License.", statusCode: 403);
     var status = license.GetStatus();
+    var selectedProfile = profiles.GetSelected();
     var report = new StringBuilder()
         .AppendLine("POS Printer Emulator Support Diagnostics")
         .AppendLine($"Generated: {DateTimeOffset.Now:O}")
@@ -141,6 +217,8 @@ app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseServ
         .AppendLine($"Last connection: {runtime.LastConnection?.ToString("O") ?? "None"}")
         .AppendLine($"License mode: {status.Mode}")
         .AppendLine($"License ID: {status.LicenseId?.ToString() ?? "None"}")
+        .AppendLine($"Printer profile: {selectedProfile.Name} ({selectedProfile.Id})")
+        .AppendLine($"Profile paper: {selectedProfile.PaperWidthMm} mm / {selectedProfile.PrintableDots} dots")
         .AppendLine($"Receipt jobs currently listed: {store.GetSummaries().Count}")
         .AppendLine($"Stored printer logos: {graphics.List().Count}")
         .AppendLine($"Simulated printer state: {printerState.GetStatus().Summary}")
@@ -193,6 +271,11 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
             job.OriginalSourceIp,
             job.ParentJobId,
             job.ImportedFileName,
+            job.ProfileId,
+            job.ProfileName,
+            job.ProfilePaperWidthMm,
+            job.ProfilePrintableDots,
+            job.CapturedProfileId,
             job.Receipt.Lines,
             job.Receipt.Commands,
             job.Receipt.PlainText,
@@ -240,6 +323,7 @@ app.MapPost("/api/captures/import", async (
             imported.OriginalReceivedAt,
             imported.OriginalSourceIp,
             imported.CapturedJobId,
+            imported.CapturedProfileId,
             out var rejection);
         return job is null
             ? Results.Problem(rejection, statusCode: 400)

@@ -192,7 +192,12 @@ public sealed record EscPosStatusProtocolResult(int AsbMask, IReadOnlyList<EscPo
 
 public static class EscPosStatusProtocol
 {
-    public static EscPosStatusProtocolResult Extract(List<byte> buffer, int currentAsbMask, PrinterStateService state)
+    public static EscPosStatusProtocolResult Extract(
+        List<byte> buffer,
+        int currentAsbMask,
+        PrinterStateService state,
+        bool dleEotSupported = true,
+        bool asbSupported = true)
     {
         var responses = new List<EscPosStatusResponse>();
         var index = 0;
@@ -205,7 +210,7 @@ public static class EscPosStatusProtocol
                 {
                     if (index + 2 >= buffer.Count) break;
                     var function = buffer[index + 2];
-                    if (function is >= 1 and <= 4)
+                    if (dleEotSupported && function is >= 1 and <= 4)
                     {
                         responses.Add(new($"DLE EOT {function}", [state.BuildRealTimeStatus(function)]));
                         buffer.RemoveRange(index, 3);
@@ -227,6 +232,7 @@ public static class EscPosStatusProtocol
                 if (buffer[index + 1] == 0x61)
                 {
                     if (index + 2 >= buffer.Count) break;
+                    if (!asbSupported) { index += 3; continue; }
                     currentAsbMask = buffer[index + 2];
                     buffer.RemoveRange(index, 3);
                     if (currentAsbMask != 0)

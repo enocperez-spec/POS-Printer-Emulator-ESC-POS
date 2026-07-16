@@ -23,6 +23,7 @@ public sealed class CapturePackageServiceTests
         Assert.Equal(original.ReceivedAt, imported.OriginalReceivedAt);
         Assert.Equal(original.SourceIp, imported.OriginalSourceIp);
         Assert.Equal(original.Id, imported.CapturedJobId);
+        Assert.Equal(original.ProfileId, imported.CapturedProfileId);
     }
 
     [Fact]
@@ -38,6 +39,7 @@ public sealed class CapturePackageServiceTests
         Assert.Null(imported.OriginalReceivedAt);
         Assert.Null(imported.OriginalSourceIp);
         Assert.Null(imported.CapturedJobId);
+        Assert.Null(imported.CapturedProfileId);
     }
 
     [Fact]

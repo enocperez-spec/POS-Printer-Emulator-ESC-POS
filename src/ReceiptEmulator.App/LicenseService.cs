@@ -75,6 +75,7 @@ public sealed class LicenseService
                     Watermark: !hasProAccess,
                     StoredLogos: hasProAccess,
                     PrinterState: hasProAccess,
+                    PrinterProfiles: hasProAccess,
                     Updates: hasProAccess,
                     Support: hasProAccess));
         }

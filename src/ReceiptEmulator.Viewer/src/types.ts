@@ -5,6 +5,7 @@ export type FeatureStatus = {
   watermark: boolean
   storedLogos: boolean
   printerState: boolean
+  printerProfiles: boolean
   updates: boolean
   support: boolean
 }
@@ -109,6 +110,41 @@ export type PrinterStateStatus = PrinterStateUpdate & {
   asbSupported: boolean
 }
 
+export type PrinterCapabilities = {
+  cutter: boolean
+  cashDrawer: boolean
+  rasterImages: boolean
+  nvGraphics: boolean
+  barcodes: boolean
+  qrCodes: boolean
+  twoColor: boolean
+  dleEotStatus: boolean
+  automaticStatusBack: boolean
+}
+
+export type PrinterProfile = {
+  id: string
+  name: string
+  description: string
+  builtIn: boolean
+  paperWidthMm: number
+  printableDots: number
+  maximumRasterWidthDots: number
+  maximumRasterHeightDots: number
+  defaultCodePage: number
+  supportedCodePages: number[]
+  fontAColumns: number
+  fontBColumns: number
+  capabilities: PrinterCapabilities
+}
+
+export type PrinterProfileInput = Omit<PrinterProfile, 'id' | 'builtIn'>
+
+export type PrinterProfileStatus = {
+  selectedProfileId: string
+  profiles: PrinterProfile[]
+}
+
 export type JobSummary = {
   id: string
   receivedAt: string
@@ -121,6 +157,10 @@ export type JobSummary = {
   rendererVersion: string
   parentJobId?: string
   importedFileName?: string
+  profileId: string
+  profileName: string
+  profilePaperWidthMm: number
+  profilePrintableDots: number
 }
 
 export type ReceiptSpan = {
@@ -158,4 +198,5 @@ export type ReceiptJob = JobSummary & {
   hex: string[]
   originalReceivedAt?: string
   originalSourceIp?: string
+  capturedProfileId?: string
 }

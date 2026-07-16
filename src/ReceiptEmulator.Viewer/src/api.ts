@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -54,6 +54,23 @@ export const api = {
     body: JSON.stringify(state),
   }),
   resetPrinterState: () => json<PrinterStateStatus>('/api/printer-state/reset', { method: 'POST' }),
+  printerProfiles: () => json<PrinterProfileStatus>('/api/printer-profiles'),
+  createPrinterProfile: (profile: PrinterProfileInput) => json<PrinterProfile>('/api/printer-profiles', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile),
+  }),
+  updatePrinterProfile: (id: string, profile: PrinterProfileInput) => json<PrinterProfile>(`/api/printer-profiles/${encodeURIComponent(id)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile),
+  }),
+  duplicatePrinterProfile: (id: string) => json<PrinterProfile>(`/api/printer-profiles/${encodeURIComponent(id)}/duplicate`, { method: 'POST' }),
+  selectPrinterProfile: (profileId: string) => json<PrinterProfile>('/api/printer-profiles/select', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileId }),
+  }),
+  deletePrinterProfile: (id: string) => request(`/api/printer-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  exportPrinterProfile: (id: string) => download(`/api/printer-profiles/${encodeURIComponent(id)}/export`),
+  importPrinterProfile: (file: File) => {
+    const form = new FormData(); form.set('file', file)
+    return json<PrinterProfile>('/api/printer-profiles/import', { method: 'POST', body: form })
+  },
   storedGraphics: () => json<StoredGraphic[]>('/api/stored-graphics'),
   importStoredGraphic: (keyCode: string, name: string, file: File) => {
     const form = new FormData()

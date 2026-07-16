@@ -4,6 +4,18 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.19
+
+- Added Pro and Enterprise Printer Profiles under Settings while keeping the feature locked for Trial installations in both the UI and local APIs.
+- Added protected built-in profiles for EPSON TM-T88V Receipt5 and a conservative Generic ESC/POS 80 mm printer.
+- Added custom-profile creation, editing, duplication, deletion, active selection, and persistent local storage.
+- Added configurable paper width, printable dots, raster-image limits, default and supported code pages, Font A/B columns, cutter, cash drawer, image, NV-graphics, barcode, QR, two-color, DLE EOT, and Automatic Status Back capabilities.
+- Added schema-versioned `.ppeprofile` import and export with size and data validation.
+- Recorded profile identity and dimensions with saved jobs and portable capture packages.
+- Made replay use the currently selected profile while retaining the source capture profile for comparison and traceability.
+- Added profile-specific unsupported-command warnings, image-limit warnings, status-protocol behavior, default-code-page decoding, and paper-width-aware receipt previews.
+- Added the selected profile to Job Details and privacy-safe support diagnostics.
+
 ## v0.3.18
 
 - Renamed the protected administration website to the POS Printer Emulator Admin Portal throughout its interface and documentation.

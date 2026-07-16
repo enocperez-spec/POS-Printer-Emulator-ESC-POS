@@ -30,6 +30,7 @@ import {
   RotateCw,
   Search,
   Settings,
+  SlidersHorizontal,
   Sun,
   Trash2,
   Upload,
@@ -40,17 +41,18 @@ import { QRCodeSVG } from 'qrcode.react'
 import BarcodeRenderer from 'react-barcode'
 import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
+import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
 import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.18',
+  version: '0.3.19',
   license: {
     mode: 'Trial', hasProAccess: false, isEnterprise: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
-    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, updates: false, support: false },
+    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false },
   },
 }
 
@@ -58,7 +60,7 @@ type ClearRequest =
   | { kind: 'one'; id: string; label: string }
   | { kind: 'all'; count: number }
 
-type SettingsSection = 'license' | 'printer' | 'logos' | 'state' | 'updates' | 'support'
+type SettingsSection = 'license' | 'printer' | 'profiles' | 'logos' | 'state' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -515,8 +517,8 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onR
       </div>
       <div className="preview-canvas">
         {job ? (
-          <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})` }}>
-            <ReceiptPaper lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} />
+          <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})`, width: `${Math.round(364 * job.profilePaperWidthMm / 80)}px` }}>
+            <ReceiptPaper lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
           </div>
         ) : (
           <div className="preview-empty">
@@ -531,9 +533,9 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onR
   )
 }
 
-function ReceiptPaper({ lines, watermark, storedGraphics }: { lines: ReceiptLine[]; watermark: boolean; storedGraphics: Map<string, StoredGraphic> }) {
+function ReceiptPaper({ lines, watermark, storedGraphics, paperWidthMm }: { lines: ReceiptLine[]; watermark: boolean; storedGraphics: Map<string, StoredGraphic>; paperWidthMm: number }) {
   return (
-    <article className="receipt-paper">
+    <article className="receipt-paper" style={{ width: `${Math.round(364 * paperWidthMm / 80)}px` }}>
       {watermark && (
         <div className="trial-watermark" aria-hidden="true">
           {Array.from({ length: 8 }, (_, index) => <span key={index}>TRIAL · NOT FOR PRODUCTION USE</span>)}
@@ -596,11 +598,12 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   const features = status.license.features
   const canAccess = (candidate: SettingsSection) => candidate === 'logos' ? features.storedLogos
     : candidate === 'state' ? features.printerState
+      : candidate === 'profiles' ? features.printerProfiles
       : candidate === 'updates' ? features.updates
         : candidate === 'support' ? features.support
           : true
   const [section, setSection] = useState<SettingsSection>(canAccess(initialSection) ? initialSection : 'license')
-  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
   const lockedTitle = 'Requires a Pro or Enterprise License'
 
   return (
@@ -614,6 +617,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
             <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
+            <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
             <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
             <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
             <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? lockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
@@ -622,6 +626,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
+            {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && features.printerState && <PrinterStateSettings />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
@@ -989,6 +994,9 @@ function Inspector({ job, tab, onTab, onCollapse }: { job?: ReceiptJob; tab: 'co
           <div><dt>Source address</dt><dd>{job.sourceIp}</dd></div>
           <div><dt>Job origin</dt><dd><span className={`detail-origin ${job.origin.toLowerCase()}`}>{job.origin}</span></dd></div>
           <div><dt>Renderer version</dt><dd>{job.rendererVersion}</dd></div>
+          <div><dt>Printer profile</dt><dd>{job.profileName}</dd></div>
+          <div><dt>Profile paper</dt><dd>{job.profilePaperWidthMm} mm · {job.profilePrintableDots} dots</dd></div>
+          {job.capturedProfileId && <div><dt>Captured profile</dt><dd>{job.capturedProfileId}</dd></div>}
           {job.originalReceivedAt && <div><dt>Original received</dt><dd>{new Date(job.originalReceivedAt).toLocaleString()}</dd></div>}
           {job.originalSourceIp && <div><dt>Original source</dt><dd>{job.originalSourceIp}</dd></div>}
           {job.importedFileName && <div><dt>Imported file</dt><dd>{job.importedFileName}</dd></div>}

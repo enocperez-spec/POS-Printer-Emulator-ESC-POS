@@ -24,6 +24,7 @@ public sealed class LicenseServiceTests
         Assert.False(status.IsEnterprise);
         Assert.False(status.Features.StoredLogos);
         Assert.False(status.Features.PrinterState);
+        Assert.False(status.Features.PrinterProfiles);
         Assert.False(status.Features.Updates);
         Assert.False(status.Features.Support);
     }

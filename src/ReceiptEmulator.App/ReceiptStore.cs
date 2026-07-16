@@ -79,7 +79,11 @@ public sealed class ReceiptStore
                 job.Origin,
                 job.RendererVersion,
                 job.ParentJobId,
-                job.ImportedFileName)).ToArray();
+                job.ImportedFileName,
+                job.ProfileId,
+                job.ProfileName,
+                job.ProfilePaperWidthMm,
+                job.ProfilePrintableDots)).ToArray();
         }
     }
 
@@ -207,7 +211,12 @@ public sealed class ReceiptStore
         DateTimeOffset? OriginalReceivedAt = null,
         string? OriginalSourceIp = null,
         Guid? ParentJobId = null,
-        string? ImportedFileName = null)
+        string? ImportedFileName = null,
+        string? ProfileId = null,
+        string? ProfileName = null,
+        int? ProfilePaperWidthMm = null,
+        int? ProfilePrintableDots = null,
+        string? CapturedProfileId = null)
     {
         public static StoredJob From(ReceiptJob job) => new(
             job.Id,
@@ -223,7 +232,12 @@ public sealed class ReceiptStore
             job.OriginalReceivedAt,
             job.OriginalSourceIp,
             job.ParentJobId,
-            job.ImportedFileName);
+            job.ImportedFileName,
+            job.ProfileId,
+            job.ProfileName,
+            job.ProfilePaperWidthMm,
+            job.ProfilePrintableDots,
+            job.CapturedProfileId);
 
         public ReceiptJob ToReceiptJob()
         {
@@ -244,7 +258,12 @@ public sealed class ReceiptStore
                 OriginalReceivedAt = OriginalReceivedAt ?? ReceivedAt,
                 OriginalSourceIp = string.IsNullOrWhiteSpace(OriginalSourceIp) ? SourceIp : OriginalSourceIp,
                 ParentJobId = ParentJobId,
-                ImportedFileName = ImportedFileName
+                ImportedFileName = ImportedFileName,
+                ProfileId = string.IsNullOrWhiteSpace(ProfileId) ? PrinterProfileService.EpsonTmT88VId : ProfileId,
+                ProfileName = string.IsNullOrWhiteSpace(ProfileName) ? "EPSON TM-T88V Receipt5" : ProfileName,
+                ProfilePaperWidthMm = ProfilePaperWidthMm ?? 80,
+                ProfilePrintableDots = ProfilePrintableDots ?? 576,
+                CapturedProfileId = CapturedProfileId
             };
         }
     }

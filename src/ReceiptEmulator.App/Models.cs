@@ -50,6 +50,11 @@ public sealed class ReceiptJob
     public string? OriginalSourceIp { get; init; }
     public Guid? ParentJobId { get; init; }
     public string? ImportedFileName { get; init; }
+    public string ProfileId { get; init; } = PrinterProfileService.EpsonTmT88VId;
+    public string ProfileName { get; init; } = "EPSON TM-T88V Receipt5";
+    public int ProfilePaperWidthMm { get; init; } = 80;
+    public int ProfilePrintableDots { get; init; } = 576;
+    public string? CapturedProfileId { get; init; }
     public int PayloadSize => RawPayload.Length;
     public int UnsupportedCount => Receipt.Commands.Count(command => !command.Supported);
 }
@@ -72,7 +77,11 @@ public sealed record JobSummary(
     string Origin,
     string RendererVersion,
     Guid? ParentJobId,
-    string? ImportedFileName);
+    string? ImportedFileName,
+    string ProfileId,
+    string ProfileName,
+    int ProfilePaperWidthMm,
+    int ProfilePrintableDots);
 
 public sealed record RegistrationInfo(string CustomerName, string EmailAddress);
 
@@ -83,6 +92,7 @@ public sealed record FeatureStatus(
     bool Watermark,
     bool StoredLogos,
     bool PrinterState,
+    bool PrinterProfiles,
     bool Updates,
     bool Support);
 

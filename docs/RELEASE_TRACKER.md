@@ -12,7 +12,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.18**
+**Current public release: v0.3.19**
 
 ## Completed releases
 
@@ -39,6 +39,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.16 | Released | In-place Text, Raw, and Capture download correction |
 | v0.3.17 | Released | Trial, Pro, and Enterprise license tiers and Pro feature gates |
 | v0.3.18 | Released | Admin Portal branding and separate Pro and Enterprise purchase pricing |
+| v0.3.19 | Released | Pro and Enterprise printer profiles, custom configuration, and profile-aware processing |
 
 ## Scheduled releases
 
@@ -114,25 +115,28 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ### v0.3.19 — Printer profiles
 
-**Status:** Next
+**Status:** Released
+
+**Tracking issue:** [GitHub #4](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/4)
 
 **Purpose:** Represent differences between printer models explicitly instead of assuming every incoming job behaves like one TM-T88V configuration.
 
 **Planned scope:**
 
 - Add built-in profiles for the tested Epson TM-T88V configuration and a generic ESC/POS printer.
-- Configure paper width, printable dots, default character set and code page, fonts, cutter, cash drawer, image limits, barcode/QR capabilities, and status behavior.
+- Configure paper width, printable dots, default and supported code pages, fonts, cutter, cash drawer, image limits, barcode/QR capabilities, two-color output, and status behavior.
 - Allow customers to duplicate and customize profiles while protecting built-in defaults.
 - Add profile selection and management under Settings.
 - Record the selected profile with captured and saved jobs so replay remains deterministic.
 - Show profile-related unsupported commands and capability mismatches in plain language.
 - Export and import custom profile definitions with schema-version validation.
+- Restrict the Settings section and all profile APIs to Pro and Enterprise licenses; Trial receives an upgrade lock and HTTP 403.
 
 **Complete when:** The same captured job can be replayed against two profiles and the viewer consistently shows the expected rendering and capability differences.
 
 ### v0.3.20 — Multiple printer listeners
 
-**Status:** Planned
+**Status:** Next
 
 **Purpose:** Let one computer emulate multiple receipt printers for different POS stations, departments, or printer roles.
 

@@ -70,6 +70,19 @@ public sealed class PrinterStateServiceTests
     }
 
     [Fact]
+    public void ProfileCanDisableRealTimeAndAutomaticStatusProtocols()
+    {
+        var service = CreateService();
+        var buffer = new List<byte> { 0x10, 0x04, 0x01, 0x1D, 0x61, 0x0E };
+
+        var result = EscPosStatusProtocol.Extract(buffer, 0, service, dleEotSupported: false, asbSupported: false);
+
+        Assert.Empty(result.Responses);
+        Assert.Equal(0, result.AsbMask);
+        Assert.Equal([0x10, 0x04, 0x01, 0x1D, 0x61, 0x0E], buffer);
+    }
+
+    [Fact]
     public void RecoveryRequestClearsRecoverableFaults()
     {
         var service = CreateService();

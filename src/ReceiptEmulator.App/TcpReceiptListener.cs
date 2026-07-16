@@ -7,6 +7,7 @@ public sealed class TcpReceiptListener(
     PrinterOptions options,
     ReceiptProcessor processor,
     PrinterStateService printerState,
+    PrinterProfileService profiles,
     ServiceRuntimeState state,
     ILogger<TcpReceiptListener> logger) : BackgroundService
 {
@@ -95,7 +96,9 @@ public sealed class TcpReceiptListener(
                         logger.LogWarning("Rejected oversized print job from {SourceIp}", source);
                         return;
                     }
-                    var statusResult = EscPosStatusProtocol.Extract(collected, asbMask, printerState);
+                    var capabilities = profiles.GetSelected().Capabilities;
+                    var statusResult = EscPosStatusProtocol.Extract(collected, asbMask, printerState,
+                        capabilities.DleEotStatus, capabilities.AutomaticStatusBack);
                     var wasActive = asbMask != 0;
                     asbMask = statusResult.AsbMask;
                     var isActive = asbMask != 0;
