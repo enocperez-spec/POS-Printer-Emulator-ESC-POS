@@ -29,7 +29,7 @@ try {
                 'customer' => required_string($body, 'customerName', 160, true),
                 'email' => strtolower(required_string($body, 'emailAddress', 254, true)),
                 'version' => required_string($body, 'appVersion', 32),
-                'mode' => (($body['licenseMode'] ?? 'Trial') === 'Full') ? 'Full' : 'Trial',
+                'mode' => in_array(($body['licenseMode'] ?? 'Trial'), ['Pro', 'Enterprise'], true) ? $body['licenseMode'] : 'Trial',
                 'license_id' => empty($body['licenseId']) ? null : required_string($body, 'licenseId', 36),
             ]);
         } catch (PDOException $exception) {
@@ -64,7 +64,7 @@ try {
         throw new InvalidArgumentException('Invalid event.');
     }
     $count = max(1, min(1000, (int)($body['count'] ?? 1)));
-    $mode = (($body['licenseMode'] ?? 'Trial') === 'Full') ? 'Full' : 'Trial';
+    $mode = in_array(($body['licenseMode'] ?? 'Trial'), ['Pro', 'Enterprise'], true) ? $body['licenseMode'] : 'Trial';
     $licenseId = empty($body['licenseId']) ? null : required_string($body, 'licenseId', 36);
     $launches = $event === 'launch' ? $count : 0;
     $jobs = $event === 'print_job' ? $count : 0;

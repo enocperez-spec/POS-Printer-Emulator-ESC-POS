@@ -27,7 +27,8 @@ try
         var privateKeyPath = GetRequiredOption(args, "--private-key");
         var customer = GetRequiredOption(args, "--customer");
         var email = GetRequiredOption(args, "--email");
-        var activationKey = ActivationKeyCodec.Issue(File.ReadAllText(privateKeyPath), customer, email);
+        var tier = Enum.Parse<LicenseTier>(GetOption(args, "--tier") ?? nameof(LicenseTier.Pro), ignoreCase: true);
+        var activationKey = ActivationKeyCodec.Issue(File.ReadAllText(privateKeyPath), customer, email, tier);
         Console.WriteLine(activationKey);
     }
     else if (command == "verify")
@@ -39,7 +40,7 @@ try
         {
             throw new InvalidOperationException(error);
         }
-        Console.WriteLine($"Valid activation key. License ID: {license!.LicenseId}; issued: {license.IssuedAt:u}");
+        Console.WriteLine($"Valid {license!.Tier} activation key. License ID: {license.LicenseId}; issued: {license.IssuedAt:u}");
     }
     else
     {
@@ -50,7 +51,7 @@ try
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- generate-keys --output "C:\secure\license-keys"
 
             Issue a customer activation key:
-              dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "C:\secure\license-keys\vendor-private-key.pem" --customer "Company Name" --email "customer@example.com"
+              dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "C:\secure\license-keys\vendor-private-key.pem" --customer "Company Name" --email "customer@example.com" --tier Pro
 
             Verify any activation key against the public key built into the application:
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- verify --key "PPE1-..." --customer "Company Name" --email "customer@example.com"
@@ -74,4 +75,12 @@ static string GetRequiredOption(string[] arguments, string name)
     }
 
     return arguments[index + 1];
+}
+
+static string? GetOption(string[] arguments, string name)
+{
+    var index = Array.FindIndex(arguments, argument => string.Equals(argument, name, StringComparison.OrdinalIgnoreCase));
+    return index >= 0 && index + 1 < arguments.Length && !string.IsNullOrWhiteSpace(arguments[index + 1])
+        ? arguments[index + 1]
+        : null;
 }

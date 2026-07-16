@@ -3,11 +3,16 @@ export type FeatureStatus = {
   exports: boolean
   premiumFeatures: boolean
   watermark: boolean
+  storedLogos: boolean
+  printerState: boolean
+  updates: boolean
+  support: boolean
 }
 
 export type LicenseStatus = {
-  mode: string
-  isFull: boolean
+  mode: 'Trial' | 'Pro' | 'Enterprise'
+  hasProAccess: boolean
+  isEnterprise: boolean
   dailyLimit: number
   usedToday: number
   remaining: number

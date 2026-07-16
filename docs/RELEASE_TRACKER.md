@@ -12,7 +12,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.16**
+**Current public release: v0.3.17**
 
 ## Completed releases
 
@@ -20,7 +20,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | --- | --- | --- |
 | v0.1.00 | Released | Initial local ESC/POS listener, parser, receipt viewer, and MVP tooling |
 | v0.2.00 | Released | POS Printer Emulator branding, desktop HTML application, installer, and uninstall |
-| v0.3.00 | Released | Trial/Full licensing, registration, persistent history, and activation |
+| v0.3.00 | Released | Trial/Pro/Enterprise licensing, registration, persistent history, and activation |
 | v0.3.01 | Released | Collapsible panels, job deletion, License Manager, and public website |
 | v0.3.02 | Released | Updated built-in Test Receipt |
 | v0.3.03 | Released | Settings, application updates, and support diagnostics |
@@ -37,10 +37,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.14 | Released | Reliable dashboard print-job telemetry and canonical endpoint reporting |
 | v0.3.15 | Released | Portable capture packages, safe import, export, and replay |
 | v0.3.16 | Released | In-place Text, Raw, and Capture download correction |
+| v0.3.17 | Released | Trial, Pro, and Enterprise license tiers and Pro feature gates |
 
 ## Scheduled releases
 
-The scheduled order is dependency-driven: capture and replay creates reusable test data; profiles define printer behavior; multiple listeners reuse profiles; comparison uses deterministic captures and profiles; enhanced diagnostics can then report across the complete system. v0.3.16 was used for the completed BUG-005 maintenance correction, so the remaining feature releases advance by one version.
+The scheduled order is dependency-driven: licensing tiers establish the commercial feature boundary; profiles then define printer behavior; multiple listeners reuse profiles; comparison uses deterministic captures and profiles; enhanced diagnostics can report across the complete system.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -76,7 +77,24 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** All three export actions save their expected attachment types, the receipt and viewer URL remain unchanged, and the installed desktop application no longer replaces the viewer with a startup error.
 
-### v0.3.17 — Printer profiles
+### v0.3.17 — License tiers and Pro feature gates
+
+**Status:** Released
+
+**Purpose:** Establish a durable three-level licensing model before Enterprise-only functionality is introduced.
+
+**Released scope:**
+
+- Model Trial, Pro, and Enterprise licenses throughout the service, viewer, telemetry, database, and administration tools.
+- Treat existing paid activation keys as Pro so current customers upgrade without receiving replacement keys.
+- Issue new tier-aware Pro or Enterprise keys from the vendor License Manager and Admin site.
+- Lock Stored Logos, Printer State, Check for Updates, and Support for Trial users in the Settings interface.
+- Enforce the same rules on every corresponding local API, including read, write, delete, diagnostics, and update-check operations.
+- Continue selling Pro keys through the existing PayPal purchase flow while reserving Enterprise keys for owner-managed issuance.
+
+**Complete when:** Trial users see all four settings as locked and receive HTTP 403 from their APIs, while Pro and Enterprise keys immediately unlock them and legacy paid keys still validate as Pro.
+
+### v0.3.18 — Printer profiles
 
 **Status:** Next
 
@@ -94,7 +112,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** The same captured job can be replayed against two profiles and the viewer consistently shows the expected rendering and capability differences.
 
-### v0.3.18 — Multiple printer listeners
+### v0.3.19 — Multiple printer listeners
 
 **Status:** Planned
 
@@ -113,7 +131,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** At least two listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart.
 
-### v0.3.19 — Receipt comparison and automated validation
+### v0.3.20 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -132,7 +150,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.20 — Enhanced support package and connection diagnostics
+### v0.3.21 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -153,7 +171,7 @@ The scheduled order is dependency-driven: capture and replay creates reusable te
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.19.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.20.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 
@@ -175,7 +193,7 @@ These items remain unnumbered until the order is approved. The priority below is
 **Proposed scope:**
 
 - Replace individual JSON history records with a versioned SQLite schema.
-- Migrate existing Full-Version history without data loss and retain a rollback-safe backup until verification succeeds.
+- Migrate existing Pro history without data loss and retain a rollback-safe backup until verification succeeds.
 - Add transactional writes, indexes, paging, fast search, source/listener/profile filters, and reliable aggregate counts.
 - Add configurable retention by job count, storage size, or age.
 - Support individual deletion, Clear All, database health checks, and safe database repair.
@@ -218,7 +236,7 @@ These items remain unnumbered until the order is approved. The priority below is
 - Preserve receipt width, long-page layout, images, barcodes, QR codes, and watermark rules.
 - Support individual and selected-job batch export with safe filenames.
 - Add export metadata and deterministic-output tests.
-- Keep premium export controls aligned with Trial and Full license rules.
+- Keep premium export controls aligned with Trial, Pro, and Enterprise license rules.
 
 ### Priority 6 — Hardened Thermal adapter
 

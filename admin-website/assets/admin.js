@@ -22,7 +22,7 @@ function filterRows() {
 search?.addEventListener('input', filterRows);
 licenseFilter?.addEventListener('change', filterRows);
 document.querySelector('[data-license-link]')?.addEventListener('click', () => {
-  if (licenseFilter) licenseFilter.value = 'Full';
+  if (licenseFilter) licenseFilter.value = 'Pro';
   filterRows();
 });
 

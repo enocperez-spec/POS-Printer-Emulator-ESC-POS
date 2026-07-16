@@ -4,12 +4,20 @@ using System.Text;
 
 namespace POSPrinterEmulator.Licensing;
 
-public sealed record ActivationLicense(Guid LicenseId, DateTimeOffset IssuedAt);
+public enum LicenseTier : byte
+{
+    Trial = 0,
+    Pro = 1,
+    Enterprise = 2
+}
+
+public sealed record ActivationLicense(Guid LicenseId, DateTimeOffset IssuedAt, LicenseTier Tier);
 
 public static class ActivationKeyCodec
 {
     private const string Prefix = "PPE1-";
-    private const int PayloadLength = 57;
+    private const int LegacyPayloadLength = 57;
+    private const int TieredPayloadLength = 58;
     private const int SignatureLength = 64;
 
     public const string PublicKeyPem = """
@@ -19,15 +27,28 @@ public static class ActivationKeyCodec
         -----END PUBLIC KEY-----
         """;
 
-    public static string Issue(string privateKeyPem, string customerName, string emailAddress)
+    public static string Issue(string privateKeyPem, string customerName, string emailAddress) =>
+        Issue(privateKeyPem, customerName, emailAddress, LicenseTier.Pro);
+
+    public static string Issue(
+        string privateKeyPem,
+        string customerName,
+        string emailAddress,
+        LicenseTier tier)
     {
         ValidateRegistration(customerName, emailAddress);
-        var payload = new byte[PayloadLength];
-        payload[0] = 1;
+        if (tier is not LicenseTier.Pro and not LicenseTier.Enterprise)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tier), "Activation keys can only be issued for Pro or Enterprise licenses.");
+        }
+
+        var payload = new byte[TieredPayloadLength];
+        payload[0] = 2;
         Guid.NewGuid().TryWriteBytes(payload.AsSpan(1, 16));
         BinaryPrimitives.WriteInt64BigEndian(payload.AsSpan(17, 8), DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         RegistrationHash(customerName).CopyTo(payload, 25);
         RegistrationHash(emailAddress.ToLowerInvariant()).CopyTo(payload, 41);
+        payload[57] = (byte)tier;
 
         using var signer = ECDsa.Create();
         signer.ImportFromPem(privateKeyPem);
@@ -75,13 +96,19 @@ public static class ActivationKeyCodec
             }
 
             var token = Base64UrlDecode(compactKey[Prefix.Length..]);
-            if (token.Length != PayloadLength + SignatureLength || token[0] != 1)
+            var payloadLength = token[0] switch
+            {
+                1 when token.Length == LegacyPayloadLength + SignatureLength => LegacyPayloadLength,
+                2 when token.Length == TieredPayloadLength + SignatureLength => TieredPayloadLength,
+                _ => 0
+            };
+            if (payloadLength == 0)
             {
                 error = "The activation key is incomplete or damaged.";
                 return false;
             }
 
-            var payload = token.AsSpan(0, PayloadLength);
+            var payload = token.AsSpan(0, payloadLength);
             if (!CryptographicOperations.FixedTimeEquals(payload.Slice(25, 16), RegistrationHash(customerName)) ||
                 !CryptographicOperations.FixedTimeEquals(payload.Slice(41, 16), RegistrationHash(emailAddress.ToLowerInvariant())))
             {
@@ -93,7 +120,7 @@ public static class ActivationKeyCodec
             verifier.ImportFromPem(publicKeyPem);
             if (!verifier.VerifyData(
                     payload,
-                    token.AsSpan(PayloadLength, SignatureLength),
+                    token.AsSpan(payloadLength, SignatureLength),
                     HashAlgorithmName.SHA256,
                     DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
             {
@@ -103,7 +130,14 @@ public static class ActivationKeyCodec
 
             var licenseId = new Guid(payload.Slice(1, 16));
             var issuedAt = DateTimeOffset.FromUnixTimeSeconds(BinaryPrimitives.ReadInt64BigEndian(payload.Slice(17, 8)));
-            license = new ActivationLicense(licenseId, issuedAt);
+            var tier = token[0] == 1 ? LicenseTier.Pro : (LicenseTier)payload[57];
+            if (tier is not LicenseTier.Pro and not LicenseTier.Enterprise)
+            {
+                error = "The activation key contains an unsupported license level.";
+                return false;
+            }
+
+            license = new ActivationLicense(licenseId, issuedAt, tier);
             return true;
         }
         catch (Exception exception) when (exception is FormatException or CryptographicException or ArgumentException)

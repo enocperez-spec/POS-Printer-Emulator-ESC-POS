@@ -5,7 +5,7 @@ return [
     'app_url' => 'https://buy.posprinteremulator.com',
     'environment' => 'production',
     'license' => [
-        'product_name' => 'POS Printer Emulator Full Version',
+        'product_name' => 'POS Printer Emulator Pro Version',
         'price' => '0.00', // Set the approved one-time price before enabling checkout.
         'currency' => 'USD',
     ],

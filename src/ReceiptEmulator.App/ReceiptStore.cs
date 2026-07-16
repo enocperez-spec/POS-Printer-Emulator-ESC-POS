@@ -16,7 +16,7 @@ public sealed class ReceiptStore
     {
         _license = license;
         _historyDirectory = Path.Combine(license.RootPath, "history");
-        if (license.IsFullVersion)
+        if (license.HasProAccess)
         {
             LoadHistory();
         }
@@ -27,19 +27,19 @@ public sealed class ReceiptStore
         lock (_sync)
         {
             _jobs.AddFirst(job);
-            while (_jobs.Count > (_license.IsFullVersion ? HistoryCapacity : SessionCapacity))
+            while (_jobs.Count > (_license.HasProAccess ? HistoryCapacity : SessionCapacity))
             {
                 _jobs.RemoveLast();
             }
 
-            if (_license.IsFullVersion)
+            if (_license.HasProAccess)
             {
                 Persist(job);
             }
         }
     }
 
-    public void EnableFullHistory()
+    public void EnableProHistory()
     {
         lock (_sync)
         {

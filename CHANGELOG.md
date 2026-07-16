@@ -4,6 +4,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.17
+
+- Added explicit Trial, Pro, and Enterprise license levels across the desktop application, activation-key format, telemetry, database schema, and owner dashboard.
+- Renamed the former paid-edition wording to Pro License while preserving every existing paid activation key as a valid Pro key.
+- Restricted Stored Logos, Printer State, Check for Updates, and Support to Pro and Enterprise licenses in both the Settings UI and protected local APIs.
+- Added Pro lock badges for restricted Trial settings and stopped Trial installations from loading those resources or running automatic update checks.
+- Added Pro and Enterprise selection to the desktop and web License Managers; normal website purchases continue to issue Pro keys.
+- Added an idempotent database migration that converts legacy `Full` telemetry records to `Pro` and records issued-license tiers.
+
 ## v0.3.16
 
 - Fixed BUG-005 so Text, Raw, and Capture exports download without navigating the desktop WebView away from the selected receipt.
@@ -14,7 +23,7 @@ For the current release status, scheduled versions, future backlog, and release-
 ## v0.3.15
 
 - Added portable `.ppecapture` export packages containing the exact ESC/POS payload, capture metadata, renderer version, parsed-command summary, and a SHA-256 integrity checksum.
-- Added Full-Version import for raw `.bin` receipts and validated POS Printer Emulator capture packages directly from Activity.
+- Added Pro import for raw `.bin` receipts and validated POS Printer Emulator capture packages directly from Activity.
 - Added safe replay through the normal parser and renderer without consuming a Trial print-job allowance or reporting replayed jobs as live usage.
 - Added Live, Imported, and Replayed origin badges plus original source, time, parent-job, imported-file, and renderer details.
 - Added strict archive-entry, schema, file-size, payload-length, and checksum validation so malformed or unsafe packages fail without being extracted or executed.
@@ -86,7 +95,7 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## v0.3.04
 
-- Added privacy-safe HTTPS reporting for installation registration, Trial/Full status, application launches, and emulated print-job counts.
+- Added privacy-safe HTTPS reporting for installation registration, Trial/Pro/Enterprise status, application launches, and emulated print-job counts.
 - Added a MariaDB schema for installations and daily aggregate usage without storing receipt text or raw ESC/POS data.
 - Added a password-protected License & Usage owner dashboard with date ranges, usage charts, license distribution, search, and license filtering.
 - Added C# database provisioning, production telemetry smoke testing, protected configuration upload, and website publishing tools.
@@ -107,7 +116,7 @@ For the current release status, scheduled versions, future backlog, and release-
 
 - Added collapse and restore controls for the left Activity panel and right receipt inspector.
 - Added deletion for an individual receipt job and a confirmed Clear All action.
-- Full-Version deletion removes saved history files; Trial deletion removes session jobs.
+- Pro deletion removes saved history files; Trial deletion removes session jobs.
 - Added Epson `GS ( L` stored-graphics parsing without leaking binary parameters into receipt text.
 - Added filtering for control-only initialization and cash-drawer connections.
 - Added the vendor-only C# License Manager desktop interface.
@@ -115,9 +124,9 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## v0.3.00
 
-- Added Trial and Full versions with offline signed activation keys.
+- Added Trial, Pro, and Enterprise versions with offline signed activation keys.
 - Added installer registration for customer/company name and email.
-- Added persistent Full-Version receipt history, exports, and in-app activation.
+- Added persistent Pro receipt history, exports, and in-app activation.
 
 ## v0.2.00
 

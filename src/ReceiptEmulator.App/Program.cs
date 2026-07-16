@@ -57,33 +57,50 @@ app.MapGet("/api/status", (ServiceRuntimeState runtime, LicenseService license, 
         ProductInfo.Version,
         license.GetStatus()));
 
-app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, CancellationToken cancellationToken) =>
-    Results.Ok(await updates.CheckAsync(force == true, cancellationToken)));
+app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, LicenseService license, CancellationToken cancellationToken) =>
+    !license.HasProAccess
+        ? Results.Problem("Check for Updates requires a Pro or Enterprise License.", statusCode: 403)
+        : Results.Ok(await updates.CheckAsync(force == true, cancellationToken)));
 
-app.MapGet("/api/updates/status", (UpdateService updates) =>
-    updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
+app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license) =>
+    !license.HasProAccess
+        ? Results.Problem("Check for Updates requires a Pro or Enterprise License.", statusCode: 403)
+        : updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
 
-app.MapGet("/api/printer-state", (PrinterStateService printerState) => Results.Ok(printerState.GetStatus()));
+app.MapGet("/api/printer-state", (PrinterStateService printerState, LicenseService license) =>
+    !license.HasProAccess
+        ? Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403)
+        : Results.Ok(printerState.GetStatus()));
 
-app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStateService printerState) =>
+app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStateService printerState, LicenseService license) =>
 {
+    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
     try { return Results.Ok(printerState.Update(request)); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
-app.MapPost("/api/printer-state/reset", (PrinterStateService printerState) => Results.Ok(printerState.Reset()));
+app.MapPost("/api/printer-state/reset", (PrinterStateService printerState, LicenseService license) =>
+    !license.HasProAccess
+        ? Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403)
+        : Results.Ok(printerState.Reset()));
 
-app.MapGet("/api/stored-graphics", (StoredGraphicService graphics) => Results.Ok(graphics.List()));
+app.MapGet("/api/stored-graphics", (StoredGraphicService graphics, LicenseService license) =>
+    !license.HasProAccess
+        ? Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403)
+        : Results.Ok(graphics.List()));
 
-app.MapGet("/api/stored-graphics/{keyCode}/content", (string keyCode, StoredGraphicService graphics) =>
-    graphics.TryRead(keyCode, out var content, out var contentType)
+app.MapGet("/api/stored-graphics/{keyCode}/content", (string keyCode, StoredGraphicService graphics, LicenseService license) =>
+    !license.HasProAccess
+        ? Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403)
+        : graphics.TryRead(keyCode, out var content, out var contentType)
         ? Results.File(content, contentType)
         : Results.NotFound());
 
-app.MapPost("/api/stored-graphics/{keyCode}", async (string keyCode, HttpRequest request, StoredGraphicService graphics, CancellationToken cancellationToken) =>
+app.MapPost("/api/stored-graphics/{keyCode}", async (string keyCode, HttpRequest request, StoredGraphicService graphics, LicenseService license, CancellationToken cancellationToken) =>
 {
+    if (!license.HasProAccess) return Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403);
     try
     {
         if (!request.HasFormContentType) return Results.Problem("Choose an image file to import.", statusCode: 400);
@@ -100,8 +117,9 @@ app.MapPost("/api/stored-graphics/{keyCode}", async (string keyCode, HttpRequest
     }
 });
 
-app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGraphicService graphics, CancellationToken cancellationToken) =>
+app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGraphicService graphics, LicenseService license, CancellationToken cancellationToken) =>
 {
+    if (!license.HasProAccess) return Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403);
     try { return await graphics.DeleteAsync(keyCode, cancellationToken) ? Results.NoContent() : Results.NotFound(); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
@@ -109,6 +127,7 @@ app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGra
 app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
     ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState, StoredGraphicService graphics) =>
 {
+    if (!license.HasProAccess) return Results.Problem("Support requires a Pro or Enterprise License.", statusCode: 403);
     var status = license.GetStatus();
     var report = new StringBuilder()
         .AppendLine("POS Printer Emulator Support Diagnostics")
@@ -143,7 +162,7 @@ app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService 
     try
     {
         var status = license.Activate(request.CustomerName, request.EmailAddress, request.ActivationKey);
-        store.EnableFullHistory();
+        store.EnableProHistory();
         telemetry.RecordActivation();
         return Results.Ok(status);
     }
@@ -201,8 +220,8 @@ app.MapPost("/api/captures/import", async (
     PrinterOptions options,
     CancellationToken cancellationToken) =>
 {
-    if (!license.IsFullVersion)
-        return Results.Problem("Capture import is available in the Full Version.", statusCode: 403);
+    if (!license.HasProAccess)
+        return Results.Problem("Capture import requires a Pro or Enterprise License.", statusCode: 403);
     try
     {
         if (!request.HasFormContentType)
@@ -238,8 +257,8 @@ app.MapPost("/api/captures/import", async (
 
 app.MapPost("/api/jobs/{id:guid}/replay", (Guid id, ReceiptStore store, ReceiptProcessor processor, LicenseService license) =>
 {
-    if (!license.IsFullVersion)
-        return Results.Problem("Receipt replay is available in the Full Version.", statusCode: 403);
+    if (!license.HasProAccess)
+        return Results.Problem("Receipt replay requires a Pro or Enterprise License.", statusCode: 403);
     var source = store.Get(id);
     if (source is null) return Results.NotFound();
     var replayed = processor.Replay(source, out var rejection);
@@ -250,8 +269,8 @@ app.MapPost("/api/jobs/{id:guid}/replay", (Guid id, ReceiptStore store, ReceiptP
 
 app.MapGet("/api/jobs/{id:guid}/capture", (Guid id, ReceiptStore store, CapturePackageService captures, LicenseService license) =>
 {
-    if (!license.IsFullVersion)
-        return Results.Problem("Capture-package export is available in the Full Version.", statusCode: 403);
+    if (!license.HasProAccess)
+        return Results.Problem("Capture-package export requires a Pro or Enterprise License.", statusCode: 403);
     var job = store.Get(id);
     return job is null
         ? Results.NotFound()
@@ -263,16 +282,16 @@ app.MapGet("/api/jobs/{id:guid}/capture", (Guid id, ReceiptStore store, CaptureP
 
 app.MapGet("/api/jobs/{id:guid}/raw", (Guid id, ReceiptStore store, LicenseService license) =>
 {
-    if (!license.IsFullVersion)
-        return Results.Problem("Raw-data export is available in the Full Version.", statusCode: 403);
+    if (!license.HasProAccess)
+        return Results.Problem("Raw-data export requires a Pro or Enterprise License.", statusCode: 403);
     var job = store.Get(id);
     return job is null ? Results.NotFound() : Results.File(job.RawPayload, "application/octet-stream", $"receipt-{id:N}.bin");
 });
 
 app.MapGet("/api/jobs/{id:guid}/text", (Guid id, ReceiptStore store, LicenseService license) =>
 {
-    if (!license.IsFullVersion)
-        return Results.Problem("Text export is available in the Full Version.", statusCode: 403);
+    if (!license.HasProAccess)
+        return Results.Problem("Text export requires a Pro or Enterprise License.", statusCode: 403);
     var job = store.Get(id);
     return job is null
         ? Results.NotFound()

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function issue_activation_key(string $customerName, string $emailAddress): array
+function issue_activation_key(string $customerName, string $emailAddress, string $licenseTier = 'Pro'): array
 {
     $customerName = trim(preg_replace('/\s+/', ' ', $customerName) ?? '');
     $emailAddress = strtolower(trim($emailAddress));
@@ -11,6 +11,11 @@ function issue_activation_key(string $customerName, string $emailAddress): array
     if (strlen($emailAddress) > 254 || filter_var($emailAddress, FILTER_VALIDATE_EMAIL) === false) {
         throw new InvalidArgumentException('A valid email address is required.');
     }
+    $tierValue = match ($licenseTier) {
+        'Pro' => 1,
+        'Enterprise' => 2,
+        default => throw new InvalidArgumentException('Choose a valid license level.'),
+    };
 
     $privateKeyPath = dirname(__DIR__) . '/private/vendor-private-key.pem';
     $privateKeyPem = file_get_contents($privateKeyPath);
@@ -24,12 +29,13 @@ function issue_activation_key(string $customerName, string $emailAddress): array
 
     $guidBytes = random_bytes(16);
     $timestamp = time();
-    $payload = chr(1)
+    $payload = chr(2)
         . $guidBytes
         . pack('N2', 0, $timestamp)
         . registration_hash($customerName)
-        . registration_hash($emailAddress);
-    if (strlen($payload) !== 57) {
+        . registration_hash($emailAddress)
+        . chr($tierValue);
+    if (strlen($payload) !== 58) {
         throw new RuntimeException('The license payload has an unexpected length.');
     }
 
@@ -45,6 +51,7 @@ function issue_activation_key(string $customerName, string $emailAddress): array
         'issued_at' => gmdate('Y-m-d H:i:s', $timestamp),
         'customer_name' => $customerName,
         'email_address' => $emailAddress,
+        'license_tier' => $licenseTier,
         'activation_key' => $activationKey,
     ];
 }

@@ -44,6 +44,16 @@ try {
     foreach ($statements as $statement) {
         $pdo->exec($statement);
     }
+    $licenseModeColumn = $pdo->query("SHOW COLUMNS FROM installations LIKE 'license_mode'")->fetch();
+    if ($licenseModeColumn && str_contains((string)$licenseModeColumn['Type'], "'Full'")) {
+        $pdo->exec("ALTER TABLE installations MODIFY license_mode ENUM('Trial', 'Full', 'Pro', 'Enterprise') NOT NULL DEFAULT 'Trial'");
+        $pdo->exec("UPDATE installations SET license_mode = 'Pro' WHERE license_mode = 'Full'");
+        $pdo->exec("ALTER TABLE installations MODIFY license_mode ENUM('Trial', 'Pro', 'Enterprise') NOT NULL DEFAULT 'Trial'");
+    }
+    $tierColumn = $pdo->query("SHOW COLUMNS FROM issued_licenses LIKE 'license_tier'")->fetch();
+    if (!$tierColumn) {
+        $pdo->exec("ALTER TABLE issued_licenses ADD COLUMN license_tier ENUM('Pro', 'Enterprise') NOT NULL DEFAULT 'Pro' AFTER email_address");
+    }
     respond(['ok' => true, 'statements' => count($statements)]);
 } catch (InvalidArgumentException|JsonException $exception) {
     respond(['error' => $exception->getMessage()], 400);

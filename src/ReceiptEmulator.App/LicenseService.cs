@@ -37,13 +37,13 @@ public sealed class LicenseService
 
     public string RootPath { get; }
 
-    public bool IsFullVersion
+    public bool HasProAccess
     {
         get
         {
             lock (_sync)
             {
-                return GetValidatedLicense() is not null;
+                return GetValidatedLicense()?.Tier is LicenseTier.Pro or LicenseTier.Enterprise;
             }
         }
     }
@@ -54,22 +54,29 @@ public sealed class LicenseService
         {
             RollDateForward();
             var license = GetValidatedLicense();
-            var isFull = license is not null;
+            var hasProAccess = license?.Tier is LicenseTier.Pro or LicenseTier.Enterprise;
+            var isEnterprise = license?.Tier == LicenseTier.Enterprise;
+            var mode = license?.Tier.ToString() ?? LicenseTier.Trial.ToString();
             return new LicenseStatus(
-                isFull ? "Full" : "Trial",
-                isFull,
+                mode,
+                hasProAccess,
+                isEnterprise,
                 TrialDailyLimit,
                 _trialState.Used,
-                isFull ? -1 : Math.Max(0, TrialDailyLimit - _trialState.Used),
+                hasProAccess ? -1 : Math.Max(0, TrialDailyLimit - _trialState.Used),
                 _trialState.Date,
                 _registration.CustomerName,
                 _registration.EmailAddress,
                 license?.LicenseId,
                 new FeatureStatus(
-                    History: isFull,
-                    Exports: isFull,
-                    PremiumFeatures: isFull,
-                    Watermark: !isFull));
+                    History: hasProAccess,
+                    Exports: hasProAccess,
+                    PremiumFeatures: hasProAccess,
+                    Watermark: !hasProAccess,
+                    StoredLogos: hasProAccess,
+                    PrinterState: hasProAccess,
+                    Updates: hasProAccess,
+                    Support: hasProAccess));
         }
     }
 

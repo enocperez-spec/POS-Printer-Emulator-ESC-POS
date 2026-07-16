@@ -338,6 +338,9 @@ button { color: inherit; }
 .settings-nav button { width: 100%; min-height: 46px; display: grid; grid-template-columns: 24px 1fr 16px; align-items: center; gap: 8px; padding: 0 11px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
 .settings-nav button:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 75%, transparent); }
 .settings-nav button.active { color: var(--blue); background: var(--surface); box-shadow: 0 1px 5px rgb(20 44 75 / 10%); font-weight: 700; }
+.settings-nav button:disabled { cursor: not-allowed; opacity: .62; }
+.settings-nav button:disabled:hover { color: var(--muted); background: transparent; }
+.settings-nav .pro-lock { display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 3px 4px; border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 5px; font-size: 9px; font-weight: 800; line-height: 1; }
 .settings-content { min-width: 0; overflow: auto; }
 .settings-panel { min-height: 100%; padding: 26px 28px; }
 .settings-panel .license-hero { margin: -26px -28px 0; }
@@ -498,9 +501,11 @@ button { color: inherit; }
 .dialog-close { position: absolute; z-index: 2; top: 14px; right: 14px; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 7px; color: var(--muted); background: transparent; cursor: pointer; }
 .dialog-close:hover { background: var(--surface-muted); }
 .license-hero { display: flex; gap: 16px; align-items: center; padding: 28px 54px 24px 28px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, #f5f9ff, #eef6ff); }
-.license-hero.is-full { background: linear-gradient(135deg, #effbf3, #e5f6eb); }
+.license-hero.is-paid { background: linear-gradient(135deg, #effbf3, #e5f6eb); }
+.license-hero.is-enterprise { background: linear-gradient(135deg, #f1efff, #e8e5fb); }
 .license-hero-icon { width: 50px; height: 50px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; color: #fff; background: #1169c9; box-shadow: 0 8px 18px rgb(17 105 201 / 22%); }
-.license-hero.is-full .license-hero-icon { background: #258547; box-shadow: 0 8px 18px rgb(37 133 71 / 20%); }
+.license-hero.is-paid .license-hero-icon { background: #258547; box-shadow: 0 8px 18px rgb(37 133 71 / 20%); }
+.license-hero.is-enterprise .license-hero-icon { background: #6651b8; box-shadow: 0 8px 18px rgb(102 81 184 / 20%); }
 .license-hero h2 { margin: 0 0 6px; color: #102a50; font-size: 21px; line-height: 1.2; }
 .license-hero p { margin: 0; color: #55687f; font-size: 13px; line-height: 1.5; }
 .feature-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; background: var(--border); border-bottom: 1px solid var(--border); }
@@ -550,7 +555,8 @@ html[data-theme="dark"] .receipt-paper { color: #101010; background: #fff; }
 html[data-theme="dark"] .license-badge.is-trial { color: #f3c56f; background: #302516; border-color: #6c5127; }
 html[data-theme="dark"] .license-badge.is-full { color: #79d998; background: #173022; border-color: #2c6941; }
 html[data-theme="dark"] .license-hero { background: linear-gradient(135deg, #162842, #14243a); }
-html[data-theme="dark"] .license-hero.is-full { background: linear-gradient(135deg, #173326, #142a22); }
+html[data-theme="dark"] .license-hero.is-paid { background: linear-gradient(135deg, #173326, #142a22); }
+html[data-theme="dark"] .license-hero.is-enterprise { background: linear-gradient(135deg, #292342, #211d37); }
 html[data-theme="dark"] .license-hero h2 { color: var(--text); }
 html[data-theme="dark"] .license-hero p { color: var(--muted); }
 html[data-theme="dark"] .confirm-icon { color: #ff8c82; background: #3b2225; }

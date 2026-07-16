@@ -26,7 +26,7 @@
         <Image Source="Branding/pos-printer-emulator-icon.png" Width="56" Height="56" Stretch="UniformToFill" />
         <StackPanel Grid.Column="1" Margin="16,2,0,0">
           <TextBlock Text="License Manager" FontFamily="Segoe UI Semibold" FontSize="24" Foreground="{StaticResource NavyBrush}" />
-          <TextBlock Text="Generate signed Full Version activation keys" FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
+          <TextBlock Text="Generate signed Pro and Enterprise activation keys" FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
         </StackPanel>
         <Border Grid.Column="2" Background="#E7F9FC" CornerRadius="15" Padding="12,6" VerticalAlignment="Center">
           <TextBlock Text="VENDOR TOOL" FontFamily="Segoe UI Semibold" FontSize="11" Foreground="#007C98" />
@@ -58,7 +58,13 @@
           <TextBox x:Name="CustomerNameTextBox" MaxLength="160" Margin="0,0,0,20" />
 
           <TextBlock Text="Email address" FontFamily="Segoe UI Semibold" FontSize="13" Foreground="{StaticResource NavyBrush}" Margin="0,0,0,7" />
-          <TextBox x:Name="EmailTextBox" MaxLength="254" Margin="0,0,0,22" />
+          <TextBox x:Name="EmailTextBox" MaxLength="254" Margin="0,0,0,20" />
+
+          <TextBlock Text="License level" FontFamily="Segoe UI Semibold" FontSize="13" Foreground="{StaticResource NavyBrush}" Margin="0,0,0,7" />
+          <ComboBox x:Name="LicenseTierComboBox" SelectedIndex="0" Margin="0,0,0,22">
+            <ComboBoxItem Content="Pro" Tag="Pro" />
+            <ComboBoxItem Content="Enterprise" Tag="Enterprise" />
+          </ComboBox>
 
           <Button x:Name="GenerateButton" Content="Generate activation key" Click="Generate_Click"
                   HorizontalAlignment="Left" Background="{StaticResource BlueBrush}" Foreground="White" BorderBrush="{StaticResource BlueBrush}" />
@@ -87,7 +93,7 @@
     </ScrollViewer>
 
     <Border Grid.Row="2" Background="#EAF1F7" BorderBrush="#D7E1EB" BorderThickness="0,1,0,0" Padding="34,13">
-      <TextBlock Text="Keep vendor-private-key.pem private and maintain an encrypted backup. Only send customers the generated PPE1 activation key."
+      <TextBlock Text="Keep vendor-private-key.pem private and maintain an encrypted backup. Only send customers their generated activation key."
                  FontFamily="Segoe UI" FontSize="12" Foreground="#536A83" TextWrapping="Wrap" />
     </Border>
   </Grid>

@@ -118,7 +118,7 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
         [property: JsonPropertyName("browser_download_url")] string BrowserDownloadUrl);
 }
 
-public sealed class PeriodicUpdateChecker(UpdateService updates, ILogger<PeriodicUpdateChecker> logger) : BackgroundService
+public sealed class PeriodicUpdateChecker(UpdateService updates, LicenseService license, ILogger<PeriodicUpdateChecker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -127,7 +127,10 @@ public sealed class PeriodicUpdateChecker(UpdateService updates, ILogger<Periodi
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
-                await updates.CheckAsync(false, stoppingToken);
+                if (license.HasProAccess)
+                {
+                    await updates.CheckAsync(false, stoppingToken);
+                }
                 await Task.Delay(TimeSpan.FromHours(6), stoppingToken);
             }
         }

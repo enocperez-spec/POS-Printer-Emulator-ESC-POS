@@ -76,11 +76,20 @@ public sealed record JobSummary(
 
 public sealed record RegistrationInfo(string CustomerName, string EmailAddress);
 
-public sealed record FeatureStatus(bool History, bool Exports, bool PremiumFeatures, bool Watermark);
+public sealed record FeatureStatus(
+    bool History,
+    bool Exports,
+    bool PremiumFeatures,
+    bool Watermark,
+    bool StoredLogos,
+    bool PrinterState,
+    bool Updates,
+    bool Support);
 
 public sealed record LicenseStatus(
     string Mode,
-    bool IsFull,
+    bool HasProAccess,
+    bool IsEnterprise,
     int DailyLimit,
     int UsedToday,
     int Remaining,

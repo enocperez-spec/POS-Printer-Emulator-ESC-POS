@@ -20,6 +20,12 @@ public sealed class LicenseServiceTests
         Assert.Equal(0, status.Remaining);
         Assert.True(status.Features.Watermark);
         Assert.False(status.Features.History);
+        Assert.False(status.HasProAccess);
+        Assert.False(status.IsEnterprise);
+        Assert.False(status.Features.StoredLogos);
+        Assert.False(status.Features.PrinterState);
+        Assert.False(status.Features.Updates);
+        Assert.False(status.Features.Support);
     }
 
     private sealed class TestEnvironment : IHostEnvironment

@@ -2,6 +2,7 @@ using Microsoft.Win32;
 using POSPrinterEmulator.Licensing;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace POSPrinterEmulator.LicenseManager;
 
@@ -51,13 +52,16 @@ public partial class MainWindow : Window
 
             var customerName = CustomerNameTextBox.Text.Trim();
             var emailAddress = EmailTextBox.Text.Trim();
+            var tierName = (LicenseTierComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? nameof(LicenseTier.Pro);
+            var tier = Enum.Parse<LicenseTier>(tierName);
             var activationKey = ActivationKeyCodec.Issue(
                 File.ReadAllText(privateKeyPath),
                 customerName,
-                emailAddress);
+                emailAddress,
+                tier);
 
             ActivationKeyTextBox.Text = activationKey;
-            IssuedToTextBlock.Text = $"Issued to {customerName} · {emailAddress.ToLowerInvariant()}";
+            IssuedToTextBlock.Text = $"{tier} License issued to {customerName} · {emailAddress.ToLowerInvariant()}";
             ResultPanel.Visibility = Visibility.Visible;
             ActivationKeyTextBox.Focus();
             ActivationKeyTextBox.SelectAll();
