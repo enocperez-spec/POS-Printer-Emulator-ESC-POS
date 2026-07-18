@@ -1,0 +1,6 @@
+/private/config.php
+/private/*.sqlite
+/private/*.sqlite-*
+/private/*.pem
+/private/setup-token.txt
+/var/

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Environmental Impact Methodology | POS Printer Emulator</title>
+  <meta name="description" content="See how POS Printer Emulator estimates thermal receipt paper and CO2e avoided through digital POS receipt testing, including formulas, assumptions, privacy, limitations, and sources.">
+  <link rel="canonical" href="https://www.posprinteremulator.com/environmental-impact">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260715-methodology">
+  <link rel="stylesheet" href="seo-pages.css?v=20260715-methodology">
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"TechArticle",
+    "headline":"POS Printer Emulator Environmental Impact Methodology",
+    "description":"How POS Printer Emulator estimates receipt paper and CO2e potentially avoided through digital POS receipt testing.",
+    "mainEntityOfPage":"https://www.posprinteremulator.com/environmental-impact",
+    "datePublished": "2026-07-18",
+    "dateModified": "2026-07-18",
+    "author":{"@type":"Organization","name":"POS Printer Emulator"},
+    "publisher":{"@type":"Organization","name":"POS Printer Emulator","url":"https://www.posprinteremulator.com/"},
+    "citation":[
+      "https://bira.co.uk/hubs/sustainability/beat-the-receipt/",
+      "https://www.uts.edu.au/case-studies/life-journey-average-receipt",
+      "https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100YWFW.TXT",
+      "https://echa.europa.eu/-/bisphenol-s-has-replaced-bisphenol-a-in-thermal-paper"
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header"><div class="shell header-inner"><a class="brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator"></a><button class="menu-toggle" aria-expanded="false" aria-controls="site-nav" data-menu-toggle><span></span><span></span><span></span><span class="sr-only">Open navigation</span></button><nav class="site-nav" id="site-nav" data-nav><a href="/">Home</a><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a class="button button-small" href="pos-printer-emulator-download">Download</a></nav></div></header>
+  <main id="main">
+    <section class="page-hero method-hero"><div class="shell"><div class="breadcrumbs"><a href="/">Home</a><span>/</span><span>Environmental impact</span></div><span class="section-kicker">TRANSPARENT BY DESIGN</span><h1>Environmental Impact Methodology</h1><p>How we estimate receipt paper and CO₂e potentially avoided when POS teams test receipts digitally instead of printing them on thermal paper.</p></div></section>
+    <section class="page-body"><div class="shell article-layout"><article class="article-content">
+      <div class="method-version"><strong>Methodology version 1.1</strong><span>Updated July 15, 2026</span></div>
+
+      <h2>What the counter measures</h2>
+      <p>The impact counter starts with completed emulated print jobs reported by POS Printer Emulator installations. One completed job is treated as one receipt that could have remained digital during development, configuration, training, or troubleshooting.</p>
+      <div class="callout"><p>These are illustrative estimates—not an environmental audit, verified carbon reduction, carbon credit, or guarantee. A job represents an avoided physical receipt only when the emulator genuinely replaces a paper test print.</p></div>
+
+      <h2>The calculation</h2>
+      <p>We deliberately use a small, readable model so anyone can reproduce the displayed totals.</p>
+      <div class="formula-list">
+        <div><span>Receipts kept digital</span><code>completed emulated jobs</code></div>
+        <div><span>Paper length potentially avoided</span><code>jobs × 6 inches ÷ 12 = feet</code></div>
+        <div><span>Paper area potentially avoided</span><code>jobs × 3.125 × 6 ÷ 144 = square feet</code></div>
+        <div><span>CO₂e potentially avoided</span><code>jobs × 2.5 grams</code></div>
+      </div>
+      <p>For example, 100 completed emulated jobs produce an estimate of 50 linear feet—or about 13 square feet—of 3⅛-inch receipt paper and 250 grams of CO₂e potentially avoided.</p>
+
+      <h2>Accounting assumptions</h2>
+      <div class="assumption-grid">
+        <section><strong>One job, one receipt</strong><p>Each completed print job counts once. Rejected, empty, or trial-limit-blocked jobs are not included.</p></section>
+        <section><strong>3⅛ inches wide</strong><p>The paper calculation uses a standard 3⅛-inch (80 mm class) thermal receipt roll.</p></section>
+        <section><strong>6 inches per receipt</strong><p>This average-length assumption is used consistently. Real receipts may be shorter or considerably longer.</p></section>
+        <section><strong>2.5 g CO₂e per receipt</strong><p>This lifecycle estimate is applied consistently. Actual emissions vary with paper, manufacturing, transport, and disposal.</p></section>
+        <section><strong>Potentially avoided</strong><p>The estimate assumes an emulated test would otherwise have been printed. The software cannot verify every user’s counterfactual behavior.</p></section>
+      </div>
+
+      <h2>Paperless solutions</h2>
+      <p>One of the most practical sustainability benefits of POS Printer Emulator is its ability to eliminate unnecessary paper waste during testing. Developers, menu administrators, and POS technicians can preview receipts digitally instead of repeatedly printing them on thermal paper.</p>
+      <h3>Why it matters</h3>
+      <ul>
+        <li><strong>Lower consumable costs:</strong> Fewer test prints reduce spending on thermal-paper rolls and unnecessary printer wear.</li>
+        <li><strong>Digital convenience:</strong> Teams can inspect, compare, export, and troubleshoot test receipts directly on the computer.</li>
+        <li><strong>Reduced environmental impact:</strong> Every physical test print genuinely replaced by emulation avoids coated-paper waste and the associated production and disposal footprint.</li>
+      </ul>
+
+      <h2>Why we use 2.5 g CO₂e</h2>
+      <p>The 2.5-gram factor is based on a receipt lifecycle estimate reported by the British Independent Retailers Association from Carbon Trust analysis. The University of Technology Sydney also discusses the lifecycle of an average paper receipt and the broader effects of receipt production and disposal.</p>
+      <p>We do not convert the counter into trees, gallons of water, landfill volume, or other equivalencies because those claims require additional assumptions that are not measured by the application.</p>
+
+      <h2>Thermal coatings and recycling</h2>
+      <p>Thermal receipts may use chemical developers such as BPA or BPS. The U.S. Environmental Protection Agency has assessed alternatives used in thermal paper, while the European Chemicals Agency has reported substitution of BPA with BPS. Coatings and local recycling rules vary, but thermal-paper chemistry can complicate recycling and contaminate recovered paper streams.</p>
+
+      <h2>Data and privacy</h2>
+      <p>The public counter uses aggregate completed-job totals. Receipt text, raw ESC/POS bytes, receipt images, and job history remain on the customer’s device and are not included in the public impact data.</p>
+      <ul>
+        <li>The public endpoint exposes aggregate totals and the assumptions used to calculate them.</li>
+        <li>Clearing local job history does not reduce previously reported aggregate totals.</li>
+        <li>For more detail about application data, read the <a href="privacy">privacy notice</a>.</li>
+      </ul>
+
+      <h2>Limitations and exclusions</h2>
+      <ul>
+        <li>Receipt length, paper weight, coating, supply chain, and end-of-life treatment vary.</li>
+        <li>The estimate does not subtract energy used by the computer, local network, or application.</li>
+        <li>It does not estimate trees, water use, landfill volume, financial savings, or chemical exposure.</li>
+        <li>It cannot distinguish a print job definitely replaced by emulation from one that would never have been physically printed.</li>
+        <li>The results have not been independently audited and cannot be used as carbon credits.</li>
+      </ul>
+
+      <h2>Review policy and sources</h2>
+      <p>We will review this methodology when the telemetry definition, receipt-length assumption, emissions factor, or supporting research changes. The methodology version and modification date will be updated when a material change is made.</p>
+      <ol class="source-list">
+        <li><a href="https://bira.co.uk/hubs/sustainability/beat-the-receipt/" rel="noopener noreferrer">British Independent Retailers Association — Beat the Receipt</a> (reports Carbon Trust lifecycle analysis).</li>
+        <li><a href="https://www.uts.edu.au/case-studies/life-journey-average-receipt" rel="noopener noreferrer">University of Technology Sydney — The life journey of an average receipt</a>.</li>
+        <li><a href="https://nepis.epa.gov/Exe/ZyPURL.cgi?Dockey=P100YWFW.TXT" rel="noopener noreferrer">U.S. EPA — Bisphenol A Alternatives in Thermal Paper</a>.</li>
+        <li><a href="https://echa.europa.eu/-/bisphenol-s-has-replaced-bisphenol-a-in-thermal-paper" rel="noopener noreferrer">European Chemicals Agency — Bisphenol S has replaced Bisphenol A in thermal paper</a>.</li>
+      </ol>
+    </article>
+    <aside class="sidebar-card method-sidebar" data-impact><span class="section-kicker">CURRENT ESTIMATE</span><h2>Testing kept digital</h2><p>Aggregate completed jobs reported by participating POS Printer Emulator installations.</p><dl><div><dt>Receipts</dt><dd><strong data-impact-receipts>—</strong></dd></div><div><dt>Paper length</dt><dd><strong data-impact-paper>—</strong> ft</dd></div><div><dt>Paper area</dt><dd><strong data-impact-area>—</strong> sq ft</dd></div><div><dt>CO₂e</dt><dd><strong data-impact-co2>—</strong> g</dd></div></dl><small data-impact-status>Loading current estimate…</small><a class="button button-primary" href="downloads/POSPrinterEmulatorSetup-0.3.20-win-x64.exe" download>Download Version 0.3.20</a><ul class="sidebar-links"><li><a href="privacy">Privacy notice</a></li><li><a href="how-to-test-pos-receipts-without-a-printer">Digital receipt testing guide</a></li></ul></aside>
+    </div></section>
+  </main>
+  <section class="related"><div class="shell"><h2>Related resources</h2><div class="related-grid"><a href="how-to-test-pos-receipts-without-a-printer"><strong>Test without paper</strong><span>Preview and troubleshoot POS receipts without a physical printer.</span></a><a href="esc-pos-printer-emulator"><strong>ESC/POS emulator</strong><span>Understand receipt command capture and rendering.</span></a><a href="privacy"><strong>Privacy notice</strong><span>See which data stays local and what aggregate data is reported.</span></a></div></div></section>
+  <footer class="site-footer"><div class="shell footer-top"><a class="brand footer-brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator"></a><nav><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a href="environmental-impact">Impact</a><a href="privacy">Privacy</a></nav></div><div class="shell footer-bottom"><span>© 2026 POS Printer Emulator.</span><span>Local tools for better receipt testing.</span></div></footer>
+  <script src="script.js?v=20260715-impact-v2" type="module"></script>
+</body>
+</html>

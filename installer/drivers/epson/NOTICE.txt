@@ -1,0 +1,16 @@
+EPSON TM-T88V Advanced Printer Driver components
+
+These unmodified, digitally signed driver files were extracted from the official
+EPSON Advanced Printer Driver 5.13 package for the TM-T88V so POS Printer Emulator
+can provide an automated Windows printer setup experience.
+
+Copyright: Seiko Epson Corporation. All rights reserved.
+Product: EPSON Advanced Printer Driver 5 for TM-T88V
+Package version: 5.13.0.0
+Driver: EPSON TM-T88V Receipt5, version 5.12.0.0
+Official source:
+https://download-center.epson.com/download/?module_id=043c5889-03e6-470b-96f4-337d2c1e7906%3A5.13E&device_id=TM-T88V&os=WIN1164&region=US&language=en
+
+See APD5_README_EN.TXT for Epson's package notes, supported systems, and notices.
+EPSON and TM-T88V are trademarks of Seiko Epson Corporation. POS Printer Emulator
+is not affiliated with or endorsed by Seiko Epson Corporation.

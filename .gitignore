@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.vs/
+artifacts/
+tmp/
+website/downloads/*.exe
+website/.vite/
+.docx-review/
+src/ReceiptEmulator.App/wwwroot/
+*.tsbuildinfo
+*.user
+*.suo
+/admin-website/private/config.php
+/admin-website/private/purchase-site.php

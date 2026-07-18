@@ -1,0 +1,72 @@
+.metrics article {
+  align-items: center;
+  flex-direction: row;
+  gap: 20px;
+  padding: 24px 26px;
+}
+
+.metrics article > div {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-icon {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.metrics .trial .metric-icon { stroke: var(--amber); }
+.metrics .full .metric-icon { stroke: var(--green); }
+.donut.empty { background: #21415d; }
+
+.impact-panel {
+  margin-top: 20px;
+  padding: 24px 26px;
+  border: 1px solid #28607a;
+  border-radius: var(--radius);
+  background: linear-gradient(120deg, rgba(8, 54, 78, .8), rgba(7, 29, 52, .72));
+}
+
+.impact-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.impact-heading > div > span {
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.impact-heading h2 { margin: 4px 0 0; font-size: 20px; }
+.impact-heading > p { margin: 0; color: var(--muted); font-size: 13px; }
+.impact-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 22px; }
+.impact-stats article { padding: 8px 24px; border-right: 1px solid var(--line); }
+.impact-stats article:first-child { padding-left: 0; }
+.impact-stats article:last-child { padding-right: 0; border-right: 0; }
+.impact-stats strong { display: block; color: #79ddba; font-size: clamp(28px, 3vw, 42px); line-height: 1.1; }
+.impact-stats span { display: block; margin-top: 8px; color: #c8d9e7; font-size: 13px; }
+.impact-method { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+@media (max-width: 700px) {
+  .metrics article { min-height: 108px; }
+  .impact-panel { padding: 21px; }
+  .impact-heading { display: block; }
+  .impact-heading > p { margin-top: 5px; }
+  .impact-stats { grid-template-columns: 1fr; }
+  .impact-stats article,
+  .impact-stats article:first-child,
+  .impact-stats article:last-child { padding: 16px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .impact-stats article:last-child { border-bottom: 0; }
+}
