@@ -38,6 +38,160 @@ function ensure_dev_support_schema(): void
 
 ensure_dev_support_schema();
 
+database()->exec(
+    "CREATE TABLE IF NOT EXISTS development_migrations (
+        migration_key VARCHAR(96) NOT NULL,
+        applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+        PRIMARY KEY (migration_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
+function migrate_dev_support_release_numbers(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $migrationKey = 'release-number-shift-v0.3.20';
+        $migrationClaim = $pdo->prepare(
+            'INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)'
+        );
+        $migrationClaim->execute([$migrationKey]);
+        if ($migrationClaim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        $rows = $pdo->query(
+            "SELECT id, item_key, title FROM development_roadmap
+             WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24')
+             FOR UPDATE"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        $byKey = [];
+        foreach ($rows as $row) {
+            $byKey[(string)$row['item_key']] = $row;
+        }
+
+        $expectedOldTitles = [
+            'v0.3.21' => 'Receipt comparison and automated validation',
+            'v0.3.22' => 'Enhanced support and connection diagnostics',
+            'v0.3.23' => 'Guided update installation and restart',
+        ];
+        $expectedShiftedTitles = [
+            'v0.3.21' => 'Enterprise multiple printer listeners',
+            'v0.3.22' => 'Receipt comparison and automated validation',
+            'v0.3.23' => 'Enhanced support and connection diagnostics',
+            'v0.3.24' => 'Guided update installation and restart',
+        ];
+        $hasCanonicalRelease = isset($byKey['v0.3.20'])
+            && $byKey['v0.3.20']['title'] === 'Reliable SQLite receipt history';
+        $oldReleaseRowsMatch = isset($byKey['v0.3.20'])
+            && in_array(
+                $byKey['v0.3.20']['title'],
+                ['Multiple printer listeners', 'Enterprise multiple printer listeners'],
+                true
+            );
+        foreach ($expectedOldTitles as $itemKey => $title) {
+            $oldReleaseRowsMatch = $oldReleaseRowsMatch
+                && isset($byKey[$itemKey])
+                && $byKey[$itemKey]['title'] === $title;
+        }
+        $hasSeededHybridLayout = $oldReleaseRowsMatch
+            && count($rows) === 5
+            && isset($byKey['v0.3.24'])
+            && $byKey['v0.3.24']['title'] === 'Guided update installation and restart';
+        $hasOldLayout = $oldReleaseRowsMatch
+            && ((count($rows) === 4 && !isset($byKey['v0.3.24'])) || $hasSeededHybridLayout);
+
+        $hasPartiallyShiftedLayout = count($rows) === 4 && !isset($byKey['v0.3.20']);
+        foreach ($expectedShiftedTitles as $itemKey => $title) {
+            $hasPartiallyShiftedLayout = $hasPartiallyShiftedLayout
+                && isset($byKey[$itemKey])
+                && $byKey[$itemKey]['title'] === $title;
+        }
+
+        if (!$hasCanonicalRelease && !$hasOldLayout && !$hasPartiallyShiftedLayout && $rows !== []) {
+            throw new RuntimeException('The release tracker has an unexpected v0.3.20-v0.3.24 layout.');
+        }
+
+        if ($hasOldLayout) {
+            if ($hasSeededHybridLayout) {
+                $deleteSeededRelease = $pdo->prepare('DELETE FROM development_roadmap WHERE id = ?');
+                $deleteSeededRelease->execute([$byKey['v0.3.24']['id']]);
+            }
+            $oldKeys = ['v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23'];
+            $moveToTemporaryKey = $pdo->prepare(
+                'UPDATE development_roadmap SET item_key = ?, version_label = NULL WHERE id = ?'
+            );
+            foreach ($oldKeys as $itemKey) {
+                $row = $byKey[$itemKey];
+                $moveToTemporaryKey->execute(['release-shift-' . $row['id'], $row['id']]);
+            }
+
+            $moveToFinalKey = $pdo->prepare(
+                'UPDATE development_roadmap SET item_key = ?, version_label = ? WHERE id = ?'
+            );
+            $newKeys = [
+                'v0.3.20' => 'v0.3.21',
+                'v0.3.21' => 'v0.3.22',
+                'v0.3.22' => 'v0.3.23',
+                'v0.3.23' => 'v0.3.24',
+            ];
+            foreach ($newKeys as $oldKey => $newKey) {
+                $moveToFinalKey->execute([$newKey, $newKey, $byKey[$oldKey]['id']]);
+            }
+        }
+
+        if ($hasOldLayout || $hasPartiallyShiftedLayout) {
+            $pdo->exec(
+                "UPDATE development_bugs
+                 SET target_release = CASE target_release
+                         WHEN 'v0.3.20' THEN 'v0.3.21'
+                         WHEN 'v0.3.21' THEN 'v0.3.22'
+                         WHEN 'v0.3.22' THEN 'v0.3.23'
+                         WHEN 'v0.3.23' THEN 'v0.3.24'
+                         ELSE target_release
+                     END,
+                     fixed_version = CASE fixed_version
+                         WHEN 'v0.3.20' THEN 'v0.3.21'
+                         WHEN 'v0.3.21' THEN 'v0.3.22'
+                         WHEN 'v0.3.22' THEN 'v0.3.23'
+                         WHEN 'v0.3.23' THEN 'v0.3.24'
+                         ELSE fixed_version
+                     END
+                 WHERE target_release IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23')
+                    OR fixed_version IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23')"
+            );
+        }
+
+        $pdo->exec(
+            "INSERT INTO development_roadmap
+                (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope,
+                 priority_reason, completion_criteria, github_url, completed_at)
+             VALUES
+                ('v0.3.20', 'v0.3.20', 'Release', 'Reliable SQLite receipt history', 'Released', 320,
+                 'Replace individual paid-history JSON files with a minimal transactional local database.',
+                 'Embedded SQLite for Pro and Enterprise, session-only Trial behavior, schema versioning, WAL, transactions, listener-ready indexes, 500-job retention, verified JSON migration, rollback backup, damaged-row isolation, durable deletion, hardened permissions, and release-runtime verification.',
+                 'Reliable storage is required before independently configured listeners share receipt history.',
+                 'Existing paid history migrates without loss, Trial creates no database, paid history survives restart within its limit, and the all-in-one installer loads the bundled SQLite runtime.',
+                 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6', UTC_TIMESTAMP(6))
+             ON DUPLICATE KEY UPDATE
+                version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
+                status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
+                planned_scope = VALUES(planned_scope), priority_reason = VALUES(priority_reason),
+                completion_criteria = VALUES(completion_criteria), github_url = VALUES(github_url),
+                completed_at = COALESCE(completed_at, UTC_TIMESTAMP(6))"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
+migrate_dev_support_release_numbers();
+
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "INSERT INTO development_roadmap
@@ -63,22 +217,27 @@ $releaseSync = database()->prepare(
          'Pro and Enterprise built-in and custom profiles for paper width, dots, image limits, code pages, fonts, cutter, drawer, images, barcode and QR, two-color output, DLE EOT, Automatic Status Back, import, export, job metadata, capture metadata, replay, capability warnings, and Trial API and UI gates.',
          'Profiles define behavior before multiple endpoints depend on it.',
          'One capture replayed against two profiles shows deterministic expected capability and rendering differences, while Trial access is rejected.', UTC_TIMESTAMP(6)),
-        ('v0.3.20', 'v0.3.20', 'Release', 'Enterprise multiple printer listeners', 'In progress', 320,
+        ('v0.3.20', 'v0.3.20', 'Release', 'Reliable SQLite receipt history', 'Released', 320,
+         'Replace individual paid-history JSON files with a minimal transactional local database.',
+         'Embedded SQLite for Pro and Enterprise, session-only Trial behavior, schema versioning, WAL, transactions, listener-ready indexes, 500-job retention, verified JSON migration, rollback backup, damaged-row isolation, durable deletion, hardened permissions, and release-runtime verification.',
+         'Reliable storage is required before independently configured listeners share receipt history.',
+         'Existing paid history migrates without loss, Trial creates no database, paid history survives restart within its limit, and the all-in-one installer loads the bundled SQLite runtime.', UTC_TIMESTAMP(6)),
+        ('v0.3.21', 'v0.3.21', 'Release', 'Enterprise multiple printer listeners', 'Next', 321,
          'Let one Enterprise installation emulate multiple receipt printers while Trial and Pro retain one local listener.',
-         'Milestone 1 complete: lightweight local SQLite paid-history foundation with schema versioning, WAL, transactions, listener-ready indexes, 500-job retention, verified JSON migration, rollback backup, and session-only Trial behavior. Remaining scope: persisted listener configuration, independent names, ports, addresses, profiles, state, buffers, counters, routing, filtering, conflict detection, firewall setup, Enterprise UI and API gates, and fault isolation.',
-         'Transactional storage and profiles establish the reliable foundation needed for isolated multi-printer operation.',
+         'Persisted listener configuration, independent names, ports, addresses, profiles, state, buffers, counters, routing, filtering, conflict detection, firewall setup, Enterprise UI and API gates, and fault isolation.',
+         'Transactional storage and profiles now provide the reliable foundation needed for isolated multi-printer operation.',
          'Two simultaneous Enterprise listeners receive jobs, apply different profiles, restart safely, and remain independently controllable while Trial and Pro single-listener behavior remains unchanged.', NULL),
-        ('v0.3.21', 'v0.3.21', 'Release', 'Receipt comparison and automated validation', 'Planned', 321,
+        ('v0.3.22', 'v0.3.22', 'Release', 'Receipt comparison and automated validation', 'Planned', 322,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Deterministic captures and profiles are required for meaningful comparisons.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.22', 'v0.3.22', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 322,
+        ('v0.3.23', 'v0.3.23', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 323,
          'Guide nontechnical customers through connection problems and support collection.',
          'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
          'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
          'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-        ('v0.3.23', 'v0.3.23', 'Release', 'Guided update installation and restart', 'Planned', 323,
+        ('v0.3.24', 'v0.3.24', 'Release', 'Guided update installation and restart', 'Planned', 324,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -108,11 +267,15 @@ $backlogSync = database()->prepare(
 );
 $backlogSync->execute();
 database()->prepare(
-    "UPDATE development_roadmap SET github_url = ? WHERE item_key = 'v0.3.20' AND (github_url IS NULL OR github_url = '')"
-)->execute(['https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5']);
-database()->prepare(
-    "UPDATE development_roadmap SET github_url = ? WHERE item_key = 'v0.3.23' AND (github_url IS NULL OR github_url = '')"
-)->execute(['https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3']);
+    "UPDATE development_roadmap
+     SET github_url = CASE item_key
+         WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
+         WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
+         WHEN 'v0.3.24' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         ELSE NULL
+     END
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24')"
+)->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
         (bug_key, title, severity, status, affected_versions, target_release, fixed_version, customer_impact,

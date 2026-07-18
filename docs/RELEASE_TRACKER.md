@@ -12,7 +12,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.19**
+**Current public release: v0.3.20**
 
 ## Completed releases
 
@@ -40,10 +40,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.17 | Released | Trial, Pro, and Enterprise license tiers and Pro feature gates |
 | v0.3.18 | Released | Admin Portal branding and separate Pro and Enterprise purchase pricing |
 | v0.3.19 | Released | Pro and Enterprise printer profiles, custom configuration, and profile-aware processing |
+| v0.3.20 | Released | Reliable SQLite receipt history, verified migration, and safer release packaging |
 
 ## Scheduled releases
 
-The scheduled order is dependency-driven: licensing tiers establish the commercial feature boundary; profiles then define printer behavior; multiple listeners reuse profiles; comparison uses deterministic captures and profiles; enhanced diagnostics can report across the complete system.
+The scheduled order is dependency-driven: licensing tiers establish the commercial feature boundary; profiles define printer behavior; SQLite supplies transactional listener-ready storage; multiple listeners reuse both; comparison uses deterministic captures and profiles; enhanced diagnostics can report across the complete system.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -134,9 +135,27 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** The same captured job can be replayed against two profiles and the viewer consistently shows the expected rendering and capability differences.
 
-### v0.3.20 — Enterprise multiple printer listeners
+### v0.3.20 — Reliable SQLite receipt history
 
-**Status:** In progress
+**Status:** Released
+
+**Purpose:** Replace individual paid-history JSON files with a minimal transactional local database before multiple independently configured listeners share the same history system.
+
+**Released scope:**
+
+- Store Pro and Enterprise receipt history in one embedded SQLite database with no separate customer installation or database service.
+- Keep Trial history session-only and preserve the existing 500-job paid-history limit.
+- Use a versioned schema, WAL journaling, transactions, and listener-ready indexes.
+- Copy and verify legacy JSON history into a rollback backup before importing it transactionally.
+- Isolate damaged database rows so valid history remains available.
+- Make delete, Clear All, retention, and Trial-to-paid activation remain consistent across restarts.
+- Harden service-data permissions and verify the SQLite runtime, executable versions, notices, and safe service shutdown during release packaging.
+
+**Complete when:** Existing paid history migrates without data loss, Trial creates no database, Pro and Enterprise history survives restart within the 500-job limit, damaged rows do not hide good data, and the all-in-one installer loads its bundled SQLite runtime.
+
+### v0.3.21 — Enterprise multiple printer listeners
+
+**Status:** Next
 
 **Tracking issue:** [GitHub #5](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5)
 
@@ -144,7 +163,6 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Implementation milestones:**
 
-- [x] Establish a lightweight SQLite paid-history foundation with WAL, schema versioning, transactional writes, listener-ready indexes, 500-job retention, verified JSON migration, and a rollback backup. Trial remains session-only.
 - [ ] Add the persisted listener configuration model and Enterprise authorization boundary.
 - [ ] Run independent listener instances with isolated ports, profiles, printer states, buffers, counters, and failure handling.
 - [ ] Add Enterprise listener management, connection details, Activity filtering, port-conflict guidance, and upgrade messaging to the desktop UI.
@@ -164,7 +182,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** At least two Enterprise listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart while Trial and Pro single-listener behavior remains unchanged.
 
-### v0.3.21 — Receipt comparison and automated validation
+### v0.3.22 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -183,7 +201,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.22 — Enhanced support package and connection diagnostics
+### v0.3.23 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -202,7 +220,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
-### v0.3.23 — Guided update installation and restart
+### v0.3.24 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -230,7 +248,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.23.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.24.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 

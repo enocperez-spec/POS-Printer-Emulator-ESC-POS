@@ -4,6 +4,16 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.20
+
+- Replaced Pro and Enterprise JSON receipt history with one embedded SQLite database while keeping Trial history session-only.
+- Added a versioned receipt schema, WAL journaling, transactional writes, listener-ready indexes, and the existing 500-job paid-history limit without requiring a separate database installation.
+- Added a verified, idempotent migration from legacy JSON history with a rollback backup retained on the customer computer.
+- Isolated damaged database rows so valid receipt history continues loading, and made delete and Clear All operations remain durable across restarts.
+- Kept the in-memory and persisted 500-job limits aligned when a Trial installation activates Pro or Enterprise.
+- Hardened ProgramData permissions for the Windows service, administrators, and the operating system.
+- Added automatic SQLite runtime and executable-version verification to release builds, safer service shutdown during upgrades, and installed third-party notices.
+
 ## v0.3.19
 
 - Added Pro and Enterprise Printer Profiles under Settings while keeping the feature locked for Trial installations in both the UI and local APIs.

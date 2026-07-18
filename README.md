@@ -31,7 +31,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.19-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.20-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -76,7 +76,7 @@ Activation is validated offline using a public-key signature. The customer does 
 
 ## License and usage dashboard
 
-Version 0.3.19 reports installation registration, Trial, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, and rendered receipt images are never uploaded.
+Version 0.3.20 reports installation registration, Trial, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, and rendered receipt images are never uploaded.
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
@@ -132,7 +132,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.19-win-x64.exe`
+Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.20-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -152,7 +152,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.19 artifacts/installer/POSPrinterEmulatorSetup-0.3.19-win-x64.exe --title "POS Printer Emulator 0.3.19" --notes "Adds Pro and Enterprise printer profiles, custom profile management, profile-aware receipt processing, and Trial feature gates."
+gh release create v0.3.20 artifacts/installer/POSPrinterEmulatorSetup-0.3.20-win-x64.exe --title "POS Printer Emulator 0.3.20" --notes "Adds embedded SQLite history for Pro and Enterprise, verified legacy migration, transactional retention, and safer upgrade packaging."
 ```
 
 ## Issue customer activation keys
@@ -168,7 +168,7 @@ Send the printed `PPE1-...` value to the customer. The corresponding public key 
 For unattended installation, provide the required registration fields:
 
 ```console
-POSPrinterEmulatorSetup-0.3.19-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
+POSPrinterEmulatorSetup-0.3.20-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
 ```
 
 ## Configuration
@@ -183,7 +183,7 @@ Development settings are stored in `src/ReceiptEmulator.App/appsettings.json`:
 
 ## Current MVP limitations
 
-The v0.3.20 development branch stores paid history in one local SQLite database with a 500-job retention limit, while Trial remains session-only. Existing JSON history is migrated transactionally after a verified rollback backup is created. Customer-facing database maintenance, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work. The current public release remains v0.3.19 until the complete Enterprise multiple-listener scope passes release QA.
+Version 0.3.20 stores Pro and Enterprise history in one local SQLite database with a 500-job retention limit, while Trial remains session-only. Existing JSON history is migrated transactionally after a verified rollback backup is created. Customer-facing database maintenance, Enterprise multiple listeners, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
 
 ## Release roadmap
 
@@ -194,10 +194,11 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.17 — License tiers and Pro feature gates:** Add Trial, Pro, and Enterprise licensing, preserve legacy paid keys as Pro, and restrict Stored Logos, Printer State, Updates, and Support to paid licenses.
 - **Released in v0.3.18 — Admin Portal and tier-aware purchase pricing:** Brand the protected administration site as the Admin Portal and manage separate Pro and Enterprise purchase prices and fulfillment.
 - **Released in v0.3.19 — Printer profiles:** Add Pro and Enterprise printer profiles with selectable models, custom import/export, paper and code-page configuration, capability warnings, and profile-aware capture/replay.
-- **In progress: v0.3.20 — Enterprise multiple printer listeners:** The SQLite storage foundation is complete; listener configuration, isolated runtimes, Enterprise UI/API gates, routing, and release QA remain in progress.
-- **v0.3.21 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.22 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
-- **v0.3.23 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.20 — Reliable SQLite receipt history:** Store Pro and Enterprise history transactionally in an embedded database, migrate legacy JSON safely, preserve a rollback backup, and keep Trial history session-only.
+- **v0.3.21 — Enterprise multiple printer listeners:** Add persisted listener configuration, isolated runtimes, Enterprise UI/API gates, routing, filtering, and independent fault handling.
+- **v0.3.22 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.23 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
+- **v0.3.24 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 
