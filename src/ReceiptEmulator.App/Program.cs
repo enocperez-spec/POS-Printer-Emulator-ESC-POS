@@ -8,6 +8,13 @@ if (setupExitCode is not null)
     return;
 }
 
+var storageVerificationExitCode = StorageVerificationCommand.TryRun(args);
+if (storageVerificationExitCode is not null)
+{
+    Environment.ExitCode = storageVerificationExitCode.Value;
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 var supportLogs = new SupportLogProvider();
 builder.Logging.AddProvider(supportLogs);

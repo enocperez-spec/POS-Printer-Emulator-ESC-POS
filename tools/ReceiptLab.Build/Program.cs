@@ -150,6 +150,7 @@ internal static class ReceiptLabBuild
             ],
             Root);
 
+        await VerifyPublishedApplicationsAsync();
         Console.WriteLine($"Self-contained Windows publish created at {PublishDirectory}");
     }
 
@@ -160,10 +161,9 @@ internal static class ReceiptLabBuild
         {
             await PublishAsync();
         }
-        else if (!File.Exists(Path.Combine(PublishDirectory, "ReceiptEmulator.exe")) ||
-                 !File.Exists(Path.Combine(PublishDirectory, "POSPrinterEmulator.Desktop.exe")))
+        else
         {
-            throw new InvalidOperationException("The published application is missing. Run the installer command without --skip-publish.");
+            await VerifyPublishedApplicationsAsync();
         }
 
         await EnsureWebView2BootstrapperAsync();
@@ -173,6 +173,43 @@ internal static class ReceiptLabBuild
         await RunProcessAsync(compiler, [installerDefinition], Root);
         SynchronizeReleaseVersion(checkOnly: false);
         Console.WriteLine($"Installer created in {Path.Combine(Root, "artifacts", "installer")}");
+    }
+
+    private static async Task VerifyPublishedApplicationsAsync()
+    {
+        var expectedVersion = ReadProductVersion();
+        if (!Version.TryParse(expectedVersion, out var parsedExpectedVersion))
+        {
+            throw new InvalidOperationException($"ProductInfo.Version '{expectedVersion}' is invalid.");
+        }
+
+        var serviceExecutable = Path.Combine(PublishDirectory, "ReceiptEmulator.exe");
+        var desktopExecutable = Path.Combine(PublishDirectory, "POSPrinterEmulator.Desktop.exe");
+        foreach (var executable in new[] { serviceExecutable, desktopExecutable })
+        {
+            if (!File.Exists(executable))
+            {
+                throw new InvalidOperationException("The published application is missing. Run the installer command without --skip-publish.");
+            }
+
+            var fileVersion = FileVersionInfo.GetVersionInfo(executable).FileVersion;
+            if (!Version.TryParse(fileVersion, out var parsedVersion) ||
+                parsedVersion.Major != parsedExpectedVersion.Major ||
+                parsedVersion.Minor != parsedExpectedVersion.Minor ||
+                parsedVersion.Build != parsedExpectedVersion.Build)
+            {
+                throw new InvalidOperationException(
+                    $"{Path.GetFileName(executable)} is version {fileVersion ?? "unknown"}; expected {expectedVersion}. Republish before building the installer.");
+            }
+        }
+
+        if (!File.Exists(Path.Combine(PublishDirectory, "THIRD-PARTY-NOTICES.txt")))
+        {
+            throw new InvalidOperationException("THIRD-PARTY-NOTICES.txt is missing from the publish output. Republish before building the installer.");
+        }
+
+        Console.WriteLine("Verifying the bundled SQLite runtime...");
+        await RunProcessAsync(serviceExecutable, ["--verify-sqlite-runtime"], Root);
     }
 
     private static async Task EnsureWebView2BootstrapperAsync()
@@ -248,17 +285,7 @@ internal static class ReceiptLabBuild
 
     private static void SynchronizeReleaseVersion(bool checkOnly)
     {
-        var productInfoPath = Path.Combine(Root, "src", "ReceiptEmulator.App", "ProductInfo.cs");
-        var productInfo = File.ReadAllText(productInfoPath);
-        var versionMatch = Regex.Match(
-            productInfo,
-            "public\\s+const\\s+string\\s+Version\\s*=\\s*\"(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)\"");
-        if (!versionMatch.Success)
-        {
-            throw new InvalidOperationException("The release version could not be read from ProductInfo.cs.");
-        }
-
-        var displayVersion = versionMatch.Groups["version"].Value;
+        var displayVersion = ReadProductVersion();
         var installerPath = Path.Combine(
             Root,
             "artifacts",
@@ -288,6 +315,21 @@ internal static class ReceiptLabBuild
         Console.WriteLine(changed.Count == 0
             ? $"Website release details match application version {displayVersion}."
             : $"Synchronized release {displayVersion}: {string.Join(", ", changed)}");
+    }
+
+    private static string ReadProductVersion()
+    {
+        var productInfoPath = Path.Combine(Root, "src", "ReceiptEmulator.App", "ProductInfo.cs");
+        var productInfo = File.ReadAllText(productInfoPath);
+        var versionMatch = Regex.Match(
+            productInfo,
+            "public\\s+const\\s+string\\s+Version\\s*=\\s*\"(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)\"");
+        if (!versionMatch.Success)
+        {
+            throw new InvalidOperationException("The release version could not be read from ProductInfo.cs.");
+        }
+
+        return versionMatch.Groups["version"].Value;
     }
 
     private static string SynchronizeWebsiteReleaseText(string text, string displayVersion, FileInfo? installer)

@@ -127,7 +127,16 @@ public static class WindowsSetupCommand
         Directory.CreateDirectory(LicenseService.DefaultRootPath);
         await RunRequiredProcessAsync(
             GetSystemExecutable("icacls.exe"),
-            [LicenseService.DefaultRootPath, "/grant", "*S-1-5-19:(OI)(CI)M", "/T", "/C"],
+            [
+                LicenseService.DefaultRootPath,
+                "/inheritance:r",
+                "/grant:r",
+                "*S-1-5-18:(OI)(CI)F",
+                "*S-1-5-32-544:(OI)(CI)F",
+                "*S-1-5-19:(OI)(CI)M",
+                "/T",
+                "/C"
+            ],
             cancellationToken);
         LicenseService.RegisterInstallationAtDefaultPath(customerName, emailAddress);
 

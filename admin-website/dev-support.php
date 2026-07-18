@@ -63,11 +63,11 @@ $releaseSync = database()->prepare(
          'Pro and Enterprise built-in and custom profiles for paper width, dots, image limits, code pages, fonts, cutter, drawer, images, barcode and QR, two-color output, DLE EOT, Automatic Status Back, import, export, job metadata, capture metadata, replay, capability warnings, and Trial API and UI gates.',
          'Profiles define behavior before multiple endpoints depend on it.',
          'One capture replayed against two profiles shows deterministic expected capability and rendering differences, while Trial access is rejected.', UTC_TIMESTAMP(6)),
-        ('v0.3.20', 'v0.3.20', 'Release', 'Multiple printer listeners', 'Next', 320,
-         'Emulate multiple receipt printers from one computer.',
-         'Independent listener names, ports, addresses, profiles, state, counters, filtering, conflict detection, firewall setup, and fault isolation.',
-         'Multiple listeners reuse the profile model and enable multi-station testing.',
-         'Two simultaneous listeners receive jobs, apply different profiles, restart safely, and remain independently controllable.', NULL),
+        ('v0.3.20', 'v0.3.20', 'Release', 'Enterprise multiple printer listeners', 'In progress', 320,
+         'Let one Enterprise installation emulate multiple receipt printers while Trial and Pro retain one local listener.',
+         'Milestone 1 complete: lightweight local SQLite paid-history foundation with schema versioning, WAL, transactions, listener-ready indexes, 500-job retention, verified JSON migration, rollback backup, and session-only Trial behavior. Remaining scope: persisted listener configuration, independent names, ports, addresses, profiles, state, buffers, counters, routing, filtering, conflict detection, firewall setup, Enterprise UI and API gates, and fault isolation.',
+         'Transactional storage and profiles establish the reliable foundation needed for isolated multi-printer operation.',
+         'Two simultaneous Enterprise listeners receive jobs, apply different profiles, restart safely, and remain independently controllable while Trial and Pro single-listener behavior remains unchanged.', NULL),
         ('v0.3.21', 'v0.3.21', 'Release', 'Receipt comparison and automated validation', 'Planned', 321,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
@@ -91,6 +91,25 @@ $releaseSync = database()->prepare(
         completed_at = IF(VALUES(status) = 'Released', COALESCE(completed_at, UTC_TIMESTAMP(6)), NULL)"
 );
 $releaseSync->execute();
+$backlogSync = database()->prepare(
+    "INSERT INTO development_roadmap
+        (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria, completed_at)
+     VALUES
+        ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1002,
+         'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.',
+         'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.',
+         'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener data model stabilizes.',
+         'Large histories remain fast and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL)
+     ON DUPLICATE KEY UPDATE
+        version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
+        status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
+        planned_scope = VALUES(planned_scope), priority_reason = VALUES(priority_reason),
+        completion_criteria = VALUES(completion_criteria)"
+);
+$backlogSync->execute();
+database()->prepare(
+    "UPDATE development_roadmap SET github_url = ? WHERE item_key = 'v0.3.20' AND (github_url IS NULL OR github_url = '')"
+)->execute(['https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5']);
 database()->prepare(
     "UPDATE development_roadmap SET github_url = ? WHERE item_key = 'v0.3.23' AND (github_url IS NULL OR github_url = '')"
 )->execute(['https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3']);

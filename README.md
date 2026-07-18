@@ -183,7 +183,7 @@ Development settings are stored in `src/ReceiptEmulator.App/appsettings.json`:
 
 ## Current MVP limitations
 
-The current build stores Pro history as local JSON job records with a 500-job retention limit. SQLite migrations, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
+The v0.3.20 development branch stores paid history in one local SQLite database with a 500-job retention limit, while Trial remains session-only. Existing JSON history is migrated transactionally after a verified rollback backup is created. Customer-facing database maintenance, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work. The current public release remains v0.3.19 until the complete Enterprise multiple-listener scope passes release QA.
 
 ## Release roadmap
 
@@ -194,12 +194,12 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.17 — License tiers and Pro feature gates:** Add Trial, Pro, and Enterprise licensing, preserve legacy paid keys as Pro, and restrict Stored Logos, Printer State, Updates, and Support to paid licenses.
 - **Released in v0.3.18 — Admin Portal and tier-aware purchase pricing:** Brand the protected administration site as the Admin Portal and manage separate Pro and Enterprise purchase prices and fulfillment.
 - **Released in v0.3.19 — Printer profiles:** Add Pro and Enterprise printer profiles with selectable models, custom import/export, paper and code-page configuration, capability warnings, and profile-aware capture/replay.
-- **Next: v0.3.20 — Multiple printer listeners:** Run and manage multiple independently named printer endpoints with separate ports, profiles, status, and activity views.
+- **In progress: v0.3.20 — Enterprise multiple printer listeners:** The SQLite storage foundation is complete; listener configuration, isolated runtimes, Enterprise UI/API gates, routing, and release QA remain in progress.
 - **v0.3.21 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
 - **v0.3.22 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
 - **v0.3.23 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
-Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, SQLite history and migrations, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
+Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 
 See [the architecture notes](docs/architecture.md) for implementation details and the production roadmap.
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace ReceiptEmulator;
 
@@ -10,29 +11,55 @@ public sealed class ReceiptStore
     private readonly LinkedList<ReceiptJob> _jobs = [];
     private readonly LicenseService _license;
     private readonly string _historyDirectory;
+    private readonly string _legacyBackupDirectory;
+    private readonly Func<bool>? _persistentHistoryOverride;
+    private readonly ILogger<ReceiptStore>? _logger;
+    private ReceiptDatabase? _database;
     private bool _historyLoaded;
 
-    public ReceiptStore(LicenseService license)
+    public ReceiptStore(LicenseService license, ILogger<ReceiptStore>? logger = null)
+        : this(license, logger, null)
+    {
+    }
+
+    internal ReceiptStore(LicenseService license, bool persistentHistoryEnabled)
+        : this(license, () => persistentHistoryEnabled)
+    {
+    }
+
+    internal ReceiptStore(LicenseService license, Func<bool> persistentHistoryEnabled)
+        : this(license, null, persistentHistoryEnabled)
+    {
+    }
+
+    private ReceiptStore(LicenseService license, ILogger<ReceiptStore>? logger, Func<bool>? persistentHistoryOverride)
     {
         _license = license;
+        _logger = logger;
+        _persistentHistoryOverride = persistentHistoryOverride;
         _historyDirectory = Path.Combine(license.RootPath, "history");
-        if (license.HasProAccess)
+        _legacyBackupDirectory = Path.Combine(license.RootPath, "history-json-backup");
+        if (HasPersistentHistory)
         {
             LoadHistory();
         }
     }
+
+    internal string DatabasePath => Path.Combine(_license.RootPath, ReceiptDatabase.FileName);
+
+    private bool HasPersistentHistory => _persistentHistoryOverride?.Invoke() ?? _license.HasProAccess;
 
     public void Add(ReceiptJob job)
     {
         lock (_sync)
         {
             _jobs.AddFirst(job);
-            while (_jobs.Count > (_license.HasProAccess ? HistoryCapacity : SessionCapacity))
+            while (_jobs.Count > (HasPersistentHistory ? HistoryCapacity : SessionCapacity))
             {
                 _jobs.RemoveLast();
             }
 
-            if (_license.HasProAccess)
+            if (HasPersistentHistory)
             {
                 Persist(job);
             }
@@ -60,7 +87,10 @@ public sealed class ReceiptStore
                 Persist(job);
             }
 
-            TrimHistoryFiles();
+            while (_jobs.Count > HistoryCapacity)
+            {
+                _jobs.RemoveLast();
+            }
         }
     }
 
@@ -105,14 +135,21 @@ public sealed class ReceiptStore
                 return false;
             }
 
-            _jobs.Remove(job);
-            if (Directory.Exists(_historyDirectory))
+            if (HasPersistentHistory)
             {
-                foreach (var path in Directory.EnumerateFiles(_historyDirectory, $"*-{id:N}.json"))
+                try
                 {
-                    File.Delete(path);
+                    EnsureDatabase().Delete(id);
+                }
+                catch (Exception exception)
+                {
+                    _logger?.LogError(exception, "SQLite receipt history delete failed for job {JobId}", id);
+                    throw new InvalidOperationException("The receipt job could not be deleted from local history. Please retry.", exception);
                 }
             }
+
+            DeleteLegacyFiles($"*-{id:N}.json");
+            _jobs.Remove(job);
 
             return true;
         }
@@ -122,15 +159,22 @@ public sealed class ReceiptStore
     {
         lock (_sync)
         {
-            var removed = _jobs.Count;
-            _jobs.Clear();
-            if (Directory.Exists(_historyDirectory))
+            if (HasPersistentHistory)
             {
-                foreach (var path in Directory.EnumerateFiles(_historyDirectory, "*.json"))
+                try
                 {
-                    File.Delete(path);
+                    EnsureDatabase().Clear();
+                }
+                catch (Exception exception)
+                {
+                    _logger?.LogError(exception, "SQLite receipt history clear failed");
+                    throw new InvalidOperationException("Local receipt history could not be cleared. Please retry.", exception);
                 }
             }
+
+            DeleteLegacyFiles("*.json");
+            var removed = _jobs.Count;
+            _jobs.Clear();
 
             return removed;
         }
@@ -151,6 +195,37 @@ public sealed class ReceiptStore
             return;
         }
 
+        try
+        {
+            _database = new ReceiptDatabase(_license.RootPath);
+            MigrateLegacyHistoryUnsafe();
+            foreach (var job in _database.LoadRecent(
+                         HistoryCapacity,
+                         (rowId, exception) => _logger?.LogWarning(
+                             exception,
+                             "Skipped damaged SQLite receipt history row {RowId}",
+                             rowId)))
+            {
+                if (_jobs.All(existing => existing.Id != job.Id))
+                {
+                    _jobs.AddLast(job);
+                }
+            }
+
+            _historyLoaded = true;
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogError(exception, "SQLite receipt history could not be opened. Falling back to legacy JSON history for this run.");
+        }
+
+        LoadLegacyHistoryUnsafe();
+        _historyLoaded = true;
+    }
+
+    private void LoadLegacyHistoryUnsafe()
+    {
         Directory.CreateDirectory(_historyDirectory);
         foreach (var path in Directory.EnumerateFiles(_historyDirectory, "*.json")
                      .OrderByDescending(File.GetLastWriteTimeUtc)
@@ -166,30 +241,139 @@ public sealed class ReceiptStore
             }
             catch
             {
-                // One damaged history entry does not prevent the remaining history from loading.
+                _logger?.LogWarning("Skipped damaged legacy receipt history file {FileName}", Path.GetFileName(path));
             }
         }
-
-        _historyLoaded = true;
     }
 
     private void Persist(ReceiptJob job)
+    {
+        try
+        {
+            EnsureDatabase().Upsert(job, HistoryCapacity);
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogError(exception, "SQLite receipt history write failed. Preserving this job in legacy JSON history.");
+        }
+
+        PersistLegacy(job);
+    }
+
+    private void PersistLegacy(ReceiptJob job)
     {
         Directory.CreateDirectory(_historyDirectory);
         var path = Path.Combine(_historyDirectory, $"{job.ReceivedAt.UtcTicks:D19}-{job.Id:N}.json");
         var temporaryPath = path + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(StoredJob.From(job)));
         File.Move(temporaryPath, path, overwrite: true);
-        TrimHistoryFiles();
+        TrimLegacyHistoryFiles();
     }
 
-    private void TrimHistoryFiles()
+    private void TrimLegacyHistoryFiles()
     {
         foreach (var path in Directory.EnumerateFiles(_historyDirectory, "*.json")
                      .OrderByDescending(File.GetLastWriteTimeUtc)
                      .Skip(HistoryCapacity))
         {
             File.Delete(path);
+        }
+    }
+
+    private ReceiptDatabase EnsureDatabase() =>
+        _database ??= new ReceiptDatabase(_license.RootPath);
+
+    private void DeleteLegacyFiles(string searchPattern)
+    {
+        if (!Directory.Exists(_historyDirectory))
+        {
+            return;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(_historyDirectory, searchPattern))
+        {
+            File.Delete(path);
+        }
+    }
+
+    private void MigrateLegacyHistoryUnsafe()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        var allPaths = Directory.Exists(_historyDirectory)
+            ? Directory.EnumerateFiles(_historyDirectory, "*.json").ToArray()
+            : Array.Empty<string>();
+        var paths = allPaths
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .Take(HistoryCapacity)
+                .OrderBy(File.GetLastWriteTimeUtc)
+                .ToArray();
+        if (paths.Length == 0)
+        {
+            if (!_database.LegacyMigrationCompleted)
+            {
+                _database.ImportLegacy([], HistoryCapacity);
+            }
+
+            return;
+        }
+
+        CreateLegacyBackup();
+        var jobs = new List<ReceiptJob>();
+        var skipped = 0;
+        foreach (var path in paths)
+        {
+            try
+            {
+                var stored = JsonSerializer.Deserialize<StoredJob>(File.ReadAllText(path));
+                if (stored is not null && jobs.All(existing => existing.Id != stored.Id))
+                {
+                    jobs.Add(stored.ToReceiptJob());
+                }
+            }
+            catch
+            {
+                skipped++;
+                _logger?.LogWarning("Skipped damaged legacy receipt history file {FileName} during SQLite migration", Path.GetFileName(path));
+            }
+        }
+
+        if (!_database.ImportLegacy(jobs, HistoryCapacity))
+        {
+            throw new InvalidDataException("The migrated SQLite receipt history could not be verified.");
+        }
+
+        foreach (var path in allPaths)
+        {
+            File.Delete(path);
+        }
+
+        _logger?.LogInformation(
+            "Migrated {MigratedCount} legacy receipt history jobs to SQLite; {SkippedCount} damaged files were preserved in the backup",
+            jobs.Count,
+            skipped);
+    }
+
+    private void CreateLegacyBackup()
+    {
+        Directory.CreateDirectory(_legacyBackupDirectory);
+        foreach (var sourcePath in Directory.EnumerateFiles(_historyDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(_historyDirectory, sourcePath);
+            var destinationPath = Path.Combine(_legacyBackupDirectory, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            File.Copy(sourcePath, destinationPath, overwrite: true);
+            using var source = File.OpenRead(sourcePath);
+            using var destination = File.OpenRead(destinationPath);
+            if (source.Length != destination.Length ||
+                !SHA256.HashData(source).SequenceEqual(SHA256.HashData(destination)))
+            {
+                throw new IOException($"The legacy history backup could not be verified for {relativePath}.");
+            }
         }
     }
 

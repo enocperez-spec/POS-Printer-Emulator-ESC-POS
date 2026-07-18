@@ -11,7 +11,7 @@ TcpReceiptListener -> EscPosJobFramer -> ReceiptProcessor
                                            |-> EscPosParser
                                            `-> ReceiptStore
                                                |-> Trial: session only
-                                               `-> Full: persistent history
+                                               `-> Pro/Enterprise: SQLite history
                                                     |
                                                     v
                                       localhost ASP.NET Core API
@@ -23,13 +23,13 @@ TcpReceiptListener -> EscPosJobFramer -> ReceiptProcessor
                                   C# WPF desktop shell (WebView2)
 ```
 
-The viewer binds to `127.0.0.1` while the printer listener binds to `0.0.0.0` by default. The WPF application embeds the viewer in a normal desktop window through Microsoft WebView2; the local URL remains available for diagnostics. Trial receipts remain only in process memory. Pro receipts are persisted under the service-owned ProgramData directory with a 500-job retention limit.
+The viewer binds to `127.0.0.1` while the printer listener binds to `0.0.0.0` by default. The WPF application embeds the viewer in a normal desktop window through Microsoft WebView2; the local URL remains available for diagnostics. Trial receipts remain only in process memory. Pro and Enterprise receipts are persisted in `%ProgramData%\POSPrinterEmulator\pos-printer-emulator.db` with a 500-job retention limit. SQLite uses WAL, schema migrations, transactional writes, and listener-ready indexes without requiring a database service or customer configuration. Existing JSON history is copied to a verified rollback backup before an idempotent migration.
 
 ## Licensing boundary
 
 New installations store the customer/company name and email address in `%ProgramData%\POSPrinterEmulator`. Trial usage is counted by local calendar day. Activation keys use ECDSA P-256 signatures and are tied to a normalized hash of both registration fields. The application contains only the vendor public key; the private key remains outside the repository and installer in the vendor's secure key folder.
 
-The local activation API validates the signed key, persists it, enables Full Mode, loads any existing Pro history, removes the trial watermark, and unlocks premium controls immediately. Editing a local license record cannot create a valid signature.
+The local activation API validates the signed key, persists it, enables the purchased Pro or Enterprise level, loads any existing paid history, removes the trial watermark, and unlocks the authorized controls immediately. Editing a local license record cannot create a valid signature.
 
 The self-contained C# service executable also owns the Windows installation lifecycle. Inno Setup invokes its `--install-windows` and `--uninstall-windows` modes to create or remove the Windows Service, configure the private/domain TCP 9100 firewall rule, verify viewer health, and remove service-owned data. Setup also checks for WebView2 and installs the bundled Microsoft bootstrapper when it is missing.
 
@@ -57,12 +57,12 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 3. **v0.3.17 — License tiers and Pro feature gates.** Establish Trial, Pro, and Enterprise licensing with paid-feature authorization boundaries.
 4. **v0.3.18 — Admin Portal and tier-aware purchase pricing.** Manage separate Pro and Enterprise prices, purchases, fulfillment, and activation keys.
 5. **v0.3.19 — Printer profiles.** Model paper width, code pages, supported commands, status behavior, and rendering defaults as selectable printer configurations.
-6. **v0.3.20 — Multiple printer listeners.** Host independently configured printer endpoints with separate names, ports, profiles, status state, and activity filtering.
+6. **v0.3.20 — Enterprise multiple printer listeners.** Establish SQLite as the first internal milestone, then host independently configured Enterprise printer endpoints with separate names, ports, profiles, status state, buffers, and activity filtering while Trial and Pro keep one listener.
 7. **v0.3.21 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
 8. **v0.3.22 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
 9. **v0.3.23 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
 10. Service-to-viewer authentication and installer repair mode.
-11. SQLite history, retention controls, deletion, and migrations.
+11. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
 12. Optional online activation revocation and license transfer workflow.
 13. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
 14. PNG export and deterministic PDF generation.

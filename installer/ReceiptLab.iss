@@ -196,6 +196,54 @@ begin
     (RegQueryStringValue(HKCU, ClientKey, 'pv', Version) and (Version <> '') and (Version <> '0.0.0.0'));
 end;
 
+function ServiceIsStoppedOrMissing: Boolean;
+var
+  ResultCode: Integer;
+  Output: TExecOutput;
+  I: Integer;
+begin
+  Result := False;
+  if not ExecAndCaptureOutput(ExpandConstant('{sys}\sc.exe'), 'query {#ServiceName}', '', SW_HIDE,
+    ewWaitUntilTerminated, ResultCode, Output) then
+    exit;
+
+  if ResultCode = 1060 then
+  begin
+    Result := True;
+    exit;
+  end;
+
+  if (ResultCode <> 0) or Output.Error then
+    exit;
+
+  for I := 0 to GetArrayLength(Output.StdOut) - 1 do
+  begin
+    { The service state value is numeric and does not depend on the Windows display language. }
+    if Pos(': 1 ', Output.StdOut[I] + ' ') > 0 then
+    begin
+      Result := True;
+      exit;
+    end;
+  end;
+end;
+
+function WaitForServiceToStop: Boolean;
+var
+  Attempt: Integer;
+begin
+  Result := False;
+  for Attempt := 1 to 120 do
+  begin
+    if ServiceIsStoppedOrMissing then
+    begin
+      Result := True;
+      exit;
+    end;
+
+    Sleep(250);
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
@@ -208,7 +256,12 @@ begin
 
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#ServiceName}', '', SW_HIDE,
     ewWaitUntilTerminated, ResultCode);
-  Sleep(2000);
+  if not WaitForServiceToStop then
+  begin
+    Result := 'POS Printer Emulator is still shutting down. Close the application, wait a few seconds, and run setup again.';
+    exit;
+  end;
+
   Result := '';
 end;
 

@@ -134,11 +134,21 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** The same captured job can be replayed against two profiles and the viewer consistently shows the expected rendering and capability differences.
 
-### v0.3.20 — Multiple printer listeners
+### v0.3.20 — Enterprise multiple printer listeners
 
-**Status:** Next
+**Status:** In progress
 
-**Purpose:** Let one computer emulate multiple receipt printers for different POS stations, departments, or printer roles.
+**Tracking issue:** [GitHub #5](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5)
+
+**Purpose:** Let one Enterprise installation emulate multiple receipt printers for different POS stations, departments, or printer roles while Trial and Pro retain the existing single listener.
+
+**Implementation milestones:**
+
+- [x] Establish a lightweight SQLite paid-history foundation with WAL, schema versioning, transactional writes, listener-ready indexes, 500-job retention, verified JSON migration, and a rollback backup. Trial remains session-only.
+- [ ] Add the persisted listener configuration model and Enterprise authorization boundary.
+- [ ] Run independent listener instances with isolated ports, profiles, printer states, buffers, counters, and failure handling.
+- [ ] Add Enterprise listener management, connection details, Activity filtering, port-conflict guidance, and upgrade messaging to the desktop UI.
+- [ ] Complete firewall automation, upgrade migration, concurrent-listener tests, installer QA, documentation, and release publication.
 
 **Planned scope:**
 
@@ -150,8 +160,9 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 - Extend firewall and setup automation for the configured listener ports.
 - Preserve a safe default listener at `0.0.0.0:9100` for existing installations.
 - Prevent one failed listener from stopping other configured listeners.
+- Restrict multiple-listener APIs and controls to Enterprise licenses; Trial and Pro continue using the default listener on port `9100`.
 
-**Complete when:** At least two listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart.
+**Complete when:** At least two Enterprise listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart while Trial and Pro single-listener behavior remains unchanged.
 
 ### v0.3.21 — Receipt comparison and automated validation
 
@@ -234,18 +245,17 @@ These items remain unnumbered until the order is approved. The priority below is
 - Preserve customer settings, activation, imported logos, and receipt history during repair.
 - Log repair actions and verify the repaired installation before reporting success.
 
-### Priority 2 — SQLite history, retention, deletion, and migrations
+### Priority 2 — Advanced SQLite maintenance and retention
 
-**Why second:** Structured transactional storage improves reliability and search performance, and it should be established before adding more history-dependent functionality.
+**Why second:** The transactional SQLite foundation and safe JSON migration are now part of v0.3.20. Customer-facing maintenance, larger-history controls, and recovery tools should follow after the multiple-listener data model stabilizes.
 
 **Proposed scope:**
 
-- Replace individual JSON history records with a versioned SQLite schema.
-- Migrate existing Pro history without data loss and retain a rollback-safe backup until verification succeeds.
-- Add transactional writes, indexes, paging, fast search, source/listener/profile filters, and reliable aggregate counts.
+- Add paging, fast search, source/listener/profile filters, and reliable aggregate counts for larger histories.
 - Add configurable retention by job count, storage size, or age.
 - Support individual deletion, Clear All, database health checks, and safe database repair.
 - Add backup and restore with schema and integrity validation.
+- Add reviewed cleanup of the rollback-safe legacy JSON backup after the customer confirms successful migration.
 
 ### Priority 3 — Production code-signing and deployment validation
 
