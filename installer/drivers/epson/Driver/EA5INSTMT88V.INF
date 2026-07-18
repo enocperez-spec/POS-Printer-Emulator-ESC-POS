@@ -1,0 +1,180 @@
+;	Printer Installation File
+;	List of supported printers, manufacturers
+
+[Version]
+Signature="$Windows NT$"
+Provider=%EPSON_CORP%
+ClassGUID={4D36E979-E325-11CE-BFC1-08002BE10318}
+Class=Printer
+DriverVer=02/06/2020, 5.12.0.0
+CatalogFile=EA5INSTMT88V.cat
+DriverIsolation	= 0
+
+[PrinterPackageInstallation.x86]
+PackageAware=TRUE
+CoreDriverDependencies={D20EA372-DD35-4950-9ED8-A6335AFE79F0}
+
+[PrinterPackageInstallation.amd64]
+PackageAware=TRUE
+CoreDriverDependencies={D20EA372-DD35-4950-9ED8-A6335AFE79F0}
+
+[Manufacturer]
+"EPSON"=EPSON_DRV,NTx86.5.1,NTx86.6.0,NTamd64,NTamd64.6.0
+
+[EPSON_DRV]
+%PrinterName% = T88VDriver2k,,USBPRINT\1284_CID_EpsonTM00000001
+%PrinterName% = T88VDriver2k,USBPRINT\EPSONTM-T88VEEBE
+%PrinterName% = T88VDriver2k,,USBPRINT\1284_CID_EpsonTM00000101
+%PrinterName% = T88VDriver2k,USBPRINT\EPSONTM-T88V-JPN93D0
+%PrinterName% = T88VDriver2k,,USBPRINT\1284_CID_EpsonTM00000401
+%PrinterName% = T88VDriver2k,,USBPRINT\EPSONTM-T88V-S/AA1E0
+%PrinterName% = T88VDriver2k,,USBPRINT\1284_CID_EpsonTM00000201
+%PrinterName% = T88VDriver2k,USBPRINT\EPSONTM-T88V-S/C6061
+%PrinterName% = T88VDriver2k,,USBPRINT\1284_CID_EpsonTM00000301
+%PrinterName% = T88VDriver2k,USBPRINT\EPSONTM-T88V-T/CA1D0
+
+[EPSON_DRV.NTx86.5.1]
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000001
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88VEEBE
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000101
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88V-JPN93D0
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000401
+%PrinterName% = T88VDriverXP,,USBPRINT\EPSONTM-T88V-S/AA1E0
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000201
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88V-S/C6061
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000301
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88V-T/CA1D0
+
+[EPSON_DRV.NTx86.6.0]
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000001
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88VEEBE
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000101
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-JPN93D0
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000401
+%PrinterName% = T88VDriverVista,,USBPRINT\EPSONTM-T88V-S/AA1E0
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000201
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-S/C6061
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000301
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-T/CA1D0
+
+[EPSON_DRV.NTamd64]
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000001
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88VEEBE
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000101
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88V-JPN93D0
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000401
+%PrinterName% = T88VDriverXP,,USBPRINT\EPSONTM-T88V-S/AA1E0
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000201
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88V-S/C6061
+%PrinterName% = T88VDriverXP,,USBPRINT\1284_CID_EpsonTM00000301
+%PrinterName% = T88VDriverXP,USBPRINT\EPSONTM-T88V-T/CA1D0
+
+[EPSON_DRV.NTamd64.6.0]
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000001
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88VEEBE
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000101
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-JPN93D0
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000401
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-S/AA1E0
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000201
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-S/C6061
+%PrinterName% = T88VDriverVista,,USBPRINT\1284_CID_EpsonTM00000301
+%PrinterName% = T88VDriverVista,USBPRINT\EPSONTM-T88V-T/CA1D0
+
+[T88VDriver2k]
+CopyFiles=T88VDriverFiles,T88VDriverFiles2k,T88VSystemFiles
+DataSection=UNIDRV_DATA
+DataFile=EA5MDLTMT88V.GPD
+Include=ntprint.inf
+Needs=UNIDRV.OEM,TTFSUB.OEM
+LanguageMonitor=%T88V_LM%
+
+[T88VDriverXP.NTx86]
+CopyFiles=T88VDriverFiles,T88VDriverFilesXPVista,T88VSystemFiles
+DataSection=UNIDRV_DATA
+DataFile=EA5MDLTMT88V.GPD
+Include=ntprint.inf
+Needs=UNIDRV.OEM,TTFSUB.OEM
+LanguageMonitor=%T88V_LM%
+
+[T88VDriverXP.NTamd64]
+CopyFiles=T88VDriverFiles,T88VDriverFilesXPVista,T88VSystemFiles
+DataSection=UNIDRV_DATA
+DataFile=EA5MDLTMT88V.GPD
+Include=ntprint.inf
+Needs=UNIDRV.OEM,TTFSUB.OEM
+LanguageMonitor=%T88V_LM%
+
+[T88VDriverVista.NTx86]
+CopyFiles=T88VDriverFiles,T88VDriverFilesXPVista,T88VSystemFiles
+DataFile=EA5MDLTMT88V.GPD
+LanguageMonitor=%T88V_LM%
+CoreDriverSections="{D20EA372-DD35-4950-9ED8-A6335AFE79F0},UNIDRV.OEM,UNIDRV_DATA,TTFSUB.OEM"
+
+[T88VDriverVista.NTamd64]
+CopyFiles=T88VDriverFiles,T88VDriverFilesXPVista,T88VSystemFiles
+DataFile=EA5MDLTMT88V.GPD
+LanguageMonitor=%T88V_LM%
+CoreDriverSections="{D20EA372-DD35-4950-9ED8-A6335AFE79F0},UNIDRV.OEM,UNIDRV_DATA,TTFSUB.OEM"
+
+[T88VDriverFiles]
+EA5MDLTMT88V.GPD
+EA5PIITMT88V.INI
+EA5RESTMT88V.DLL
+EA5UIPTMT88V.dll,EA5UIPTM.dll
+EA5EpucInst.exe
+EA5Bcd0.dll
+EA5BcdR0.dll
+
+[T88VDriverFiles2k]
+EA5RDPTMT88V.dll,EA5RDPTM.DLL
+
+[T88VDriverFilesXPVista]
+EA5RDPTMT88V.dll,EA5RDPTM.DLL
+
+[T88VSystemFiles]
+EA5LMTMT88V.DLL,EA5LMTM.DLL,,,0x00000020
+EA5LMTMT88V.dat,EA5LMTMT88V.dat,,,0x00000020
+
+[DestinationDirs]
+DefaultDestDir=66000
+T88VSystemFiles=66002
+
+[SourceDisksNames]
+1 = %disk1%,,,
+
+[SourceDisksNames.x86]
+2 = %disk1%,,,\i386
+
+[SourceDisksNames.amd64]
+3 = %disk1%,,,\amd64
+
+[SourceDisksFiles]
+EA5MDLTMT88V.GPD = 1
+EA5PIITMT88V.INI = 1
+EA5RESTMT88V.DLL = 1
+EA5LMTMT88V.dat = 1
+
+[SourceDisksFiles.x86]
+EA5UIPTM.dll = 2
+EA5RDPTM.DLL = 2
+EA5LMTM.DLL = 2
+EA5EpucInst.exe = 2
+EA5Bcd0.dll = 2
+EA5BcdR0.dll = 2
+
+[SourceDisksFiles.amd64]
+EA5UIPTM.dll = 3
+EA5RDPTM.DLL = 3
+EA5LMTM.dll = 3
+EA5EpucInst.exe = 3
+EA5Bcd0.dll = 3
+EA5BcdR0.dll = 3
+
+[Strings]
+PrinterClassName="Printers"
+PrinterName="EPSON TM-T88V Receipt5"
+EPSON_CORP="EPSON"
+EPSONURL = "http://www.epson.com/"
+disk1="EPSON Printer Driver for TM-T88V"
+T88V_LM="EPSON TM-T88V Receipt5 LM,EA5LMTMT88V.DLL"

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ESC/POS Command Compatibility Matrix | POS Printer Emulator</title>
+  <meta name="description" content="Review ESC/POS commands supported by POS Printer Emulator, including text modes, code pages, raster images, barcodes, QR codes, feeds, cuts, and diagnostics.">
+  <link rel="canonical" href="https://www.posprinteremulator.com/esc-pos-command-compatibility">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260715">
+  <link rel="stylesheet" href="seo-pages.css?v=20260715-2">
+</head>
+<body>
+  <header class="site-header"><div class="shell header-inner"><a class="brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator"></a><button class="menu-toggle" aria-expanded="false" aria-controls="site-nav" data-menu-toggle><span></span><span></span><span></span><span class="sr-only">Open navigation</span></button><nav class="site-nav" id="site-nav" data-nav><a href="/">Home</a><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a class="button button-small" href="pos-printer-emulator-download">Download</a></nav></div></header>
+  <main id="main">
+    <section class="page-hero"><div class="shell"><div class="breadcrumbs"><a href="/">Home</a><span>/</span><a href="esc-pos-printer-emulator">ESC/POS</a><span>/</span><span>Command compatibility</span></div><h1>ESC/POS Command Compatibility Matrix</h1><p>See which receipt-printer commands the current Windows emulator recognizes, renders, and explains in its command diagnostics.</p></div></section>
+    <section class="page-body"><div class="shell article-layout"><article class="article-content">
+      <h2>Supported command groups</h2>
+      <p>This matrix describes Version 0.3.20. Recognized commands appear in the Commands tab with their byte offset, hexadecimal data, name, and decoded details. Unrecognized or incomplete commands are preserved in the job and flagged as warnings.</p>
+      <div class="table-scroll"><table class="compact-table compatibility-table"><thead><tr><th>Capability</th><th>ESC/POS commands</th><th>Status</th><th>Emulated behavior</th></tr></thead><tbody>
+        <tr><td>Basic controls</td><td><code>LF</code>, <code>CR</code>, <code>HT</code></td><td><span class="status-supported">Supported</span></td><td>Line feed, carriage return, and eight-column tab stops.</td></tr>
+        <tr><td>Initialization and alignment</td><td><code>ESC @</code>, <code>ESC a n</code></td><td><span class="status-supported">Supported</span></td><td>Reset formatting and align left, center, or right.</td></tr>
+        <tr><td>Text emphasis and size</td><td><code>ESC E</code>, <code>ESC -</code>, <code>ESC !</code>, <code>GS !</code></td><td><span class="status-supported">Supported</span></td><td>Bold, underline, combined print mode, and 1–8× character sizing.</td></tr>
+        <tr><td>Fonts and orientation</td><td><code>ESC M</code>, <code>ESC V</code>, <code>ESC {</code>, <code>GS B</code></td><td><span class="status-supported">Supported</span></td><td>Font A/B, 90-degree rotation, upside-down text, and reverse printing.</td></tr>
+        <tr><td>Code pages</td><td><code>ESC t n</code></td><td><span class="status-supported">Supported</span></td><td>CP437, 850, 860, 863, 865, 1252, 866, 852, 858, 874, 775, 855, 857, 862, and 864.</td></tr>
+        <tr><td>Positioning and feeds</td><td><code>ESC $</code>, <code>ESC \\</code>, <code>ESC J</code>, <code>ESC d</code></td><td><span class="status-supported">Supported</span></td><td>Absolute/relative horizontal positioning and paper feeds.</td></tr>
+        <tr><td>Legacy bit images</td><td><code>ESC *</code></td><td><span class="status-partial">Common modes</span></td><td>Renders supported 8-dot and 24-dot bit-image modes; malformed or unknown modes generate warnings.</td></tr>
+        <tr><td>Raster and NV graphics</td><td><code>GS v 0</code>, <code>GS ( L</code></td><td><span class="status-supported">Supported</span></td><td>Renders raster graphics and recognized stored/graphics payloads used for receipt logos.</td></tr>
+        <tr><td>Barcodes</td><td><code>GS w</code>, <code>GS h</code>, <code>GS H</code>, <code>GS f</code>, <code>GS k</code></td><td><span class="status-supported">Supported</span></td><td>Configures barcode dimensions and text, then renders common barcode data.</td></tr>
+        <tr><td>QR codes</td><td><code>GS ( k</code></td><td><span class="status-supported">Supported</span></td><td>Configures model, module size, error correction, stores data, and renders QR codes.</td></tr>
+        <tr><td>Paper cut</td><td><code>GS V</code></td><td><span class="status-supported">Supported</span></td><td>Records full and partial cut operations in the preview and command log.</td></tr>
+        <tr><td>Cash drawer pulse</td><td><code>ESC p</code></td><td><span class="status-supported">Diagnostic</span></td><td>Decodes and records the requested drawer pulse without controlling physical hardware.</td></tr>
+        <tr><td>Vendor/model extensions</td><td>Manufacturer-specific ESC/GS sequences</td><td><span class="status-warning">Flagged</span></td><td>Preserves the bytes and identifies the offset as unsupported for troubleshooting.</td></tr>
+      </tbody></table></div>
+      <h2>How to interpret compatibility</h2><p>“Supported” means the parser recognizes the command and reproduces its intended receipt-viewer effect where applicable. Some hardware operations—such as cutting paper or opening a cash drawer—are represented diagnostically because the emulator does not operate physical mechanisms.</p>
+      <div class="callout"><p>ESC/POS behavior can vary by printer model and firmware. Use the emulator to shorten development and troubleshooting, then validate the final workflow on the exact production hardware.</p></div>
+      <h2>When a command is not supported</h2><p>The job still appears in Activity. Open Commands to find the warning, Raw data to review the original bytes, and Job details to see the unsupported-command count. This makes it possible to compare vendor-specific output without silently discarding the evidence.</p>
+    </article><aside class="sidebar-card"><h2>Test your command stream</h2><p>Send RAW ESC/POS data to the Windows listener on TCP port 9100.</p><a class="button button-primary" href="downloads/POSPrinterEmulatorSetup-0.3.20-win-x64.exe" download>Download Version 0.3.20</a><a class="button button-outline" href="esc-pos-troubleshooting">Troubleshooting guide</a><ul class="sidebar-links"><li><a href="esc-pos-printer-emulator">ESC/POS overview</a></li><li><a href="documentation">Application documentation</a></li></ul></aside></div></section>
+  </main>
+  <section class="related"><div class="shell"><h2>Related resources</h2><div class="related-grid"><a href="esc-pos-troubleshooting"><strong>ESC/POS troubleshooting</strong><span>Diagnose blank receipts, warnings, and connection problems.</span></a><a href="how-to-create-a-windows-tcp-ip-printer-port"><strong>Port 9100 setup</strong><span>Create a Windows RAW TCP/IP printer port.</span></a><a href="epson-pos-printer-emulator"><strong>Epson-compatible testing</strong><span>Understand model and driver expectations.</span></a></div></div></section>
+  <footer class="site-footer"><div class="shell footer-top"><a class="brand footer-brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator"></a><nav><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a href="privacy">Privacy</a></nav></div><div class="shell footer-bottom"><span>© 2026 POS Printer Emulator.</span><span>Local tools for better receipt testing.</span></div></footer>
+  <script src="script.js" type="module"></script>
+</body></html>

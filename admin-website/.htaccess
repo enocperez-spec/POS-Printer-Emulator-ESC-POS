@@ -1,0 +1,9 @@
+DirectoryIndex index.php
+
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
+<FilesMatch "^(config\.php|purchase-site\.php|schema\.sql|two-factor\.json|vendor-private-key\.pem)$">
+    Require all denied
+</FilesMatch>
