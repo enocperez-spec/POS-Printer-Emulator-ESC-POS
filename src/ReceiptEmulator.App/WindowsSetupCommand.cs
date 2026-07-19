@@ -152,41 +152,60 @@ public static class WindowsSetupCommand
                 BuildDataDirectoryChildInheritanceArguments(LicenseService.DefaultRootPath),
                 cancellationToken);
         }
-        if (!upgradeStateRestored)
+        try
         {
-            LicenseService.RestoreUpgradeStateAtDefaultPath();
+            if (!upgradeStateRestored)
+            {
+                LicenseService.RestoreUpgradeStateAtDefaultPath();
+            }
+            var expectedLicenseMode = LicenseService.ValidatePersistedLicenseForRegistrationAtDefaultPath(
+                customerName,
+                emailAddress);
+            LicenseService.RegisterInstallationAtDefaultPath(customerName, emailAddress);
+
+            Console.WriteLine("Configuring the POS Printer Emulator Windows service...");
+            await RemoveServiceAsync(cancellationToken);
+
+            WindowsServiceManager.Create(
+                ServiceName,
+                DisplayName,
+                "Receives ESC/POS jobs on configured RAW TCP ports and serves the local POS Printer Emulator viewer.",
+                executablePath);
+
+            Console.WriteLine("Configuring the private/domain RAW TCP listener firewall rule...");
+            await RemoveFirewallRulesAsync(cancellationToken);
+            await RunRequiredProcessAsync(
+                GetSystemExecutable("netsh.exe"),
+                BuildFirewallRuleArguments(executablePath),
+                cancellationToken);
+
+            using var service = new ServiceController(ServiceName);
+            service.Start();
+            service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+
+            await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken, expectedLicenseMode);
+            if (!upgradeStateRestored)
+            {
+                LicenseService.CompleteUpgradeStateAtDefaultPath();
+            }
+            Console.WriteLine("POS Printer Emulator installation completed successfully.");
         }
-        LicenseService.RegisterInstallationAtDefaultPath(customerName, emailAddress);
-        var expectedLicenseMode = upgradeStateRestored
-            ? LicenseService.GetRequiredPersistedLicenseModeAtDefaultPath()
-            : null;
-
-        Console.WriteLine("Configuring the POS Printer Emulator Windows service...");
-        await RemoveServiceAsync(cancellationToken);
-
-        WindowsServiceManager.Create(
-            ServiceName,
-            DisplayName,
-            "Receives ESC/POS jobs on configured RAW TCP ports and serves the local POS Printer Emulator viewer.",
-            executablePath);
-
-        Console.WriteLine("Configuring the private/domain RAW TCP listener firewall rule...");
-        await RemoveFirewallRulesAsync(cancellationToken);
-        await RunRequiredProcessAsync(
-            GetSystemExecutable("netsh.exe"),
-            BuildFirewallRuleArguments(executablePath),
-            cancellationToken);
-
-        using var service = new ServiceController(ServiceName);
-        service.Start();
-        service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
-
-        await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken, expectedLicenseMode);
-        if (!upgradeStateRestored)
+        catch (Exception installException)
         {
-            LicenseService.CompleteUpgradeStateAtDefaultPath();
+            try
+            {
+                LicenseService.RestoreUpgradeStateAtDefaultPath();
+            }
+            catch (Exception restoreException)
+            {
+                throw new AggregateException(
+                    "Windows setup failed and could not restore the preserved registration and activation files.",
+                    installException,
+                    restoreException);
+            }
+
+            throw;
         }
-        Console.WriteLine("POS Printer Emulator installation completed successfully.");
     }
 
     [SupportedOSPlatform("windows")]

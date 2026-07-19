@@ -38,6 +38,44 @@ public sealed class PrinterSetupManagerTests
     }
 
     [Fact]
+    public void PortSelectionReservesLoopbackListenerForLanAddress()
+    {
+        var listeners = new[] { Listener("127.0.0.1", 9100) };
+
+        Assert.Equal(9101, PrinterSetupManager.FindFirstAvailablePort(
+            9100,
+            [],
+            "192.168.1.25",
+            listeners));
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0")]
+    [InlineData("192.168.1.25")]
+    public void PortSelectionCanReuseWildcardOrExactListenerForLanAddress(string bindAddress)
+    {
+        var listeners = new[] { Listener(bindAddress, 9100) };
+
+        Assert.Equal(9100, PrinterSetupManager.FindFirstAvailablePort(
+            9100,
+            [],
+            "192.168.1.25",
+            listeners));
+    }
+
+    [Fact]
+    public void PortSelectionReservesListenerWithNonEpsonProfile()
+    {
+        var listeners = new[] { Listener("0.0.0.0", 9100, PrinterProfileService.GenericEscPosId) };
+
+        Assert.Equal(9101, PrinterSetupManager.FindFirstAvailablePort(
+            9100,
+            [],
+            "192.168.1.25",
+            listeners));
+    }
+
+    [Fact]
     public void AdjustedPrinterPortBuildsMatchingEnterpriseListener()
     {
         var input = PrinterSetupManager.BuildSetupListenerInput("POS Printer Emulator QA", 9101);
@@ -56,5 +94,25 @@ public sealed class PrinterSetupManagerTests
 
         Assert.Equal(80, input.Name.Length);
         Assert.EndsWith(" - 9102", input.Name);
+    }
+
+    private static PrinterListenerConfiguration Listener(
+        string bindAddress,
+        int port,
+        string profileId = PrinterProfileService.EpsonTmT88VId)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new PrinterListenerConfiguration(
+            $"listener-{port}",
+            $"Listener {port}",
+            bindAddress,
+            port,
+            profileId,
+            true,
+            PrinterListenerDefaults.DefaultIdleJobTimeoutMilliseconds,
+            PrinterListenerDefaults.DefaultMaximumJobBytes,
+            new PrinterListenerBufferConfiguration(),
+            now,
+            now);
     }
 }

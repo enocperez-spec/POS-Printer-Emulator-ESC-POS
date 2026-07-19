@@ -9,6 +9,8 @@ For the current release status, scheduled versions, future backlog, and release-
 - Fixed **BUG-011**, which could leave an updated Pro or Enterprise installation in Trial and then fail while saving the activation key inside the hardened application-data folder.
 - Added a compatibility-safe direct-write fallback when Windows permits overwriting the existing license file but denies temporary-file creation or replacement.
 - Preserved registration and activation files as one upgrade pair, restored them before service startup, and removed the temporary upgrade backups only after a successful health check.
+- Retained the last known-good upgrade pair across interrupted installer retries and restored it on every setup failure instead of replacing it with damaged live state.
+- Validated installer-entered customer information against any surviving paid activation key before writing registration data.
 - Repaired ownership and inherited access on existing application-data files before restoring upgrade state, including recovery from an interrupted update that left hardened files inaccessible to the service.
 - Made unattended installer failures return a nonzero process exit code so deployment and update tooling can detect an incomplete installation.
 - Retried persisted license loading after a temporary startup read failure instead of remaining in Trial until the service restarted.
@@ -17,8 +19,9 @@ For the current release status, scheduled versions, future backlog, and release-
 - Fixed **BUG-012** by selecting the first unassigned Windows printer port beginning at 9100, displaying the resolved port in the setup summary, and rechecking for conflicts throughout installation.
 - Read machine-wide Windows printer and TCP/IP port assignments from the print registry so port conflicts are detected correctly when the background service runs as `LocalService`.
 - Kept same-name reinstall behavior idempotent while preventing a different printer from claiming the selected port during setup.
+- Reused an existing emulator listener only when both its bind address and Epson TM-T88V profile are compatible with the requested Windows printer endpoint.
 - Added stage-specific Windows spooler errors for the wizard's Print Test Receipt action.
-- Passed all 98 automated tests, an installed v0.3.23-to-v0.3.24 Enterprise upgrade and maintenance reinstall, and an installed Windows printer test that selected port 9101 beside an existing 9100 queue, created the matching Enterprise listener and Epson queue, sent a 112-byte ESC/POS test job, and then selected 9102 for the next printer.
+- Passed all 105 automated tests, an installed v0.3.23-to-v0.3.24 Enterprise upgrade and maintenance reinstall, and an installed Windows printer test that selected port 9101 beside an existing 9100 queue, created the matching Enterprise listener and Epson queue, sent a 112-byte ESC/POS test job, and then selected 9102 for the next printer.
 
 ## v0.3.23 — 2026-07-19
 

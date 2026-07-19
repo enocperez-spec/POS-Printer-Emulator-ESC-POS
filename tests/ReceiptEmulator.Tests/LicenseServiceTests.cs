@@ -160,6 +160,46 @@ public sealed class LicenseServiceTests
     }
 
     [Fact]
+    public void MissingRegistrationCanOnlyBeRepairedWithIdentityMatchingThePersistedLicense()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var publicKey = vendorKey.ExportSubjectPublicKeyInfoPem();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Data:Root"] = root,
+            ["Licensing:PublicKeyPem"] = publicKey
+        }).Build();
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Recovery Customer",
+            "recovery@example.com",
+            LicenseTier.Enterprise);
+        new LicenseService(new TestEnvironment(), configuration).Activate(
+            "Recovery Customer",
+            "recovery@example.com",
+            activationKey);
+        var registrationPath = Path.Combine(root, "registration.json");
+        File.Delete(registrationPath);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            LicenseService.ValidatePersistedLicenseForRegistration(
+                root,
+                publicKey,
+                "Wrong Customer",
+                "wrong@example.com"));
+        Assert.False(File.Exists(registrationPath));
+
+        Assert.Equal(
+            "Enterprise",
+            LicenseService.ValidatePersistedLicenseForRegistration(
+                root,
+                publicKey,
+                "Recovery Customer",
+                "recovery@example.com"));
+    }
+
+    [Fact]
     public void ActivationStopsBeforeWritingWhenAnExistingSnapshotCannotBeRead()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -196,6 +236,26 @@ public sealed class LicenseServiceTests
 
         Assert.Equal(originalRegistration, File.ReadAllBytes(registrationPath));
         Assert.Equal(originalActivation, File.ReadAllBytes(activationPath));
+    }
+
+    [Fact]
+    public void SnapshotTreatsAFileNotFoundErrorAsAnAbsentFile()
+    {
+        var snapshot = LicenseService.ReadSnapshot(
+            "missing-license.json",
+            _ => throw new FileNotFoundException());
+
+        Assert.False(snapshot.Exists);
+        Assert.Null(snapshot.Content);
+    }
+
+    [Fact]
+    public void SnapshotDoesNotTreatAccessDeniedAsAnAbsentFile()
+    {
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            LicenseService.ReadSnapshot(
+                "protected-license.json",
+                _ => throw new UnauthorizedAccessException("Access denied.")));
     }
 
     private sealed class TestEnvironment : IHostEnvironment

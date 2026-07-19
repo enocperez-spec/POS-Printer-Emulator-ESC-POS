@@ -243,7 +243,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 - Recheck the selected port before, during, and immediately after queue creation, rolling back safely if another printer claims it.
 - Preserve idempotent reinstall of the same printer name and configuration.
 
-**Completion verification:** All 98 automated tests pass. An installed Enterprise v0.3.23 system upgraded and completed a v0.3.24 maintenance reinstall without reactivation or re-entering registration. Trial-safe Activation Diagnostics passed authorization and privacy checks. With an existing Windows queue on 9100, the installed service selected 9101, created the matching Enterprise listener and an `EPSON TM-T88V Receipt5` queue, received its 112-byte ESC/POS test job, and then selected 9102 for the next printer. Setup retains conflict checks before, during, and after queue creation and rolls back incomplete state.
+**Completion verification:** All 105 automated tests pass. An installed Enterprise v0.3.23 system upgraded and completed a v0.3.24 maintenance reinstall without reactivation or re-entering registration. Trial-safe Activation Diagnostics passed authorization and privacy checks. With an existing Windows queue on 9100, the installed service selected 9101, created the matching Enterprise listener and an `EPSON TM-T88V Receipt5` queue, received its 112-byte ESC/POS test job, and then selected 9102 for the next printer. Setup retains conflict checks before, during, and after queue creation and rolls back incomplete state.
 
 ### v0.3.25 — Receipt comparison and automated validation
 

@@ -293,6 +293,8 @@ begin
   end;
 end;
 
+function RestorePreservedUpgradeState: Boolean; forward;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
@@ -321,36 +323,46 @@ begin
 
   RegistrationPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\registration.json');
   LicensePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\license.json');
-  if FileExists(RegistrationPath + '.upgrade-backup') and
-     (not DeleteFile(RegistrationPath + '.upgrade-backup')) then
+  if FileExists(RegistrationPath + '.upgrade-backup') or
+     FileExists(LicensePath + '.upgrade-backup') then
   begin
-    Result := 'Setup could not refresh the preserved customer registration from an earlier update. Run setup as an administrator and try again.';
-    exit;
-  end;
-  if FileExists(LicensePath + '.upgrade-backup') and
-     (not DeleteFile(LicensePath + '.upgrade-backup')) then
-  begin
-    Result := 'Setup could not refresh the preserved activation license from an earlier update. Run setup as an administrator and try again.';
-    exit;
-  end;
-  Log('Cleared any prior upgrade backup generation before preserving the current registration and license.');
-  if FileExists(RegistrationPath) then
-  begin
-    if not CopyFile(RegistrationPath, RegistrationPath + '.upgrade-backup', True) then
+    if not RestorePreservedUpgradeState then
     begin
-      Result := 'Setup could not preserve the existing customer registration. Close POS Printer Emulator and run setup again.';
+      Result := 'Setup could not restore the protected registration and license from the earlier update attempt. The recovery files were retained; run setup as an administrator and try again.';
       exit;
     end;
-    Log('Preserved the existing customer registration for this upgrade.');
-  end;
-  if FileExists(LicensePath) then
-  begin
-    if not CopyFile(LicensePath, LicensePath + '.upgrade-backup', True) then
+
+    RegistrationPage.Values[0] := '';
+    RegistrationPage.Values[1] := '';
+    ExistingRegistrationFound := False;
+    LoadExistingRegistration;
+    if not RegistrationIsValid(False) then
     begin
-      Result := 'Setup could not preserve the existing activation license. Close POS Printer Emulator and run setup again.';
+      Result := 'Setup restored the protected upgrade files, but the preserved customer registration is incomplete. The recovery files were retained.';
       exit;
     end;
-    Log('Preserved the existing activation license for this upgrade.');
+    Log('Restored the prior upgrade backup generation and retained it for this retry.');
+  end
+  else
+  begin
+    if FileExists(RegistrationPath) then
+    begin
+      if not CopyFile(RegistrationPath, RegistrationPath + '.upgrade-backup', True) then
+      begin
+        Result := 'Setup could not preserve the existing customer registration. Close POS Printer Emulator and run setup again.';
+        exit;
+      end;
+      Log('Preserved the existing customer registration for this upgrade.');
+    end;
+    if FileExists(LicensePath) then
+    begin
+      if not CopyFile(LicensePath, LicensePath + '.upgrade-backup', True) then
+      begin
+        Result := 'Setup could not preserve the existing activation license. Close POS Printer Emulator and run setup again.';
+        exit;
+      end;
+      Log('Preserved the existing activation license for this upgrade.');
+    end;
   end;
 
   Result := '';
@@ -412,11 +424,22 @@ begin
   end;
 end;
 
+procedure FailAndRestorePreservedUpgradeState(const FailureMessage: String);
+begin
+  SetupFailed := True;
+  if not RestorePreservedUpgradeState then
+    RaiseException(FailureMessage + #13#10 + #13#10 +
+      'Setup also could not restore the protected registration and activation files. The recovery copies were retained.')
+  else
+    RaiseException(FailureMessage);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   ErrorDetails: AnsiString;
   InstallArguments: String;
+  FailureMessage: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -432,10 +455,8 @@ begin
       if (not Exec(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe'), '/silent /install',
         '', SW_HIDE, ewWaitUntilTerminated, ResultCode)) or
         ((ResultCode <> 0) and (ResultCode <> 3010)) then
-      begin
-        SetupFailed := True;
-        RaiseException('POS Printer Emulator could not install its desktop HTML component. Setup did not complete.');
-      end;
+        FailAndRestorePreservedUpgradeState(
+          'POS Printer Emulator could not install its desktop HTML component. Setup did not complete.');
     end;
 
     WizardForm.StatusLabel.Caption := 'Configuring the POS Printer Emulator background service...';
@@ -444,12 +465,12 @@ begin
       ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode)) or
       (ResultCode <> 0) then
     begin
-      SetupFailed := True;
       Log(Format('POS Printer Emulator C# installer command failed with exit code %d.', [ResultCode]));
       if LoadStringFromFile(ExpandConstant('{app}\POSPrinterEmulator-setup-error.txt'), ErrorDetails) then
-        RaiseException('POS Printer Emulator could not configure its Windows service:' + #13#10 + #13#10 + String(ErrorDetails))
+        FailureMessage := 'POS Printer Emulator could not configure its Windows service:' + #13#10 + #13#10 + String(ErrorDetails)
       else
-        RaiseException('POS Printer Emulator could not configure its Windows service. Setup did not complete.');
+        FailureMessage := 'POS Printer Emulator could not configure its Windows service. Setup did not complete.';
+      FailAndRestorePreservedUpgradeState(FailureMessage);
     end;
 
     if not CompletePreservedUpgradeState then

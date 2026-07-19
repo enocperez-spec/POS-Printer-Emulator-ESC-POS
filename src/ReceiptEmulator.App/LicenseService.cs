@@ -193,19 +193,65 @@ public sealed class LicenseService
     public static string? GetRequiredPersistedLicenseModeAtDefaultPath() =>
         GetRequiredPersistedLicenseMode(DefaultRootPath, ActivationKeyCodec.PublicKeyPem);
 
+    public static string? ValidatePersistedLicenseForRegistrationAtDefaultPath(
+        string customerName,
+        string emailAddress) =>
+        ValidatePersistedLicenseForRegistration(
+            DefaultRootPath,
+            ActivationKeyCodec.PublicKeyPem,
+            customerName,
+            emailAddress);
+
+    internal static string? ValidatePersistedLicenseForRegistration(
+        string rootPath,
+        string publicKeyPem,
+        string customerName,
+        string emailAddress) =>
+        GetRequiredPersistedLicenseMode(
+            rootPath,
+            publicKeyPem,
+            new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant()));
+
     internal static string? GetRequiredPersistedLicenseMode(string rootPath, string publicKeyPem)
+        => GetRequiredPersistedLicenseMode(rootPath, publicKeyPem, registrationOverride: null);
+
+    private static string? GetRequiredPersistedLicenseMode(
+        string rootPath,
+        string publicKeyPem,
+        RegistrationInfo? registrationOverride)
     {
         var activationPath = Path.Combine(rootPath, "license.json");
-        if (!File.Exists(activationPath)) return null;
+        ActivationRecord activation;
+        try
+        {
+            activation = JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(activationPath))
+                ?? throw new InvalidOperationException("The existing activation license could not be read. The preserved upgrade files were not removed.");
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null;
+        }
 
-        var registrationPath = Path.Combine(rootPath, "registration.json");
-        if (!File.Exists(registrationPath))
-            throw new InvalidOperationException("The existing activation license is missing its customer registration. The preserved upgrade files were not removed.");
-
-        var registration = JsonSerializer.Deserialize<RegistrationInfo>(File.ReadAllText(registrationPath))
-            ?? throw new InvalidOperationException("The existing customer registration could not be read. The preserved upgrade files were not removed.");
-        var activation = JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(activationPath))
-            ?? throw new InvalidOperationException("The existing activation license could not be read. The preserved upgrade files were not removed.");
+        var registration = registrationOverride;
+        if (registration is null)
+        {
+            var registrationPath = Path.Combine(rootPath, "registration.json");
+            try
+            {
+                registration = JsonSerializer.Deserialize<RegistrationInfo>(File.ReadAllText(registrationPath))
+                    ?? throw new InvalidOperationException("The existing customer registration could not be read. The preserved upgrade files were not removed.");
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                throw new InvalidOperationException(
+                    "The existing activation license is missing its customer registration. The preserved upgrade files were not removed.",
+                    exception);
+            }
+        }
         if (!ActivationKeyCodec.TryValidateWithPublicKey(
                 activation.ActivationKey,
                 registration.CustomerName,
@@ -359,10 +405,22 @@ public sealed class LicenseService
         stream.Flush(flushToDisk: true);
     }
 
-    private static FileSnapshot ReadSnapshot(string path)
+    private static FileSnapshot ReadSnapshot(string path) => ReadSnapshot(path, File.ReadAllBytes);
+
+    internal static FileSnapshot ReadSnapshot(string path, Func<string, byte[]> readAllBytes)
     {
-        if (!File.Exists(path)) return new(false, null);
-        return new(true, File.ReadAllBytes(path));
+        try
+        {
+            return new(true, readAllBytes(path));
+        }
+        catch (FileNotFoundException)
+        {
+            return new(false, null);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return new(false, null);
+        }
     }
 
     private static void TryRestoreSnapshot(string path, FileSnapshot snapshot)
@@ -416,7 +474,7 @@ public sealed class LicenseService
 
     private static TrialState NewTrialState() => new(DateOnly.FromDateTime(DateTime.Now), 0);
 
-    private sealed record FileSnapshot(bool Exists, byte[]? Content);
+    internal sealed record FileSnapshot(bool Exists, byte[]? Content);
     private sealed record TrialState(DateOnly Date, int Used);
     private sealed record ActivationRecord(string ActivationKey, DateTimeOffset ActivatedAt);
 }

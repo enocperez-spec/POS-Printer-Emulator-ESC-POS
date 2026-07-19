@@ -53,6 +53,7 @@ public static class PrinterSetupManager
     public const string RecommendedStatusApiVersion = "6.7.0.0";
     private const string QueueComment = "Managed by POS Printer Emulator";
     private const string LocalListenerApi = "http://127.0.0.1:5187/api/listeners";
+    private const string LocalAvailablePortApi = "http://127.0.0.1:5187/api/printer-setup/available-port";
     private const string WindowsPrinterRegistryPath = @"SYSTEM\CurrentControlSet\Control\Print\Printers";
     private const string WindowsTcpPortRegistryPath = @"SYSTEM\CurrentControlSet\Control\Print\Monitors\Standard TCP/IP Port\Ports";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -98,18 +99,27 @@ public static class PrinterSetupManager
     public static PrinterPortSelection GetAvailablePort(
         string printerName,
         string ipAddress,
-        int startingPort = PrinterListenerDefaults.DefaultPort)
+        int startingPort = PrinterListenerDefaults.DefaultPort,
+        IEnumerable<PrinterListenerConfiguration>? configuredListeners = null)
     {
         Validate(new PrinterInstallRequest(printerName, ipAddress, startingPort, ipAddress == "127.0.0.1"));
-        if (!OperatingSystem.IsWindows())
+        HashSet<int> assignedPorts = OperatingSystem.IsWindows()
+            ? GetAssignedPrinterPorts(printerName)
+            : [];
+        var listeners = configuredListeners?.ToArray() ?? [];
+
+        var port = FindFirstAvailablePort(startingPort, assignedPorts, ipAddress, listeners);
+        if (port == startingPort)
         {
-            return new(startingPort, false, $"Port {startingPort} is the default connection port.");
+            return OperatingSystem.IsWindows()
+                ? new(port, false, $"Port {port} is available.")
+                : new(port, false, $"Port {port} is the default connection port.");
         }
 
-        var port = FindFirstAvailablePort(startingPort, GetAssignedPrinterPorts(printerName));
-        return port == startingPort
-            ? new(port, false, $"Port {port} is available.")
-            : new(port, true, $"Port {startingPort} is already assigned to another Windows printer. Port {port} was selected automatically.");
+        var reason = assignedPorts.Contains(startingPort)
+            ? $"Port {startingPort} is already assigned to another Windows printer."
+            : $"Port {startingPort} is assigned to an emulator listener that cannot be reused for {ipAddress} with the Epson TM-T88V driver.";
+        return new(port, true, $"{reason} Port {port} was selected automatically.");
     }
 
     internal static int FindFirstAvailablePort(int startingPort, IEnumerable<int> assignedPorts)
@@ -123,7 +133,37 @@ public static class PrinterSetupManager
             if (!assigned.Contains(candidate)) return candidate;
         }
 
-        throw new InvalidOperationException($"No available Windows printer port was found at or above {startingPort}.");
+        throw new InvalidOperationException($"No available printer port was found at or above {startingPort}.");
+    }
+
+    internal static int FindFirstAvailablePort(
+        int startingPort,
+        IEnumerable<int> assignedPorts,
+        string requestedAddress,
+        IEnumerable<PrinterListenerConfiguration> configuredListeners)
+    {
+        var reservedPorts = assignedPorts.ToHashSet();
+        reservedPorts.UnionWith(configuredListeners
+            .Where(listener => !IsListenerCompatibleForPrinterSetup(listener, requestedAddress))
+            .Select(listener => listener.Port));
+        return FindFirstAvailablePort(startingPort, reservedPorts);
+    }
+
+    internal static bool IsListenerCompatibleForPrinterSetup(
+        PrinterListenerConfiguration listener,
+        string requestedAddress) =>
+        IsListenerBindCompatible(listener.BindAddress, requestedAddress) &&
+        string.Equals(listener.ProfileId, PrinterProfileService.EpsonTmT88VId, StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsListenerBindCompatible(string bindAddress, string requestedAddress)
+    {
+        if (!IPAddress.TryParse(bindAddress, out var bind) || bind.AddressFamily != AddressFamily.InterNetwork ||
+            !IPAddress.TryParse(requestedAddress, out var requested) || requested.AddressFamily != AddressFamily.InterNetwork)
+        {
+            return false;
+        }
+
+        return bind.Equals(IPAddress.Any) || bind.Equals(requested);
     }
 
     public static async Task<int> InstallFromFilesAsync(string requestPath, string resultPath, CancellationToken cancellationToken)
@@ -207,14 +247,17 @@ public static class PrinterSetupManager
         PrinterInstallRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.Port == PrinterListenerDefaults.DefaultPort) return null;
-
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         using var listResponse = await client.GetAsync(LocalListenerApi, cancellationToken);
         if (listResponse.StatusCode == HttpStatusCode.Forbidden)
         {
+            if (request.Port == PrinterListenerDefaults.DefaultPort)
+            {
+                await RevalidateDefaultListenerAsync(client, request, cancellationToken);
+                return null;
+            }
+
             throw new InvalidOperationException(
-                $"Port {PrinterListenerDefaults.DefaultPort} is already assigned to another Windows printer. " +
                 $"Installing an additional printer on port {request.Port} requires an Enterprise License so the emulator can listen on that port.");
         }
 
@@ -225,6 +268,20 @@ public static class PrinterSetupManager
         var existing = collection.Listeners.FirstOrDefault(listener => listener.Port == request.Port);
         if (existing is not null)
         {
+            if (!IsListenerBindCompatible(existing.BindAddress, request.IpAddress))
+            {
+                throw new InvalidOperationException(
+                    $"Port {request.Port} is assigned to emulator listener '{existing.Name}', but its bind address " +
+                    $"{existing.BindAddress} cannot accept connections for {request.IpAddress}. Return to the printer setup summary so another port can be selected.");
+            }
+
+            if (!string.Equals(existing.ProfileId, PrinterProfileService.EpsonTmT88VId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"Port {request.Port} is assigned to emulator listener '{existing.Name}', but it uses a printer profile that is not compatible " +
+                    $"with the {DriverName} driver. Return to the printer setup summary so another port can be selected.");
+            }
+
             if (!existing.Listening)
             {
                 using var startResponse = await client.PostAsync(
@@ -234,6 +291,12 @@ public static class PrinterSetupManager
                 startResponse.EnsureSuccessStatusCode();
             }
             return null;
+        }
+
+        if (request.Port == PrinterListenerDefaults.DefaultPort)
+        {
+            throw new InvalidOperationException(
+                $"The emulator's default printer listener on port {request.Port} is unavailable. Return to the printer setup summary so another port can be selected.");
         }
 
         var input = BuildSetupListenerInput(request.PrinterName, request.Port);
@@ -250,6 +313,28 @@ public static class PrinterSetupManager
 
         Log($"Created Enterprise printer listener '{created.Name}' on port {created.Port} for Windows printer setup.");
         return created.Id;
+    }
+
+    private static async Task RevalidateDefaultListenerAsync(
+        HttpClient client,
+        PrinterInstallRequest request,
+        CancellationToken cancellationToken)
+    {
+        var requestUri = $"{LocalAvailablePortApi}?printerName={Uri.EscapeDataString(request.PrinterName)}" +
+            $"&ipAddress={Uri.EscapeDataString(request.IpAddress)}&startingPort={request.Port}";
+        using var response = await client.GetAsync(requestUri, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"The emulator's default printer listener on port {request.Port} can no longer be reused for this setup. Return to the printer setup summary so another port can be selected.");
+        }
+
+        var selection = await response.Content.ReadFromJsonAsync<PrinterPortSelection>(JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("The emulator did not confirm the selected printer port.");
+        if (selection.Port != request.Port)
+        {
+            throw new InvalidOperationException($"{selection.Message} Return to the printer setup summary before continuing.");
+        }
     }
 
     internal static PrinterListenerInput BuildSetupListenerInput(string printerName, int port)

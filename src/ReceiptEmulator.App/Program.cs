@@ -91,6 +91,7 @@ app.MapGet("/api/printer-setup/available-port", (
     string printerName,
     string ipAddress,
     int? startingPort,
+    PrinterListenerManager listeners,
     LicenseService license) =>
 {
     try
@@ -98,11 +99,12 @@ app.MapGet("/api/printer-setup/available-port", (
         var selection = PrinterSetupManager.GetAvailablePort(
             printerName,
             ipAddress,
-            startingPort ?? PrinterListenerDefaults.DefaultPort);
+            startingPort ?? PrinterListenerDefaults.DefaultPort,
+            listeners.GetStatus().Listeners.Select(listener => listener.Configuration));
         if (selection.AutomaticallyAdjusted && !license.HasEnterpriseAccess)
         {
             return Results.Problem(
-                $"Port {PrinterListenerDefaults.DefaultPort} is already assigned to another Windows printer. " +
+                $"{selection.Message} " +
                 $"Installing an additional printer on port {selection.Port} requires an Enterprise License so the emulator can listen on that port.",
                 statusCode: 403);
         }

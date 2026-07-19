@@ -241,7 +241,7 @@ $releaseSync = database()->prepare(
          'Preserve paid licensing through updates and prevent Windows printer-port conflicts.',
          'Matched registration and activation recovery; hardened-folder ACL repair; license-aware post-update health; Trial-safe activation diagnostics; sequential Windows port selection; automatic Enterprise listener alignment; repeated conflict checks; rollback; installed validation.',
          'Upgrade and printer setup reliability must be restored before the next feature release.',
-         'Paid activation survives upgrade and maintenance reinstall, Trial can export activation diagnostics, a second Enterprise printer receives a test job on the first free port, and all 98 tests pass.', UTC_TIMESTAMP(6)),
+         'Paid activation survives upgrade and maintenance reinstall, Trial can export activation diagnostics, a second Enterprise printer receives a test job on the first free port, and all 105 tests pass.', UTC_TIMESTAMP(6)),
         ('v0.3.25', 'v0.3.25', 'Release', 'Receipt comparison and automated validation', 'Next', 325,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
@@ -387,7 +387,7 @@ $bugSync = database()->prepare(
          'Registration and activation must survive updates as one validated pair.',
          'Hardened data permissions and partial persistence could hide or reject the saved paid license.',
          'Upgrade a registered paid v0.3.23 installation over protected application-data files.',
-         'All 98 tests pass; installed Enterprise upgrade and maintenance-reinstall tests preserve registration and activation without re-entry.',
+         'All 105 tests pass; installed Enterprise upgrade and maintenance-reinstall tests preserve registration and activation without re-entry.',
          UTC_TIMESTAMP(6)),
         ('BUG-012', 'Printer Setup Wizard could reuse an assigned TCP/IP port',
          'Medium', 'Released', 'v0.3.23 and earlier', 'v0.3.24', 'v0.3.24',
@@ -395,7 +395,7 @@ $bugSync = database()->prepare(
          'The wizard should select the first free port and keep the matching emulator listener available.',
          'Port 9100 could be reused without a complete conflict check.',
          'Install a differently named printer while an existing queue already uses port 9100.',
-         'All 98 tests pass; installed Enterprise validation selected 9101, aligned its listener, delivered a 112-byte test job, and selected 9102 next.',
+         'All 105 tests pass; installed Enterprise validation selected 9101, aligned its listener, delivered a 112-byte test job, and selected 9102 next.',
          UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
