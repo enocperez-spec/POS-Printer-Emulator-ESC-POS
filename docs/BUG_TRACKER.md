@@ -27,7 +27,10 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 
 ## Open bugs
 
-There are currently no documented open bugs. New reports must be entered here before implementation begins.
+| Bug ID | Severity | Summary | Affected version(s) | Target | Status | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+
+There are no open bugs assigned to the v0.3.24 release.
 
 ## Resolved bugs
 
@@ -43,6 +46,8 @@ There are currently no documented open bugs. New reports must be entered here be
 | BUG-008 | High | Delete All Print Jobs returned HTTP 500 and left jobs visible when obsolete legacy history cleanup encountered a locked file. | v0.3.21 | v0.3.22 | Released | SQLite deletion remains authoritative, locked legacy cleanup is best effort, a locked-file regression test passes, all 80 tests pass, and end-to-end Clear All completed in 285 ms without an error banner. |
 | [BUG-009](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/13) | High | Activating a valid Enterprise key returned HTTP 500 when optional paid-history or listener storage initialization failed. | v0.3.22 | v0.3.23 | Released | Activation succeeds independently of optional storage recovery, malformed keys fail safely, regression tests cover forced storage failures, and the complete 83-test suite passes. |
 | [BUG-010](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/14) | High | Printer Setup Wizard failed with `System.Management.ManagementException: Invalid parameter` while creating the Windows printer queue. | v0.3.22 and earlier wizard implementation | v0.3.23 | Released | Queue creation uses the native Windows `AddPrinter` API with the required driver, port, print processor, and RAW data type; an installed Windows test created the Epson queue on `127.0.0.1:9100` and sent the wizard Test Receipt successfully. |
+| [BUG-011](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/16) | High | Updating could leave a paid installation in Trial, and reactivation could fail when Windows allowed overwriting the existing license file but denied temporary-file replacement. Trial users were then directed to the paid-only Support page. | v0.3.23 | v0.3.24 | Released | License writes use a compatible direct-write fallback; setup refreshes and restores registration plus activation together; ownership and inheritance are repaired; paid license mode is verified through the updated service before recovery files are removed; startup retries persisted state; and Trial can download privacy-safe Activation Diagnostics. All 98 tests pass, and installed Enterprise upgrade plus maintenance-reinstall tests preserved the customer and license without reactivation. |
+| [BUG-012](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/17) | Medium | Printer Setup Wizard could assign the same TCP/IP port number to more than one Windows printer instead of selecting the next available port. | v0.3.23 and earlier | v0.3.24 | Released | Port selection reads machine-wide Windows printer and TCP/IP-port assignments, excludes an idempotent same-printer reinstall, selects the first free port from 9100 upward, displays it in the summary, creates or reuses the matching Enterprise listener, and rechecks throughout installation. The installed test selected 9101 beside an existing 9100 queue, created the Epson queue, delivered a 112-byte test receipt, and then identified 9102 as next available. |
 
 ## Bug record template
 

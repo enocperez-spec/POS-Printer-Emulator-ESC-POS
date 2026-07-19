@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.ServiceProcess;
+using System.Text.Json;
 
 namespace ReceiptEmulator;
 
@@ -105,7 +106,9 @@ public static class WindowsSetupCommand
         {
             var customerName = GetRequiredOption(arguments, "--customer-name");
             var emailAddress = GetRequiredOption(arguments, "--email");
-            await InstallAsync(customerName, emailAddress, cancellationToken);
+            var upgradeStateRestored = arguments.Any(argument =>
+                string.Equals(argument, "--upgrade-state-restored", StringComparison.OrdinalIgnoreCase));
+            await InstallAsync(customerName, emailAddress, upgradeStateRestored, cancellationToken);
         }
         else
         {
@@ -119,6 +122,7 @@ public static class WindowsSetupCommand
     private static async Task InstallAsync(
         string customerName,
         string emailAddress,
+        bool upgradeStateRestored,
         CancellationToken cancellationToken)
     {
         var executablePath = Environment.ProcessPath;
@@ -130,19 +134,32 @@ public static class WindowsSetupCommand
         Console.WriteLine("Registering the POS Printer Emulator installation...");
         Directory.CreateDirectory(LicenseService.DefaultRootPath);
         await RunRequiredProcessAsync(
-            GetSystemExecutable("icacls.exe"),
-            [
-                LicenseService.DefaultRootPath,
-                "/inheritance:r",
-                "/grant:r",
-                "*S-1-5-18:(OI)(CI)F",
-                "*S-1-5-32-544:(OI)(CI)F",
-                "*S-1-5-19:(OI)(CI)M",
-                "/T",
-                "/C"
-            ],
+            GetSystemExecutable("takeown.exe"),
+            BuildTakeOwnershipArguments(LicenseService.DefaultRootPath),
             cancellationToken);
+        await RunRequiredProcessAsync(
+            GetSystemExecutable("icacls.exe"),
+            BuildDataDirectoryAclArguments(LicenseService.DefaultRootPath),
+            cancellationToken);
+        if (Directory.EnumerateFileSystemEntries(LicenseService.DefaultRootPath).Any())
+        {
+            await RunRequiredProcessAsync(
+                GetSystemExecutable("icacls.exe"),
+                BuildDataDirectoryChildAclResetArguments(LicenseService.DefaultRootPath),
+                cancellationToken);
+            await RunRequiredProcessAsync(
+                GetSystemExecutable("icacls.exe"),
+                BuildDataDirectoryChildInheritanceArguments(LicenseService.DefaultRootPath),
+                cancellationToken);
+        }
+        if (!upgradeStateRestored)
+        {
+            LicenseService.RestoreUpgradeStateAtDefaultPath();
+        }
         LicenseService.RegisterInstallationAtDefaultPath(customerName, emailAddress);
+        var expectedLicenseMode = upgradeStateRestored
+            ? LicenseService.GetRequiredPersistedLicenseModeAtDefaultPath()
+            : null;
 
         Console.WriteLine("Configuring the POS Printer Emulator Windows service...");
         await RemoveServiceAsync(cancellationToken);
@@ -164,7 +181,11 @@ public static class WindowsSetupCommand
         service.Start();
         service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
 
-        await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken, expectedLicenseMode);
+        if (!upgradeStateRestored)
+        {
+            LicenseService.CompleteUpgradeStateAtDefaultPath();
+        }
         Console.WriteLine("POS Printer Emulator installation completed successfully.");
     }
 
@@ -273,10 +294,62 @@ public static class WindowsSetupCommand
         ];
     }
 
-    private static async Task WaitForViewerAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    internal static IReadOnlyList<string> BuildTakeOwnershipArguments(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            throw new ArgumentException("The application-data directory is required.", nameof(directoryPath));
+        }
+
+        return ["/F", Path.GetFullPath(directoryPath), "/A", "/R", "/D", "Y"];
+    }
+
+    internal static IReadOnlyList<string> BuildDataDirectoryAclArguments(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            throw new ArgumentException("The application-data directory is required.", nameof(directoryPath));
+        }
+
+        return
+        [
+            Path.GetFullPath(directoryPath),
+            "/inheritance:r",
+            "/grant:r",
+            "*S-1-5-18:(OI)(CI)F",
+            "*S-1-5-32-544:(OI)(CI)F",
+            "*S-1-5-19:(OI)(CI)M"
+        ];
+    }
+
+    internal static IReadOnlyList<string> BuildDataDirectoryChildAclResetArguments(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            throw new ArgumentException("The application-data directory is required.", nameof(directoryPath));
+        }
+
+        return [Path.Combine(Path.GetFullPath(directoryPath), "*"), "/reset", "/T", "/C"];
+    }
+
+    internal static IReadOnlyList<string> BuildDataDirectoryChildInheritanceArguments(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            throw new ArgumentException("The application-data directory is required.", nameof(directoryPath));
+        }
+
+        return [Path.Combine(Path.GetFullPath(directoryPath), "*"), "/inheritance:e", "/T", "/C"];
+    }
+
+    private static async Task WaitForViewerAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        string? expectedLicenseMode = null)
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        string? observedLicenseMode = null;
 
         while (DateTimeOffset.UtcNow < deadline)
         {
@@ -285,7 +358,15 @@ public static class WindowsSetupCommand
                 using var response = await client.GetAsync(ViewerHealthUrl, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
-                    return;
+                    if (expectedLicenseMode is null) return;
+
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var status = JsonSerializer.Deserialize<ServiceStatus>(
+                        json,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                    observedLicenseMode = status?.License.Mode;
+                    if (string.Equals(observedLicenseMode, expectedLicenseMode, StringComparison.OrdinalIgnoreCase))
+                        return;
                 }
             }
             catch (HttpRequestException)
@@ -298,6 +379,13 @@ public static class WindowsSetupCommand
             }
 
             await Task.Delay(500, cancellationToken);
+        }
+
+        if (expectedLicenseMode is not null && observedLicenseMode is not null)
+        {
+            throw new InvalidOperationException(
+                $"The updated service reported {observedLicenseMode} instead of the preserved {expectedLicenseMode} License. " +
+                "The preserved upgrade files were not removed.");
         }
 
         throw new System.TimeoutException("The local POS Printer Emulator viewer did not become ready.");

@@ -237,17 +237,22 @@ $releaseSync = database()->prepare(
          'Resilient Enterprise activation and storage recovery; safe malformed-key handling; unique temporary persistence; native Windows AddPrinter queue creation; retained Epson driver, TCP/IP port, verification, rollback, and error reporting; automated and installed Windows verification.',
          'Core activation and printer setup must be reliable before the next feature release.',
          'Valid Enterprise activation avoids HTTP 500, the wizard creates the Epson queue on 127.0.0.1:9100 without Invalid parameter, the Test Receipt sends successfully, and all 83 tests pass.', UTC_TIMESTAMP(6)),
-        ('v0.3.24', 'v0.3.24', 'Release', 'Receipt comparison and automated validation', 'Next', 324,
+        ('v0.3.24', 'v0.3.24', 'Release', 'Upgrade licensing and Printer Setup safeguards', 'Released', 324,
+         'Preserve paid licensing through updates and prevent Windows printer-port conflicts.',
+         'Matched registration and activation recovery; hardened-folder ACL repair; license-aware post-update health; Trial-safe activation diagnostics; sequential Windows port selection; automatic Enterprise listener alignment; repeated conflict checks; rollback; installed validation.',
+         'Upgrade and printer setup reliability must be restored before the next feature release.',
+         'Paid activation survives upgrade and maintenance reinstall, Trial can export activation diagnostics, a second Enterprise printer receives a test job on the first free port, and all 98 tests pass.', UTC_TIMESTAMP(6)),
+        ('v0.3.25', 'v0.3.25', 'Release', 'Receipt comparison and automated validation', 'Next', 325,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Deterministic captures and profiles are required for meaningful comparisons.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.25', 'v0.3.25', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 325,
+        ('v0.3.26', 'v0.3.26', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 326,
          'Guide nontechnical customers through connection problems and support collection.',
          'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
          'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
          'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-        ('v0.3.26', 'v0.3.26', 'Release', 'Guided update installation and restart', 'Planned', 326,
+        ('v0.3.27', 'v0.3.27', 'Release', 'Guided update installation and restart', 'Planned', 327,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -316,12 +321,12 @@ database()->prepare(
      SET github_url = CASE item_key
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
-         WHEN 'v0.3.26' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.27' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'BACKLOG-007' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.27', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -375,6 +380,22 @@ $bugSync = database()->prepare(
          'WMI Put attempted to assign the read-only Win32_Printer Name property and raised System.Management.ManagementException.',
          'Run the Printer Setup Wizard with the Epson driver installed and select Install Printer.',
          'Native AddPrinter regression coverage passes; installed Windows validation created POS Printer Emulator with EPSON TM-T88V Receipt5 on 127.0.0.1:9100 and sent the wizard Test Receipt.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-011', 'Upgrade could lose paid activation and fail to save the license',
+         'High', 'Released', 'v0.3.23', 'v0.3.24', 'v0.3.24',
+         'Updating could leave a paid installation in Trial and prevent reactivation.',
+         'Registration and activation must survive updates as one validated pair.',
+         'Hardened data permissions and partial persistence could hide or reject the saved paid license.',
+         'Upgrade a registered paid v0.3.23 installation over protected application-data files.',
+         'All 98 tests pass; installed Enterprise upgrade and maintenance-reinstall tests preserve registration and activation without re-entry.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-012', 'Printer Setup Wizard could reuse an assigned TCP/IP port',
+         'Medium', 'Released', 'v0.3.23 and earlier', 'v0.3.24', 'v0.3.24',
+         'A second Windows printer could be assigned a conflicting endpoint.',
+         'The wizard should select the first free port and keep the matching emulator listener available.',
+         'Port 9100 could be reused without a complete conflict check.',
+         'Install a differently named printer while an existing queue already uses port 9100.',
+         'All 98 tests pass; installed Enterprise validation selected 9101, aligned its listener, delivered a 112-byte test job, and selected 9102 next.',
          UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
@@ -394,9 +415,11 @@ database()->exec(
      SET github_url = CASE bug_key
          WHEN 'BUG-009' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/13'
          WHEN 'BUG-010' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/14'
+         WHEN 'BUG-011' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/16'
+         WHEN 'BUG-012' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/17'
          ELSE github_url
      END
-     WHERE bug_key IN ('BUG-009', 'BUG-010')"
+     WHERE bug_key IN ('BUG-009', 'BUG-010', 'BUG-011', 'BUG-012')"
 );
 
 $roadmapStatuses = ['Released', 'Next', 'Planned', 'In progress', 'Deferred'];

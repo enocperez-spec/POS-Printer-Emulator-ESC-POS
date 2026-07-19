@@ -35,4 +35,49 @@ public sealed class WindowsSetupCommandTests
         Assert.DoesNotContain(arguments, argument => argument.Contains("public", StringComparison.OrdinalIgnoreCase));
         Assert.Contains($"program={Path.GetFullPath(executable)}", arguments);
     }
+
+    [Fact]
+    public void TakeOwnershipArguments_RecursivelyAssignAdministrators()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "Data");
+
+        var arguments = WindowsSetupCommand.BuildTakeOwnershipArguments(directory);
+
+        Assert.Equal(["/F", Path.GetFullPath(directory), "/A", "/R", "/D", "Y"], arguments);
+    }
+
+    [Fact]
+    public void DataDirectoryAclArguments_GrantRequiredPrincipalsWithoutIgnoringFailures()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "Data");
+
+        var arguments = WindowsSetupCommand.BuildDataDirectoryAclArguments(directory);
+
+        Assert.Equal(Path.GetFullPath(directory), arguments[0]);
+        Assert.Contains("*S-1-5-18:(OI)(CI)F", arguments);
+        Assert.Contains("*S-1-5-32-544:(OI)(CI)F", arguments);
+        Assert.Contains("*S-1-5-19:(OI)(CI)M", arguments);
+        Assert.DoesNotContain("/T", arguments);
+        Assert.DoesNotContain("/C", arguments);
+    }
+
+    [Fact]
+    public void DataDirectoryChildAclResetArguments_RemoveLegacyExplicitRestrictionsRecursively()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "Data");
+
+        var arguments = WindowsSetupCommand.BuildDataDirectoryChildAclResetArguments(directory);
+
+        Assert.Equal([Path.Combine(Path.GetFullPath(directory), "*"), "/reset", "/T", "/C"], arguments);
+    }
+
+    [Fact]
+    public void DataDirectoryChildInheritanceArguments_EnableInheritanceRecursively()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "Data");
+
+        var arguments = WindowsSetupCommand.BuildDataDirectoryChildInheritanceArguments(directory);
+
+        Assert.Equal([Path.Combine(Path.GetFullPath(directory), "*"), "/inheritance:e", "/T", "/C"], arguments);
+    }
 }

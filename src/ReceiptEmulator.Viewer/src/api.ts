@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -108,6 +108,8 @@ export const api = {
   }),
   checkUpdates: (force = false) => json<UpdateStatus>(`/api/updates/check?force=${force}`),
   printerSetupStatus: () => json<PrinterSetupStatus>('/api/printer-setup/status'),
+  availablePrinterPort: (printerName: string, ipAddress: string, startingPort = 9100) =>
+    json<PrinterPortSelection>(`/api/printer-setup/available-port?printerName=${encodeURIComponent(printerName)}&ipAddress=${encodeURIComponent(ipAddress)}&startingPort=${startingPort}`),
   printerState: () => json<PrinterStateStatus>('/api/printer-state'),
   updatePrinterState: (state: PrinterStateUpdate) => json<PrinterStateStatus>('/api/printer-state', {
     method: 'PUT',

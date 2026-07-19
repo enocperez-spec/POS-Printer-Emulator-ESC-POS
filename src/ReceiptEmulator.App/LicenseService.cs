@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using POSPrinterEmulator.Licensing;
 
@@ -10,9 +11,11 @@ public sealed class LicenseService
     private readonly string _trialStatePath;
     private readonly string _registrationPath;
     private readonly string _activationPath;
+    private readonly string _publicKeyPem;
     private TrialState _trialState;
     private RegistrationInfo _registration;
     private ActivationRecord? _activation;
+    private Exception? _lastStorageError;
 
     public LicenseService(IHostEnvironment environment, IConfiguration? configuration = null)
     {
@@ -26,6 +29,10 @@ public sealed class LicenseService
         _trialStatePath = Path.Combine(RootPath, "trial-state.json");
         _registrationPath = Path.Combine(RootPath, "registration.json");
         _activationPath = Path.Combine(RootPath, "license.json");
+        _publicKeyPem = environment.IsEnvironment("Testing") &&
+                        !string.IsNullOrWhiteSpace(configuration?["Licensing:PublicKeyPem"])
+            ? configuration!["Licensing:PublicKeyPem"]!
+            : ActivationKeyCodec.PublicKeyPem;
         _trialState = Load<TrialState>(_trialStatePath) ?? NewTrialState();
         _registration = Load<RegistrationInfo>(_registrationPath) ?? new RegistrationInfo(string.Empty, string.Empty);
         _activation = Load<ActivationRecord>(_activationPath);
@@ -111,7 +118,7 @@ public sealed class LicenseService
             }
 
             _trialState = _trialState with { Used = _trialState.Used + 1 };
-            SaveJson(_trialStatePath, _trialState);
+            SavePersistedJson(_trialStatePath, _trialState);
             status = GetStatus();
             return true;
         }
@@ -121,10 +128,11 @@ public sealed class LicenseService
     {
         lock (_sync)
         {
-            if (!ActivationKeyCodec.TryValidate(
+            if (!ActivationKeyCodec.TryValidateWithPublicKey(
                     activationKey,
                     customerName,
                     emailAddress,
+                    _publicKeyPem,
                     out var license,
                     out var error) || license is null)
             {
@@ -134,8 +142,7 @@ public sealed class LicenseService
             var registration = new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant());
             var activation = new ActivationRecord(activationKey.Trim(), DateTimeOffset.UtcNow);
 
-            SaveJson(_registrationPath, registration);
-            SaveJson(_activationPath, activation);
+            SaveActivationPair(registration, activation);
             _registration = registration;
             _activation = activation;
             return GetStatus();
@@ -154,24 +161,91 @@ public sealed class LicenseService
 
             ActivationKeyCodec.ValidateRegistration(customerName, emailAddress);
             _registration = new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant());
-            SaveJson(_registrationPath, _registration);
+            SavePersistedJson(_registrationPath, _registration);
+        }
+    }
+
+    public LicenseStorageDiagnostics GetStorageDiagnostics()
+    {
+        lock (_sync)
+        {
+            return new LicenseStorageDiagnostics(
+                RootPath,
+                Directory.Exists(RootPath),
+                File.Exists(_registrationPath),
+                File.Exists(_activationPath),
+                _lastStorageError?.GetType().FullName,
+                _lastStorageError?.Message);
         }
     }
 
     public static void RegisterInstallationAtDefaultPath(string customerName, string emailAddress)
+        => RegisterInstallation(DefaultRootPath, customerName, emailAddress);
+
+    internal static void RegisterInstallation(string rootPath, string customerName, string emailAddress)
     {
         ActivationKeyCodec.ValidateRegistration(customerName, emailAddress);
-        Directory.CreateDirectory(DefaultRootPath);
-        var registrationPath = Path.Combine(DefaultRootPath, "registration.json");
-        var activationPath = Path.Combine(DefaultRootPath, "license.json");
-        if (!File.Exists(activationPath))
+        Directory.CreateDirectory(rootPath);
+        var registrationPath = Path.Combine(rootPath, "registration.json");
+        SaveJson(registrationPath, new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant()));
+    }
+
+    public static string? GetRequiredPersistedLicenseModeAtDefaultPath() =>
+        GetRequiredPersistedLicenseMode(DefaultRootPath, ActivationKeyCodec.PublicKeyPem);
+
+    internal static string? GetRequiredPersistedLicenseMode(string rootPath, string publicKeyPem)
+    {
+        var activationPath = Path.Combine(rootPath, "license.json");
+        if (!File.Exists(activationPath)) return null;
+
+        var registrationPath = Path.Combine(rootPath, "registration.json");
+        if (!File.Exists(registrationPath))
+            throw new InvalidOperationException("The existing activation license is missing its customer registration. The preserved upgrade files were not removed.");
+
+        var registration = JsonSerializer.Deserialize<RegistrationInfo>(File.ReadAllText(registrationPath))
+            ?? throw new InvalidOperationException("The existing customer registration could not be read. The preserved upgrade files were not removed.");
+        var activation = JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(activationPath))
+            ?? throw new InvalidOperationException("The existing activation license could not be read. The preserved upgrade files were not removed.");
+        if (!ActivationKeyCodec.TryValidateWithPublicKey(
+                activation.ActivationKey,
+                registration.CustomerName,
+                registration.EmailAddress,
+                publicKeyPem,
+                out var license,
+                out var error) || license is null)
         {
-            SaveJson(registrationPath, new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant()));
+            throw new InvalidOperationException($"The existing activation license could not be validated: {error} The preserved upgrade files were not removed.");
         }
+
+        return license.Tier.ToString();
+    }
+
+    public static void RestoreUpgradeStateAtDefaultPath()
+    {
+        Directory.CreateDirectory(DefaultRootPath);
+        RestoreUpgradeFile("registration.json");
+        RestoreUpgradeFile("license.json");
+    }
+
+    public static void CompleteUpgradeStateAtDefaultPath()
+    {
+        DeleteUpgradeFile("registration.json");
+        DeleteUpgradeFile("license.json");
     }
 
     private ActivationLicense? GetValidatedLicense()
     {
+        if (_activation is null)
+        {
+            _activation = Load<ActivationRecord>(_activationPath);
+        }
+
+        if (string.IsNullOrWhiteSpace(_registration.CustomerName) ||
+            string.IsNullOrWhiteSpace(_registration.EmailAddress))
+        {
+            _registration = Load<RegistrationInfo>(_registrationPath) ?? _registration;
+        }
+
         if (_activation is null ||
             string.IsNullOrWhiteSpace(_registration.CustomerName) ||
             string.IsNullOrWhiteSpace(_registration.EmailAddress))
@@ -179,10 +253,11 @@ public sealed class LicenseService
             return null;
         }
 
-        return ActivationKeyCodec.TryValidate(
+        return ActivationKeyCodec.TryValidateWithPublicKey(
             _activation.ActivationKey,
             _registration.CustomerName,
             _registration.EmailAddress,
+            _publicKeyPem,
             out var license,
             out _)
             ? license
@@ -195,8 +270,9 @@ public sealed class LicenseService
         {
             return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path)) : default;
         }
-        catch
+        catch (Exception exception)
         {
+            _lastStorageError = exception;
             if (typeof(T) == typeof(TrialState))
             {
                 return (T)(object)new TrialState(DateOnly.FromDateTime(DateTime.Now), TrialDailyLimit);
@@ -206,12 +282,62 @@ public sealed class LicenseService
         }
     }
 
-    private static void SaveJson<T>(string path, T value)
+    private void SavePersistedJson<T>(string path, T value)
+    {
+        try
+        {
+            SaveJson(path, value);
+            _lastStorageError = null;
+        }
+        catch (Exception exception)
+        {
+            _lastStorageError = exception;
+            throw;
+        }
+    }
+
+    private void SaveActivationPair(RegistrationInfo registration, ActivationRecord activation)
+    {
+        var registrationSnapshot = ReadSnapshot(_registrationPath);
+        var activationSnapshot = ReadSnapshot(_activationPath);
+        try
+        {
+            SavePersistedJson(_registrationPath, registration);
+            SavePersistedJson(_activationPath, activation);
+        }
+        catch (Exception originalException)
+        {
+            TryRestoreSnapshot(_registrationPath, registrationSnapshot);
+            TryRestoreSnapshot(_activationPath, activationSnapshot);
+            _lastStorageError = originalException;
+            throw;
+        }
+    }
+
+    private static void SaveJson<T>(string path, T value) =>
+        WriteJsonWithFallback(path, JsonSerializer.Serialize(value), WriteJsonAtomically);
+
+    internal static void WriteJsonWithFallback(
+        string path,
+        string json,
+        Action<string, string> atomicWriter)
+    {
+        try
+        {
+            atomicWriter(path, json);
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        {
+            WriteJsonDirectly(path, json);
+        }
+    }
+
+    private static void WriteJsonAtomically(string path, string json)
     {
         var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(value));
+            File.WriteAllText(temporaryPath, json, new UTF8Encoding(false));
             File.Move(temporaryPath, path, overwrite: true);
         }
         finally
@@ -224,18 +350,73 @@ public sealed class LicenseService
         }
     }
 
+    private static void WriteJsonDirectly(string path, string json)
+    {
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
+        writer.Write(json);
+        writer.Flush();
+        stream.Flush(flushToDisk: true);
+    }
+
+    private static FileSnapshot ReadSnapshot(string path)
+    {
+        if (!File.Exists(path)) return new(false, null);
+        return new(true, File.ReadAllBytes(path));
+    }
+
+    private static void TryRestoreSnapshot(string path, FileSnapshot snapshot)
+    {
+        try
+        {
+            if (!snapshot.Exists)
+            {
+                if (File.Exists(path)) File.Delete(path);
+                return;
+            }
+
+            using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+            stream.Write(snapshot.Content!);
+            stream.Flush(flushToDisk: true);
+        }
+        catch
+        {
+            // Preserve the original save failure for activation diagnostics.
+        }
+    }
+
+    private static void RestoreUpgradeFile(string fileName)
+    {
+        var path = Path.Combine(DefaultRootPath, fileName);
+        var backupPath = path + ".upgrade-backup";
+        if (File.Exists(backupPath))
+        {
+            File.Copy(backupPath, path, overwrite: true);
+        }
+    }
+
+    private static void DeleteUpgradeFile(string fileName)
+    {
+        var backupPath = Path.Combine(DefaultRootPath, fileName + ".upgrade-backup");
+        if (File.Exists(backupPath))
+        {
+            File.Delete(backupPath);
+        }
+    }
+
     private void RollDateForward()
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         if (today > _trialState.Date)
         {
             _trialState = NewTrialState();
-            SaveJson(_trialStatePath, _trialState);
+            SavePersistedJson(_trialStatePath, _trialState);
         }
     }
 
     private static TrialState NewTrialState() => new(DateOnly.FromDateTime(DateTime.Now), 0);
 
+    private sealed record FileSnapshot(bool Exists, byte[]? Content);
     private sealed record TrialState(DateOnly Date, int Used);
     private sealed record ActivationRecord(string ActivationKey, DateTimeOffset ActivatedAt);
 }

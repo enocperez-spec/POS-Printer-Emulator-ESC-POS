@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.23"
+#define MyAppVersion "0.3.24"
 #define MyAppPublisher "POS Printer Emulator"
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -52,6 +52,7 @@ Filename: "{app}\{#MyDesktopExeName}"; Description: "Open POS Printer Emulator";
 var
   RegistrationPage: TInputQueryWizardPage;
   ExistingRegistrationFound: Boolean;
+  SetupFailed: Boolean;
 
 function ExtractJsonString(const Json: String; const PropertyName: String; var Value: String): Boolean;
 var
@@ -146,8 +147,55 @@ begin
     Log('Existing registration was incomplete; available values were prefilled for confirmation.');
 end;
 
+function EnsureDataDirectoryAccess: Boolean;
+var
+  DataPath: String;
+  ResultCode: Integer;
+begin
+  Result := True;
+  DataPath := ExpandConstant('{commonappdata}\POSPrinterEmulator');
+  if not DirExists(DataPath) then
+    exit;
+
+  if (not Exec(ExpandConstant('{sys}\takeown.exe'),
+      Format('/F "%s" /A /R /D Y', [DataPath]), '', SW_HIDE,
+      ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+  begin
+    Log(Format('Could not take ownership of the application-data directory (exit code %d).', [ResultCode]));
+    Result := False;
+    exit;
+  end;
+
+  if (not Exec(ExpandConstant('{sys}\icacls.exe'),
+      Format('"%s" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-19:(OI)(CI)M', [DataPath]),
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+  begin
+    Log(Format('Could not normalize the application-data permissions (exit code %d).', [ResultCode]));
+    Result := False;
+    exit;
+  end;
+
+  if (not Exec(ExpandConstant('{sys}\icacls.exe'),
+      Format('"%s\*" /reset /T /C', [DataPath]), '', SW_HIDE,
+      ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+  begin
+    Log(Format('Could not reset child application-data permissions (exit code %d).', [ResultCode]));
+    Result := False;
+    exit;
+  end;
+
+  if (not Exec(ExpandConstant('{sys}\icacls.exe'),
+      Format('"%s\*" /inheritance:e /T /C', [DataPath]), '', SW_HIDE,
+      ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+  begin
+    Log(Format('Could not enable child application-data inheritance (exit code %d).', [ResultCode]));
+    Result := False;
+  end;
+end;
+
 procedure InitializeWizard;
 begin
+  SetupFailed := False;
   RegistrationPage := CreateInputQueryPage(wpSelectDir,
     'Register POS Printer Emulator',
     'Enter the customer information for this installation.',
@@ -156,6 +204,7 @@ begin
   RegistrationPage.Add('Email address:', False);
   RegistrationPage.Values[0] := ExpandConstant('{param:CustomerName|}');
   RegistrationPage.Values[1] := ExpandConstant('{param:CustomerEmail|}');
+  EnsureDataDirectoryAccess;
   LoadExistingRegistration;
 end;
 
@@ -247,6 +296,8 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
+  RegistrationPath: String;
+  LicensePath: String;
 begin
   if not RegistrationIsValid(False) then
   begin
@@ -262,7 +313,103 @@ begin
     exit;
   end;
 
+  if not EnsureDataDirectoryAccess then
+  begin
+    Result := 'Setup could not access the existing POS Printer Emulator license data. Run setup as an administrator and try again.';
+    exit;
+  end;
+
+  RegistrationPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\registration.json');
+  LicensePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\license.json');
+  if FileExists(RegistrationPath + '.upgrade-backup') and
+     (not DeleteFile(RegistrationPath + '.upgrade-backup')) then
+  begin
+    Result := 'Setup could not refresh the preserved customer registration from an earlier update. Run setup as an administrator and try again.';
+    exit;
+  end;
+  if FileExists(LicensePath + '.upgrade-backup') and
+     (not DeleteFile(LicensePath + '.upgrade-backup')) then
+  begin
+    Result := 'Setup could not refresh the preserved activation license from an earlier update. Run setup as an administrator and try again.';
+    exit;
+  end;
+  Log('Cleared any prior upgrade backup generation before preserving the current registration and license.');
+  if FileExists(RegistrationPath) then
+  begin
+    if not CopyFile(RegistrationPath, RegistrationPath + '.upgrade-backup', True) then
+    begin
+      Result := 'Setup could not preserve the existing customer registration. Close POS Printer Emulator and run setup again.';
+      exit;
+    end;
+    Log('Preserved the existing customer registration for this upgrade.');
+  end;
+  if FileExists(LicensePath) then
+  begin
+    if not CopyFile(LicensePath, LicensePath + '.upgrade-backup', True) then
+    begin
+      Result := 'Setup could not preserve the existing activation license. Close POS Printer Emulator and run setup again.';
+      exit;
+    end;
+    Log('Preserved the existing activation license for this upgrade.');
+  end;
+
   Result := '';
+end;
+
+function RestorePreservedUpgradeFile(const FilePath: String): Boolean;
+var
+  BackupPath: String;
+begin
+  Result := True;
+  BackupPath := FilePath + '.upgrade-backup';
+  if not FileExists(BackupPath) then
+    exit;
+
+  if FileExists(FilePath) and (not DeleteFile(FilePath)) then
+  begin
+    Log('Could not remove the current upgrade file before restoring its preserved copy: ' + FilePath);
+    Result := False;
+    exit;
+  end;
+
+  if not CopyFile(BackupPath, FilePath, True) then
+  begin
+    Log('Could not restore the preserved upgrade file: ' + FilePath);
+    Result := False;
+    exit;
+  end;
+
+  Log('Restored the preserved upgrade file: ' + FilePath);
+end;
+
+function RestorePreservedUpgradeState: Boolean;
+var
+  DataPath: String;
+begin
+  DataPath := ExpandConstant('{commonappdata}\POSPrinterEmulator');
+  Result :=
+    RestorePreservedUpgradeFile(DataPath + '\registration.json') and
+    RestorePreservedUpgradeFile(DataPath + '\license.json');
+end;
+
+function CompletePreservedUpgradeState: Boolean;
+var
+  DataPath: String;
+begin
+  DataPath := ExpandConstant('{commonappdata}\POSPrinterEmulator');
+  Result := True;
+  if FileExists(DataPath + '\registration.json.upgrade-backup') and
+     (not DeleteFile(DataPath + '\registration.json.upgrade-backup')) then
+  begin
+    Log('Could not remove the completed registration upgrade backup.');
+    Result := False;
+  end;
+  if FileExists(DataPath + '\license.json.upgrade-backup') and
+     (not DeleteFile(DataPath + '\license.json.upgrade-backup')) then
+  begin
+    Log('Could not remove the completed activation upgrade backup.');
+    Result := False;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -273,28 +420,52 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
+    if not RestorePreservedUpgradeState then
+    begin
+      SetupFailed := True;
+      RaiseException('POS Printer Emulator could not restore the existing registration and license. The preserved copies were not removed.');
+    end;
+
     if not IsWebView2Installed then
     begin
       WizardForm.StatusLabel.Caption := 'Installing the desktop HTML component...';
       if (not Exec(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe'), '/silent /install',
         '', SW_HIDE, ewWaitUntilTerminated, ResultCode)) or
         ((ResultCode <> 0) and (ResultCode <> 3010)) then
+      begin
+        SetupFailed := True;
         RaiseException('POS Printer Emulator could not install its desktop HTML component. Setup did not complete.');
+      end;
     end;
 
     WizardForm.StatusLabel.Caption := 'Configuring the POS Printer Emulator background service...';
-    InstallArguments := Format('--install-windows --customer-name "%s" --email "%s"', [Trim(RegistrationPage.Values[0]), Trim(RegistrationPage.Values[1])]);
+    InstallArguments := Format('--install-windows --upgrade-state-restored --customer-name "%s" --email "%s"', [Trim(RegistrationPage.Values[0]), Trim(RegistrationPage.Values[1])]);
     if (not Exec(ExpandConstant('{app}\{#MyAppExeName}'), InstallArguments,
       ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode)) or
       (ResultCode <> 0) then
     begin
+      SetupFailed := True;
       Log(Format('POS Printer Emulator C# installer command failed with exit code %d.', [ResultCode]));
       if LoadStringFromFile(ExpandConstant('{app}\POSPrinterEmulator-setup-error.txt'), ErrorDetails) then
         RaiseException('POS Printer Emulator could not configure its Windows service:' + #13#10 + #13#10 + String(ErrorDetails))
       else
         RaiseException('POS Printer Emulator could not configure its Windows service. Setup did not complete.');
     end;
+
+    if not CompletePreservedUpgradeState then
+    begin
+      SetupFailed := True;
+      RaiseException('POS Printer Emulator was updated, but setup could not remove its protected recovery files. Run setup again as an administrator.');
+    end;
   end;
+end;
+
+function GetCustomSetupExitCode: Integer;
+begin
+  if SetupFailed then
+    Result := 1
+  else
+    Result := 0;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

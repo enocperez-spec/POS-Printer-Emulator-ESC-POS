@@ -118,6 +118,14 @@ public sealed record LicenseStatus(
 
 public sealed record ActivationRequest(string CustomerName, string EmailAddress, string ActivationKey);
 
+public sealed record LicenseStorageDiagnostics(
+    string DataPath,
+    bool DataDirectoryExists,
+    bool RegistrationFileExists,
+    bool LicenseFileExists,
+    string? LastErrorType,
+    string? LastErrorMessage);
+
 public sealed record ServiceStatus(
     bool Listening,
     string Listener,

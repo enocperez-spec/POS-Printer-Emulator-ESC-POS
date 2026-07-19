@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, LoaderCircle, Printer, RotateCw, Server, XCircle } from 'lucide-react'
 import { api } from './api'
-import type { PrinterInstallRequest, PrinterInstallResult, PrinterSetupStatus } from './types'
+import type { PrinterInstallRequest, PrinterInstallResult, PrinterPortSelection, PrinterSetupStatus } from './types'
 
 type DesktopBridge = { postMessage: (message: unknown) => void; addEventListener: (type: 'message', listener: (event: MessageEvent) => void) => void; removeEventListener: (type: 'message', listener: (event: MessageEvent) => void) => void }
 const desktopBridge = () => (window as Window & { chrome?: { webview?: DesktopBridge } }).chrome?.webview
@@ -10,7 +10,10 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
   const [step, setStep] = useState(1)
   const [sameComputer, setSameComputer] = useState(true)
   const [ipAddress, setIpAddress] = useState('127.0.0.1')
-  const [port] = useState(9100)
+  const [port, setPort] = useState(9100)
+  const [portSelection, setPortSelection] = useState<PrinterPortSelection>()
+  const [portError, setPortError] = useState<string>()
+  const [resolvingPort, setResolvingPort] = useState(false)
   const [printerName, setPrinterName] = useState('POS Printer Emulator')
   const [driver, setDriver] = useState<PrinterSetupStatus>()
   const [driverError, setDriverError] = useState<string>()
@@ -45,9 +48,43 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
   function chooseLocation(value: boolean) {
     setSameComputer(value)
     setIpAddress(value ? '127.0.0.1' : '')
+    setPort(9100)
+    setPortSelection(undefined)
+    setPortError(undefined)
   }
 
-  function install() {
+  async function resolvePort() {
+    setResolvingPort(true)
+    setPortError(undefined)
+    try {
+      const selection = await api.availablePrinterPort(printerName.trim(), ipAddress)
+      setPort(selection.port)
+      setPortSelection(selection)
+      return selection
+    } catch (cause) {
+      setPortError(cause instanceof Error ? cause.message : 'Windows printer-port availability could not be checked.')
+      return undefined
+    } finally {
+      setResolvingPort(false)
+    }
+  }
+
+  async function continueWizard() {
+    if (step !== 3) {
+      setStep(value => value + 1)
+      return
+    }
+    if (await resolvePort()) setStep(4)
+  }
+
+  async function install() {
+    const latestSelection = await resolvePort()
+    if (!latestSelection) return
+    if (latestSelection.port !== port) {
+      setPortSelection({ ...latestSelection, message: `Port ${port} became assigned while you were reviewing the configuration. Port ${latestSelection.port} is now selected. Review the updated summary, then click Install Printer again.` })
+      return
+    }
+
     const bridge = desktopBridge()
     if (!bridge) {
       setResult({ ...request, success: false, driverName: driver?.driverName ?? 'EPSON TM-T88V Receipt5', message: 'Open this wizard in the POS Printer Emulator Windows desktop application to install a printer.', technicalDetails: 'The Windows desktop bridge was not available.' })
@@ -59,7 +96,13 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
     bridge.postMessage({ type: 'install-printer', printer: request })
   }
 
-  function retry() { setDetailsVisible(false); setResult(undefined); setStep(4) }
+  async function retry() {
+    setDetailsVisible(false)
+    if (await resolvePort()) {
+      setResult(undefined)
+      setStep(4)
+    }
+  }
   function printTest() { setTestMessage('Sending test receipt…'); desktopBridge()?.postMessage({ type: 'print-printer-test', printerName }) }
 
   return (
@@ -76,7 +119,7 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
           <label className={!sameComputer ? 'selected' : ''}><input type="radio" checked={!sameComputer} onChange={() => chooseLocation(false)} /><strong>No, another computer</strong><span>The POS sends receipts across your local network</span></label>
         </fieldset>
         {!sameComputer && <label className="wizard-field">Emulator computer IP address<input value={ipAddress} onChange={event => setIpAddress(event.target.value)} placeholder="Example: 192.168.1.25" inputMode="decimal" /><small>On the computer running this emulator, open Windows Settings → Network & internet to find its IPv4 address.</small>{ipAddress && !ipValid && <em>Enter a valid IPv4 address.</em>}</label>}
-        <div className="automatic-value"><span>Connection port</span><strong>9100 · selected automatically</strong></div>
+        <div className="automatic-value"><span>Connection port</span><strong>Starts at 9100 · availability checked automatically</strong></div>
       </div>}
 
       {step === 2 && <div className="wizard-page">
@@ -101,6 +144,7 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
           </dl>
           {driver.driverInstalled && driver.statusApiVersion !== driver.recommendedStatusApiVersion && <p className="compatibility-note">The core printer driver is ready. A different Status API version was detected; this does not prevent receipt emulation.</p>}
         </>}
+        {portError && <div className="wizard-alert error"><XCircle size={20} /><div><strong>Printer port check could not finish</strong><p>{portError}</p></div></div>}
       </div>}
 
       {step === 4 && <div className="wizard-page">
@@ -110,6 +154,10 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
           <div><dt>Epson driver</dt><dd>{driver?.driverName}</dd></div><div><dt>Driver installation</dt><dd>{driver?.driverInstalled ? 'Already installed' : 'Install automatically'}</dd></div>
           <div><dt>POS location</dt><dd>{sameComputer ? 'Same computer as emulator' : 'Another computer'}</dd></div>
         </dl>
+        {portSelection && <div className={`wizard-alert ${portSelection.automaticallyAdjusted ? 'info' : 'success'}`}>
+          {portSelection.automaticallyAdjusted ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
+          <div><strong>{portSelection.automaticallyAdjusted ? `Port ${port} selected automatically` : `Port ${port} is available`}</strong><p>{portSelection.message}</p></div>
+        </div>}
       </div>}
 
       {step === 5 && <div className="wizard-page wizard-installing"><LoaderCircle className="spin" size={42} /><h2>Installing your printer…</h2><p>Approve the Windows security prompt if it appears. Keep this window open while the Epson driver, printer port, and Windows printer are configured.</p><div className="installation-list"><span>Checking Epson components</span><span>Creating the printer connection</span><span>Adding and verifying the Windows printer</span></div></div>}
@@ -125,12 +173,14 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
         </>}
       </div>}
 
+      {step !== 3 && portError && <div className="wizard-alert error"><XCircle size={20} /><div><strong>Printer port check could not finish</strong><p>{portError}</p></div></div>}
+
       {step !== 5 && <footer className="wizard-actions">
         <button className="secondary-action" onClick={onCancel}>{step === 6 ? 'Finish' : 'Cancel'}</button>
         <div>
           {step > 1 && step < 5 && step !== 6 && <button className="secondary-action" onClick={() => setStep(value => value - 1)}><ChevronLeft size={16} /> Back</button>}
-          {step < 4 && <button className="primary-action" disabled={!canContinue} onClick={() => setStep(value => value + 1)}>Continue <ChevronRight size={16} /></button>}
-          {step === 4 && <button className="primary-action" disabled={!driver || (!driver.driverInstalled && !driver.driverPackageAvailable)} onClick={install}><Printer size={16} /> Install Printer</button>}
+          {step < 4 && <button className="primary-action" disabled={!canContinue || resolvingPort} onClick={continueWizard}>{resolvingPort ? 'Checking port…' : 'Continue'} {!resolvingPort && <ChevronRight size={16} />}</button>}
+          {step === 4 && <button className="primary-action" disabled={resolvingPort || !driver || (!driver.driverInstalled && !driver.driverPackageAvailable)} onClick={install}><Printer size={16} /> {resolvingPort ? 'Rechecking port…' : 'Install Printer'}</button>}
           {step === 6 && result?.success && <button className="primary-action" onClick={printTest}><Printer size={16} /> Print Test Receipt</button>}
           {step === 6 && !result?.success && <button className="primary-action" onClick={retry}><RotateCw size={16} /> Retry Installation</button>}
         </div>

@@ -69,12 +69,13 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 7. **v0.3.21 — Enterprise multiple printer listeners (released 2026-07-18).** Host independently configured Enterprise printer endpoints with separate names, ports, profiles, status state, buffers, counters, and Activity filtering while Trial and Pro keep one listener.
 8. **v0.3.22 — Receipt workflow regression fixes (released 2026-07-18).** Restore near-instant Test Receipt display and reliable Clear All deletion when obsolete legacy history files are locked.
 9. **v0.3.23 — Activation and Printer Setup Wizard fixes (released 2026-07-19).** Keep valid Enterprise activation independent from optional storage recovery and create Windows printer queues through the native printer API instead of assigning the read-only WMI printer name.
-10. **v0.3.24 — Receipt comparison and automated validation (next).** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-11. **v0.3.25 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
-12. **v0.3.26 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
-13. Service-to-viewer authentication and installer repair mode.
-14. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
-15. Optional online activation revocation and license transfer workflow.
-16. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-17. PNG export and deterministic PDF generation.
-18. Production code-signing and expanded unattended deployment validation.
+10. **v0.3.24 — Upgrade licensing and Printer Setup safeguards (released 2026-07-19).** Preserve paid licensing through updates, make license persistence compatible with hardened Windows data folders, give Trial users safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100 with matching Enterprise listeners.
+11. **v0.3.25 — Receipt comparison and automated validation (next).** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+12. **v0.3.26 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
+13. **v0.3.27 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+14. Service-to-viewer authentication and installer repair mode.
+15. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
+16. Optional online activation revocation and license transfer workflow.
+17. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+18. PNG export and deterministic PDF generation.
+19. Production code-signing and expanded unattended deployment validation.

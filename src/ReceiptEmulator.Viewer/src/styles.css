@@ -528,7 +528,7 @@ button { color: inherit; }
 .activation-form input, .activation-form textarea { width: 100%; border: 1px solid var(--border); border-radius: 7px; padding: 10px 11px; color: var(--text); background: var(--surface); outline: 0; font: 13px/1.4 "Segoe UI", sans-serif; }
 .activation-form textarea { resize: vertical; min-height: 86px; font-family: "Cascadia Mono", Consolas, monospace; font-size: 11px; }
 .activation-form input:focus, .activation-form textarea:focus { border-color: #70a8e5; box-shadow: 0 0 0 3px rgb(61 139 222 / 14%); }
-.key-field, .activation-error, .activate-button, .activation-note { grid-column: 1 / -1; }
+.key-field, .activation-error, .activation-diagnostics, .activate-button, .activation-note { grid-column: 1 / -1; }
 .activation-error { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid #edbe8a; border-radius: 7px; color: #8c4100; background: var(--amber-soft); font-size: 12px; line-height: 1.4; }
 .activate-button { height: 42px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 7px; color: #fff; background: #1169c9; font-size: 13px; font-weight: 700; cursor: pointer; }
 .activate-button:disabled { opacity: .6; cursor: wait; }

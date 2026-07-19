@@ -20,7 +20,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 - All-in-one Windows installer—customers do not separately install .NET, WebView2, Node.js, CMake, a database, or printer utilities.
 - Service, firewall, health-check, uninstall, build, publish, and developer utility operations are implemented in C# without PowerShell.
 - Automatic Windows Service registration, delayed startup, failure recovery, and private/domain firewall configuration.
-- Guided Printer Setup Wizard that detects and installs the signed Epson TM-T88V Receipt5 driver, creates the RAW TCP/IP port and Windows queue, verifies the connection, rolls back incomplete setup, and sends a test receipt.
+- Guided Printer Setup Wizard that detects and installs the signed Epson TM-T88V Receipt5 driver, selects the first free port from 9100 upward, aligns adjusted Enterprise ports with emulator listeners, creates the Windows queue, verifies the connection, rolls back incomplete setup, and sends a test receipt.
 - Privacy-safe license and usage reporting with a password- and authenticator-protected Admin Portal; receipt contents and raw printer data never leave the customer computer.
 - Clean uninstall through Windows **Installed apps** or the Start Menu.
 
@@ -32,7 +32,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.23-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.24-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -83,7 +83,7 @@ Activation is validated offline using a public-key signature. The customer does 
 
 ## License and usage dashboard
 
-Version 0.3.23 reports installation registration, Trial, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
+Version 0.3.24 reports installation registration, Trial, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
@@ -139,7 +139,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.23-win-x64.exe`
+Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.24-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -159,7 +159,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.23 artifacts/installer/POSPrinterEmulatorSetup-0.3.23-win-x64.exe --title "POS Printer Emulator 0.3.23" --notes "Fixes Enterprise activation HTTP 500 failures and the Printer Setup Wizard Invalid parameter error."
+gh release create v0.3.24 artifacts/installer/POSPrinterEmulatorSetup-0.3.24-win-x64.exe --title "POS Printer Emulator 0.3.24" --notes "Preserves paid licenses during upgrades, adds Trial-safe activation diagnostics, and prevents Windows printer-port conflicts."
 ```
 
 ## Issue customer activation keys
@@ -177,7 +177,7 @@ The protected Admin Portal License Manager unifies manual and purchase-issued ke
 For unattended installation, provide the required registration fields:
 
 ```console
-POSPrinterEmulatorSetup-0.3.23-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
+POSPrinterEmulatorSetup-0.3.24-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
 ```
 
 ## Configuration
@@ -194,7 +194,7 @@ The `Printer` section supplies the compatible default listener for Trial and Pro
 
 ## Current MVP limitations
 
-Version 0.3.23 stores Pro and Enterprise history plus Enterprise listener configuration in one local SQLite database with a 500-job history limit, while Trial remains session-only. Existing JSON and v0.3.20 SQLite history migrate transactionally. Customer-facing database maintenance, receipt comparison, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
+Version 0.3.24 stores Pro and Enterprise history plus Enterprise listener configuration in one local SQLite database with a 500-job history limit, while Trial remains session-only. Existing JSON and v0.3.20 SQLite history migrate transactionally. Customer-facing database maintenance, receipt comparison, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
 
 ## Release roadmap
 
@@ -209,9 +209,10 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.21 — Enterprise multiple printer listeners:** Add persisted listener configuration, isolated runtimes, Enterprise UI/API gates, routing, filtering, live counters, dynamic-port firewall support, and independent fault handling.
 - **Released in v0.3.22 — Receipt workflow regression fixes:** Restore near-instant Test Receipt display and reliable Clear All deletion when obsolete legacy history files are locked.
 - **Released in v0.3.23 — Activation and Printer Setup Wizard fixes:** Prevent valid Enterprise activation from failing when optional paid storage cannot initialize, and create Windows printer queues through the native printer API without the WMI `Invalid parameter` failure.
-- **v0.3.24 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.25 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
-- **v0.3.26 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.24 — Upgrade licensing and Printer Setup safeguards:** Preserve paid licensing during updates, recover from hardened-folder persistence failures, provide Trial-safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100.
+- **v0.3.25 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.26 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
+- **v0.3.27 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

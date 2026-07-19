@@ -51,7 +51,7 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.23',
+  version: '0.3.24',
   license: {
     mode: 'Trial', hasProAccess: false, isEnterprise: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -760,6 +760,7 @@ function LicenseSettings({ status, onActivated }: {
           <label>Email address<input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" /></label>
           <label className="key-field">Activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
           {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
+          {message && <a className="download-diagnostics activation-diagnostics" href="/api/support/activation-diagnostics" download><Download size={17} /> Download Activation Diagnostics</a>}
           <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : 'Validate and activate'}</button>
           <p className="activation-note">A Pro or Enterprise activation key unlocks its license level immediately without reinstalling.</p>
         </form>

@@ -12,9 +12,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.23 — released 2026-07-19**
+**Current public release: v0.3.24 — released 2026-07-19**
 
-**Next release: v0.3.24 — Receipt comparison and automated validation**
+**Next release: v0.3.25 — Receipt comparison and automated validation**
 
 ## Completed releases
 
@@ -46,6 +46,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.21 | Released | Enterprise multiple printer listeners, isolated runtimes, and listener-aware Activity |
 | v0.3.22 | Released | Test Receipt performance and reliable Clear All job deletion |
 | v0.3.23 | Released | Enterprise activation and Printer Setup Wizard maintenance fixes |
+| v0.3.24 | Released | Upgrade licensing and Printer Setup safeguards |
 
 ## Scheduled releases
 
@@ -221,9 +222,32 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** Valid Enterprise keys no longer produce HTTP 500, malformed keys fail safely, the Printer Setup Wizard creates the Windows queue without `Invalid parameter`, the wizard sends its Test Receipt, and all automated and packaging checks pass.
 
-### v0.3.24 — Receipt comparison and automated validation
+### v0.3.24 — Upgrade licensing and Printer Setup safeguards
 
-**Status:** Next
+**Status:** Released 2026-07-19
+
+**Purpose:** Correct the v0.3.23 licensing regression and prevent Printer Setup from assigning one TCP/IP port number to multiple Windows printers.
+
+**Planned release scope:**
+
+- Preserve the existing registration and activation files as a matched pair before an upgrade changes the service or application files.
+- Refresh and restore the preserved pair as one upgrade generation, then retain it until the updated service reports the expected paid license mode.
+- Fall back to direct file overwrite when the hardened Windows data directory permits updating an existing license file but denies temporary-file replacement.
+- Keep a failed two-file activation save from leaving an old key paired with new customer registration values.
+- Retry persisted license loading after a temporary startup read failure.
+- Provide a privacy-safe Activation Diagnostics download on the License page for Trial users without unlocking the paid Support section.
+- Add automated persistence, restart, and startup-recovery regression tests.
+- Scan Windows printer-to-port assignments and select the first available port beginning at 9100.
+- Display an automatically adjusted port in the configuration summary before administrator approval.
+- For Enterprise, create or reuse the matching emulator listener before adding a Windows queue on an automatically adjusted port; explain the Enterprise requirement before installing an additional Trial or Pro queue.
+- Recheck the selected port before, during, and immediately after queue creation, rolling back safely if another printer claims it.
+- Preserve idempotent reinstall of the same printer name and configuration.
+
+**Completion verification:** All 98 automated tests pass. An installed Enterprise v0.3.23 system upgraded and completed a v0.3.24 maintenance reinstall without reactivation or re-entering registration. Trial-safe Activation Diagnostics passed authorization and privacy checks. With an existing Windows queue on 9100, the installed service selected 9101, created the matching Enterprise listener and an `EPSON TM-T88V Receipt5` queue, received its 112-byte ESC/POS test job, and then selected 9102 for the next printer. Setup retains conflict checks before, during, and after queue creation and rolls back incomplete state.
+
+### v0.3.25 — Receipt comparison and automated validation
+
+**Status:** Planned after v0.3.24 maintenance release
 
 **Purpose:** Turn the emulator into a repeatable compatibility-testing tool for POS changes, printer migrations, and regression testing.
 
@@ -240,7 +264,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.25 — Enhanced support package and connection diagnostics
+### v0.3.26 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -259,7 +283,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
-### v0.3.26 — Guided update installation and restart
+### v0.3.27 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -287,7 +311,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.26.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.27.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 

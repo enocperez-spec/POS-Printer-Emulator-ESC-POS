@@ -87,6 +87,33 @@ app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
 
+app.MapGet("/api/printer-setup/available-port", (
+    string printerName,
+    string ipAddress,
+    int? startingPort,
+    LicenseService license) =>
+{
+    try
+    {
+        var selection = PrinterSetupManager.GetAvailablePort(
+            printerName,
+            ipAddress,
+            startingPort ?? PrinterListenerDefaults.DefaultPort);
+        if (selection.AutomaticallyAdjusted && !license.HasEnterpriseAccess)
+        {
+            return Results.Problem(
+                $"Port {PrinterListenerDefaults.DefaultPort} is already assigned to another Windows printer. " +
+                $"Installing an additional printer on port {selection.Port} requires an Enterprise License so the emulator can listen on that port.",
+                statusCode: 403);
+        }
+        return Results.Ok(selection);
+    }
+    catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
+});
+
 app.MapGet("/api/listeners", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
     if (!license.HasEnterpriseAccess)
@@ -495,6 +522,30 @@ app.MapGet("/api/support/diagnostics", (LicenseService license, PrinterListenerM
     return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
 });
 
+app.MapGet("/api/support/activation-diagnostics", (LicenseService license) =>
+{
+    var status = license.GetStatus();
+    var storage = license.GetStorageDiagnostics();
+    var report = new StringBuilder()
+        .AppendLine("POS Printer Emulator Activation Diagnostics")
+        .AppendLine($"Generated: {DateTimeOffset.Now:O}")
+        .AppendLine($"Application version: {ProductInfo.Version}")
+        .AppendLine($"Operating system: {Environment.OSVersion}")
+        .AppendLine($"Runtime: {Environment.Version}")
+        .AppendLine($"64-bit process: {Environment.Is64BitProcess}")
+        .AppendLine($"License mode: {status.Mode}")
+        .AppendLine($"Data path: {storage.DataPath}")
+        .AppendLine($"Data directory exists: {storage.DataDirectoryExists}")
+        .AppendLine($"Registration file exists: {storage.RegistrationFileExists}")
+        .AppendLine($"License file exists: {storage.LicenseFileExists}")
+        .AppendLine($"Last storage error type: {storage.LastErrorType ?? "None"}")
+        .AppendLine($"Last storage error: {storage.LastErrorMessage ?? "None"}")
+        .AppendLine()
+        .AppendLine("This report does not contain the activation key, customer registration data, or receipt contents.")
+        .ToString();
+    return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Activation-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+});
+
 app.MapPost("/api/license/activate", async (
     ActivationRequest request,
     LicenseService license,
@@ -519,7 +570,7 @@ app.MapPost("/api/license/activate", async (
     {
         logger.LogError(exception, "A validated license could not be saved to local storage");
         return Results.Problem(
-            "The activation key could not be saved on this computer. Open Settings > Support to export the application logs, then try again.",
+            "The activation key could not be saved on this computer. Download Activation Diagnostics from this License page and send it to support, then try again.",
             statusCode: 500);
     }
 

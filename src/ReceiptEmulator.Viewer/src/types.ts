@@ -133,6 +133,12 @@ export type PrinterSetupStatus = {
   message: string
 }
 
+export type PrinterPortSelection = {
+  port: number
+  automaticallyAdjusted: boolean
+  message: string
+}
+
 export type PrinterInstallRequest = {
   printerName: string
   ipAddress: string

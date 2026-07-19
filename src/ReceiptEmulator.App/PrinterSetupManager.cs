@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Management;
 using System.Net;
+using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -39,6 +40,11 @@ public sealed record PrinterInstallResult(
     string DriverName,
     string? TechnicalDetails = null);
 
+public sealed record PrinterPortSelection(
+    int Port,
+    bool AutomaticallyAdjusted,
+    string Message);
+
 public static class PrinterSetupManager
 {
     public const string DriverName = "EPSON TM-T88V Receipt5";
@@ -46,6 +52,9 @@ public static class PrinterSetupManager
     public const string RecommendedDriverVersion = "5.12.0.0";
     public const string RecommendedStatusApiVersion = "6.7.0.0";
     private const string QueueComment = "Managed by POS Printer Emulator";
+    private const string LocalListenerApi = "http://127.0.0.1:5187/api/listeners";
+    private const string WindowsPrinterRegistryPath = @"SYSTEM\CurrentControlSet\Control\Print\Printers";
+    private const string WindowsTcpPortRegistryPath = @"SYSTEM\CurrentControlSet\Control\Print\Monitors\Standard TCP/IP Port\Ports";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public static PrinterSetupStatus GetStatus()
@@ -86,13 +95,45 @@ public static class PrinterSetupManager
             installer is not null, message);
     }
 
+    public static PrinterPortSelection GetAvailablePort(
+        string printerName,
+        string ipAddress,
+        int startingPort = PrinterListenerDefaults.DefaultPort)
+    {
+        Validate(new PrinterInstallRequest(printerName, ipAddress, startingPort, ipAddress == "127.0.0.1"));
+        if (!OperatingSystem.IsWindows())
+        {
+            return new(startingPort, false, $"Port {startingPort} is the default connection port.");
+        }
+
+        var port = FindFirstAvailablePort(startingPort, GetAssignedPrinterPorts(printerName));
+        return port == startingPort
+            ? new(port, false, $"Port {port} is available.")
+            : new(port, true, $"Port {startingPort} is already assigned to another Windows printer. Port {port} was selected automatically.");
+    }
+
+    internal static int FindFirstAvailablePort(int startingPort, IEnumerable<int> assignedPorts)
+    {
+        if (startingPort is < 1 or > 65535)
+            throw new ArgumentOutOfRangeException(nameof(startingPort), "The starting port must be between 1 and 65535.");
+
+        var assigned = assignedPorts.ToHashSet();
+        for (var candidate = startingPort; candidate <= 65535; candidate++)
+        {
+            if (!assigned.Contains(candidate)) return candidate;
+        }
+
+        throw new InvalidOperationException($"No available Windows printer port was found at or above {startingPort}.");
+    }
+
     public static async Task<int> InstallFromFilesAsync(string requestPath, string resultPath, CancellationToken cancellationToken)
     {
         PrinterInstallResult result;
+        PrinterInstallRequest? request = null;
         try
         {
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Printer setup requires Windows.");
-            var request = JsonSerializer.Deserialize<PrinterInstallRequest>(
+            request = JsonSerializer.Deserialize<PrinterInstallRequest>(
                 await File.ReadAllTextAsync(requestPath, cancellationToken), JsonOptions)
                 ?? throw new InvalidOperationException("The printer setup request was empty.");
             Validate(request);
@@ -101,7 +142,8 @@ public static class PrinterSetupManager
         catch (Exception exception)
         {
             Log($"Printer installation failed: {exception}");
-            result = new(false, FriendlyMessage(exception), "POS Printer Emulator", "127.0.0.1", 9100,
+            result = new(false, FriendlyMessage(exception), request?.PrinterName ?? "POS Printer Emulator",
+                request?.IpAddress ?? "127.0.0.1", request?.Port ?? PrinterListenerDefaults.DefaultPort,
                 DriverName, exception.ToString());
         }
 
@@ -115,6 +157,7 @@ public static class PrinterSetupManager
     {
         var createdPort = false;
         var createdPrinter = false;
+        string? createdListenerId = null;
         var portName = MakePortName(request.IpAddress, request.Port);
         Log($"Starting printer installation: name='{request.PrinterName}', endpoint={request.IpAddress}:{request.Port}.");
 
@@ -129,8 +172,12 @@ public static class PrinterSetupManager
                 }
             }
 
+            EnsurePortIsAvailable(request.PrinterName, request.Port);
+            createdListenerId = await EnsureEmulatorListenerAsync(request, cancellationToken);
             createdPort = EnsureTcpPort(portName, request.IpAddress, request.Port);
+            EnsurePortIsAvailable(request.PrinterName, request.Port);
             createdPrinter = EnsurePrinter(request.PrinterName, portName);
+            EnsurePortIsAvailable(request.PrinterName, request.Port);
 
             if (!await CanConnectAsync(request.IpAddress, request.Port, cancellationToken))
             {
@@ -150,7 +197,92 @@ public static class PrinterSetupManager
         {
             if (createdPrinter) TryDeletePrinter(request.PrinterName);
             if (createdPort) TryDeletePort(portName);
+            if (createdListenerId is not null)
+                await TryDeleteSetupListenerAsync(createdListenerId, cancellationToken);
             throw;
+        }
+    }
+
+    private static async Task<string?> EnsureEmulatorListenerAsync(
+        PrinterInstallRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Port == PrinterListenerDefaults.DefaultPort) return null;
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        using var listResponse = await client.GetAsync(LocalListenerApi, cancellationToken);
+        if (listResponse.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(
+                $"Port {PrinterListenerDefaults.DefaultPort} is already assigned to another Windows printer. " +
+                $"Installing an additional printer on port {request.Port} requires an Enterprise License so the emulator can listen on that port.");
+        }
+
+        listResponse.EnsureSuccessStatusCode();
+        var collection = await listResponse.Content.ReadFromJsonAsync<PrinterListenerCollectionResponse>(
+            JsonOptions,
+            cancellationToken) ?? throw new InvalidOperationException("The emulator did not return its printer listener configuration.");
+        var existing = collection.Listeners.FirstOrDefault(listener => listener.Port == request.Port);
+        if (existing is not null)
+        {
+            if (!existing.Listening)
+            {
+                using var startResponse = await client.PostAsync(
+                    $"{LocalListenerApi}/{Uri.EscapeDataString(existing.Id)}/start",
+                    content: null,
+                    cancellationToken);
+                startResponse.EnsureSuccessStatusCode();
+            }
+            return null;
+        }
+
+        var input = BuildSetupListenerInput(request.PrinterName, request.Port);
+        using var createResponse = await client.PostAsJsonAsync(LocalListenerApi, input, JsonOptions, cancellationToken);
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<PrinterListenerResponse>(
+            JsonOptions,
+            cancellationToken) ?? throw new InvalidOperationException("The emulator did not confirm the new printer listener.");
+        if (!created.Listening)
+        {
+            await TryDeleteSetupListenerAsync(created.Id, cancellationToken);
+            throw new InvalidOperationException($"The emulator created port {request.Port}, but it did not start listening.");
+        }
+
+        Log($"Created Enterprise printer listener '{created.Name}' on port {created.Port} for Windows printer setup.");
+        return created.Id;
+    }
+
+    internal static PrinterListenerInput BuildSetupListenerInput(string printerName, int port)
+    {
+        var suffix = $" - {port}";
+        var baseName = printerName.Trim();
+        if (baseName.Length > 80 - suffix.Length) baseName = baseName[..(80 - suffix.Length)];
+        var name = baseName + suffix;
+        return new PrinterListenerInput(
+            name,
+            PrinterListenerDefaults.DefaultBindAddress,
+            port,
+            PrinterProfileService.EpsonTmT88VId,
+            true,
+            PrinterListenerDefaults.DefaultIdleJobTimeoutMilliseconds,
+            PrinterListenerDefaults.DefaultMaximumJobBytes,
+            new PrinterListenerBufferConfiguration());
+    }
+
+    private static async Task TryDeleteSetupListenerAsync(string listenerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            using var response = await client.DeleteAsync(
+                $"{LocalListenerApi}/{Uri.EscapeDataString(listenerId)}",
+                cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                Log($"Printer listener rollback warning: the local service returned HTTP {(int)response.StatusCode}.");
+        }
+        catch (Exception exception)
+        {
+            Log($"Printer listener rollback warning: {exception.Message}");
         }
     }
 
@@ -207,6 +339,108 @@ public static class PrinterSetupManager
         instance.Put();
         Log($"Created Standard TCP/IP port '{portName}'.");
         return true;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void EnsurePortIsAvailable(string printerName, int port)
+    {
+        if (GetAssignedPrinterPorts(printerName).Contains(port))
+        {
+            throw new PrinterPortConflictException(port);
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static HashSet<int> GetAssignedPrinterPorts(string excludedPrinterName)
+    {
+        var assignedPortNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddAssignedPrinterPortNamesFromRegistry(assignedPortNames, excludedPrinterName);
+        try
+        {
+            using var printerSearcher = new ManagementObjectSearcher("SELECT Name, PortName FROM Win32_Printer");
+            foreach (ManagementObject printer in printerSearcher.Get())
+            {
+                using (printer)
+                {
+                    if (string.Equals(printer["Name"]?.ToString(), excludedPrinterName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    foreach (var name in (printer["PortName"]?.ToString() ?? string.Empty)
+                                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        assignedPortNames.Add(name);
+                }
+            }
+        }
+        catch (ManagementException exception)
+        {
+            Log($"Windows printer WMI lookup warning: {exception.Message}");
+        }
+
+        var assignedPorts = new HashSet<int>();
+        AddAssignedTcpPortsFromRegistry(assignedPortNames, assignedPorts);
+        try
+        {
+            using var portSearcher = new ManagementObjectSearcher("SELECT Name, PortNumber FROM Win32_TCPIPPrinterPort");
+            foreach (ManagementObject port in portSearcher.Get())
+            {
+                using (port)
+                {
+                    if (!assignedPortNames.Contains(port["Name"]?.ToString() ?? string.Empty)) continue;
+                    if (int.TryParse(port["PortNumber"]?.ToString(), out var portNumber)) assignedPorts.Add(portNumber);
+                }
+            }
+        }
+        catch (ManagementException exception)
+        {
+            Log($"Windows TCP/IP port WMI lookup warning: {exception.Message}");
+        }
+        return assignedPorts;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void AddAssignedPrinterPortNamesFromRegistry(
+        HashSet<string> assignedPortNames,
+        string excludedPrinterName)
+    {
+        try
+        {
+            using var printers = Registry.LocalMachine.OpenSubKey(WindowsPrinterRegistryPath);
+            if (printers is null) return;
+            foreach (var printerName in printers.GetSubKeyNames())
+            {
+                if (string.Equals(printerName, excludedPrinterName, StringComparison.OrdinalIgnoreCase)) continue;
+                using var printer = printers.OpenSubKey(printerName);
+                foreach (var portName in (printer?.GetValue("Port")?.ToString() ?? string.Empty)
+                             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    assignedPortNames.Add(portName);
+            }
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Log($"Windows printer registry lookup warning: {exception.Message}");
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void AddAssignedTcpPortsFromRegistry(
+        HashSet<string> assignedPortNames,
+        HashSet<int> assignedPorts)
+    {
+        try
+        {
+            using var ports = Registry.LocalMachine.OpenSubKey(WindowsTcpPortRegistryPath);
+            if (ports is null) return;
+            foreach (var portName in ports.GetSubKeyNames())
+            {
+                if (!assignedPortNames.Contains(portName)) continue;
+                using var port = ports.OpenSubKey(portName);
+                if (int.TryParse(port?.GetValue("PortNumber")?.ToString(), out var portNumber))
+                    assignedPorts.Add(portNumber);
+            }
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Log($"Windows TCP/IP port registry lookup warning: {exception.Message}");
+        }
     }
 
     [SupportedOSPlatform("windows")]
@@ -360,6 +594,21 @@ public static class PrinterSetupManager
     {
         try
         {
+            using (var printerSearcher = new ManagementObjectSearcher("SELECT PortName FROM Win32_Printer"))
+            {
+                foreach (ManagementObject printer in printerSearcher.Get())
+                {
+                    using (printer)
+                    {
+                        var assignedNames = (printer["PortName"]?.ToString() ?? string.Empty)
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        if (!assignedNames.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
+                        Log($"Port rollback skipped because Windows printer port '{name}' is now assigned to another printer.");
+                        return;
+                    }
+                }
+            }
+
             using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_TCPIPPrinterPort");
             foreach (ManagementObject item in searcher.Get())
                 using (item) if (string.Equals(item["Name"]?.ToString(), name, StringComparison.OrdinalIgnoreCase)) item.Delete();
@@ -372,7 +621,7 @@ public static class PrinterSetupManager
     {
         Validate(new(printerName, "127.0.0.1", 9100, true));
         var bytes = Encoding.ASCII.GetBytes("\x1b@\x1ba\x01POS PRINTER EMULATOR\nPrinter setup test\n\nIf you can see this receipt,\nWindows printer setup is working.\n\n\x1dV\x00");
-        if (!RawPrinter.Send(printerName, bytes)) throw new InvalidOperationException("Windows could not send the test receipt to the printer.");
+        RawPrinter.Send(printerName, bytes);
         return 0;
     }
 
@@ -383,6 +632,7 @@ public static class PrinterSetupManager
         Win32Exception { NativeErrorCode: 5 } => "Windows administrator approval is required to install the printer.",
         Win32Exception nativeException => $"Windows could not add the printer queue (Windows error {nativeException.NativeErrorCode}).",
         FileNotFoundException => "The Epson driver package required for automatic installation is missing. Reinstall POS Printer Emulator and try again.",
+        PrinterPortConflictException conflict => $"Port {conflict.Port} was assigned to another Windows printer before installation could finish. Return to the summary so the wizard can select the next available port, then try again.",
         ArgumentException => exception.Message,
         _ => $"Windows could not finish installing the printer: {exception.Message}"
     };
@@ -413,6 +663,11 @@ public static class PrinterSetupManager
     }
 
     private sealed record DriverInfo(string Name, string Version);
+
+    private sealed class PrinterPortConflictException(int port) : InvalidOperationException
+    {
+        public int Port { get; } = port;
+    }
 }
 
 internal sealed record PrinterQueueDefinition(
@@ -511,19 +766,50 @@ internal static class RawPrinter
     [DllImport("winspool.drv", SetLastError = true)] private static extern bool EndPagePrinter(IntPtr handle);
     [DllImport("winspool.drv", SetLastError = true)] private static extern bool WritePrinter(IntPtr handle, byte[] bytes, int count, out int written);
 
-    public static bool Send(string printerName, byte[] bytes)
+    public static void Send(string printerName, byte[] bytes)
     {
-        if (!OpenPrinter(printerName, out var printer, IntPtr.Zero)) return false;
+        if (!OpenPrinter(printerName, out var printer, IntPtr.Zero))
+        {
+            ThrowSpoolerError("open the Windows printer");
+        }
+
         try
         {
-            if (StartDocPrinter(printer, 1, new DocInfo()) == 0) return false;
+            if (StartDocPrinter(printer, 1, new DocInfo()) == 0)
+            {
+                ThrowSpoolerError("start the test receipt print job");
+            }
+
             try
             {
-                return StartPagePrinter(printer) && WritePrinter(printer, bytes, bytes.Length, out var written)
-                    && written == bytes.Length && EndPagePrinter(printer);
+                if (!StartPagePrinter(printer))
+                {
+                    ThrowSpoolerError("start the test receipt page");
+                }
+
+                if (!WritePrinter(printer, bytes, bytes.Length, out var written))
+                {
+                    ThrowSpoolerError("send the test receipt bytes to Windows");
+                }
+
+                if (written != bytes.Length)
+                {
+                    throw new IOException($"Windows accepted only {written} of {bytes.Length} test receipt bytes.");
+                }
+
+                if (!EndPagePrinter(printer))
+                {
+                    ThrowSpoolerError("finish the test receipt page");
+                }
             }
             finally { EndDocPrinter(printer); }
         }
         finally { ClosePrinter(printer); }
+    }
+
+    private static void ThrowSpoolerError(string operation)
+    {
+        var error = Marshal.GetLastWin32Error();
+        throw new Win32Exception(error, $"Windows could not {operation} (Windows error {error}).");
     }
 }
