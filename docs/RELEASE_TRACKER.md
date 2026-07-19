@@ -347,6 +347,24 @@ These items remain unnumbered until the order is approved. The priority below is
 - Add golden receipt fixtures, differential tests against the managed parser, fuzz testing, and performance limits.
 - Retain the managed parser as a controlled fallback during rollout.
 
+### Priority 8 — Admin Portal License Manager tabs
+
+**Tracker:** [BACKLOG-008](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12)
+
+**Why eighth:** This is a contained usability enhancement to the completed License Manager foundation. The higher-risk security, listener, storage, signing, entitlement, export, and compatibility work remains ahead of it, but this item can be pulled forward when a short Admin Portal-focused release is useful.
+
+**Proposed scope:**
+
+- Add three tabs inside License Manager: **Issued Licenses**, **Trial Installations**, and **Recent License Activity**.
+- Make Issued Licenses the default tab and keep manual key generation, search, status filters, deleted-license access, and license management actions in that view.
+- Preserve each tab's filters, record counts, and scroll position while switching views.
+- Support direct links plus browser Back and Forward navigation through a stable query parameter or URL fragment.
+- Keep the self-reported registration warning visible in Trial Installations and the immutable-history disclosure visible in Recent License Activity.
+- Implement keyboard-accessible tab semantics, visible focus states, screen-reader labels, responsive mobile behavior, and browser regression tests.
+- Reuse the existing License Manager data and actions without creating another admin page or duplicate source of truth.
+
+**Complete when:** The three sections render as accessible tabs, the active tab survives refresh and browser navigation, existing license confirmations work unchanged, filters and counts remain accurate, mobile layouts remain usable, and automated/browser tests cover tab switching and state preservation.
+
 ## Release completion checklist
 
 A release is marked **Released** only after all applicable items are complete:

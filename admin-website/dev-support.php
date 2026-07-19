@@ -263,10 +263,15 @@ $backlogSync = database()->prepare(
          'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.',
          'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.',
          'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.',
-         'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL)
+         'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
+        ('BACKLOG-008', NULL, 'Backlog', 'Admin Portal License Manager tabs', 'Planned', 1008,
+         'Organize license administration into focused views without creating separate or conflicting admin areas.',
+         'Add accessible tabs for Issued Licenses, Trial Installations, and Recent License Activity; keep key generation and license actions in Issued Licenses; preserve per-tab filters, counts, deleted-license view, scroll position, direct links, and browser navigation; retain Trial verification warnings and audit disclosures; support responsive layouts and regression tests.',
+         'This is a contained usability enhancement to the completed License Manager foundation. It follows higher-risk security, listener, storage, signing, entitlement, export, and compatibility work, but can be pulled forward for a short Admin Portal release.',
+         'All three sections render as accessible tabs, the active tab survives refresh and Back/Forward navigation, existing confirmations work unchanged, filters and counts remain accurate, and desktop and mobile browser tests pass.', NULL)
      ON DUPLICATE KEY UPDATE
         version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
-        status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
+        priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
         planned_scope = VALUES(planned_scope), priority_reason = VALUES(priority_reason),
         completion_criteria = VALUES(completion_criteria)"
 );
@@ -291,9 +296,10 @@ database()->exec(
          WHEN 'BACKLOG-004' THEN 1005
          WHEN 'BACKLOG-005' THEN 1006
          WHEN 'BACKLOG-006' THEN 1007
+         WHEN 'BACKLOG-008' THEN 1008
          ELSE priority_rank
      END
-     WHERE item_key IN ('BACKLOG-001', 'BACKLOG-007', 'BACKLOG-002', 'BACKLOG-003', 'BACKLOG-004', 'BACKLOG-005', 'BACKLOG-006')"
+     WHERE item_key IN ('BACKLOG-001', 'BACKLOG-007', 'BACKLOG-002', 'BACKLOG-003', 'BACKLOG-004', 'BACKLOG-005', 'BACKLOG-006', 'BACKLOG-008')"
 );
 database()->prepare(
     "UPDATE development_roadmap
@@ -302,9 +308,10 @@ database()->prepare(
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
          WHEN 'v0.3.24' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'BACKLOG-007' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
+         WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'BACKLOG-007')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
