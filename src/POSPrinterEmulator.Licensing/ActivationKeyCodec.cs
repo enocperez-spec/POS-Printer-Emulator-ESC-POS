@@ -96,6 +96,12 @@ public static class ActivationKeyCodec
             }
 
             var token = Base64UrlDecode(compactKey[Prefix.Length..]);
+            if (token.Length == 0)
+            {
+                error = "The activation key is incomplete or damaged.";
+                return false;
+            }
+
             var payloadLength = token[0] switch
             {
                 1 when token.Length == LegacyPayloadLength + SignatureLength => LegacyPayloadLength,

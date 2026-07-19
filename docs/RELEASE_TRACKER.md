@@ -12,9 +12,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.22 — released 2026-07-18**
+**Current public release: v0.3.23 — released 2026-07-19**
 
-**Next release: v0.3.23 — Receipt comparison and automated validation**
+**Next release: v0.3.24 — Receipt comparison and automated validation**
 
 ## Completed releases
 
@@ -45,6 +45,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.20 | Released | Reliable SQLite receipt history, verified migration, and safer release packaging |
 | v0.3.21 | Released | Enterprise multiple printer listeners, isolated runtimes, and listener-aware Activity |
 | v0.3.22 | Released | Test Receipt performance and reliable Clear All job deletion |
+| v0.3.23 | Released | Enterprise activation and Printer Setup Wizard maintenance fixes |
 
 ## Scheduled releases
 
@@ -202,7 +203,25 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable after restart, and related automated and end-to-end tests pass.
 
-### v0.3.23 — Receipt comparison and automated validation
+### v0.3.23 — Activation and Printer Setup Wizard fixes
+
+**Status:** Released — 2026-07-19
+
+**Purpose:** Correct two High-severity failures before resuming feature development: Enterprise activation returning HTTP 500 and Windows printer installation failing with an invalid WMI parameter.
+
+**Released scope:**
+
+- Keep valid Enterprise activation successful even when optional paid-history or listener storage needs recovery.
+- Return safe activation validation results for malformed or truncated keys.
+- Use unique temporary files and atomic replacement for license persistence.
+- Replace WMI printer-queue creation with the native Windows `AddPrinter` API.
+- Preserve automated TCP/IP port creation, Epson driver assignment, verification, rollback, and plain-language error details.
+- Add regression coverage for activation/storage failures, listener startup resilience, and native printer configuration.
+- Complete an installed Windows test with the Epson driver and a live `127.0.0.1:9100` listener.
+
+**Complete when:** Valid Enterprise keys no longer produce HTTP 500, malformed keys fail safely, the Printer Setup Wizard creates the Windows queue without `Invalid parameter`, the wizard sends its Test Receipt, and all automated and packaging checks pass.
+
+### v0.3.24 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -221,7 +240,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.24 — Enhanced support package and connection diagnostics
+### v0.3.25 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -240,7 +259,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
-### v0.3.25 — Guided update installation and restart
+### v0.3.26 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -268,7 +287,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.25.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.26.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 
@@ -327,7 +346,7 @@ These items remain unnumbered until the order is approved. The priority below is
 
 **Why fifth:** It improves commercial license control, but requires a highly reliable online service and clear offline behavior. The current signed offline activation remains functional while this is built.
 
-**Admin Portal foundation completed:** Confirmed tier-replacement, Trial-upgrade, deactivation, reactivation, revocation, soft-deletion, purchase-license synchronization, optimistic concurrency, and audit-history controls are available in the protected License Manager. Because v0.3.22 validates signed keys offline, these portal controls intentionally do not claim to erase or remotely disable a key already stored on a customer computer.
+**Admin Portal foundation completed:** Confirmed tier-replacement, Trial-upgrade, deactivation, reactivation, revocation, soft-deletion, purchase-license synchronization, optimistic concurrency, and audit-history controls are available in the protected License Manager. Because v0.3.23 validates signed keys offline, these portal controls intentionally do not claim to erase or remotely disable a key already stored on a customer computer.
 
 **Proposed scope:**
 

@@ -122,6 +122,42 @@ public sealed class PrinterListenerRuntimeTests
     }
 
     [Fact]
+    public async Task StatusFallsBackToActiveRuntimeWhenEnterpriseStorageCannotBeOpened()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var enterprise = false;
+        var license = new LicenseService(new TestEnvironment(), new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Data:Root"] = root })
+            .Build());
+        var options = new PrinterOptions { BindAddress = "127.0.0.1", Port = FreePort() };
+        var profiles = new PrinterProfileService(license);
+        var configurations = new PrinterListenerConfigurationService(
+            license, options, profiles, () => enterprise, NullLogger<PrinterListenerConfigurationService>.Instance);
+        await using (var manager = new PrinterListenerManager(
+                         configurations,
+                         profiles,
+                         new RecordingSink(),
+                         () => enterprise,
+                         new ServiceRuntimeState(),
+                         NullLoggerFactory.Instance,
+                         NullLogger<PrinterListenerManager>.Instance))
+        {
+            await manager.StartAsync(CancellationToken.None);
+            Directory.CreateDirectory(Path.Combine(root, ReceiptDatabase.FileName));
+            enterprise = true;
+
+            var status = manager.GetStatus();
+
+            Assert.True(status.EnterpriseEnabled);
+            Assert.Single(status.Listeners);
+            Assert.True(status.Listeners[0].Listening);
+            Assert.Equal(PrinterListenerDefaults.DefaultId, status.Listeners[0].Configuration.Id);
+        }
+
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
     public async Task ManagerDisposalIsIdempotentAfterHostedServiceStop()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));

@@ -94,6 +94,24 @@ public sealed class ActivationKeyCodecTests
         Assert.False(valid);
     }
 
+    [Fact]
+    public void EmptyPayloadIsRejectedWithoutThrowing()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+        var valid = ActivationKeyCodec.TryValidateWithPublicKey(
+            "PPE1-",
+            "Northwind Market",
+            "owner@northwind.example",
+            vendorKey.ExportSubjectPublicKeyInfoPem(),
+            out var license,
+            out var error);
+
+        Assert.False(valid);
+        Assert.Null(license);
+        Assert.Contains("incomplete or damaged", error);
+    }
+
     private static string IssueLegacyKey(ECDsa vendorKey, string customerName, string emailAddress)
     {
         var payload = new byte[57];

@@ -501,20 +501,54 @@ app.MapPost("/api/license/activate", async (
     ReceiptStore store,
     PrinterListenerManager listeners,
     IUsageTelemetry telemetry,
+    ILoggerFactory loggerFactory,
     CancellationToken cancellationToken) =>
 {
+    var logger = loggerFactory.CreateLogger("LicenseActivation");
+    LicenseStatus status;
+
     try
     {
-        var status = license.Activate(request.CustomerName, request.EmailAddress, request.ActivationKey);
-        store.EnableProHistory();
-        await listeners.ReconcileAsync(cancellationToken);
-        telemetry.RecordActivation();
-        return Results.Ok(status);
+        status = license.Activate(request.CustomerName, request.EmailAddress, request.ActivationKey);
     }
     catch (InvalidOperationException exception)
     {
         return Results.Problem(exception.Message, statusCode: 400);
     }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "A validated license could not be saved to local storage");
+        return Results.Problem(
+            "The activation key could not be saved on this computer. Open Settings > Support to export the application logs, then try again.",
+            statusCode: 500);
+    }
+
+    try
+    {
+        store.EnableProHistory();
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(
+            exception,
+            "License {LicenseId} was activated, but paid receipt history could not be initialized",
+            status.LicenseId);
+    }
+
+    try
+    {
+        await listeners.ReconcileAsync(cancellationToken);
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(
+            exception,
+            "License {LicenseId} was activated, but printer listeners could not be reconciled",
+            status.LicenseId);
+    }
+
+    telemetry.RecordActivation();
+    return Results.Ok(license.GetStatus());
 });
 
 app.MapGet("/api/jobs", (string? listenerId, ReceiptStore store) => store.GetSummaries(listenerId));
