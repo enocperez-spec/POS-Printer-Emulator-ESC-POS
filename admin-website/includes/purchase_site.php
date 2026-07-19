@@ -8,6 +8,11 @@ function purchase_site_config(): array
     if (!is_array($config) || empty($config['base_url']) || empty($config['admin_token'])) {
         throw new RuntimeException('Purchase-site management is not configured.');
     }
+    $baseUrl = (string)$config['base_url'];
+    $parts = parse_url($baseUrl);
+    if (!is_array($parts) || strtolower((string)($parts['scheme'] ?? '')) !== 'https' || empty($parts['host'])) {
+        throw new RuntimeException('Purchase-site management requires an HTTPS base URL.');
+    }
     return $config;
 }
 

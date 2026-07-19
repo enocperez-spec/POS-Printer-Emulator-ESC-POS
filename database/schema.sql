@@ -46,13 +46,43 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     activation_key VARCHAR(512) NOT NULL,
     issued_at DATETIME(6) NOT NULL,
     created_by VARCHAR(80) NOT NULL DEFAULT 'owner',
+    control_state ENUM('Enabled', 'Deactivated', 'Revoked', 'Deleted') NOT NULL DEFAULT 'Enabled',
+    deactivated_at DATETIME(6) NULL,
     revoked_at DATETIME(6) NULL,
+    deleted_at DATETIME(6) NULL,
+    superseded_by_license_id CHAR(36) NULL,
+    license_source ENUM('Manual', 'Purchase') NOT NULL DEFAULT 'Manual',
+    source_reference VARCHAR(64) NULL,
+    row_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     UNIQUE KEY uq_issued_licenses_license_id (license_id),
     KEY ix_issued_licenses_email (email_address),
     KEY ix_issued_licenses_issued_at (issued_at),
-    KEY ix_issued_licenses_revoked_at (revoked_at)
+    KEY ix_issued_licenses_revoked_at (revoked_at),
+    KEY ix_issued_licenses_control_state (control_state),
+    KEY ix_issued_licenses_source_reference (source_reference)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS issued_license_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    license_id CHAR(36) NOT NULL,
+    customer_name VARCHAR(160) NOT NULL,
+    email_address VARCHAR(254) NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    previous_state VARCHAR(24) NULL,
+    new_state VARCHAR(24) NULL,
+    previous_tier VARCHAR(24) NULL,
+    new_tier VARCHAR(24) NULL,
+    replacement_license_id CHAR(36) NULL,
+    reason VARCHAR(500) NULL,
+    performed_by VARCHAR(80) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_license_events_license_id (license_id),
+    KEY ix_license_events_created_at (created_at),
+    KEY ix_license_events_event_type (event_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS development_roadmap (
@@ -142,7 +172,7 @@ VALUES
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
     ('BACKLOG-003', NULL, 'Backlog', 'Production code-signing and deployment validation', 'Planned', 1004, 'Improve customer trust and verify distributed binaries.', 'Sign executables, installer, and uninstaller, apply trusted timestamps, verify builds and update hashes, and test clean install, upgrade, repair, silent install, and uninstall.', 'Signing is a production trust requirement and may move earlier when a certificate is available.', 'All distributed binaries verify successfully and supported deployment paths pass on Windows 10 and 11.', NULL),
-    ('BACKLOG-004', NULL, 'Backlog', 'Online license transfer and revocation', 'Planned', 1005, 'Support customer deactivation, transfer, and owner license controls.', 'Deactivation, transfer limits, cooldowns, revocation, audit history, signed cached authorization, offline grace, and privacy-minimized events.', 'Commercial control is valuable but must not disable customers during temporary outages.', 'Transfers and revocations work with auditable state and temporary service outages preserve valid licensed use.', NULL),
+    ('BACKLOG-004', NULL, 'Backlog', 'Online license transfer and revocation', 'Planned', 1005, 'Complete outage-safe enforcement after the Admin Portal license-control foundation.', 'The portal now provides confirmed tier replacement, Trial upgrades, deactivation, reactivation, revocation, soft deletion, purchase synchronization, and audit history. Remaining work is per-computer activation tracking, transfer limits and cooldowns, server-signed entitlement checks that replace client-reported legacy paid status, a defined offline grace period, and privacy-minimized enforcement events.', 'Commercial control is valuable but must not disable customers during temporary outages; v0.3.21 offline keys remain valid until the enforcement release.', 'Transfers and remote revocations work with auditable state, the desktop clearly reports its entitlement, and temporary service outages preserve valid licensed use.', NULL),
     ('BACKLOG-005', NULL, 'Backlog', 'PNG and deterministic PDF export', 'Planned', 1006, 'Provide predictable receipt artifacts outside the application.', 'Complete receipt PNG, deterministic PDF, correct thermal dimensions, long pages, images, codes, watermark rules, batch export, and output tests.', 'Comparison should establish deterministic rendering before final export formats depend on it.', 'Exports are independent of window size, zoom, and theme and match tested receipt output.', NULL),
     ('BACKLOG-006', NULL, 'Backlog', 'Hardened Thermal adapter', 'Planned', 1007, 'Add deeper renderer compatibility through an isolated hardened process.', 'Stable ABI, structured errors and offsets, profile parity, safe malformed-input handling, golden tests, differential tests, fuzzing, performance limits, and managed fallback.', 'It carries the greatest integration risk and needs captures and baselines for safe validation.', 'The isolated renderer matches approved fixtures, survives hostile inputs, and falls back safely.', NULL);
 

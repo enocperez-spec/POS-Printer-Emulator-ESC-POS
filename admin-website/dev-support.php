@@ -271,6 +271,16 @@ $backlogSync = database()->prepare(
         completion_criteria = VALUES(completion_criteria)"
 );
 $backlogSync->execute();
+database()->prepare(
+    "UPDATE development_roadmap
+     SET purpose = ?, planned_scope = ?, priority_reason = ?, completion_criteria = ?
+     WHERE item_key = 'BACKLOG-004'"
+)->execute([
+    'Complete outage-safe enforcement after the Admin Portal license-control foundation.',
+    'The portal now provides confirmed tier replacement, Trial upgrades, deactivation, reactivation, revocation, soft deletion, purchase synchronization, and audit history. Remaining work is per-computer activation tracking, transfer limits and cooldowns, server-signed entitlement checks that replace client-reported legacy paid status, a defined offline grace period, and privacy-minimized enforcement events.',
+    'Commercial control is valuable but must not disable customers during temporary outages; v0.3.21 offline keys remain valid until the enforcement release.',
+    'Transfers and remote revocations work with auditable state, the desktop clearly reports its entitlement, and temporary service outages preserve valid licensed use.',
+]);
 database()->exec(
     "UPDATE development_roadmap
      SET priority_rank = CASE item_key

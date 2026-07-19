@@ -23,7 +23,7 @@ if (!preg_match('/^[A-F0-9]{16}$/',$publicId) || !in_array($action,['approve','r
 $query = db()->prepare('SELECT * FROM orders WHERE public_id=?'); $query->execute([$publicId]); $order = $query->fetch();
 if (!$order) json_response(['error'=>'Order not found.'],404);
 if ($action === 'approve' && $order['status'] !== 'PAID_AWAITING_APPROVAL') json_response(['error'=>'Only a verified paid order awaiting approval can be approved.'],409);
-if ($action === 'retry_email' && $order['status'] !== 'EMAIL_FAILED') json_response(['error'=>'Only a failed activation email can be retried.'],409);
+if ($action === 'retry_email' && !in_array($order['status'], ['APPROVED', 'EMAIL_FAILED'], true)) json_response(['error'=>'Only an approved or failed activation email can be retried.'],409);
 
 if ($action === 'approve') {
     $license = issue_activation_key($order['customer_name'],$order['email'],(string)($order['license_tier'] ?? 'Pro'));

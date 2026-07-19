@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
+require __DIR__ . '/includes/license_management.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -27,12 +28,17 @@ try {
 
     $pdo = database();
     if (($body['action'] ?? '') === 'cleanup-license-smoke-test') {
+        ensure_license_management_schema($pdo);
         $licenseId = (string)($body['licenseId'] ?? '');
         if (!preg_match('/^[0-9a-fA-F-]{36}$/', $licenseId)) {
             throw new InvalidArgumentException('Invalid licenseId.');
         }
+        $pdo->beginTransaction();
+        $cleanupEvents = $pdo->prepare("DELETE FROM issued_license_events WHERE license_id = :id AND customer_name = 'Deployment License Test'");
+        $cleanupEvents->execute(['id' => strtolower($licenseId)]);
         $cleanup = $pdo->prepare("DELETE FROM issued_licenses WHERE license_id = :id AND customer_name = 'Deployment License Test'");
         $cleanup->execute(['id' => strtolower($licenseId)]);
+        $pdo->commit();
         respond(['ok' => true, 'removed' => $cleanup->rowCount()]);
     }
 
@@ -54,10 +60,17 @@ try {
     if (!$tierColumn) {
         $pdo->exec("ALTER TABLE issued_licenses ADD COLUMN license_tier ENUM('Pro', 'Enterprise') NOT NULL DEFAULT 'Pro' AFTER email_address");
     }
+    ensure_license_management_schema($pdo);
     respond(['ok' => true, 'statements' => count($statements)]);
 } catch (InvalidArgumentException|JsonException $exception) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     respond(['error' => $exception->getMessage()], 400);
 } catch (Throwable $exception) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log('POS Printer Emulator admin setup failure: ' . $exception->getMessage());
     respond(['error' => 'Database setup failed.'], 500);
 }

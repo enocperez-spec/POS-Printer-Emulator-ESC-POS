@@ -310,6 +310,8 @@ These items remain unnumbered until the order is approved. The priority below is
 
 **Why fifth:** It improves commercial license control, but requires a highly reliable online service and clear offline behavior. The current signed offline activation remains functional while this is built.
 
+**Admin Portal foundation completed:** Confirmed tier-replacement, Trial-upgrade, deactivation, reactivation, revocation, soft-deletion, purchase-license synchronization, optimistic concurrency, and audit-history controls are available in the protected License Manager. Because v0.3.21 validates signed keys offline, these portal controls intentionally do not claim to erase or remotely disable a key already stored on a customer computer.
+
 **Proposed scope:**
 
 - Let customers deactivate a licensed computer and transfer an available activation to a replacement computer.
@@ -317,7 +319,7 @@ These items remain unnumbered until the order is approved. The priority below is
 - Enforce configurable activation limits and transfer cooldowns.
 - Cache signed authorization state locally with a defined offline grace period.
 - Avoid disabling valid customers because of temporary network or server failures.
-- Record privacy-minimized activation events and show actionable license status in the desktop application.
+- Record privacy-minimized activation events, replace client-reported legacy paid status with signed entitlement proof, and show actionable license status in the desktop application.
 
 ### Priority 6 — PNG export and deterministic PDF generation
 

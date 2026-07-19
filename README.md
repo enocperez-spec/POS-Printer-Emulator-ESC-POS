@@ -172,6 +172,8 @@ dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key
 
 Send the printed `PPE1-...` value to the customer. The corresponding public key is embedded in the application and can validate the key without internet access.
 
+The protected Admin Portal License Manager unifies manual and purchase-issued keys, can issue paid upgrades for registered Trial installations, and provides confirmation-gated tier replacement, deactivation, reactivation, revocation, deletion, and audit history. Paid-tier changes always generate a new signed key; the customer must enter that replacement key because the tier is cryptographically embedded in the original key. Portal lifecycle controls do not remotely erase a key already stored by v0.3.21—the outage-safe online entitlement and transfer workflow remains tracked in `BACKLOG-004`. Until that release adds signed entitlement proof, telemetry for a legacy paid license ID that is not yet in the central ledger remains client-reported for dashboard compatibility; this reporting does not unlock desktop features.
+
 For unattended installation, provide the required registration fields:
 
 ```console

@@ -15,9 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         usleep(1500000);
         $error = 'Too many attempts. Close the browser and try again later.';
     } elseif (verify_admin_password(trim((string)($_POST['username'] ?? '')), (string)($_POST['password'] ?? ''))) {
+        $verifiedUsername = trim((string)($_POST['username'] ?? ''));
         session_regenerate_id(true);
         $_SESSION['password_verified'] = true;
         $_SESSION['two_factor_verified'] = false;
+        $_SESSION['admin_username'] = $verifiedUsername;
         $_SESSION['login_attempts'] = 0;
         $_SESSION['csrf'] = bin2hex(random_bytes(24));
         header('Location: ' . (two_factor_secret() === null ? '/two-factor-setup.php' : '/two-factor.php'));
