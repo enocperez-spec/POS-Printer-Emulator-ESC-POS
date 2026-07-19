@@ -12,7 +12,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.20**
+**Current public release: v0.3.21 — released 2026-07-18**
+
+**Next release: v0.3.22 — Receipt comparison and automated validation**
 
 ## Completed releases
 
@@ -41,6 +43,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.18 | Released | Admin Portal branding and separate Pro and Enterprise purchase pricing |
 | v0.3.19 | Released | Pro and Enterprise printer profiles, custom configuration, and profile-aware processing |
 | v0.3.20 | Released | Reliable SQLite receipt history, verified migration, and safer release packaging |
+| v0.3.21 | Released | Enterprise multiple printer listeners, isolated runtimes, and listener-aware Activity |
 
 ## Scheduled releases
 
@@ -155,7 +158,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ### v0.3.21 — Enterprise multiple printer listeners
 
-**Status:** Next
+**Status:** Released — 2026-07-18
 
 **Tracking issue:** [GitHub #5](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5)
 
@@ -163,19 +166,19 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Implementation milestones:**
 
-- [ ] Add the persisted listener configuration model and Enterprise authorization boundary.
-- [ ] Run independent listener instances with isolated ports, profiles, printer states, buffers, counters, and failure handling.
-- [ ] Add Enterprise listener management, connection details, Activity filtering, port-conflict guidance, and upgrade messaging to the desktop UI.
-- [ ] Complete firewall automation, upgrade migration, concurrent-listener tests, installer QA, documentation, and release publication.
+- [x] Add the persisted listener configuration model and Enterprise authorization boundary.
+- [x] Run independent listener instances with isolated ports, profiles, printer states, buffers, counters, and failure handling.
+- [x] Add Enterprise listener management, connection details, Activity filtering, port-conflict guidance, and upgrade messaging to the desktop UI.
+- [x] Complete firewall automation, upgrade migration, concurrent-listener tests, installer QA, documentation, and release publication.
 
-**Planned scope:**
+**Released scope:**
 
-- Create, edit, start, stop, and remove independently named listeners.
+- Create, edit, start, stop, restart, and remove independently named listeners.
 - Assign a unique TCP port, bind address, printer profile, and simulated printer state to each listener.
 - Detect port conflicts before saving and explain how to correct them.
 - Filter Activity by listener and show the destination listener on every job.
-- Display per-listener connection, job, byte, warning, and error counters.
-- Extend firewall and setup automation for the configured listener ports.
+- Display per-listener active/total connection, queued/processing job, byte, completed, rejected, and failed counters.
+- Use a private/domain, program-scoped RAW TCP firewall rule that automatically covers validated listener ports.
 - Preserve a safe default listener at `0.0.0.0:9100` for existing installations.
 - Prevent one failed listener from stopping other configured listeners.
 - Restrict multiple-listener APIs and controls to Enterprise licenses; Trial and Pro continue using the default listener on port `9100`.
@@ -184,7 +187,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ### v0.3.22 — Receipt comparison and automated validation
 
-**Status:** Planned
+**Status:** Next
 
 **Purpose:** Turn the emulator into a repeatable compatibility-testing tool for POS changes, printer migrations, and regression testing.
 
@@ -263,21 +266,36 @@ These items remain unnumbered until the order is approved. The priority below is
 - Preserve customer settings, activation, imported logos, and receipt history during repair.
 - Log repair actions and verify the repaired installation before reporting success.
 
-### Priority 2 — Advanced SQLite maintenance and retention
+### Priority 2 — Listener security and lifecycle hardening
 
-**Why second:** The transactional SQLite foundation and safe JSON migration are now part of v0.3.20. Customer-facing maintenance, larger-history controls, and recovery tools should follow after the multiple-listener data model stabilizes.
+**Tracker:** [BACKLOG-007](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9)
+
+**Why second:** v0.3.21 intentionally exposes configurable RAW TCP listeners to trusted private/domain networks. Connection resource limits and cancellation-safe management should be hardened before larger histories or additional network-facing features increase the service's workload.
+
+**Proposed scope:**
+
+- Add configurable per-listener and installation-wide active-connection limits.
+- Limit connections per source, slow or idle clients, aggregate in-flight bytes, and queue memory without rejecting normal receipt traffic.
+- Add rate-limited plain-language logs and diagnostics for refused or timed-out connections.
+- Make create, update, delete, start, stop, and restart transitions finish or roll back safely when an HTTP request is cancelled.
+- Make profile assignment/deletion atomic with listener updates and evaluate reconciled port-specific firewall rules against the current program-scoped rule.
+- Add adversarial concurrency, cancellation, slow-client, and memory-pressure tests while preserving independent-listener fault isolation.
+
+### Priority 3 — Advanced SQLite maintenance and retention
+
+**Why third:** The transactional SQLite foundation and safe JSON migration are now part of v0.3.20. Customer-facing maintenance, larger-history controls, and recovery tools should follow after the multiple-listener runtime is hardened.
 
 **Proposed scope:**
 
 - Add paging, fast search, source/listener/profile filters, and reliable aggregate counts for larger histories.
-- Add configurable retention by job count, storage size, or age.
+- Add configurable retention by job count, storage size, or age, including fair per-listener limits so one busy printer cannot evict every other printer's history.
 - Support individual deletion, Clear All, database health checks, and safe database repair.
 - Add backup and restore with schema and integrity validation.
 - Add reviewed cleanup of the rollback-safe legacy JSON backup after the customer confirms successful migration.
 
-### Priority 3 — Production code-signing and deployment validation
+### Priority 4 — Production code-signing and deployment validation
 
-**Why third:** Signed binaries and installers improve customer trust and tamper verification. It should move earlier if a production signing certificate is already available.
+**Why fourth:** Signed binaries and installers improve customer trust and tamper verification. It should move earlier if a production signing certificate is already available.
 
 **Proposed scope:**
 
@@ -288,9 +306,9 @@ These items remain unnumbered until the order is approved. The priority below is
 - Test clean install, upgrade, repair, silent install, and uninstall on supported Windows 10/11 environments.
 - Document certificate custody, renewal, and emergency revocation procedures without storing private signing material in the repository.
 
-### Priority 4 — Online license deactivation, revocation, and transfer
+### Priority 5 — Online license deactivation, revocation, and transfer
 
-**Why fourth:** It improves commercial license control, but requires a highly reliable online service and clear offline behavior. The current signed offline activation remains functional while this is built.
+**Why fifth:** It improves commercial license control, but requires a highly reliable online service and clear offline behavior. The current signed offline activation remains functional while this is built.
 
 **Proposed scope:**
 
@@ -301,9 +319,9 @@ These items remain unnumbered until the order is approved. The priority below is
 - Avoid disabling valid customers because of temporary network or server failures.
 - Record privacy-minimized activation events and show actionable license status in the desktop application.
 
-### Priority 5 — PNG export and deterministic PDF generation
+### Priority 6 — PNG export and deterministic PDF generation
 
-**Why fifth:** It is a valuable customer-facing feature, and the comparison release benefits from deterministic rendering first.
+**Why sixth:** It is a valuable customer-facing feature, and the comparison release benefits from deterministic rendering first.
 
 **Proposed scope:**
 
@@ -314,9 +332,9 @@ These items remain unnumbered until the order is approved. The priority below is
 - Add export metadata and deterministic-output tests.
 - Keep premium export controls aligned with Trial, Pro, and Enterprise license rules.
 
-### Priority 6 — Hardened Thermal adapter
+### Priority 7 — Hardened Thermal adapter
 
-**Why sixth:** It offers deeper compatibility but carries the greatest implementation and packaging risk. Capture, profiles, comparison baselines, and diagnostics should exist first so compatibility can be measured safely.
+**Why seventh:** It offers deeper compatibility but carries the greatest implementation and packaging risk. Capture, profiles, comparison baselines, and diagnostics should exist first so compatibility can be measured safely.
 
 **Proposed scope:**
 

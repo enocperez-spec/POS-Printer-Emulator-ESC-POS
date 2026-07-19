@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, CircleOff, Gauge, RotateCcw, Save } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CircleOff, Gauge, Network, RotateCcw, Save } from 'lucide-react'
 import { api } from './api'
-import type { PaperStatus, PrinterStateStatus, PrinterStateUpdate } from './types'
+import type { PaperStatus, PrinterListener, PrinterStateStatus, PrinterStateUpdate } from './types'
 
 const readyState: PrinterStateUpdate = {
   online: true,
@@ -23,15 +23,29 @@ const presets: Array<{ label: string; description: string; state: PrinterStateUp
   { label: 'Offline', description: 'Printer is unavailable', state: { ...readyState, online: false } },
 ]
 
-export function PrinterStateSettings() {
+export function PrinterStateSettings({ listeners = [], isEnterprise = false }: { listeners?: PrinterListener[]; isEnterprise?: boolean }) {
   const [status, setStatus] = useState<PrinterStateStatus>()
   const [draft, setDraft] = useState<PrinterStateUpdate>(readyState)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [selectedListenerId, setSelectedListenerId] = useState<string>()
+  const selectedListener = listeners.find(listener => listener.id === selectedListenerId) ?? listeners.find(listener => listener.isDefault)
+
+  useEffect(() => {
+    if (!isEnterprise || listeners.length === 0) return
+    setSelectedListenerId(current => current && listeners.some(listener => listener.id === current)
+      ? current
+      : (listeners.find(listener => listener.isDefault) ?? listeners[0]).id)
+  }, [isEnterprise, listeners])
 
   useEffect(() => {
     let active = true
-    api.printerState()
+    setStatus(undefined)
+    setError(undefined)
+    const request = selectedListener && !selectedListener.isDefault
+      ? api.listenerPrinterState(selectedListener.id)
+      : api.printerState()
+    request
       .then(value => {
         if (!active) return
         setStatus(value)
@@ -39,13 +53,15 @@ export function PrinterStateSettings() {
       })
       .catch(cause => active && setError(messageFrom(cause)))
     return () => { active = false }
-  }, [])
+  }, [selectedListener?.id, selectedListener?.isDefault])
 
   async function apply(next = draft) {
     setBusy(true)
     setError(undefined)
     try {
-      const value = await api.updatePrinterState(next)
+      const value = selectedListener && !selectedListener.isDefault
+        ? await api.updateListenerPrinterState(selectedListener.id, next)
+        : await api.updatePrinterState(next)
       setStatus(value)
       setDraft(toUpdate(value))
     } catch (cause) {
@@ -59,7 +75,9 @@ export function PrinterStateSettings() {
     setBusy(true)
     setError(undefined)
     try {
-      const value = await api.resetPrinterState()
+      const value = selectedListener && !selectedListener.isDefault
+        ? await api.resetListenerPrinterState(selectedListener.id)
+        : await api.resetPrinterState()
       setStatus(value)
       setDraft(toUpdate(value))
     } catch (cause) {
@@ -73,11 +91,20 @@ export function PrinterStateSettings() {
 
   return (
     <div className="settings-panel printer-state-settings">
+      {isEnterprise && listeners.length > 0 ? (
+        <label className="state-listener-select">
+          <Network size={18} />
+          <span><strong>Printer listener</strong><small>Simulated state is managed independently for each Enterprise printer.</small></span>
+          <select value={selectedListener?.id ?? ''} onChange={event => setSelectedListenerId(event.target.value)}>
+            {listeners.map(listener => <option key={listener.id} value={listener.id}>{listener.name} · port {listener.port}</option>)}
+          </select>
+        </label>
+      ) : null}
       <div className={`settings-status-card printer-state-hero ${status?.effectiveOnline ? 'is-current' : 'has-fault'}`}>
         <div className="settings-status-icon">{status?.effectiveOnline ? <CheckCircle2 size={26} /> : <AlertTriangle size={26} />}</div>
         <div>
           <h2>{status?.summary ?? 'Printer state unavailable'}</h2>
-          <p>The emulator answers Epson real-time status requests with this simulated printer condition.</p>
+          <p>{selectedListener ? `${selectedListener.name} answers Epson real-time status requests with this simulated printer condition.` : 'The emulator answers Epson real-time status requests with this simulated printer condition.'}</p>
         </div>
       </div>
 

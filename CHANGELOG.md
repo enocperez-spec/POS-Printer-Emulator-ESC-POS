@@ -4,6 +4,20 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.21 — 2026-07-18
+
+- Added Enterprise-only management for up to 16 independently named RAW TCP printer listeners while Trial and Pro retain one compatible default listener.
+- Added create, edit, start, stop, restart, and delete controls under **Settings → Printer Listeners**, with connection details, live status, buffer settings, per-listener counters, and clear Enterprise upgrade guidance.
+- Added isolated listener runtimes with independent bind addresses, ports, printer profiles, simulated printer state, job buffers, connection tracking, and failure handling so one listener cannot stop the others.
+- Added transactional SQLite schema v2 persistence for listener configuration and immutable listener ID, name, and port snapshots on receipt history, legacy JSON, and capture packages.
+- Added Activity filtering by printer listener and displayed the destination listener and endpoint in receipt summaries and Job Details.
+- Added pre-save IPv4, reserved-port, duplicate-name, duplicate-port, profile, buffer, and maximum-job-size validation with plain-language conflict errors.
+- Preserved `0.0.0.0:9100` as the non-removable default listener and migrated existing installations without losing v0.3.20 receipt history.
+- Enforced the Enterprise boundary in both the local API and Settings UI; Trial and Pro multiple-listener requests are rejected without creating listener configuration storage.
+- Changed Windows setup to a private/domain, program-scoped RAW TCP firewall rule so newly configured listener ports work without separate customer firewall steps.
+- Fixed `BUG-006`, which could raise an unhandled double-disposal error after the Windows host had already stopped all listener runtimes during application or service shutdown.
+- Added simultaneous-listener, routing, isolation, restart, persistence, migration, port-conflict, authorization, buffer, capture, and receipt-history regression coverage.
+
 ## v0.3.20
 
 - Replaced Pro and Enterprise JSON receipt history with one embedded SQLite database while keeping Trial history session-only.

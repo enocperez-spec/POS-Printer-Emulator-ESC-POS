@@ -48,6 +48,17 @@ public sealed class LicenseService
         }
     }
 
+    public bool HasEnterpriseAccess
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return GetValidatedLicense()?.Tier == LicenseTier.Enterprise;
+            }
+        }
+    }
+
     public LicenseStatus GetStatus()
     {
         lock (_sync)
@@ -77,7 +88,8 @@ public sealed class LicenseService
                     PrinterState: hasProAccess,
                     PrinterProfiles: hasProAccess,
                     Updates: hasProAccess,
-                    Support: hasProAccess));
+                    Support: hasProAccess,
+                    MultipleListeners: isEnterprise));
         }
     }
 

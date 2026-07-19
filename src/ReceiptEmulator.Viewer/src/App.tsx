@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   AlertTriangle,
   Braces,
@@ -18,6 +18,7 @@ import {
   LockKeyhole,
   Minus,
   Moon,
+  Network,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -43,24 +44,26 @@ import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
 import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
-import type { JobSummary, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+import type { JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+
+const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.20',
+  version: '0.3.21',
   license: {
     mode: 'Trial', hasProAccess: false, isEnterprise: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
-    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false },
+    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false },
   },
 }
 
 type ClearRequest =
   | { kind: 'one'; id: string; label: string }
-  | { kind: 'all'; count: number }
+  | { kind: 'all'; count: number; listenerId?: string; listenerName?: string }
 
-type SettingsSection = 'license' | 'printer' | 'profiles' | 'logos' | 'state' | 'updates' | 'support'
+type SettingsSection = 'license' | 'printer' | 'listeners' | 'profiles' | 'logos' | 'state' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -91,6 +94,8 @@ function App() {
   const [selectedId, setSelectedId] = useState<string>()
   const [job, setJob] = useState<ReceiptJob>()
   const [query, setQuery] = useState('')
+  const [listenerFilter, setListenerFilter] = useState('all')
+  const [listeners, setListeners] = useState<PrinterListener[]>([])
   const [tab, setTab] = useState<'commands' | 'raw' | 'details'>('commands')
   const [zoom, setZoom] = useState(100)
   const [busy, setBusy] = useState(false)
@@ -123,14 +128,38 @@ function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextStatus, nextJobs] = await Promise.all([api.status(), api.jobs()])
+      const [nextStatus, nextJobs] = await Promise.all([api.status(), api.jobs(listenerFilter === 'all' ? undefined : listenerFilter)])
       setStatus(nextStatus)
       setJobs(nextJobs)
       setSelectedId(current => current && nextJobs.some(item => item.id === current) ? current : nextJobs[0]?.id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to reach the local service.')
     }
-  }, [])
+  }, [listenerFilter])
+
+  useEffect(() => {
+    if (!status.license.isEnterprise) {
+      setListeners([])
+      setListenerFilter('all')
+      return
+    }
+    let cancelled = false
+    const load = async () => {
+      try {
+        const next = await api.printerListeners()
+        if (!cancelled) {
+          setListeners(next.listeners)
+          setListenerFilter(current => current === 'all' || next.listeners.some(listener => listener.id === current) ? current : 'all')
+        }
+      } catch { /* Listener management errors are shown inside Settings. */ }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 4_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [status.license.isEnterprise])
 
   const checkForUpdates = useCallback(async (force = false) => {
     const result = await api.checkUpdates(force)
@@ -182,7 +211,7 @@ function App() {
   const filteredJobs = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return jobs
-    return jobs.filter(item => `${item.sourceIp} ${item.preview} ${item.status} ${item.origin} ${item.importedFileName ?? ''}`.toLowerCase().includes(needle))
+    return jobs.filter(item => `${item.sourceIp} ${item.preview} ${item.status} ${item.origin} ${item.listenerName ?? ''} ${item.listenerPort ?? ''} ${item.importedFileName ?? ''}`.toLowerCase().includes(needle))
   }, [jobs, query])
 
   async function renderSample() {
@@ -252,7 +281,14 @@ function App() {
   }
 
   function clearAllJobs() {
-    if (jobs.length > 0) setClearRequest({ kind: 'all', count: jobs.length })
+    if (jobs.length === 0) return
+    const filteredListener = listenerFilter === 'all' ? undefined : listeners.find(listener => listener.id === listenerFilter)
+    setClearRequest({
+      kind: 'all',
+      count: jobs.length,
+      listenerId: listenerFilter === 'all' ? undefined : listenerFilter,
+      listenerName: filteredListener?.name ?? (listenerFilter === 'all' ? undefined : 'the selected printer'),
+    })
   }
 
   async function confirmClear() {
@@ -260,7 +296,7 @@ function App() {
     setClearing(true)
     try {
       if (clearRequest.kind === 'all') {
-        await api.clearJobs()
+        await api.clearJobs(clearRequest.listenerId)
         setJobs([])
         setSelectedId(undefined)
         setJob(undefined)
@@ -306,6 +342,7 @@ function App() {
           <CollapsedSide side="left" label="Activity" onExpand={() => setActivityCollapsed(false)} />
         ) : (
           <ActivityRail jobs={filteredJobs} totalJobs={jobs.length} selectedId={selectedId} query={query} onQuery={setQuery}
+            listeners={listeners} listenerFilter={listenerFilter} onListenerFilter={setListenerFilter}
             onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
             onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history}
             onImport={() => captureFileRef.current?.click()} importEnabled={status.license.features.premiumFeatures} importing={captureBusy} />
@@ -330,7 +367,9 @@ function App() {
           updateStatus={updateStatus}
           onCheckUpdates={checkForUpdates}
           storedGraphics={storedGraphics}
+          listeners={listeners}
           onStoredGraphicsChanged={refreshStoredGraphics}
+          onListenersChanged={setListeners}
           onClose={() => setSettingsSection(undefined)}
           onActivated={license => {
             setStatus(current => ({ ...current, license }))
@@ -353,14 +392,17 @@ function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
   onConfirm: () => void
 }) {
   const isAll = request.kind === 'all'
+  const listenerName = isAll ? request.listenerName : undefined
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-jobs-title">
         <div className="confirm-icon"><Trash2 size={24} /></div>
         <div>
-          <h2 id="clear-jobs-title">{isAll ? `Clear all ${request.count} jobs?` : 'Clear this job?'}</h2>
+          <h2 id="clear-jobs-title">{isAll ? listenerName ? `Clear ${request.count} jobs for ${listenerName}?` : `Clear all ${request.count} jobs?` : 'Clear this job?'}</h2>
           <p>{isAll
-            ? 'Every job in Activity will be permanently removed, including saved Pro or Enterprise history.'
+            ? listenerName
+              ? `Every job for ${listenerName} will be permanently removed. Jobs belonging to other printers will be kept.`
+              : 'Every job in Activity will be permanently removed, including saved Pro or Enterprise history.'
             : `“${request.label}” will be permanently removed from Activity and saved history.`}</p>
         </div>
         <div className="confirm-actions">
@@ -380,16 +422,24 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   onTheme: () => void
   onSettings: (section: SettingsSection) => void
 }) {
+  const listenerSummary = status.listenerSummary
+  const listenerStateLabel = status.license.isEnterprise && listenerSummary
+    ? `${listenerSummary.running} of ${listenerSummary.total} listeners running`
+    : status.listening ? 'Running (listening)' : 'Listener stopped'
+  const listenerFact = status.license.isEnterprise && listenerSummary
+    ? `${listenerSummary.total} printers · ${listenerSummary.faulted} faulted`
+    : status.listener
+  const serviceLive = listenerSummary ? listenerSummary.running > 0 : status.listening
   return (
     <header className="app-header">
       <div className="brand-mark" aria-hidden="true">
         <img src="/pos-printer-emulator-icon.png" alt="" />
       </div>
       <strong className="brand-name">POS Printer Emulator</strong>
-      <div className={`service-state ${status.listening ? 'is-live' : 'is-down'}`}>
-        <span className="state-dot" /> {status.listening ? 'Running (listening)' : 'Listener stopped'}
+      <div className={`service-state ${serviceLive ? 'is-live' : 'is-down'}`}>
+        <span className="state-dot" /> {listenerStateLabel}
       </div>
-      <div className="header-fact"><span>Listener</span> {status.listener}</div>
+      <div className="header-fact"><span>{status.license.isEnterprise && listenerSummary ? 'Listeners' : 'Listener'}</span> {listenerFact}</div>
       <div className="header-actions">
         <button className="sample-button" onClick={onSample} disabled={busy || (!status.license.hasProAccess && status.license.remaining === 0)}>
           <FlaskConical size={16} /> {busy ? 'Rendering…' : 'Test receipt'}
@@ -411,12 +461,15 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   )
 }
 
-function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, onDelete, onClearAll, onCollapse, historyEnabled, onImport, importEnabled, importing }: {
+function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listeners, listenerFilter, onListenerFilter, onSelect, onDelete, onClearAll, onCollapse, historyEnabled, onImport, importEnabled, importing }: {
   jobs: JobSummary[]
   totalJobs: number
   selectedId?: string
   query: string
   onQuery: (value: string) => void
+  listeners: PrinterListener[]
+  listenerFilter: string
+  onListenerFilter: (listenerId: string) => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
   onClearAll: () => void
@@ -440,7 +493,14 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
         <Search size={16} />
         <input value={query} onChange={event => onQuery(event.target.value)} placeholder="Search jobs…" />
       </label>
-      <button className="filter-control"><Filter size={15} /> All sources <ChevronDown size={15} /></button>
+      <label className="filter-control">
+        <Filter size={15} />
+        <select value={listenerFilter} onChange={event => onListenerFilter(event.target.value)} aria-label="Filter Activity by printer">
+          <option value="all">All printers</option>
+          {listeners.map(listener => <option key={listener.id} value={listener.id}>{listener.name} · port {listener.port}</option>)}
+        </select>
+        <ChevronDown size={15} />
+      </label>
       <div className="job-list">
         {jobs.map(item => (
           <div key={item.id} className={`job-row ${selectedId === item.id ? 'is-selected' : ''}`}>
@@ -450,6 +510,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, onSelect, o
               <span className="job-source">{item.sourceIp}</span>
               <strong className="job-preview">{item.preview}</strong>
               <span className="job-size">{formatBytes(item.payloadSize)}</span>
+              {item.listenerName ? <span className="job-listener"><Network size={11} />{item.listenerName}{item.listenerPort ? ` · ${item.listenerPort}` : ''}</span> : null}
               <span className="job-result"><b className={`job-origin ${item.origin.toLowerCase()}`}>{item.origin}</b>{item.status}</span>
               {item.unsupportedCount > 0 && <span className="job-warning">{item.unsupportedCount} warning</span>}
             </button>
@@ -585,13 +646,15 @@ function ReceiptPaper({ lines, watermark, storedGraphics, paperWidthMm }: { line
   )
 }
 
-function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, onStoredGraphicsChanged, onClose, onActivated }: {
+function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, listeners, onStoredGraphicsChanged, onListenersChanged, onClose, onActivated }: {
   status: ServiceStatus
   initialSection: SettingsSection
   updateStatus?: UpdateStatus
   onCheckUpdates: (force?: boolean) => Promise<UpdateStatus>
   storedGraphics: StoredGraphic[]
+  listeners: PrinterListener[]
   onStoredGraphicsChanged: () => Promise<void>
+  onListenersChanged: (listeners: PrinterListener[]) => void
   onClose: () => void
   onActivated: (license: ServiceStatus['license']) => void
 }) {
@@ -603,7 +666,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
         : candidate === 'support' ? features.support
           : true
   const [section, setSection] = useState<SettingsSection>(canAccess(initialSection) ? initialSection : 'license')
-  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
   const lockedTitle = 'Requires a Pro or Enterprise License'
 
   return (
@@ -617,6 +680,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
             <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
+            <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{status.license.isEnterprise && (features.multipleListeners ?? true) ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Enterprise</span>}</button>
             <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
             <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
             <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
@@ -626,9 +690,10 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
+            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings isEnterprise={status.license.isEnterprise && (features.multipleListeners ?? true)} onChanged={onListenersChanged} /></Suspense>}
             {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
-            {section === 'state' && features.printerState && <PrinterStateSettings />}
+            {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} isEnterprise={status.license.isEnterprise} />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
             {section === 'support' && features.support && <SupportSettings status={status} />}
           </div>
@@ -992,6 +1057,9 @@ function Inspector({ job, tab, onTab, onCollapse }: { job?: ReceiptJob; tab: 'co
           <div><dt>Receipt ID</dt><dd>{job.id}</dd></div>
           <div><dt>Received</dt><dd>{new Date(job.receivedAt).toLocaleString()}</dd></div>
           <div><dt>Source address</dt><dd>{job.sourceIp}</dd></div>
+          {job.listenerName && <div><dt>Printer listener</dt><dd>{job.listenerName}</dd></div>}
+          {job.listenerPort && <div><dt>Listener endpoint</dt><dd>TCP port {job.listenerPort}</dd></div>}
+          {job.listenerId && <div><dt>Listener ID</dt><dd>{job.listenerId}</dd></div>}
           <div><dt>Job origin</dt><dd><span className={`detail-origin ${job.origin.toLowerCase()}`}>{job.origin}</span></dd></div>
           <div><dt>Renderer version</dt><dd>{job.rendererVersion}</dd></div>
           <div><dt>Printer profile</dt><dd>{job.profileName}</dd></div>

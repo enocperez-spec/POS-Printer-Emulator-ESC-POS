@@ -8,6 +8,14 @@ export type FeatureStatus = {
   printerProfiles: boolean
   updates: boolean
   support: boolean
+  multipleListeners?: boolean
+}
+
+export type ListenerSummary = {
+  total: number
+  running: number
+  stopped: number
+  faulted: number
 }
 
 export type LicenseStatus = {
@@ -30,6 +38,58 @@ export type ServiceStatus = {
   lastConnection?: string
   version: string
   license: LicenseStatus
+  listenerSummary?: ListenerSummary
+}
+
+export type ListenerOverflowBehavior = 'RejectNewest' | 'DropOldest'
+
+export type PrinterListenerBuffer = {
+  enabled: boolean
+  capacity: number
+  processingDelayMilliseconds: number
+  overflowBehavior: ListenerOverflowBehavior
+}
+
+export type PrinterListenerInput = {
+  name: string
+  bindAddress: string
+  port: number
+  profileId: string
+  enabled: boolean
+  idleJobTimeoutMilliseconds: number
+  maximumJobBytes: number
+  buffer: PrinterListenerBuffer
+}
+
+export type PrinterListenerCounters = {
+  activeConnections: number
+  totalConnections: number
+  bytesReceived: number
+  jobsReceived: number
+  jobsCompleted: number
+  jobsRejected: number
+  jobsFailed: number
+  queued: number
+  processing: number
+}
+
+export type PrinterListener = PrinterListenerInput & {
+  id: string
+  protocol: 'RawTcp'
+  profileName?: string
+  isDefault: boolean
+  status: 'Running' | 'Listening' | 'Stopped' | 'Faulted' | 'Starting' | 'Stopping'
+  listening: boolean
+  endpoint?: string
+  connectionAddress?: string
+  lastConnection?: string
+  lastError?: string
+  counters: PrinterListenerCounters
+}
+
+export type PrinterListenerCollection = {
+  listeners: PrinterListener[]
+  maximumListeners?: number
 }
 
 export type ActivationRequest = {
@@ -161,6 +221,9 @@ export type JobSummary = {
   profileName: string
   profilePaperWidthMm: number
   profilePrintableDots: number
+  listenerId?: string
+  listenerName?: string
+  listenerPort?: number
 }
 
 export type ReceiptSpan = {

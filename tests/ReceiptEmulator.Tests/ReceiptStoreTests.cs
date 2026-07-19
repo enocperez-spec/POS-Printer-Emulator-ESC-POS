@@ -59,6 +59,9 @@ public sealed class ReceiptStoreTests
         Assert.Equal(original.ParentJobId, reloaded.ParentJobId);
         Assert.Equal(original.ProfileId, reloaded.ProfileId);
         Assert.Equal(original.CapturedProfileId, reloaded.CapturedProfileId);
+        Assert.Equal(original.ListenerId, reloaded.ListenerId);
+        Assert.Equal(original.ListenerName, reloaded.ListenerName);
+        Assert.Equal(original.ListenerPort, reloaded.ListenerPort);
     }
 
     [Fact]
@@ -105,10 +108,34 @@ public sealed class ReceiptStoreTests
         using var connection = new SqliteConnection($"Data Source={store.DatabasePath}");
         connection.Open();
 
-        Assert.Equal(1L, ExecuteLong(connection, "PRAGMA user_version;"));
+        Assert.Equal(2L, ExecuteLong(connection, "PRAGMA user_version;"));
         Assert.Equal("wal", ExecuteString(connection, "PRAGMA journal_mode;"));
         Assert.Equal("ok", ExecuteString(connection, "PRAGMA integrity_check;"));
         Assert.Equal(4L, ExecuteLong(connection, "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'ix_receipt_jobs_%';"));
+        Assert.Equal(1L, ExecuteLong(connection, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='printer_listeners';"));
+        Assert.Equal(3L, ExecuteLong(connection, "SELECT COUNT(*) FROM pragma_table_info('receipt_jobs') WHERE name IN ('listener_id', 'listener_name', 'listener_port');"));
+    }
+
+    [Fact]
+    public void ListenerMetadataRoundTripsAndFiltersHistory()
+    {
+        var root = NewRoot();
+        var store = PersistentStore(root);
+        var defaultJob = CreateJob("DEFAULT");
+        var kitchenJob = WithListener(CreateJob("KITCHEN"), "listener-kitchen", "Kitchen", 9101);
+        store.Add(defaultJob);
+        store.Add(kitchenJob);
+
+        var reloaded = PersistentStore(root);
+        var summary = Assert.Single(reloaded.GetSummaries("listener-kitchen"));
+
+        Assert.Equal(kitchenJob.Id, summary.Id);
+        Assert.Equal("Kitchen", summary.ListenerName);
+        Assert.Equal(9101, summary.ListenerPort);
+        Assert.Single(reloaded.GetSummaries(PrinterListenerDefaults.DefaultId));
+        Assert.Equal(1, reloaded.Clear("listener-kitchen"));
+        Assert.Null(PersistentStore(root).Get(kitchenJob.Id));
+        Assert.NotNull(PersistentStore(root).Get(defaultJob.Id));
     }
 
     [Fact]
@@ -291,9 +318,37 @@ public sealed class ReceiptStoreTests
             ProfileName = "Custom Profile",
             ProfilePaperWidthMm = 58,
             ProfilePrintableDots = 384,
-            CapturedProfileId = "captured-profile"
+            CapturedProfileId = "captured-profile",
+            ListenerId = "listener-front-counter",
+            ListenerName = "Front Counter",
+            ListenerPort = 9102
         };
     }
+
+    private static ReceiptJob WithListener(ReceiptJob job, string id, string name, int port) => new()
+    {
+        Id = job.Id,
+        ReceivedAt = job.ReceivedAt,
+        SourceIp = job.SourceIp,
+        RawPayload = job.RawPayload,
+        Receipt = job.Receipt,
+        Status = job.Status,
+        Error = job.Error,
+        Origin = job.Origin,
+        RendererVersion = job.RendererVersion,
+        OriginalReceivedAt = job.OriginalReceivedAt,
+        OriginalSourceIp = job.OriginalSourceIp,
+        ParentJobId = job.ParentJobId,
+        ImportedFileName = job.ImportedFileName,
+        ProfileId = job.ProfileId,
+        ProfileName = job.ProfileName,
+        ProfilePaperWidthMm = job.ProfilePaperWidthMm,
+        ProfilePrintableDots = job.ProfilePrintableDots,
+        CapturedProfileId = job.CapturedProfileId,
+        ListenerId = id,
+        ListenerName = name,
+        ListenerPort = port
+    };
 
     private static string WriteLegacyJob(string historyDirectory, ReceiptJob job)
     {

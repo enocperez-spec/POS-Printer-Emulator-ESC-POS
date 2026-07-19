@@ -31,6 +31,8 @@ builder.Services.AddSingleton<ReceiptProcessor>();
 builder.Services.AddSingleton<CapturePackageService>();
 builder.Services.AddSingleton<ServiceRuntimeState>();
 builder.Services.AddSingleton<PrinterStateService>();
+builder.Services.AddSingleton<PrinterListenerConfigurationService>();
+builder.Services.AddSingleton<PrinterListenerManager>();
 builder.Services.AddSingleton<StoredGraphicService>();
 builder.Services.AddSingleton(supportLogs);
 builder.Services.AddHttpClient("UsageTelemetry");
@@ -50,20 +52,28 @@ builder.Services.AddHttpClient<UpdateService>(client =>
     client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
     client.Timeout = TimeSpan.FromSeconds(15);
 });
-builder.Services.AddHostedService<TcpReceiptListener>();
+builder.Services.AddHostedService(services => services.GetRequiredService<PrinterListenerManager>());
 builder.Services.AddHostedService<PeriodicUpdateChecker>();
 
 var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.MapGet("/api/status", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options) =>
-    new ServiceStatus(
-        runtime.Listening,
-        $"{options.BindAddress}:{options.Port}",
-        runtime.LastConnection,
+app.MapGet("/api/status", (PrinterListenerManager listeners, LicenseService license) =>
+{
+    var status = listeners.GetStatus();
+    var defaultListener = status.Listeners.FirstOrDefault(listener =>
+        listener.Configuration.Id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase));
+    return new ServiceStatus(
+        status.ListeningCount > 0,
+        defaultListener is null
+            ? $"{PrinterListenerDefaults.DefaultBindAddress}:{PrinterListenerDefaults.DefaultPort}"
+            : $"{defaultListener.Configuration.BindAddress}:{defaultListener.Configuration.Port}",
+        status.Listeners.Select(listener => listener.LastConnection).Where(value => value is not null).Max(),
         ProductInfo.Version,
-        license.GetStatus()));
+        license.GetStatus(),
+        status.ToSummary());
+});
 
 app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, LicenseService license, CancellationToken cancellationToken) =>
     !license.HasProAccess
@@ -76,6 +86,102 @@ app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license
         : updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
+
+app.MapGet("/api/listeners", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    var response = listeners.GetStatus().Listeners.Select(listener => listener.ToResponse(profiles)).ToArray();
+    return Results.Ok(new PrinterListenerCollectionResponse(response, PrinterListenerDefaults.MaximumListeners));
+});
+
+app.MapPost("/api/listeners", async (
+    PrinterListenerInput request,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    try { return Results.Ok((await listeners.CreateAsync(request, cancellationToken)).ToResponse(profiles)); }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
+
+app.MapPut("/api/listeners/{id}", async (
+    string id,
+    PrinterListenerInput request,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    try
+    {
+        var updated = await listeners.UpdateAsync(id, request, cancellationToken);
+        if (id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase))
+            profiles.Select(request.ProfileId);
+        return Results.Ok(updated.ToResponse(profiles));
+    }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
+
+app.MapDelete("/api/listeners/{id}", async (
+    string id,
+    PrinterListenerManager listeners,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    try
+    {
+        await listeners.DeleteAsync(id, cancellationToken);
+        return Results.NoContent();
+    }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
+
+app.MapPost("/api/listeners/{id}/start", async (
+    string id,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    try { return Results.Ok((await listeners.StartListenerAsync(id, cancellationToken)).ToResponse(profiles)); }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
+
+app.MapPost("/api/listeners/{id}/stop", async (
+    string id,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    try { return Results.Ok((await listeners.StopListenerAsync(id, cancellationToken)).ToResponse(profiles)); }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
+
+app.MapPost("/api/listeners/{id}/restart", async (
+    string id,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    try { return Results.Ok((await listeners.RestartListenerAsync(id, cancellationToken)).ToResponse(profiles)); }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
 
 app.MapGet("/api/printer-profiles", (PrinterProfileService profiles, LicenseService license) =>
     !license.HasProAccess
@@ -105,16 +211,59 @@ app.MapPost("/api/printer-profiles/{id}/duplicate", (string id, PrinterProfileSe
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
-app.MapPost("/api/printer-profiles/select", (PrinterProfileSelection request, PrinterProfileService profiles, LicenseService license) =>
+app.MapPost("/api/printer-profiles/select", async (
+    PrinterProfileSelection request,
+    PrinterProfileService profiles,
+    PrinterListenerManager listeners,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
 {
     if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
-    try { return Results.Ok(profiles.Select(request.ProfileId)); }
+    try
+    {
+        var previous = profiles.GetSelected();
+        var selected = profiles.Select(request.ProfileId);
+        try
+        {
+            if (license.HasEnterpriseAccess)
+            {
+                var current = listeners.Get(PrinterListenerDefaults.DefaultId).Configuration;
+                var input = new PrinterListenerInput(
+                    current.Name,
+                    current.BindAddress,
+                    current.Port,
+                    selected.Id,
+                    current.Enabled,
+                    current.IdleJobTimeoutMilliseconds,
+                    current.MaximumJobBytes,
+                    current.Buffer);
+                await listeners.UpdateAsync(current.Id, input, cancellationToken);
+            }
+            else
+            {
+                await listeners.ReconcileAsync(cancellationToken);
+            }
+        }
+        catch
+        {
+            profiles.Select(previous.Id);
+            throw;
+        }
+        return Results.Ok(selected);
+    }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 409); }
 });
 
-app.MapDelete("/api/printer-profiles/{id}", (string id, PrinterProfileService profiles, LicenseService license) =>
+app.MapDelete("/api/printer-profiles/{id}", (
+    string id,
+    PrinterProfileService profiles,
+    PrinterListenerConfigurationService listeners,
+    LicenseService license) =>
 {
     if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (listeners.IsProfileInUse(id))
+        return Results.Problem("This printer profile is assigned to a configured listener. Reassign that listener before deleting the profile.", statusCode: 409);
     try { return profiles.Delete(id) ? Results.NoContent() : Results.NotFound(); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
@@ -143,29 +292,115 @@ app.MapPost("/api/printer-profiles/import", async (HttpRequest request, PrinterP
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
-app.MapGet("/api/printer-state", (PrinterStateService printerState, PrinterProfileService profiles, LicenseService license) =>
+app.MapGet("/api/printer-state", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
     if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
     var capabilities = profiles.GetSelected().Capabilities;
-    return Results.Ok(printerState.GetStatus() with { DleEotSupported = capabilities.DleEotStatus, AsbSupported = capabilities.AutomaticStatusBack });
+    try
+    {
+        return Results.Ok(listeners.GetPrinterState(PrinterListenerDefaults.DefaultId) with
+        {
+            DleEotSupported = capabilities.DleEotStatus,
+            AsbSupported = capabilities.AutomaticStatusBack
+        });
+    }
+    catch (KeyNotFoundException) { return Results.Problem("The default printer listener is not ready yet.", statusCode: 503); }
 });
 
-app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterStateService printerState, PrinterProfileService profiles, LicenseService license) =>
+app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
     if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
     try
     {
         var capabilities = profiles.GetSelected().Capabilities;
-        return Results.Ok(printerState.Update(request) with { DleEotSupported = capabilities.DleEotStatus, AsbSupported = capabilities.AutomaticStatusBack });
+        return Results.Ok(listeners.UpdatePrinterState(PrinterListenerDefaults.DefaultId, request) with
+        {
+            DleEotSupported = capabilities.DleEotStatus,
+            AsbSupported = capabilities.AutomaticStatusBack
+        });
     }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (KeyNotFoundException) { return Results.Problem("The default printer listener is not ready yet.", statusCode: 503); }
 });
 
-app.MapPost("/api/printer-state/reset", (PrinterStateService printerState, PrinterProfileService profiles, LicenseService license) =>
+app.MapPost("/api/printer-state/reset", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
     if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
     var capabilities = profiles.GetSelected().Capabilities;
-    return Results.Ok(printerState.Reset() with { DleEotSupported = capabilities.DleEotStatus, AsbSupported = capabilities.AutomaticStatusBack });
+    try
+    {
+        return Results.Ok(listeners.ResetPrinterState(PrinterListenerDefaults.DefaultId) with
+        {
+            DleEotSupported = capabilities.DleEotStatus,
+            AsbSupported = capabilities.AutomaticStatusBack
+        });
+    }
+    catch (KeyNotFoundException) { return Results.Problem("The default printer listener is not ready yet.", statusCode: 503); }
+});
+
+app.MapGet("/api/listeners/{id}/printer-state", (
+    string id,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Per-listener printer state requires an Enterprise License.", statusCode: 403);
+    try
+    {
+        var listener = listeners.Get(id);
+        var profile = profiles.Get(listener.Configuration.ProfileId);
+        return Results.Ok(listeners.GetPrinterState(id) with
+        {
+            DleEotSupported = profile.Capabilities.DleEotStatus,
+            AsbSupported = profile.Capabilities.AutomaticStatusBack
+        });
+    }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
+});
+
+app.MapPut("/api/listeners/{id}/printer-state", (
+    string id,
+    PrinterStateUpdateRequest request,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Per-listener printer state requires an Enterprise License.", statusCode: 403);
+    try
+    {
+        var listener = listeners.Get(id);
+        var profile = profiles.Get(listener.Configuration.ProfileId);
+        return Results.Ok(listeners.UpdatePrinterState(id, request) with
+        {
+            DleEotSupported = profile.Capabilities.DleEotStatus,
+            AsbSupported = profile.Capabilities.AutomaticStatusBack
+        });
+    }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
+});
+
+app.MapPost("/api/listeners/{id}/printer-state/reset", (
+    string id,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license) =>
+{
+    if (!license.HasEnterpriseAccess)
+        return Results.Problem("Per-listener printer state requires an Enterprise License.", statusCode: 403);
+    try
+    {
+        var listener = listeners.Get(id);
+        var profile = profiles.Get(listener.Configuration.ProfileId);
+        return Results.Ok(listeners.ResetPrinterState(id) with
+        {
+            DleEotSupported = profile.Capabilities.DleEotStatus,
+            AsbSupported = profile.Capabilities.AutomaticStatusBack
+        });
+    }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
 });
 
 app.MapGet("/api/stored-graphics", (StoredGraphicService graphics, LicenseService license) =>
@@ -206,30 +441,48 @@ app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGra
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
-app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseService license, PrinterOptions options,
-    ReceiptStore store, SupportLogProvider logs, PrinterStateService printerState, StoredGraphicService graphics, PrinterProfileService profiles) =>
+app.MapGet("/api/support/diagnostics", (LicenseService license, PrinterListenerManager listeners,
+    ReceiptStore store, SupportLogProvider logs, StoredGraphicService graphics, PrinterProfileService profiles) =>
 {
     if (!license.HasProAccess) return Results.Problem("Support requires a Pro or Enterprise License.", statusCode: 403);
     var status = license.GetStatus();
     var selectedProfile = profiles.GetSelected();
-    var report = new StringBuilder()
+    var listenerStatus = listeners.GetStatus();
+    var reportBuilder = new StringBuilder()
         .AppendLine("POS Printer Emulator Support Diagnostics")
         .AppendLine($"Generated: {DateTimeOffset.Now:O}")
         .AppendLine($"Application version: {ProductInfo.Version}")
         .AppendLine($"Operating system: {Environment.OSVersion}")
         .AppendLine($"Runtime: {Environment.Version}")
         .AppendLine($"64-bit process: {Environment.Is64BitProcess}")
-        .AppendLine($"Listener: {options.BindAddress}:{options.Port}")
-        .AppendLine($"Listening: {runtime.Listening}")
-        .AppendLine($"Last connection: {runtime.LastConnection?.ToString("O") ?? "None"}")
+        .AppendLine($"Configured printer listeners: {listenerStatus.Listeners.Count}")
+        .AppendLine($"Listening printer listeners: {listenerStatus.ListeningCount}")
         .AppendLine($"License mode: {status.Mode}")
         .AppendLine($"License ID: {status.LicenseId?.ToString() ?? "None"}")
         .AppendLine($"Printer profile: {selectedProfile.Name} ({selectedProfile.Id})")
         .AppendLine($"Profile paper: {selectedProfile.PaperWidthMm} mm / {selectedProfile.PrintableDots} dots")
         .AppendLine($"Receipt jobs currently listed: {store.GetSummaries().Count}")
-        .AppendLine($"Stored printer logos: {graphics.List().Count}")
-        .AppendLine($"Simulated printer state: {printerState.GetStatus().Summary}")
-        .AppendLine($"Printer status responses sent: {printerState.GetStatus().ResponsesSent}")
+        .AppendLine($"Stored printer logos: {graphics.List().Count}");
+
+    reportBuilder.AppendLine().AppendLine("Printer listeners").AppendLine("-----------------");
+    foreach (var listener in listenerStatus.Listeners)
+    {
+        var configuration = listener.Configuration;
+        var stateSummary = "Unavailable";
+        try { stateSummary = listeners.GetPrinterState(configuration.Id).Summary; }
+        catch (KeyNotFoundException) { }
+        reportBuilder
+            .AppendLine($"{configuration.Name} ({configuration.Id})")
+            .AppendLine($"  Endpoint: {configuration.BindAddress}:{configuration.Port} / {configuration.Protocol}")
+            .AppendLine($"  Profile: {configuration.ProfileId}")
+            .AppendLine($"  Enabled/listening/state: {configuration.Enabled}/{listener.Listening}/{listener.State}")
+            .AppendLine($"  Last connection: {listener.LastConnection?.ToString("O") ?? "None"}")
+            .AppendLine($"  Last error: {listener.LastError ?? "None"}")
+            .AppendLine($"  Counters: connections={listener.Counters.AcceptedConnections}, active={listener.Counters.ActiveConnections}, jobs={listener.Counters.ReceivedJobs}, completed={listener.Counters.CompletedJobs}, rejected={listener.Counters.RejectedJobs}, failed={listener.Counters.FailedJobs}, bytes={listener.Counters.ReceivedBytes}")
+            .AppendLine($"  Simulated state: {stateSummary}");
+    }
+
+    var report = reportBuilder
         .AppendLine()
         .AppendLine("Application log")
         .AppendLine("---------------")
@@ -242,12 +495,19 @@ app.MapGet("/api/support/diagnostics", (ServiceRuntimeState runtime, LicenseServ
     return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
 });
 
-app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService license, ReceiptStore store, IUsageTelemetry telemetry) =>
+app.MapPost("/api/license/activate", async (
+    ActivationRequest request,
+    LicenseService license,
+    ReceiptStore store,
+    PrinterListenerManager listeners,
+    IUsageTelemetry telemetry,
+    CancellationToken cancellationToken) =>
 {
     try
     {
         var status = license.Activate(request.CustomerName, request.EmailAddress, request.ActivationKey);
         store.EnableProHistory();
+        await listeners.ReconcileAsync(cancellationToken);
         telemetry.RecordActivation();
         return Results.Ok(status);
     }
@@ -257,7 +517,7 @@ app.MapPost("/api/license/activate", (ActivationRequest request, LicenseService 
     }
 });
 
-app.MapGet("/api/jobs", (ReceiptStore store) => store.GetSummaries());
+app.MapGet("/api/jobs", (string? listenerId, ReceiptStore store) => store.GetSummaries(listenerId));
 
 app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
 {
@@ -283,6 +543,9 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
             job.ProfilePaperWidthMm,
             job.ProfilePrintableDots,
             job.CapturedProfileId,
+            job.ListenerId,
+            job.ListenerName,
+            job.ListenerPort,
             job.Receipt.Lines,
             job.Receipt.Commands,
             job.Receipt.PlainText,
@@ -293,12 +556,15 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
 app.MapDelete("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
     store.Delete(id) ? Results.NoContent() : Results.NotFound());
 
-app.MapDelete("/api/jobs", (ReceiptStore store) =>
-    Results.Ok(new { Removed = store.Clear() }));
+app.MapDelete("/api/jobs", (string? listenerId, ReceiptStore store) =>
+    Results.Ok(new { Removed = store.Clear(listenerId) }));
 
-app.MapPost("/api/sample", (ReceiptProcessor processor) =>
+app.MapPost("/api/sample", (ReceiptProcessor processor, PrinterListenerManager listeners, PrinterProfileService profiles) =>
 {
-    var job = processor.Process(SampleReceipt.Create(), "127.0.0.1", out var rejection);
+    var configuration = listeners.Get(PrinterListenerDefaults.DefaultId).Configuration;
+    var profile = profiles.Get(configuration.ProfileId);
+    var context = new PrinterListenerJobContext(configuration.Id, configuration.Name, configuration.Port);
+    var job = processor.Process(SampleReceipt.Create(), "127.0.0.1", profile, context, out var rejection);
     return job is null ? Results.Problem(rejection, statusCode: 429) : Results.Ok(new { job.Id });
 });
 
@@ -331,6 +597,9 @@ app.MapPost("/api/captures/import", async (
             imported.OriginalSourceIp,
             imported.CapturedJobId,
             imported.CapturedProfileId,
+            imported.ListenerId,
+            imported.ListenerName,
+            imported.ListenerPort,
             out var rejection);
         return job is null
             ? Results.Problem(rejection, statusCode: 400)
@@ -388,6 +657,15 @@ app.MapGet("/api/jobs/{id:guid}/text", (Guid id, ReceiptStore store, LicenseServ
         ? Results.NotFound()
         : Results.File(Encoding.UTF8.GetBytes(job.Receipt.PlainText), "text/plain", $"receipt-{id:N}.txt");
 });
+
+static IResult ListenerProblem(Exception exception) => exception switch
+{
+    UnauthorizedAccessException => Results.Problem(exception.Message, statusCode: 403),
+    KeyNotFoundException => Results.Problem(exception.Message, statusCode: 404),
+    ArgumentException => Results.Problem(exception.Message, statusCode: 400),
+    InvalidOperationException => Results.Problem(exception.Message, statusCode: 409),
+    _ => Results.Problem("The printer listener operation could not be completed. Review Support diagnostics and try again.", statusCode: 500)
+};
 
 app.MapFallbackToFile("index.html");
 app.Run();

@@ -24,6 +24,9 @@ public sealed class CapturePackageServiceTests
         Assert.Equal(original.SourceIp, imported.OriginalSourceIp);
         Assert.Equal(original.Id, imported.CapturedJobId);
         Assert.Equal(original.ProfileId, imported.CapturedProfileId);
+        Assert.Equal(original.ListenerId, imported.ListenerId);
+        Assert.Equal(original.ListenerName, imported.ListenerName);
+        Assert.Equal(original.ListenerPort, imported.ListenerPort);
     }
 
     [Fact]
@@ -98,7 +101,10 @@ public sealed class CapturePackageServiceTests
             Receipt = receipt,
             Status = "Completed",
             Origin = JobOrigins.Live,
-            RendererVersion = ProductInfo.Version
+            RendererVersion = ProductInfo.Version,
+            ListenerId = "listener-kitchen",
+            ListenerName = "Kitchen",
+            ListenerPort = 9101
         };
     }
 

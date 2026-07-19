@@ -6,7 +6,7 @@
     <title>POS Printer Emulator Documentation</title>
     <meta
       name="description"
-      content="Set up POS Printer Emulator on Windows, configure TCP/IP port 9100, test ESC/POS receipts, inspect jobs, and activate the Pro Version."
+      content="Set up POS Printer Emulator on Windows, configure one or more TCP/IP receipt printers, test ESC/POS receipts, inspect jobs, and activate Pro or Enterprise features."
     />
     <link
       rel="canonical"
@@ -53,7 +53,8 @@
           <h1>POS Printer Emulator Documentation</h1>
           <p>
             Install the Windows application, connect your POS over TCP/IP,
-            inspect ESC/POS receipts, manage jobs, and activate the Pro Version.
+            inspect ESC/POS receipts, manage jobs, and activate a Pro or
+            Enterprise License.
           </p>
         </div>
       </section>
@@ -85,10 +86,11 @@
             <h2>Application areas</h2>
             <h3>Activity</h3>
             <p>
-              Shows received print jobs with time, source, size, status, and
-              warnings. Select a job to inspect it. Use the trash controls to
-              remove one job or clear all jobs. Collapse the panel when you need
-              more preview space.
+              Shows received print jobs with time, source, printer listener,
+              size, status, and warnings. Select a job to inspect it. Enterprise
+              customers can filter or clear Activity for one printer while
+              keeping jobs from other listeners. Collapse the panel when you
+              need more preview space.
             </p>
             <h3>Receipt preview</h3>
             <p>
@@ -125,13 +127,23 @@
               capabilities so receipts can be validated against the target
               printer. Printer Profiles are locked in the Trial License.
             </p>
+            <h2>Enterprise Printer Listeners</h2>
+            <p>
+              An Enterprise License unlocks Settings → Printer Listeners so one
+              Windows installation can emulate multiple independent receipt
+              printers. Assign each printer a unique name, TCP port, network
+              address, and printer profile; then start, stop, restart, and
+              monitor it without interrupting the other listeners. Each printer
+              keeps its own simulated state, buffer, connection counters, and
+              error status. Trial and Pro Licenses retain one local listener.
+            </p>
             <h2>Registration and activation</h2>
             <p>
               Enter the customer or company name and email requested during
               setup. Every installation begins in Trial Mode. To activate, open
               Settings, enter the unique activation key supplied after purchase,
-              and validate it. The Pro Version unlocks immediately without
-              another download.
+              and validate it. The purchased Pro or Enterprise features unlock
+              immediately without another download.
             </p>
             <h2>Trial limits</h2>
             <ul>
@@ -163,10 +175,10 @@
           </article>
           <aside class="sidebar-card">
             <h2>Documentation links</h2>
-            <p>Version 0.3.20</p>
+            <p>Version 0.3.21</p>
             <a
               class="button button-primary"
-              href="downloads/POSPrinterEmulatorSetup-0.3.20-win-x64.exe"
+              href="downloads/POSPrinterEmulatorSetup-0.3.21-win-x64.exe"
               download
               >Download for Windows</a
             >
