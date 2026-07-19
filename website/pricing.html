@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>POS Printer Emulator Pricing | Trial vs Pro</title>
+    <title>POS Printer Emulator Pricing | Trial, Pro &amp; Enterprise</title>
     <meta
       name="description"
-      content="Compare the POS Printer Emulator Trial, Pro, and Enterprise licenses. Start with five daily jobs, then unlock unlimited testing, history, exports, and no watermark."
+      content="Compare POS Printer Emulator Trial, Pro, and Enterprise pricing and features, including daily job limits, receipt history, exports, printer profiles, and multiple TCP/IP listeners."
     />
     <link rel="canonical" href="https://www.posprinteremulator.com/pricing" />
     <link rel="icon" href="assets/favicon.png" />
@@ -16,8 +16,39 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260715" />
-    <link rel="stylesheet" href="seo-pages.css?v=20260715" />
+    <link rel="stylesheet" href="styles.css?v=20260718-editions" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260718-editions" />
+    <meta property="og:title" content="POS Printer Emulator Pricing | Trial, Pro &amp; Enterprise" />
+    <meta property="og:description" content="Compare all three POS Printer Emulator editions for Windows receipt testing." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.posprinteremulator.com/pricing" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://www.posprinteremulator.com/#software",
+            "name": "POS Printer Emulator",
+            "operatingSystem": "Windows 10, Windows 11",
+            "applicationCategory": "DeveloperApplication",
+            "softwareVersion": "0.3.21",
+            "offers": [
+              {"@type":"Offer","name":"Trial License","price":"0.00","priceCurrency":"USD","availability":"https://schema.org/InStock","url":"https://www.posprinteremulator.com/pos-printer-emulator-download"},
+              {"@type":"Offer","name":"Pro License","price":"39.99","priceCurrency":"USD","availability":"https://schema.org/InStock","url":"https://buy.posprinteremulator.com/","description":"One-time license for unlimited receipt testing, local history, exports, and premium tools."},
+              {"@type":"Offer","name":"Enterprise License","price":"199.99","priceCurrency":"USD","availability":"https://schema.org/InStock","url":"https://buy.posprinteremulator.com/","description":"One-time license with every Pro feature and up to 16 independent RAW TCP/IP printer listeners."}
+            ]
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {"@type":"ListItem","position":1,"name":"Home","item":"https://www.posprinteremulator.com/"},
+              {"@type":"ListItem","position":2,"name":"Pricing","item":"https://www.posprinteremulator.com/pricing"}
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <header class="site-header">
@@ -60,7 +91,33 @@
         <div class="shell article-layout">
           <article class="article-content">
             <h2>Compare editions</h2>
-            <table class="compact-table">
+            <div class="edition-grid" aria-label="POS Printer Emulator license editions">
+              <section class="edition-card trial-edition">
+                <span class="edition-label">Evaluate</span>
+                <h3>Trial</h3>
+                <p class="edition-price"><strong>$0</strong><span>Free evaluation</span></p>
+                <p>For testing the local workflow before purchasing.</p>
+                <ul><li>5 emulated jobs per day</li><li>Watermarked receipt preview</li><li>Session-only Activity</li><li>One TCP/IP listener</li></ul>
+                <a class="button button-outline" href="downloads/POSPrinterEmulatorSetup-0.3.21-win-x64.exe" download>Start free trial</a>
+              </section>
+              <section class="edition-card pro-edition">
+                <span class="edition-label">Individual teams</span>
+                <h3>Pro</h3>
+                <p class="edition-price"><strong>$39.99</strong><span>One-time license</span></p>
+                <p>For developers, administrators, and technicians testing one virtual printer.</p>
+                <ul><li>Unlimited print jobs</li><li>Full local receipt history</li><li>Exports and clean previews</li><li>Printer profiles and premium tools</li></ul>
+                <a class="button button-primary" href="https://buy.posprinteremulator.com/">Buy Pro</a>
+              </section>
+              <section class="edition-card enterprise-edition">
+                <span class="edition-label">Multi-printer labs</span>
+                <h3>Enterprise</h3>
+                <p class="edition-price"><strong>$199.99</strong><span>One-time license</span></p>
+                <p>For organizations that need several isolated virtual receipt printers on one Windows installation.</p>
+                <ul><li>Everything in Pro</li><li>Up to 16 printer listeners</li><li>Independent ports, profiles, and states</li><li>Per-listener counters, buffering, and Activity filters</li></ul>
+                <a class="button enterprise-button" href="https://buy.posprinteremulator.com/">Buy Enterprise</a>
+              </section>
+            </div>
+            <div class="table-scroll"><table class="compact-table edition-table">
               <thead>
                 <tr>
                   <th>Feature</th>
@@ -107,10 +164,22 @@
                   <td>Included</td>
                 </tr>
                 <tr>
+                  <td>Stored logos and printer-state simulation</td>
+                  <td>Unavailable</td>
+                  <td>Included</td>
+                  <td>Included</td>
+                </tr>
+                <tr>
                   <td>Local printer listeners</td>
                   <td>1</td>
                   <td>1</td>
-                  <td>Multiple independent listeners</td>
+                  <td>Up to 16 independent listeners</td>
+                </tr>
+                <tr>
+                  <td>Per-listener ports, state, counters, and Activity filters</td>
+                  <td>Unavailable</td>
+                  <td>Unavailable</td>
+                  <td>Included</td>
                 </tr>
                 <tr>
                   <td>Upgrade process</td>
@@ -119,7 +188,7 @@
                   <td>No reinstall required</td>
                 </tr>
               </tbody>
-            </table>
+            </table></div>
             <p>
               Enterprise includes every Pro feature plus multiple independently
               configured RAW TCP/IP printers. Each listener can use its own

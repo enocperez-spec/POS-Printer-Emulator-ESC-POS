@@ -40,7 +40,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260715-methodology" />
+    <link rel="stylesheet" href="styles.css?v=20260718-editions" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -91,11 +91,20 @@
           {
             "@type": "Offer",
             "name": "Pro Version — Permanent Desktop License",
-            "price": "39.00",
+            "price": "39.99",
             "priceCurrency": "USD",
             "availability": "https://schema.org/InStock",
             "url": "https://buy.posprinteremulator.com/",
-            "description": "One-time Pro Version license with unlimited emulated print jobs and all premium features."
+            "description": "One-time Pro license with unlimited emulated print jobs, local history, exports, printer profiles, and premium features."
+          },
+          {
+            "@type": "Offer",
+            "name": "Enterprise Version — Permanent Desktop License",
+            "price": "199.99",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock",
+            "url": "https://buy.posprinteremulator.com/",
+            "description": "One-time Enterprise license with every Pro feature and up to 16 independent RAW TCP/IP printer listeners."
           }
         ]
       }
@@ -465,10 +474,12 @@
       <section class="comparison section" id="compare">
         <div class="shell compare-grid">
           <div class="compare-intro reveal">
-            <h2>Start in Trial Mode. Unlock everything when you’re ready.</h2>
+            <h2>Choose Trial, Pro, or Enterprise.</h2>
             <p>
-              Every installation starts with a free trial. Enter your activation
-              key inside the app to upgrade instantly—no reinstall required.
+              Every installation starts with a free trial. Choose Pro for
+              unlimited testing on one virtual printer, or Enterprise for up to
+              16 independently configured printer listeners. Activate inside
+              the app with no reinstall.
             </p>
             <div class="compare-actions">
               <a
@@ -479,8 +490,8 @@
               >
               <a
                 class="button button-outline"
-                href="https://buy.posprinteremulator.com/"
-                >Buy the Pro License</a
+                href="pricing"
+                >Compare Pro &amp; Enterprise</a
               >
             </div>
           </div>
@@ -493,11 +504,15 @@
               Trial Version
             </div>
             <div class="compare-head full" role="columnheader">Pro Version</div>
+            <div class="compare-head enterprise" role="columnheader">Enterprise Version</div>
             <div class="compare-cell" role="cell">
               <span class="trial-icon">5</span>5 emulated print jobs per day
             </div>
             <div class="compare-cell" role="cell">
               <span class="check">∞</span>Unlimited print jobs
+            </div>
+            <div class="compare-cell enterprise-cell" role="cell">
+              <span class="enterprise-check">∞</span>Unlimited print jobs
             </div>
             <div class="compare-cell" role="cell">
               <span class="trial-icon">◷</span>Session-only job list
@@ -505,17 +520,26 @@
             <div class="compare-cell" role="cell">
               <span class="check">✓</span>Full print-job history
             </div>
+            <div class="compare-cell enterprise-cell" role="cell">
+              <span class="enterprise-check">✓</span>Full print-job history
+            </div>
             <div class="compare-cell" role="cell">
               <span class="trial-icon">T</span>TRIAL receipt watermark
             </div>
             <div class="compare-cell" role="cell">
               <span class="check">✓</span>No watermark
             </div>
+            <div class="compare-cell enterprise-cell" role="cell">
+              <span class="enterprise-check">✓</span>No watermark
+            </div>
             <div class="compare-cell" role="cell">
               <span class="trial-icon">×</span>Premium features locked
             </div>
             <div class="compare-cell" role="cell">
-              <span class="check">✓</span>All exports and premium features
+              <span class="check">1</span>One printer listener plus all Pro tools
+            </div>
+            <div class="compare-cell enterprise-cell" role="cell">
+              <span class="enterprise-check">16</span>Up to 16 isolated printer listeners
             </div>
           </div>
         </div>
@@ -588,7 +612,7 @@
               <summary>How does activation work?<span></span></summary>
               <p>
                 Enter your customer or company name, email address, and
-                activation key in the app. A valid key unlocks the Pro Version
+                activation key in the app. A valid key unlocks Pro or Enterprise
                 immediately.
               </p>
             </details>
@@ -596,7 +620,7 @@
               <summary>Where is receipt data stored?<span></span></summary>
               <p>
                 Receipt data stays on the local Windows device. Trial jobs are
-                session-only; the Pro Version keeps local job history.
+                session-only; Pro and Enterprise keep local job history.
               </p>
             </details>
             <details class="reveal">

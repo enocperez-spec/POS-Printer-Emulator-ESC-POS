@@ -63,3 +63,10 @@ img{height:auto}
 .seo-link-grid span{color:var(--muted);font-size:14px}
 @media (max-width:1100px){.seo-overview-grid{grid-template-columns:1fr;gap:45px}}
 @media (max-width:680px){.seo-link-grid{grid-template-columns:1fr}.seo-link-grid a{min-height:0}}
+.comparison-table{grid-template-columns:repeat(3,1fr)}
+.compare-head.enterprise{background:#6654a5}
+.compare-cell{border-left:1px solid var(--line)}
+.compare-cell:nth-child(3n+1){border-left:0}
+.enterprise-cell{background:#faf8ff}
+.enterprise-check{flex:0 0 34px;width:34px;height:34px;display:grid;place-items:center;border:1px solid #7762bd;border-radius:50%;color:#6654a5;font-size:12px;font-weight:800}
+@media (max-width:780px){.comparison-table{grid-template-columns:repeat(3,minmax(190px,1fr));overflow-x:auto}.compare-cell{min-height:105px}}
