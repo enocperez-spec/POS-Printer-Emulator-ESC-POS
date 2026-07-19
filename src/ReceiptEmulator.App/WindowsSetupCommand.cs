@@ -19,8 +19,12 @@ public static class WindowsSetupCommand
 {
     private const string ServiceName = "ReceiptLab";
     private const string DisplayName = "POS Printer Emulator";
-    private const string FirewallRuleName = "POS Printer Emulator ESC-POS (TCP 9100)";
-    private const string LegacyFirewallRuleName = "Receipt Lab ESC-POS (TCP 9100)";
+    private const string FirewallRuleName = "POS Printer Emulator RAW TCP Listeners";
+    private static readonly string[] LegacyFirewallRuleNames =
+    [
+        "POS Printer Emulator ESC-POS (TCP 9100)",
+        "Receipt Lab ESC-POS (TCP 9100)"
+    ];
     private const string ViewerHealthUrl = "http://127.0.0.1:5187/api/status";
 
     public static WindowsSetupAction ParseAction(IReadOnlyList<string> arguments)
@@ -146,27 +150,14 @@ public static class WindowsSetupCommand
         WindowsServiceManager.Create(
             ServiceName,
             DisplayName,
-            "Receives ESC/POS jobs on TCP port 9100 and serves the local POS Printer Emulator viewer.",
+            "Receives ESC/POS jobs on configured RAW TCP ports and serves the local POS Printer Emulator viewer.",
             executablePath);
 
-        Console.WriteLine("Configuring the private/domain TCP 9100 firewall rule...");
+        Console.WriteLine("Configuring the private/domain RAW TCP listener firewall rule...");
         await RemoveFirewallRulesAsync(cancellationToken);
         await RunRequiredProcessAsync(
             GetSystemExecutable("netsh.exe"),
-            [
-                "advfirewall",
-                "firewall",
-                "add",
-                "rule",
-                $"name={FirewallRuleName}",
-                "dir=in",
-                "action=allow",
-                "protocol=TCP",
-                "localport=9100",
-                "profile=private,domain",
-                $"program={executablePath}",
-                "enable=yes"
-            ],
+            BuildFirewallRuleArguments(executablePath),
             cancellationToken);
 
         using var service = new ServiceController(ServiceName);
@@ -244,7 +235,7 @@ public static class WindowsSetupCommand
 
     private static async Task RemoveFirewallRulesAsync(CancellationToken cancellationToken)
     {
-        foreach (var ruleName in new[] { FirewallRuleName, LegacyFirewallRuleName })
+        foreach (var ruleName in new[] { FirewallRuleName }.Concat(LegacyFirewallRuleNames))
         {
             var result = await RunProcessAsync(
                 GetSystemExecutable("netsh.exe"),
@@ -256,6 +247,30 @@ public static class WindowsSetupCommand
                 Console.WriteLine($"No existing '{ruleName}' firewall rule needed removal.");
             }
         }
+    }
+
+    internal static IReadOnlyList<string> BuildFirewallRuleArguments(string executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            throw new ArgumentException("The application executable path is required.", nameof(executablePath));
+        }
+
+        return
+        [
+            "advfirewall",
+            "firewall",
+            "add",
+            "rule",
+            $"name={FirewallRuleName}",
+            "dir=in",
+            "action=allow",
+            "protocol=TCP",
+            "localport=any",
+            "profile=private,domain",
+            $"program={Path.GetFullPath(executablePath)}",
+            "enable=yes"
+        ];
     }
 
     private static async Task WaitForViewerAsync(TimeSpan timeout, CancellationToken cancellationToken)

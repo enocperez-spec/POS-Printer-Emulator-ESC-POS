@@ -94,11 +94,13 @@ public sealed class ReceiptStore
         }
     }
 
-    public IReadOnlyList<JobSummary> GetSummaries()
+    public IReadOnlyList<JobSummary> GetSummaries(string? listenerId = null)
     {
         lock (_sync)
         {
-            return _jobs.Select(job => new JobSummary(
+            return _jobs
+                .Where(job => MatchesListener(job, listenerId))
+                .Select(job => new JobSummary(
                 job.Id,
                 job.ReceivedAt,
                 job.SourceIp,
@@ -113,15 +115,18 @@ public sealed class ReceiptStore
                 job.ProfileId,
                 job.ProfileName,
                 job.ProfilePaperWidthMm,
-                job.ProfilePrintableDots)).ToArray();
+                job.ProfilePrintableDots,
+                NormalizeListenerId(job.ListenerId),
+                NormalizeListenerName(job.ListenerName),
+                NormalizeListenerPort(job.ListenerPort))).ToArray();
         }
     }
 
-    public ReceiptJob? Get(Guid id)
+    public ReceiptJob? Get(Guid id, string? listenerId = null)
     {
         lock (_sync)
         {
-            return _jobs.FirstOrDefault(job => job.Id == id);
+            return _jobs.FirstOrDefault(job => job.Id == id && MatchesListener(job, listenerId));
         }
     }
 
@@ -148,14 +153,14 @@ public sealed class ReceiptStore
                 }
             }
 
-            DeleteLegacyFiles($"*-{id:N}.json");
+            DeleteLegacyFiles($"*-{id:N}*.json");
             _jobs.Remove(job);
 
             return true;
         }
     }
 
-    public int Clear()
+    public int Clear(string? listenerId = null)
     {
         lock (_sync)
         {
@@ -163,7 +168,7 @@ public sealed class ReceiptStore
             {
                 try
                 {
-                    EnsureDatabase().Clear();
+                    EnsureDatabase().Clear(listenerId);
                 }
                 catch (Exception exception)
                 {
@@ -172,9 +177,27 @@ public sealed class ReceiptStore
                 }
             }
 
-            DeleteLegacyFiles("*.json");
-            var removed = _jobs.Count;
-            _jobs.Clear();
+            if (string.IsNullOrWhiteSpace(listenerId))
+            {
+                DeleteLegacyFiles("*.json");
+            }
+            else
+            {
+                DeleteLegacyFilesForListener(listenerId);
+            }
+            var removed = _jobs.Count(job => MatchesListener(job, listenerId));
+            if (string.IsNullOrWhiteSpace(listenerId))
+            {
+                _jobs.Clear();
+            }
+            else
+            {
+                var matches = _jobs.Where(job => MatchesListener(job, listenerId)).ToArray();
+                foreach (var job in matches)
+                {
+                    _jobs.Remove(job);
+                }
+            }
 
             return removed;
         }
@@ -264,7 +287,9 @@ public sealed class ReceiptStore
     private void PersistLegacy(ReceiptJob job)
     {
         Directory.CreateDirectory(_historyDirectory);
-        var path = Path.Combine(_historyDirectory, $"{job.ReceivedAt.UtcTicks:D19}-{job.Id:N}.json");
+        var path = Path.Combine(
+            _historyDirectory,
+            $"{job.ReceivedAt.UtcTicks:D19}-{job.Id:N}-{SafeFileName(NormalizeListenerId(job.ListenerId))}.json");
         var temporaryPath = path + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(StoredJob.From(job)));
         File.Move(temporaryPath, path, overwrite: true);
@@ -294,6 +319,31 @@ public sealed class ReceiptStore
         foreach (var path in Directory.EnumerateFiles(_historyDirectory, searchPattern))
         {
             File.Delete(path);
+        }
+    }
+
+    private void DeleteLegacyFilesForListener(string listenerId)
+    {
+        if (!Directory.Exists(_historyDirectory))
+        {
+            return;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(_historyDirectory, "*.json"))
+        {
+            try
+            {
+                var stored = JsonSerializer.Deserialize<StoredJob>(File.ReadAllText(path));
+                if (stored is not null &&
+                    NormalizeListenerId(stored.ListenerId).Equals(listenerId, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+                _logger?.LogWarning("Could not inspect legacy receipt history file {FileName} while clearing listener history", Path.GetFileName(path));
+            }
         }
     }
 
@@ -381,6 +431,25 @@ public sealed class ReceiptStore
         .Select(line => string.Concat(line.Spans.Select(span => span.Text)).Trim())
         .FirstOrDefault(text => text.Length > 0) ?? "Receipt job";
 
+    private static bool MatchesListener(ReceiptJob job, string? listenerId) =>
+        string.IsNullOrWhiteSpace(listenerId) ||
+        NormalizeListenerId(job.ListenerId).Equals(listenerId, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeListenerId(string? listenerId) =>
+        string.IsNullOrWhiteSpace(listenerId) ? PrinterListenerDefaults.DefaultId : listenerId;
+
+    private static string NormalizeListenerName(string? listenerName) =>
+        string.IsNullOrWhiteSpace(listenerName) ? PrinterListenerDefaults.DefaultName : listenerName;
+
+    private static int NormalizeListenerPort(int listenerPort) =>
+        listenerPort is >= 1 and <= 65535 ? listenerPort : PrinterListenerDefaults.DefaultPort;
+
+    private static string SafeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        return new string(value.Select(character => invalid.Contains(character) ? '_' : character).ToArray());
+    }
+
     private sealed record StoredJob(
         Guid Id,
         DateTimeOffset ReceivedAt,
@@ -400,7 +469,10 @@ public sealed class ReceiptStore
         string? ProfileName = null,
         int? ProfilePaperWidthMm = null,
         int? ProfilePrintableDots = null,
-        string? CapturedProfileId = null)
+        string? CapturedProfileId = null,
+        string? ListenerId = null,
+        string? ListenerName = null,
+        int? ListenerPort = null)
     {
         public static StoredJob From(ReceiptJob job) => new(
             job.Id,
@@ -421,7 +493,10 @@ public sealed class ReceiptStore
             job.ProfileName,
             job.ProfilePaperWidthMm,
             job.ProfilePrintableDots,
-            job.CapturedProfileId);
+            job.CapturedProfileId,
+            NormalizeListenerId(job.ListenerId),
+            NormalizeListenerName(job.ListenerName),
+            NormalizeListenerPort(job.ListenerPort));
 
         public ReceiptJob ToReceiptJob()
         {
@@ -447,7 +522,10 @@ public sealed class ReceiptStore
                 ProfileName = string.IsNullOrWhiteSpace(ProfileName) ? "EPSON TM-T88V Receipt5" : ProfileName,
                 ProfilePaperWidthMm = ProfilePaperWidthMm ?? 80,
                 ProfilePrintableDots = ProfilePrintableDots ?? 576,
-                CapturedProfileId = CapturedProfileId
+                CapturedProfileId = CapturedProfileId,
+                ListenerId = NormalizeListenerId(ListenerId),
+                ListenerName = NormalizeListenerName(ListenerName),
+                ListenerPort = NormalizeListenerPort(ListenerPort ?? PrinterListenerDefaults.DefaultPort)
             };
         }
     }

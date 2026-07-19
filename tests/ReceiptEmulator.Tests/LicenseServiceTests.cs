@@ -27,6 +27,8 @@ public sealed class LicenseServiceTests
         Assert.False(status.Features.PrinterProfiles);
         Assert.False(status.Features.Updates);
         Assert.False(status.Features.Support);
+        Assert.False(status.Features.MultipleListeners);
+        Assert.False(service.HasEnterpriseAccess);
     }
 
     private sealed class TestEnvironment : IHostEnvironment

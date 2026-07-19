@@ -109,6 +109,23 @@ public sealed class PrinterProfileService
         lock (_sync) return FindUnsafe(_selectedProfileId) ?? BuiltIns[0];
     }
 
+    public PrinterProfile Get(string profileId)
+    {
+        lock (_sync)
+        {
+            return FindUnsafe(profileId) ?? throw new KeyNotFoundException("The printer profile was not found.");
+        }
+    }
+
+    public bool TryGet(string profileId, out PrinterProfile? profile)
+    {
+        lock (_sync)
+        {
+            profile = FindUnsafe(profileId);
+            return profile is not null;
+        }
+    }
+
     public PrinterProfile Select(string profileId)
     {
         lock (_sync)

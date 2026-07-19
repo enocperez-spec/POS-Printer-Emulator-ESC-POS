@@ -55,6 +55,9 @@ public sealed class ReceiptJob
     public int ProfilePaperWidthMm { get; init; } = 80;
     public int ProfilePrintableDots { get; init; } = 576;
     public string? CapturedProfileId { get; init; }
+    public string ListenerId { get; init; } = PrinterListenerDefaults.DefaultId;
+    public string ListenerName { get; init; } = PrinterListenerDefaults.DefaultName;
+    public int ListenerPort { get; init; } = PrinterListenerDefaults.DefaultPort;
     public int PayloadSize => RawPayload.Length;
     public int UnsupportedCount => Receipt.Commands.Count(command => !command.Supported);
 }
@@ -81,7 +84,10 @@ public sealed record JobSummary(
     string ProfileId,
     string ProfileName,
     int ProfilePaperWidthMm,
-    int ProfilePrintableDots);
+    int ProfilePrintableDots,
+    string ListenerId = PrinterListenerDefaults.DefaultId,
+    string ListenerName = PrinterListenerDefaults.DefaultName,
+    int ListenerPort = PrinterListenerDefaults.DefaultPort);
 
 public sealed record RegistrationInfo(string CustomerName, string EmailAddress);
 
@@ -94,7 +100,8 @@ public sealed record FeatureStatus(
     bool PrinterState,
     bool PrinterProfiles,
     bool Updates,
-    bool Support);
+    bool Support,
+    bool MultipleListeners = false);
 
 public sealed record LicenseStatus(
     string Mode,
@@ -116,4 +123,5 @@ public sealed record ServiceStatus(
     string Listener,
     DateTimeOffset? LastConnection,
     string Version,
-    LicenseStatus License);
+    LicenseStatus License,
+    PrinterListenerSummary? ListenerSummary = null);

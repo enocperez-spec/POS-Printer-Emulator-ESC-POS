@@ -222,12 +222,12 @@ $releaseSync = database()->prepare(
          'Embedded SQLite for Pro and Enterprise, session-only Trial behavior, schema versioning, WAL, transactions, listener-ready indexes, 500-job retention, verified JSON migration, rollback backup, damaged-row isolation, durable deletion, hardened permissions, and release-runtime verification.',
          'Reliable storage is required before independently configured listeners share receipt history.',
          'Existing paid history migrates without loss, Trial creates no database, paid history survives restart within its limit, and the all-in-one installer loads the bundled SQLite runtime.', UTC_TIMESTAMP(6)),
-        ('v0.3.21', 'v0.3.21', 'Release', 'Enterprise multiple printer listeners', 'Next', 321,
+        ('v0.3.21', 'v0.3.21', 'Release', 'Enterprise multiple printer listeners', 'Released', 321,
          'Let one Enterprise installation emulate multiple receipt printers while Trial and Pro retain one local listener.',
          'Persisted listener configuration, independent names, ports, addresses, profiles, state, buffers, counters, routing, filtering, conflict detection, firewall setup, Enterprise UI and API gates, and fault isolation.',
          'Transactional storage and profiles now provide the reliable foundation needed for isolated multi-printer operation.',
-         'Two simultaneous Enterprise listeners receive jobs, apply different profiles, restart safely, and remain independently controllable while Trial and Pro single-listener behavior remains unchanged.', NULL),
-        ('v0.3.22', 'v0.3.22', 'Release', 'Receipt comparison and automated validation', 'Planned', 322,
+         'Two simultaneous Enterprise listeners receive jobs, apply different profiles, restart safely, and remain independently controllable while Trial and Pro single-listener behavior remains unchanged.', UTC_TIMESTAMP(6)),
+        ('v0.3.22', 'v0.3.22', 'Release', 'Receipt comparison and automated validation', 'Next', 322,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Deterministic captures and profiles are required for meaningful comparisons.',
@@ -254,11 +254,16 @@ $backlogSync = database()->prepare(
     "INSERT INTO development_roadmap
         (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria, completed_at)
      VALUES
-        ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1002,
+        ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002,
+         'Bound network resource use and make listener management cancellation-safe.',
+         'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.',
+         'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.',
+         'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
+        ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003,
          'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.',
-         'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.',
-         'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener data model stabilizes.',
-         'Large histories remain fast and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL)
+         'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.',
+         'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.',
+         'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL)
      ON DUPLICATE KEY UPDATE
         version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
         status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
@@ -266,15 +271,30 @@ $backlogSync = database()->prepare(
         completion_criteria = VALUES(completion_criteria)"
 );
 $backlogSync->execute();
+database()->exec(
+    "UPDATE development_roadmap
+     SET priority_rank = CASE item_key
+         WHEN 'BACKLOG-001' THEN 1001
+         WHEN 'BACKLOG-007' THEN 1002
+         WHEN 'BACKLOG-002' THEN 1003
+         WHEN 'BACKLOG-003' THEN 1004
+         WHEN 'BACKLOG-004' THEN 1005
+         WHEN 'BACKLOG-005' THEN 1006
+         WHEN 'BACKLOG-006' THEN 1007
+         ELSE priority_rank
+     END
+     WHERE item_key IN ('BACKLOG-001', 'BACKLOG-007', 'BACKLOG-002', 'BACKLOG-003', 'BACKLOG-004', 'BACKLOG-005', 'BACKLOG-006')"
+);
 database()->prepare(
     "UPDATE development_roadmap
      SET github_url = CASE item_key
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
          WHEN 'v0.3.24' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'BACKLOG-007' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'BACKLOG-007')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -288,6 +308,14 @@ $bugSync = database()->prepare(
          'Direct attachment links were treated as main-frame WebView navigation and the aborted navigation was displayed as a startup failure.',
          'Select a receipt in the v0.3.15 desktop application and choose Text, Raw, or Capture.',
          'Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-006', 'Listener manager double disposal raised an unhandled shutdown error',
+         'Medium', 'Released', 'v0.3.21 development build', 'v0.3.21', 'v0.3.21',
+         'Application or service shutdown could end with an unhandled ObjectDisposedException after listeners had already stopped.',
+         'Hosted-service stop and dependency-injection disposal should be safe and idempotent.',
+         'The singleton listener manager was tracked by two service descriptors and its second disposal reused an already disposed lifecycle semaphore.',
+         'Start two listeners, stop the host, and allow dependency injection to dispose the listener manager.',
+         'Disposal is idempotent, a regression test repeats disposal after hosted-service stop, all 79 tests pass, and live Ctrl+C shutdown completes without an unhandled exception.',
          UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
@@ -297,6 +325,11 @@ $bugSync = database()->prepare(
         resolved_at = IF(status = 'Released', COALESCE(resolved_at, UTC_TIMESTAMP(6)), resolved_at)"
 );
 $bugSync->execute();
+database()->prepare(
+    "UPDATE development_bugs
+     SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/8'
+     WHERE bug_key = 'BUG-006'"
+)->execute();
 
 $roadmapStatuses = ['Released', 'Next', 'Planned', 'In progress', 'Deferred'];
 $bugStatuses = ['Reported', 'Confirmed', 'In progress', 'Fixed locally', 'Released', 'Deferred', 'Closed - not a bug'];

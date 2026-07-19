@@ -53,7 +53,10 @@ public sealed class CapturePackageService
             job.ProfileId,
             job.ProfileName,
             job.ProfilePaperWidthMm,
-            job.ProfilePrintableDots);
+            job.ProfilePrintableDots,
+            job.ListenerId,
+            job.ListenerName,
+            job.ListenerPort);
 
         using var output = new MemoryStream();
         using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -126,7 +129,10 @@ public sealed class CapturePackageService
             manifest.OriginalReceivedAt,
             manifest.OriginalSourceIp,
             manifest.JobId,
-            manifest.ProfileId);
+            manifest.ProfileId,
+            manifest.ListenerId,
+            manifest.ListenerName,
+            manifest.ListenerPort);
     }
 
     private static ZipArchiveEntry SingleEntry(ZipArchive archive, string name)
@@ -194,7 +200,10 @@ public sealed record ImportedCapture(
     DateTimeOffset? OriginalReceivedAt,
     string? OriginalSourceIp,
     Guid? CapturedJobId,
-    string? CapturedProfileId);
+    string? CapturedProfileId,
+    string? ListenerId = null,
+    string? ListenerName = null,
+    int? ListenerPort = null);
 
 public sealed record CaptureCommandSummary(string Name, int Count, int UnsupportedCount);
 
@@ -220,4 +229,7 @@ public sealed record CaptureManifest(
     string? ProfileId = null,
     string? ProfileName = null,
     int? ProfilePaperWidthMm = null,
-    int? ProfilePrintableDots = null);
+    int? ProfilePrintableDots = null,
+    string? ListenerId = null,
+    string? ListenerName = null,
+    int? ListenerPort = null);

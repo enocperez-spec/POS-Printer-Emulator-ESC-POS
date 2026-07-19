@@ -3,7 +3,17 @@ namespace ReceiptEmulator;
 public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger, IUsageTelemetry? telemetry = null, PrinterProfileService? profiles = null)
 {
     public ReceiptJob? Process(byte[] payload, string sourceIp, out string? rejection)
-        => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, null, out rejection);
+        => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, null,
+            null, null, out rejection);
+
+    internal ReceiptJob? Process(
+        byte[] payload,
+        string sourceIp,
+        PrinterProfile profile,
+        PrinterListenerJobContext listener,
+        out string? rejection)
+        => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, null,
+            profile, listener, out rejection);
 
     public ReceiptJob? Import(
         byte[] payload,
@@ -22,8 +32,23 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
         Guid? capturedJobId,
         string? capturedProfileId,
         out string? rejection)
+        => Import(payload, fileName, originalReceivedAt, originalSourceIp, capturedJobId, capturedProfileId,
+            null, null, null, out rejection);
+
+    public ReceiptJob? Import(
+        byte[] payload,
+        string fileName,
+        DateTimeOffset? originalReceivedAt,
+        string? originalSourceIp,
+        Guid? capturedJobId,
+        string? capturedProfileId,
+        string? listenerId,
+        string? listenerName,
+        int? listenerPort,
+        out string? rejection)
         => ProcessCore(payload, originalSourceIp ?? "Imported file", JobOrigins.Imported, false, false,
-            originalReceivedAt, originalSourceIp, capturedJobId, Path.GetFileName(fileName), capturedProfileId, out rejection);
+            originalReceivedAt, originalSourceIp, capturedJobId, Path.GetFileName(fileName), capturedProfileId,
+            null, CreateListenerContext(listenerId, listenerName, listenerPort), out rejection);
 
     public ReceiptJob? Replay(ReceiptJob source, out string? rejection)
         => ProcessCore(source.RawPayload, source.SourceIp, JobOrigins.Replayed, false, false,
@@ -32,6 +57,8 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             source.Id,
             source.ImportedFileName,
             source.CapturedProfileId ?? source.ProfileId,
+            null,
+            new PrinterListenerJobContext(source.ListenerId, source.ListenerName, source.ListenerPort),
             out rejection);
 
     private ReceiptJob? ProcessCore(
@@ -45,6 +72,8 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
         Guid? parentJobId,
         string? importedFileName,
         string? capturedProfileId,
+        PrinterProfile? explicitProfile,
+        PrinterListenerJobContext? listener,
         out string? rejection)
     {
         rejection = null;
@@ -54,7 +83,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             return null;
         }
 
-        var profile = profiles?.GetSelected() ?? new PrinterProfile(
+        var profile = explicitProfile ?? profiles?.GetSelected() ?? new PrinterProfile(
             PrinterProfileService.EpsonTmT88VId, "EPSON TM-T88V Receipt5", string.Empty, true, 80, 576, 576, 2304, 437,
             [437, 850, 852, 855, 857, 858, 860, 862, 863, 864, 865, 866, 874, 1252], 48, 64,
             new PrinterCapabilities(true, true, true, true, true, true, true, true, true));
@@ -105,14 +134,29 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             ProfileName = profile.Name,
             ProfilePaperWidthMm = profile.PaperWidthMm,
             ProfilePrintableDots = profile.PrintableDots,
-            CapturedProfileId = capturedProfileId
+            CapturedProfileId = capturedProfileId,
+            ListenerId = listener?.Id ?? PrinterListenerDefaults.DefaultId,
+            ListenerName = listener?.Name ?? PrinterListenerDefaults.DefaultName,
+            ListenerPort = listener?.Port ?? PrinterListenerDefaults.DefaultPort
         };
         store.Add(job);
         if (recordTelemetry)
         {
             telemetry?.RecordPrintJob();
         }
-        logger.LogInformation("Stored {Origin} receipt {ReceiptId} from {SourceIp} ({Length} bytes)", origin, job.Id, sourceIp, payload.Length);
+        logger.LogInformation(
+            "Stored {Origin} receipt {ReceiptId} from {SourceIp} on listener {ListenerId} ({Length} bytes)",
+            origin, job.Id, sourceIp, job.ListenerId, payload.Length);
         return job;
     }
+
+    private static PrinterListenerJobContext? CreateListenerContext(
+        string? listenerId,
+        string? listenerName,
+        int? listenerPort) =>
+        string.IsNullOrWhiteSpace(listenerId) ||
+        string.IsNullOrWhiteSpace(listenerName) ||
+        listenerPort is not (>= 1 and <= 65535)
+            ? null
+            : new PrinterListenerJobContext(listenerId, listenerName, listenerPort.Value);
 }
