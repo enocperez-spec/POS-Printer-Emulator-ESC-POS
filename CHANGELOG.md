@@ -4,6 +4,14 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.22 — 2026-07-18
+
+- Restored near-instant Test Receipt display by returning the complete generated receipt from the sample endpoint and selecting it immediately while Activity refreshes in the background.
+- Fixed **Delete All Print Jobs** returning HTTP 500 when a stale, read-only, or locked legacy JSON history file remained after the SQLite history was cleared.
+- Kept paid-history deletion durable by treating obsolete legacy-file cleanup as best effort after the authoritative SQLite transaction succeeds.
+- Added plain-language local API problem details for unexpected receipt-history deletion failures.
+- Added regression coverage for locked legacy history and verified Test Receipt and Clear All end to end at 280 ms and 285 ms respectively.
+
 ## v0.3.21 — 2026-07-18
 
 - Added Enterprise-only management for up to 16 independently named RAW TCP printer listeners while Trial and Pro retain one compatible default listener.

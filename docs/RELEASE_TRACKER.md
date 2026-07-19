@@ -12,9 +12,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.21 — released 2026-07-18**
+**Current public release: v0.3.22 — released 2026-07-18**
 
-**Next release: v0.3.22 — Receipt comparison and automated validation**
+**Next release: v0.3.23 — Receipt comparison and automated validation**
 
 ## Completed releases
 
@@ -44,6 +44,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.19 | Released | Pro and Enterprise printer profiles, custom configuration, and profile-aware processing |
 | v0.3.20 | Released | Reliable SQLite receipt history, verified migration, and safer release packaging |
 | v0.3.21 | Released | Enterprise multiple printer listeners, isolated runtimes, and listener-aware Activity |
+| v0.3.22 | Released | Test Receipt performance and reliable Clear All job deletion |
 
 ## Scheduled releases
 
@@ -185,7 +186,23 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** At least two Enterprise listeners can receive simultaneous jobs on different ports, apply different profiles, remain independently controllable, and survive an application restart while Trial and Pro single-listener behavior remains unchanged.
 
-### v0.3.22 — Receipt comparison and automated validation
+### v0.3.22 — Receipt workflow regression fixes
+
+**Status:** Released — 2026-07-18
+
+**Purpose:** Restore fast Test Receipt feedback and reliable paid-history cleanup before the next feature release.
+
+**Released scope:**
+
+- Return and display the complete generated Test Receipt immediately while Activity refreshes in the background.
+- Avoid a redundant receipt-detail fetch after the generated job is already loaded.
+- Keep the SQLite clear transaction authoritative when obsolete legacy JSON cleanup encounters a stale, read-only, or locked file.
+- Return plain-language API problem details for receipt-history deletion failures.
+- Add locked-file regression coverage and end-to-end timing verification.
+
+**Complete when:** Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable after restart, and related automated and end-to-end tests pass.
+
+### v0.3.23 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -204,7 +221,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.23 — Enhanced support package and connection diagnostics
+### v0.3.24 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -223,7 +240,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
-### v0.3.24 — Guided update installation and restart
+### v0.3.25 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -251,7 +268,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.24.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.25.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 
@@ -310,7 +327,7 @@ These items remain unnumbered until the order is approved. The priority below is
 
 **Why fifth:** It improves commercial license control, but requires a highly reliable online service and clear offline behavior. The current signed offline activation remains functional while this is built.
 
-**Admin Portal foundation completed:** Confirmed tier-replacement, Trial-upgrade, deactivation, reactivation, revocation, soft-deletion, purchase-license synchronization, optimistic concurrency, and audit-history controls are available in the protected License Manager. Because v0.3.21 validates signed keys offline, these portal controls intentionally do not claim to erase or remotely disable a key already stored on a customer computer.
+**Admin Portal foundation completed:** Confirmed tier-replacement, Trial-upgrade, deactivation, reactivation, revocation, soft-deletion, purchase-license synchronization, optimistic concurrency, and audit-history controls are available in the protected License Manager. Because v0.3.22 validates signed keys offline, these portal controls intentionally do not claim to erase or remotely disable a key already stored on a customer computer.
 
 **Proposed scope:**
 

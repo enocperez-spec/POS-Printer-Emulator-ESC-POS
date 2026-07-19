@@ -524,40 +524,20 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
     var job = store.Get(id);
     return job is null
         ? Results.NotFound()
-        : Results.Ok(new
-        {
-            job.Id,
-            job.ReceivedAt,
-            job.SourceIp,
-            job.PayloadSize,
-            job.Status,
-            job.UnsupportedCount,
-            job.Origin,
-            job.RendererVersion,
-            job.OriginalReceivedAt,
-            job.OriginalSourceIp,
-            job.ParentJobId,
-            job.ImportedFileName,
-            job.ProfileId,
-            job.ProfileName,
-            job.ProfilePaperWidthMm,
-            job.ProfilePrintableDots,
-            job.CapturedProfileId,
-            job.ListenerId,
-            job.ListenerName,
-            job.ListenerPort,
-            job.Receipt.Lines,
-            job.Receipt.Commands,
-            job.Receipt.PlainText,
-            Hex = Convert.ToHexString(job.RawPayload).Chunk(2).Select(chars => new string(chars)).Chunk(16).Select(row => string.Join(" ", row))
-        });
+        : Results.Ok(JobResponse(job));
 });
 
 app.MapDelete("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
-    store.Delete(id) ? Results.NoContent() : Results.NotFound());
+{
+    try { return store.Delete(id) ? Results.NoContent() : Results.NotFound(); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 500); }
+});
 
 app.MapDelete("/api/jobs", (string? listenerId, ReceiptStore store) =>
-    Results.Ok(new { Removed = store.Clear(listenerId) }));
+{
+    try { return Results.Ok(new { Removed = store.Clear(listenerId) }); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 500); }
+});
 
 app.MapPost("/api/sample", (ReceiptProcessor processor, PrinterListenerManager listeners, PrinterProfileService profiles) =>
 {
@@ -565,7 +545,7 @@ app.MapPost("/api/sample", (ReceiptProcessor processor, PrinterListenerManager l
     var profile = profiles.Get(configuration.ProfileId);
     var context = new PrinterListenerJobContext(configuration.Id, configuration.Name, configuration.Port);
     var job = processor.Process(SampleReceipt.Create(), "127.0.0.1", profile, context, out var rejection);
-    return job is null ? Results.Problem(rejection, statusCode: 429) : Results.Ok(new { job.Id });
+    return job is null ? Results.Problem(rejection, statusCode: 429) : Results.Ok(JobResponse(job));
 });
 
 app.MapPost("/api/captures/import", async (
@@ -665,6 +645,38 @@ static IResult ListenerProblem(Exception exception) => exception switch
     ArgumentException => Results.Problem(exception.Message, statusCode: 400),
     InvalidOperationException => Results.Problem(exception.Message, statusCode: 409),
     _ => Results.Problem("The printer listener operation could not be completed. Review Support diagnostics and try again.", statusCode: 500)
+};
+
+static object JobResponse(ReceiptJob job) => new
+{
+    job.Id,
+    job.ReceivedAt,
+    job.SourceIp,
+    job.PayloadSize,
+    job.Status,
+    job.UnsupportedCount,
+    job.Origin,
+    job.RendererVersion,
+    job.OriginalReceivedAt,
+    job.OriginalSourceIp,
+    job.ParentJobId,
+    job.ImportedFileName,
+    job.ProfileId,
+    job.ProfileName,
+    job.ProfilePaperWidthMm,
+    job.ProfilePrintableDots,
+    job.CapturedProfileId,
+    job.ListenerId,
+    job.ListenerName,
+    job.ListenerPort,
+    job.Receipt.Lines,
+    job.Receipt.Commands,
+    job.Receipt.PlainText,
+    Hex = Convert.ToHexString(job.RawPayload)
+        .Chunk(2)
+        .Select(chars => new string(chars))
+        .Chunk(16)
+        .Select(row => string.Join(" ", row))
 };
 
 app.MapFallbackToFile("index.html");

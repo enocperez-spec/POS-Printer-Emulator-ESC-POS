@@ -194,7 +194,7 @@ $licenseStatus = static function (array $license): string {
 
     <?php if ($flash !== null): ?><div class="license-flash <?= e((string)$flash['type']) ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>"><?= e((string)$flash['message']) ?></div><?php endif; ?>
     <?php if ($syncWarning !== ''): ?><div class="license-flash warning" role="status"><?= e($syncWarning) ?></div><?php endif; ?>
-    <div class="offline-notice"><strong>Offline-license behavior</strong><span>Tier changes generate a replacement key that the customer must enter. Portal deactivation, revocation, or deletion does not erase an activation key already stored by v0.3.21; full remote enforcement remains planned with an outage-safe offline grace period.</span></div>
+    <div class="offline-notice"><strong>Offline-license behavior</strong><span>Tier changes generate a replacement key that the customer must enter. Portal deactivation, revocation, or deletion does not erase an activation key already stored by v0.3.22; full remote enforcement remains planned with an outage-safe offline grace period.</span></div>
 
     <section class="generator-panel">
       <div class="generator-form"><span class="eyebrow">Paid licenses</span><h2>Generate customer key</h2><p>Enter the customer details exactly as they appear in the desktop application.</p>

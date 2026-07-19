@@ -67,12 +67,13 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 5. **v0.3.19 — Printer profiles.** Model paper width, code pages, supported commands, status behavior, and rendering defaults as selectable printer configurations.
 6. **v0.3.20 — Reliable SQLite receipt history.** Persist Pro and Enterprise history transactionally, migrate legacy JSON after a verified rollback backup, keep Trial session-only, and prepare listener-ready indexes.
 7. **v0.3.21 — Enterprise multiple printer listeners (released 2026-07-18).** Host independently configured Enterprise printer endpoints with separate names, ports, profiles, status state, buffers, counters, and Activity filtering while Trial and Pro keep one listener.
-8. **v0.3.22 — Receipt comparison and automated validation (next).** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-9. **v0.3.23 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
-10. **v0.3.24 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
-11. Service-to-viewer authentication and installer repair mode.
-12. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
-13. Optional online activation revocation and license transfer workflow.
-14. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-15. PNG export and deterministic PDF generation.
-16. Production code-signing and expanded unattended deployment validation.
+8. **v0.3.22 — Receipt workflow regression fixes (released 2026-07-18).** Restore near-instant Test Receipt display and reliable Clear All deletion when obsolete legacy history files are locked.
+9. **v0.3.23 — Receipt comparison and automated validation (next).** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+10. **v0.3.24 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
+11. **v0.3.25 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+12. Service-to-viewer authentication and installer repair mode.
+13. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
+14. Optional online activation revocation and license transfer workflow.
+15. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+16. PNG export and deterministic PDF generation.
+17. Production code-signing and expanded unattended deployment validation.

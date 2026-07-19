@@ -227,17 +227,22 @@ $releaseSync = database()->prepare(
          'Persisted listener configuration, independent names, ports, addresses, profiles, state, buffers, counters, routing, filtering, conflict detection, firewall setup, Enterprise UI and API gates, and fault isolation.',
          'Transactional storage and profiles now provide the reliable foundation needed for isolated multi-printer operation.',
          'Two simultaneous Enterprise listeners receive jobs, apply different profiles, restart safely, and remain independently controllable while Trial and Pro single-listener behavior remains unchanged.', UTC_TIMESTAMP(6)),
-        ('v0.3.22', 'v0.3.22', 'Release', 'Receipt comparison and automated validation', 'Next', 322,
+        ('v0.3.22', 'v0.3.22', 'Release', 'Receipt workflow regression fixes', 'Released', 322,
+         'Restore fast Test Receipt feedback and reliable paid-history cleanup.',
+         'Immediate complete Test Receipt response and selection; background Activity refresh; redundant detail-fetch avoidance; SQLite-authoritative Clear All; best-effort obsolete legacy JSON cleanup; plain-language delete failures; regression and end-to-end timing coverage.',
+         'Core receipt workflows must be reliable before the next feature release.',
+         'Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable, and all automated and end-to-end tests pass.', UTC_TIMESTAMP(6)),
+        ('v0.3.23', 'v0.3.23', 'Release', 'Receipt comparison and automated validation', 'Next', 323,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Deterministic captures and profiles are required for meaningful comparisons.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.23', 'v0.3.23', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 323,
+        ('v0.3.24', 'v0.3.24', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 324,
          'Guide nontechnical customers through connection problems and support collection.',
          'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
          'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
          'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-        ('v0.3.24', 'v0.3.24', 'Release', 'Guided update installation and restart', 'Planned', 324,
+        ('v0.3.25', 'v0.3.25', 'Release', 'Guided update installation and restart', 'Planned', 325,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -283,7 +288,7 @@ database()->prepare(
 )->execute([
     'Complete outage-safe enforcement after the Admin Portal license-control foundation.',
     'The portal now provides confirmed tier replacement, Trial upgrades, deactivation, reactivation, revocation, soft deletion, purchase synchronization, and audit history. Remaining work is per-computer activation tracking, transfer limits and cooldowns, server-signed entitlement checks that replace client-reported legacy paid status, a defined offline grace period, and privacy-minimized enforcement events.',
-    'Commercial control is valuable but must not disable customers during temporary outages; v0.3.21 offline keys remain valid until the enforcement release.',
+    'Commercial control is valuable but must not disable customers during temporary outages; v0.3.22 offline keys remain valid until the enforcement release.',
     'Transfers and remote revocations work with auditable state, the desktop clearly reports its entitlement, and temporary service outages preserve valid licensed use.',
 ]);
 database()->exec(
@@ -306,12 +311,12 @@ database()->prepare(
      SET github_url = CASE item_key
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
-         WHEN 'v0.3.24' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.25' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'BACKLOG-007' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -333,6 +338,22 @@ $bugSync = database()->prepare(
          'The singleton listener manager was tracked by two service descriptors and its second disposal reused an already disposed lifecycle semaphore.',
          'Start two listeners, stop the host, and allow dependency injection to dispose the listener manager.',
          'Disposal is idempotent, a regression test repeats disposal after hosted-service stop, all 79 tests pass, and live Ctrl+C shutdown completes without an unhandled exception.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-007', 'Test Receipt display regressed to approximately three seconds',
+         'Medium', 'Released', 'v0.3.21', 'v0.3.22', 'v0.3.22',
+         'Customers waited several seconds for a built-in Test Receipt that previously appeared almost instantly.',
+         'The generated receipt should be selected and displayed immediately.',
+         'The UI waited for Activity refresh and a second receipt-detail request before rendering the generated receipt.',
+         'Open the desktop application and select Test receipt.',
+         'The endpoint returns the complete receipt, the UI selects it immediately while Activity refreshes in the background, and end-to-end display completes in 280 ms.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-008', 'Delete All Print Jobs returned HTTP 500 on locked legacy history',
+         'High', 'Released', 'v0.3.21', 'v0.3.22', 'v0.3.22',
+         'Customers could not clear paid print-job history and the Activity list remained populated.',
+         'Clear All should durably remove receipt history even when obsolete migration files cannot be cleaned up.',
+         'Successful SQLite deletion was followed by legacy JSON cleanup that could throw on a stale, read-only, or locked file and turn the request into HTTP 500.',
+         'Keep an obsolete legacy history file locked and select Delete All Print Jobs.',
+         'SQLite deletion remains authoritative, locked legacy cleanup is best effort, the regression test passes, all 80 tests pass, and end-to-end Clear All completes in 285 ms.',
          UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),

@@ -51,7 +51,7 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.21',
+  version: '0.3.22',
   license: {
     mode: 'Trial', hasProAccess: false, isEnterprise: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -201,12 +201,13 @@ function App() {
       setJob(undefined)
       return
     }
+    if (job?.id === selectedId) return
     let cancelled = false
     void api.job(selectedId)
       .then(nextJob => { if (!cancelled) setJob(nextJob) })
       .catch(cause => { if (!cancelled) setError(cause.message) })
     return () => { cancelled = true }
-  }, [selectedId])
+  }, [job?.id, selectedId])
 
   const filteredJobs = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -220,7 +221,8 @@ function App() {
     try {
       const created = await api.sample()
       setSelectedId(created.id)
-      await refresh()
+      setJob(created)
+      void refresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not render the sample receipt.')
     } finally {
