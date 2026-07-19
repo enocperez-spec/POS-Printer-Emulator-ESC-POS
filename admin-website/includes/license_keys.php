@@ -111,6 +111,72 @@ function normalize_signature_integer(string $value): string
     return str_pad($value, 32, "\0", STR_PAD_LEFT);
 }
 
+function validate_activation_key_record(array $license): void
+{
+    $activationKey = trim((string)($license['activation_key'] ?? ''));
+    if (!str_starts_with($activationKey, 'PPE1-')) {
+        throw new InvalidArgumentException('The imported activation key format is invalid.');
+    }
+    $encoded = substr($activationKey, 5);
+    $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
+    $decoded = base64_decode(strtr($encoded, '-_', '+/'), true);
+    if ($decoded === false || !in_array(strlen($decoded), [121, 122], true)) {
+        throw new InvalidArgumentException('The imported activation key is incomplete or damaged.');
+    }
+    $version = ord($decoded[0]);
+    $payloadLength = match ($version) {
+        1 => 57,
+        2 => 58,
+        default => 0,
+    };
+    if ($payloadLength === 0 || strlen($decoded) !== $payloadLength + 64) {
+        throw new InvalidArgumentException('The imported activation key version is unsupported.');
+    }
+    $payload = substr($decoded, 0, $payloadLength);
+    $signature = substr($decoded, $payloadLength, 64);
+
+    $licenseId = dotnet_guid_string(substr($payload, 1, 16));
+    $tier = $version === 1
+        ? 'Pro'
+        : match (ord($payload[57])) {
+            1 => 'Pro',
+            2 => 'Enterprise',
+            default => throw new InvalidArgumentException('The imported activation key level is invalid.'),
+        };
+    if (!hash_equals($licenseId, canonical_license_uuid((string)($license['license_id'] ?? ''))) ||
+        !hash_equals($tier, canonical_paid_tier((string)($license['license_tier'] ?? ''))) ||
+        !hash_equals(substr($payload, 25, 16), registration_hash((string)($license['customer_name'] ?? ''))) ||
+        !hash_equals(substr($payload, 41, 16), registration_hash((string)($license['email_address'] ?? '')))) {
+        throw new InvalidArgumentException('The imported activation key does not match its customer, license ID, or level.');
+    }
+
+    $privateKeyPath = dirname(__DIR__) . '/private/vendor-private-key.pem';
+    $privateKeyPem = file_get_contents($privateKeyPath);
+    $privateKey = $privateKeyPem === false ? false : openssl_pkey_get_private($privateKeyPem);
+    $details = $privateKey === false ? false : openssl_pkey_get_details($privateKey);
+    $publicKey = is_array($details) && isset($details['key']) ? openssl_pkey_get_public((string)$details['key']) : false;
+    if ($publicKey === false || openssl_verify($payload, p1363_signature_to_der($signature), $publicKey, OPENSSL_ALGO_SHA256) !== 1) {
+        throw new InvalidArgumentException('The imported activation key signature is invalid.');
+    }
+}
+
+function p1363_signature_to_der(string $signature): string
+{
+    if (strlen($signature) !== 64) {
+        throw new InvalidArgumentException('The activation-key signature length is invalid.');
+    }
+    $encodeInteger = static function (string $value): string {
+        $value = ltrim($value, "\0");
+        $value = $value === '' ? "\0" : $value;
+        if ((ord($value[0]) & 0x80) !== 0) {
+            $value = "\0" . $value;
+        }
+        return "\x02" . chr(strlen($value)) . $value;
+    };
+    $body = $encodeInteger(substr($signature, 0, 32)) . $encodeInteger(substr($signature, 32, 32));
+    return "\x30" . chr(strlen($body)) . $body;
+}
+
 function dotnet_guid_string(string $bytes): string
 {
     $hex = bin2hex($bytes);

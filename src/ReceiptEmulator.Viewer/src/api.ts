@@ -82,7 +82,7 @@ export const api = {
   job: (id: string) => json<ReceiptJob>(`/api/jobs/${id}`),
   deleteJob: (id: string) => request(`/api/jobs/${id}`, { method: 'DELETE' }),
   clearJobs: (listenerId?: string) => request(listenerId ? `/api/jobs?listenerId=${encodeURIComponent(listenerId)}` : '/api/jobs', { method: 'DELETE' }),
-  sample: () => json<{ id: string }>('/api/sample', { method: 'POST' }),
+  sample: () => json<ReceiptJob>('/api/sample', { method: 'POST' }),
   printerListeners: () => json<ListenerCollectionResponse>('/api/listeners').then(normalizeListeners),
   createPrinterListener: (listener: PrinterListenerInput) => json<PrinterListener>('/api/listeners', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(listener),

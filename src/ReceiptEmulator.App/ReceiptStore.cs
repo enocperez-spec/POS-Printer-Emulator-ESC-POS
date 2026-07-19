@@ -318,7 +318,7 @@ public sealed class ReceiptStore
 
         foreach (var path in Directory.EnumerateFiles(_historyDirectory, searchPattern))
         {
-            File.Delete(path);
+            TryDeleteLegacyFile(path);
         }
     }
 
@@ -337,13 +337,30 @@ public sealed class ReceiptStore
                 if (stored is not null &&
                     NormalizeListenerId(stored.ListenerId).Equals(listenerId, StringComparison.OrdinalIgnoreCase))
                 {
-                    File.Delete(path);
+                    TryDeleteLegacyFile(path);
                 }
             }
             catch
             {
                 _logger?.LogWarning("Could not inspect legacy receipt history file {FileName} while clearing listener history", Path.GetFileName(path));
             }
+        }
+    }
+
+    private void TryDeleteLegacyFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // SQLite is authoritative after migration. A stale or locked legacy file must not
+            // turn a successful database delete into an HTTP 500 or leave the UI out of sync.
+            _logger?.LogWarning(
+                exception,
+                "Could not remove stale legacy receipt history file {FileName}",
+                Path.GetFileName(path));
         }
     }
 

@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>POSPrinterEmulator.LicenseManager</AssemblyName>
     <RootNamespace>POSPrinterEmulator.LicenseManager</RootNamespace>
-    <Version>0.3.21</Version>
+    <Version>0.3.22</Version>
   </PropertyGroup>
 
   <ItemGroup>

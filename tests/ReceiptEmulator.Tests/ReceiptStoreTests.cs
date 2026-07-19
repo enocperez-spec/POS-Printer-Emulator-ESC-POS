@@ -155,6 +155,31 @@ public sealed class ReceiptStoreTests
     }
 
     [Fact]
+    public void LockedLegacyHistoryFileDoesNotBreakPaidClearOrRestoreDeletedJobs()
+    {
+        var root = NewRoot();
+        var store = PersistentStore(root);
+        var job = CreateJob("CLEAR DESPITE LEGACY FILE");
+        store.Add(job);
+        var history = Directory.CreateDirectory(Path.Combine(root, "history"));
+        var legacyPath = Path.Combine(history.FullName, $"legacy-{job.Id:N}.json");
+        File.WriteAllText(legacyPath, "{}");
+        File.SetAttributes(legacyPath, FileAttributes.ReadOnly);
+
+        try
+        {
+            Assert.Equal(1, store.Clear());
+            Assert.Empty(store.GetSummaries());
+            Assert.Empty(PersistentStore(root).GetSummaries());
+        }
+        finally
+        {
+            File.SetAttributes(legacyPath, FileAttributes.Normal);
+            File.Delete(legacyPath);
+        }
+    }
+
+    [Fact]
     public void FailedPersistentDeleteDoesNotRemoveTheVisibleJobOrReportSuccess()
     {
         var root = NewRoot();

@@ -46,13 +46,43 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     activation_key VARCHAR(512) NOT NULL,
     issued_at DATETIME(6) NOT NULL,
     created_by VARCHAR(80) NOT NULL DEFAULT 'owner',
+    control_state ENUM('Enabled', 'Deactivated', 'Revoked', 'Deleted') NOT NULL DEFAULT 'Enabled',
+    deactivated_at DATETIME(6) NULL,
     revoked_at DATETIME(6) NULL,
+    deleted_at DATETIME(6) NULL,
+    superseded_by_license_id CHAR(36) NULL,
+    license_source ENUM('Manual', 'Purchase') NOT NULL DEFAULT 'Manual',
+    source_reference VARCHAR(64) NULL,
+    row_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     UNIQUE KEY uq_issued_licenses_license_id (license_id),
     KEY ix_issued_licenses_email (email_address),
     KEY ix_issued_licenses_issued_at (issued_at),
-    KEY ix_issued_licenses_revoked_at (revoked_at)
+    KEY ix_issued_licenses_revoked_at (revoked_at),
+    KEY ix_issued_licenses_control_state (control_state),
+    KEY ix_issued_licenses_source_reference (source_reference)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS issued_license_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    license_id CHAR(36) NOT NULL,
+    customer_name VARCHAR(160) NOT NULL,
+    email_address VARCHAR(254) NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    previous_state VARCHAR(24) NULL,
+    new_state VARCHAR(24) NULL,
+    previous_tier VARCHAR(24) NULL,
+    new_tier VARCHAR(24) NULL,
+    replacement_license_id CHAR(36) NULL,
+    reason VARCHAR(500) NULL,
+    performed_by VARCHAR(80) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_license_events_license_id (license_id),
+    KEY ix_license_events_created_at (created_at),
+    KEY ix_license_events_event_type (event_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS development_roadmap (
@@ -135,16 +165,18 @@ VALUES
     ('v0.3.19', 'v0.3.19', 'Release', 'Printer profiles', 'Released', 319, 'Model differences between printer configurations explicitly.', 'Pro and Enterprise built-in and custom profiles for paper width, dots, image limits, code pages, fonts, cutter, drawer, images, barcode/QR, two-color output, DLE EOT, Automatic Status Back, import, export, job metadata, capture metadata, replay, capability warnings, and Trial API/UI gates.', 'Profiles define behavior before multiple endpoints depend on it.', 'One capture replayed against two profiles shows deterministic expected capability and rendering differences, while Trial access is rejected.', UTC_TIMESTAMP(6)),
     ('v0.3.20', 'v0.3.20', 'Release', 'Reliable SQLite receipt history', 'Released', 320, 'Replace individual paid-history JSON files with a minimal transactional local database.', 'Embedded SQLite for Pro and Enterprise, session-only Trial behavior, schema versioning, WAL, transactions, listener-ready indexes, 500-job retention, verified JSON migration, rollback backup, damaged-row isolation, durable deletion, hardened permissions, and release-runtime verification.', 'Reliable storage is required before independently configured listeners share receipt history.', 'Existing paid history migrates without loss, Trial creates no database, paid history survives restart within its limit, and the all-in-one installer loads the bundled SQLite runtime.', UTC_TIMESTAMP(6)),
     ('v0.3.21', 'v0.3.21', 'Release', 'Enterprise multiple printer listeners', 'Released', 321, 'Let one Enterprise installation emulate multiple receipt printers while Trial and Pro retain one local listener.', 'Persisted listener configuration; independent names, IPv4 addresses, ports, profiles, printer state, bounded buffers, counters, routing, Activity filtering, conflict validation, program-scoped firewall setup, Enterprise UI/API gates, capture metadata, and fault isolation.', 'Transactional storage and profiles provide the reliable foundation needed for isolated multi-printer operation.', 'Two simultaneous Enterprise listeners receive jobs, apply different profiles, restart safely, persist configuration, and remain independently controllable while Trial and Pro single-listener behavior remains unchanged.', '2026-07-18 00:00:00.000000'),
-    ('v0.3.22', 'v0.3.22', 'Release', 'Receipt comparison and automated validation', 'Next', 322, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Deterministic captures and profiles are required for meaningful comparisons.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-    ('v0.3.23', 'v0.3.23', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 323, 'Guide nontechnical customers through connection problems and support collection.', 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.', 'Diagnostics should understand the completed listener, profile, capture, and comparison system.', 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-    ('v0.3.24', 'v0.3.24', 'Release', 'Guided update installation and restart', 'Planned', 324, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+    ('v0.3.22', 'v0.3.22', 'Release', 'Receipt workflow regression fixes', 'Released', 322, 'Restore fast Test Receipt feedback and reliable paid-history cleanup.', 'Immediate complete Test Receipt response and selection; background Activity refresh; redundant detail-fetch avoidance; SQLite-authoritative Clear All; best-effort obsolete legacy JSON cleanup; plain-language delete failures; regression and end-to-end timing coverage.', 'Core receipt workflows must be reliable before the next feature release.', 'Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable, and all automated and end-to-end tests pass.', '2026-07-18 00:00:00.000000'),
+    ('v0.3.23', 'v0.3.23', 'Release', 'Receipt comparison and automated validation', 'Next', 323, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Deterministic captures and profiles are required for meaningful comparisons.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
+    ('v0.3.24', 'v0.3.24', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 324, 'Guide nontechnical customers through connection problems and support collection.', 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.', 'Diagnostics should understand the completed listener, profile, capture, and comparison system.', 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
+    ('v0.3.25', 'v0.3.25', 'Release', 'Guided update installation and restart', 'Planned', 325, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
     ('BACKLOG-003', NULL, 'Backlog', 'Production code-signing and deployment validation', 'Planned', 1004, 'Improve customer trust and verify distributed binaries.', 'Sign executables, installer, and uninstaller, apply trusted timestamps, verify builds and update hashes, and test clean install, upgrade, repair, silent install, and uninstall.', 'Signing is a production trust requirement and may move earlier when a certificate is available.', 'All distributed binaries verify successfully and supported deployment paths pass on Windows 10 and 11.', NULL),
-    ('BACKLOG-004', NULL, 'Backlog', 'Online license transfer and revocation', 'Planned', 1005, 'Support customer deactivation, transfer, and owner license controls.', 'Deactivation, transfer limits, cooldowns, revocation, audit history, signed cached authorization, offline grace, and privacy-minimized events.', 'Commercial control is valuable but must not disable customers during temporary outages.', 'Transfers and revocations work with auditable state and temporary service outages preserve valid licensed use.', NULL),
+    ('BACKLOG-004', NULL, 'Backlog', 'Online license transfer and revocation', 'Planned', 1005, 'Complete outage-safe enforcement after the Admin Portal license-control foundation.', 'The portal now provides confirmed tier replacement, Trial upgrades, deactivation, reactivation, revocation, soft deletion, purchase synchronization, and audit history. Remaining work is per-computer activation tracking, transfer limits and cooldowns, server-signed entitlement checks that replace client-reported legacy paid status, a defined offline grace period, and privacy-minimized enforcement events.', 'Commercial control is valuable but must not disable customers during temporary outages; v0.3.22 offline keys remain valid until the enforcement release.', 'Transfers and remote revocations work with auditable state, the desktop clearly reports its entitlement, and temporary service outages preserve valid licensed use.', NULL),
     ('BACKLOG-005', NULL, 'Backlog', 'PNG and deterministic PDF export', 'Planned', 1006, 'Provide predictable receipt artifacts outside the application.', 'Complete receipt PNG, deterministic PDF, correct thermal dimensions, long pages, images, codes, watermark rules, batch export, and output tests.', 'Comparison should establish deterministic rendering before final export formats depend on it.', 'Exports are independent of window size, zoom, and theme and match tested receipt output.', NULL),
-    ('BACKLOG-006', NULL, 'Backlog', 'Hardened Thermal adapter', 'Planned', 1007, 'Add deeper renderer compatibility through an isolated hardened process.', 'Stable ABI, structured errors and offsets, profile parity, safe malformed-input handling, golden tests, differential tests, fuzzing, performance limits, and managed fallback.', 'It carries the greatest integration risk and needs captures and baselines for safe validation.', 'The isolated renderer matches approved fixtures, survives hostile inputs, and falls back safely.', NULL);
+    ('BACKLOG-006', NULL, 'Backlog', 'Hardened Thermal adapter', 'Planned', 1007, 'Add deeper renderer compatibility through an isolated hardened process.', 'Stable ABI, structured errors and offsets, profile parity, safe malformed-input handling, golden tests, differential tests, fuzzing, performance limits, and managed fallback.', 'It carries the greatest integration risk and needs captures and baselines for safe validation.', 'The isolated renderer matches approved fixtures, survives hostile inputs, and falls back safely.', NULL),
+    ('BACKLOG-008', NULL, 'Backlog', 'Admin Portal License Manager tabs', 'Planned', 1008, 'Organize license administration into focused views without creating separate or conflicting admin areas.', 'Add accessible tabs for Issued Licenses, Trial Installations, and Recent License Activity; keep key generation and license actions in Issued Licenses; preserve per-tab filters, counts, deleted-license view, scroll position, direct links, and browser navigation; retain Trial verification warnings and audit disclosures; support responsive layouts and regression tests.', 'This is a contained usability enhancement to the completed License Manager foundation. It follows higher-risk security, listener, storage, signing, entitlement, export, and compatibility work, but can be pulled forward for a short Admin Portal release.', 'All three sections render as accessible tabs, the active tab survives refresh and Back/Forward navigation, existing confirmations work unchanged, filters and counts remain accurate, and desktop and mobile browser tests pass.', NULL);
 
 UPDATE development_roadmap
 SET status = 'Released',
@@ -156,12 +188,22 @@ SET status = 'Released',
 WHERE item_key = 'v0.3.21';
 
 UPDATE development_roadmap
-SET status = 'Next'
+SET status = 'Released',
+    title = 'Receipt workflow regression fixes',
+    purpose = 'Restore fast Test Receipt feedback and reliable paid-history cleanup.',
+    planned_scope = 'Immediate complete Test Receipt response and selection; background Activity refresh; redundant detail-fetch avoidance; SQLite-authoritative Clear All; best-effort obsolete legacy JSON cleanup; plain-language delete failures; regression and end-to-end timing coverage.',
+    priority_reason = 'Core receipt workflows must be reliable before the next feature release.',
+    completion_criteria = 'Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable, and all automated and end-to-end tests pass.',
+    completed_at = COALESCE(completed_at, '2026-07-18 00:00:00.000000')
 WHERE item_key = 'v0.3.22';
 
 UPDATE development_roadmap
+SET status = 'Next'
+WHERE item_key = 'v0.3.23';
+
+UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
-WHERE item_key = 'v0.3.24' AND (github_url IS NULL OR github_url = '');
+WHERE item_key = 'v0.3.25' AND (github_url IS NULL OR github_url = '');
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
@@ -175,6 +217,10 @@ UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
 WHERE item_key = 'BACKLOG-007' AND (github_url IS NULL OR github_url = '');
 
+UPDATE development_roadmap
+SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
+WHERE item_key = 'BACKLOG-008' AND (github_url IS NULL OR github_url = '');
+
 INSERT IGNORE INTO development_bugs
     (bug_key, title, severity, status, affected_versions, fixed_version, customer_impact, expected_behavior, actual_behavior, reproduction_steps, verification, resolved_at)
 VALUES
@@ -187,7 +233,9 @@ INSERT IGNORE INTO development_bugs
     (bug_key, title, severity, status, affected_versions, target_release, fixed_version, customer_impact, expected_behavior, actual_behavior, reproduction_steps, verification, resolved_at)
 VALUES
     ('BUG-005', 'Receipt exports replaced the desktop viewer with a ConnectionAborted error', 'Medium', 'Released', 'v0.3.15', 'v0.3.16', 'v0.3.16', 'Pro customers could not save Text, Raw, or Capture files without leaving the desktop receipt viewer.', 'Selecting an export should open a Save dialog, download the file, and keep the current receipt visible.', 'Direct attachment links were treated as main-frame WebView navigation and the aborted navigation was displayed as a startup failure.', 'Select a receipt in the v0.3.15 desktop application and choose Text, Raw, or Capture.', 'Production viewer build and desktop wrapper build pass; all 45 automated tests pass. Text, Raw, and Capture return the correct attachment types and complete with the viewer URL unchanged, the receipt still visible, and no browser warnings or errors.', UTC_TIMESTAMP(6)),
-    ('BUG-006', 'Listener manager double disposal raised an unhandled shutdown error', 'Medium', 'Released', 'v0.3.21 development build', 'v0.3.21', 'v0.3.21', 'Application or service shutdown could end with an unhandled ObjectDisposedException after listeners had already stopped.', 'Hosted-service stop and dependency-injection disposal should be safe and idempotent.', 'The singleton listener manager was tracked by two service descriptors and its second disposal reused an already disposed lifecycle semaphore.', 'Start two listeners, stop the host, and allow dependency injection to dispose the listener manager.', 'Disposal is idempotent, a regression test repeats disposal after hosted-service stop, all 79 tests pass, and live Ctrl+C shutdown completes without an unhandled exception.', UTC_TIMESTAMP(6));
+    ('BUG-006', 'Listener manager double disposal raised an unhandled shutdown error', 'Medium', 'Released', 'v0.3.21 development build', 'v0.3.21', 'v0.3.21', 'Application or service shutdown could end with an unhandled ObjectDisposedException after listeners had already stopped.', 'Hosted-service stop and dependency-injection disposal should be safe and idempotent.', 'The singleton listener manager was tracked by two service descriptors and its second disposal reused an already disposed lifecycle semaphore.', 'Start two listeners, stop the host, and allow dependency injection to dispose the listener manager.', 'Disposal is idempotent, a regression test repeats disposal after hosted-service stop, all 79 tests pass, and live Ctrl+C shutdown completes without an unhandled exception.', UTC_TIMESTAMP(6)),
+    ('BUG-007', 'Test Receipt display regressed to approximately three seconds', 'Medium', 'Released', 'v0.3.21', 'v0.3.22', 'v0.3.22', 'Customers waited several seconds for a built-in Test Receipt that previously appeared almost instantly.', 'The generated receipt should be selected and displayed immediately.', 'The UI waited for Activity refresh and a second receipt-detail request before rendering the generated receipt.', 'Open the desktop application and select Test receipt.', 'The endpoint returns the complete receipt, the UI selects it immediately while Activity refreshes in the background, and end-to-end display completes in 280 ms.', UTC_TIMESTAMP(6)),
+    ('BUG-008', 'Delete All Print Jobs returned HTTP 500 on locked legacy history', 'High', 'Released', 'v0.3.21', 'v0.3.22', 'v0.3.22', 'Customers could not clear paid print-job history and the Activity list remained populated.', 'Clear All should durably remove receipt history even when obsolete migration files cannot be cleaned up.', 'Successful SQLite deletion was followed by legacy JSON cleanup that could throw on a stale, read-only, or locked file and turn the request into HTTP 500.', 'Keep an obsolete legacy history file locked and select Delete All Print Jobs.', 'SQLite deletion remains authoritative, locked legacy cleanup is best effort, the regression test passes, all 80 tests pass, and end-to-end Clear All completes in 285 ms.', UTC_TIMESTAMP(6));
 
 UPDATE development_bugs
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/8'
