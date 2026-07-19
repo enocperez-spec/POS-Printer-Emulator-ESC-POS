@@ -232,17 +232,22 @@ $releaseSync = database()->prepare(
          'Immediate complete Test Receipt response and selection; background Activity refresh; redundant detail-fetch avoidance; SQLite-authoritative Clear All; best-effort obsolete legacy JSON cleanup; plain-language delete failures; regression and end-to-end timing coverage.',
          'Core receipt workflows must be reliable before the next feature release.',
          'Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable, and all automated and end-to-end tests pass.', UTC_TIMESTAMP(6)),
-        ('v0.3.23', 'v0.3.23', 'Release', 'Receipt comparison and automated validation', 'Next', 323,
+        ('v0.3.23', 'v0.3.23', 'Release', 'Activation and Printer Setup Wizard fixes', 'Released', 323,
+         'Correct High-severity Enterprise activation and Windows printer installation failures.',
+         'Resilient Enterprise activation and storage recovery; safe malformed-key handling; unique temporary persistence; native Windows AddPrinter queue creation; retained Epson driver, TCP/IP port, verification, rollback, and error reporting; automated and installed Windows verification.',
+         'Core activation and printer setup must be reliable before the next feature release.',
+         'Valid Enterprise activation avoids HTTP 500, the wizard creates the Epson queue on 127.0.0.1:9100 without Invalid parameter, the Test Receipt sends successfully, and all 83 tests pass.', UTC_TIMESTAMP(6)),
+        ('v0.3.24', 'v0.3.24', 'Release', 'Receipt comparison and automated validation', 'Next', 324,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Deterministic captures and profiles are required for meaningful comparisons.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.24', 'v0.3.24', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 324,
+        ('v0.3.25', 'v0.3.25', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 325,
          'Guide nontechnical customers through connection problems and support collection.',
          'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
          'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
          'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-        ('v0.3.25', 'v0.3.25', 'Release', 'Guided update installation and restart', 'Planned', 325,
+        ('v0.3.26', 'v0.3.26', 'Release', 'Guided update installation and restart', 'Planned', 326,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -288,7 +293,7 @@ database()->prepare(
 )->execute([
     'Complete outage-safe enforcement after the Admin Portal license-control foundation.',
     'The portal now provides confirmed tier replacement, Trial upgrades, deactivation, reactivation, revocation, soft deletion, purchase synchronization, and audit history. Remaining work is per-computer activation tracking, transfer limits and cooldowns, server-signed entitlement checks that replace client-reported legacy paid status, a defined offline grace period, and privacy-minimized enforcement events.',
-    'Commercial control is valuable but must not disable customers during temporary outages; v0.3.22 offline keys remain valid until the enforcement release.',
+    'Commercial control is valuable but must not disable customers during temporary outages; v0.3.23 offline keys remain valid until the enforcement release.',
     'Transfers and remote revocations work with auditable state, the desktop clearly reports its entitlement, and temporary service outages preserve valid licensed use.',
 ]);
 database()->exec(
@@ -311,12 +316,12 @@ database()->prepare(
      SET github_url = CASE item_key
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
-         WHEN 'v0.3.25' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.26' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'BACKLOG-007' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -354,6 +359,22 @@ $bugSync = database()->prepare(
          'Successful SQLite deletion was followed by legacy JSON cleanup that could throw on a stale, read-only, or locked file and turn the request into HTTP 500.',
          'Keep an obsolete legacy history file locked and select Delete All Print Jobs.',
          'SQLite deletion remains authoritative, locked legacy cleanup is best effort, the regression test passes, all 80 tests pass, and end-to-end Clear All completes in 285 ms.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-009', 'Enterprise activation returned HTTP 500 during optional storage initialization',
+         'High', 'Released', 'v0.3.22', 'v0.3.23', 'v0.3.23',
+         'Customers with a valid Enterprise key could not complete activation.',
+         'A valid signed key should unlock Enterprise immediately and optional storage recovery should be reported separately.',
+         'Paid-history or listener storage initialization could throw after signature validation and turn activation into HTTP 500.',
+         'Validate a signed Enterprise key while forcing optional storage initialization to fail.',
+         'Activation succeeds, malformed keys fail safely, forced storage-failure regression tests pass, and all 83 tests pass.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-010', 'Printer Setup Wizard failed with Invalid parameter while creating queue',
+         'High', 'Released', 'v0.3.22 and earlier wizard implementation', 'v0.3.23', 'v0.3.23',
+         'Customers could not finish automated Windows printer installation.',
+         'The wizard should create the Epson queue and RAW TCP/IP port without manual Windows configuration.',
+         'WMI Put attempted to assign the read-only Win32_Printer Name property and raised System.Management.ManagementException.',
+         'Run the Printer Setup Wizard with the Epson driver installed and select Install Printer.',
+         'Native AddPrinter regression coverage passes; installed Windows validation created POS Printer Emulator with EPSON TM-T88V Receipt5 on 127.0.0.1:9100 and sent the wizard Test Receipt.',
          UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
@@ -368,6 +389,15 @@ database()->prepare(
      SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/8'
      WHERE bug_key = 'BUG-006'"
 )->execute();
+database()->exec(
+    "UPDATE development_bugs
+     SET github_url = CASE bug_key
+         WHEN 'BUG-009' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/13'
+         WHEN 'BUG-010' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/14'
+         ELSE github_url
+     END
+     WHERE bug_key IN ('BUG-009', 'BUG-010')"
+);
 
 $roadmapStatuses = ['Released', 'Next', 'Planned', 'In progress', 'Deferred'];
 $bugStatuses = ['Reported', 'Confirmed', 'In progress', 'Fixed locally', 'Released', 'Deferred', 'Closed - not a bug'];

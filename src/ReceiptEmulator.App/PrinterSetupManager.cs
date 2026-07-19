@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Management;
 using System.Net;
@@ -223,14 +224,7 @@ public static class PrinterSetupManager
             }
         }
 
-        using var printerClass = new ManagementClass("Win32_Printer");
-        using var printer = printerClass.CreateInstance() ?? throw new InvalidOperationException("Windows could not create the printer queue.");
-        printer["Name"] = printerName;
-        printer["DriverName"] = DriverName;
-        printer["PortName"] = portName;
-        printer["Comment"] = QueueComment;
-        printer["PrintProcessor"] = "WinPrint";
-        printer.Put();
+        WindowsPrinterQueue.Create(printerName, portName, DriverName, QueueComment);
         Log($"Created Windows printer '{printerName}'.");
         return true;
     }
@@ -386,6 +380,8 @@ public static class PrinterSetupManager
     {
         UnauthorizedAccessException => "Windows administrator approval is required to install the printer.",
         SocketException => "The printer was added, but the POS Printer Emulator is not reachable at the selected IP address and port. The incomplete setup was removed.",
+        Win32Exception { NativeErrorCode: 5 } => "Windows administrator approval is required to install the printer.",
+        Win32Exception nativeException => $"Windows could not add the printer queue (Windows error {nativeException.NativeErrorCode}).",
         FileNotFoundException => "The Epson driver package required for automatic installation is missing. Reinstall POS Printer Emulator and try again.",
         ArgumentException => exception.Message,
         _ => $"Windows could not finish installing the printer: {exception.Message}"
@@ -417,6 +413,90 @@ public static class PrinterSetupManager
     }
 
     private sealed record DriverInfo(string Name, string Version);
+}
+
+internal sealed record PrinterQueueDefinition(
+    string PrinterName,
+    string PortName,
+    string DriverName,
+    string PrintProcessor,
+    string DataType,
+    string Comment);
+
+internal static class WindowsPrinterQueue
+{
+    internal const string DefaultPrintProcessor = "winprint";
+    internal const string RawDataType = "RAW";
+
+    internal static PrinterQueueDefinition CreateDefinition(
+        string printerName,
+        string portName,
+        string driverName,
+        string comment) => new(
+            printerName,
+            portName,
+            driverName,
+            DefaultPrintProcessor,
+            RawDataType,
+            comment);
+
+    [SupportedOSPlatform("windows")]
+    public static void Create(string printerName, string portName, string driverName, string comment)
+    {
+        var definition = CreateDefinition(printerName, portName, driverName, comment);
+        var printer = new PrinterInfo2
+        {
+            PrinterName = definition.PrinterName,
+            PortName = definition.PortName,
+            DriverName = definition.DriverName,
+            Comment = definition.Comment,
+            PrintProcessor = definition.PrintProcessor,
+            DataType = definition.DataType,
+            Priority = 1,
+            DefaultPriority = 1
+        };
+
+        var handle = AddPrinter(null, 2, ref printer);
+        if (handle == IntPtr.Zero)
+        {
+            var error = Marshal.GetLastWin32Error();
+            throw new Win32Exception(error, $"Windows could not create the printer queue (Windows error {error}).");
+        }
+
+        ClosePrinter(handle);
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct PrinterInfo2
+    {
+        [MarshalAs(UnmanagedType.LPWStr)] public string? ServerName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? PrinterName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? ShareName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? PortName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? DriverName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? Comment;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? Location;
+        public IntPtr DeviceMode;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? SeparatorFile;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? PrintProcessor;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? DataType;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? Parameters;
+        public IntPtr SecurityDescriptor;
+        public uint Attributes;
+        public uint Priority;
+        public uint DefaultPriority;
+        public uint StartTime;
+        public uint UntilTime;
+        public uint Status;
+        public uint JobCount;
+        public uint AveragePagesPerMinute;
+    }
+
+    [DllImport("winspool.drv", EntryPoint = "AddPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr AddPrinter(string? serverName, uint level, ref PrinterInfo2 printer);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    private static extern bool ClosePrinter(IntPtr handle);
 }
 
 internal static class RawPrinter

@@ -20,6 +20,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
     private readonly ILogger<PrinterListenerManager> _logger;
     private int _started;
     private int _disposed;
+    private int _statusStorageFailureLogged;
 
     public PrinterListenerManager(
         PrinterListenerConfigurationService configurations,
@@ -83,13 +84,34 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
     public PrinterListenerCollectionStatus GetStatus()
     {
         var enterpriseEnabled = _hasEnterpriseAccess();
-        var configurations = _configurations.GetEffectiveConfigurations();
-        var listeners = configurations.Select(configuration =>
+        PrinterListenerRuntimeStatus[] listeners;
+        try
         {
-            if (_runtimes.TryGetValue(configuration.Id, out var runtime)) return runtime.GetStatus();
-            if (_configurationErrors.TryGetValue(configuration.Id, out var error)) return FaultedStatus(configuration, error);
-            return StoppedStatus(configuration);
-        }).ToArray();
+            var configurations = _configurations.GetEffectiveConfigurations();
+            listeners = configurations.Select(configuration =>
+            {
+                if (_runtimes.TryGetValue(configuration.Id, out var runtime)) return runtime.GetStatus();
+                if (_configurationErrors.TryGetValue(configuration.Id, out var error)) return FaultedStatus(configuration, error);
+                return StoppedStatus(configuration);
+            }).ToArray();
+            Interlocked.Exchange(ref _statusStorageFailureLogged, 0);
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (Interlocked.Exchange(ref _statusStorageFailureLogged, 1) == 0)
+            {
+                _logger.LogError(
+                    exception,
+                    "Printer listener configuration storage is unavailable; reporting the active listener runtimes instead");
+            }
+
+            listeners = _runtimes.Values
+                .Select(runtime => runtime.GetStatus())
+                .OrderBy(status => status.Configuration.CreatedAt)
+                .ThenBy(status => status.Configuration.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         return new PrinterListenerCollectionStatus(
             enterpriseEnabled,
             listeners.Count(listener => listener.State is PrinterListenerRuntimeStates.Starting

@@ -131,10 +131,13 @@ public sealed class LicenseService
                 throw new InvalidOperationException(error);
             }
 
-            _registration = new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant());
-            _activation = new ActivationRecord(activationKey.Trim(), DateTimeOffset.UtcNow);
-            SaveJson(_registrationPath, _registration);
-            SaveJson(_activationPath, _activation);
+            var registration = new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant());
+            var activation = new ActivationRecord(activationKey.Trim(), DateTimeOffset.UtcNow);
+
+            SaveJson(_registrationPath, registration);
+            SaveJson(_activationPath, activation);
+            _registration = registration;
+            _activation = activation;
             return GetStatus();
         }
     }
@@ -205,9 +208,20 @@ public sealed class LicenseService
 
     private static void SaveJson<T>(string path, T value)
     {
-        var temporaryPath = path + ".tmp";
-        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(value));
-        File.Move(temporaryPath, path, overwrite: true);
+        var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(value));
+            File.Move(temporaryPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                try { File.Delete(temporaryPath); }
+                catch { }
+            }
+        }
     }
 
     private void RollDateForward()

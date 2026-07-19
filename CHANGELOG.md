@@ -4,6 +4,16 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.23 — 2026-07-19
+
+- Fixed **BUG-009**, which returned HTTP 500 after a valid Enterprise key was accepted when optional paid-history or listener storage could not initialize; activation now succeeds immediately and reports storage recovery separately.
+- Hardened activation-key parsing so malformed or truncated keys return a validation result instead of reaching an unhandled server exception.
+- Made paid-storage initialization resilient with unique temporary files, atomic replacement, and safe fallback when optional listener state cannot be loaded.
+- Fixed **BUG-010**, where the Printer Setup Wizard failed with `System.Management.ManagementException: Invalid parameter` while creating the Windows printer queue.
+- Replaced WMI printer-queue creation with the native Windows `AddPrinter` API while retaining automated TCP/IP port creation, Epson driver assignment, verification, rollback, and plain-language Windows error reporting.
+- Added activation, storage-failure, listener-runtime, and native printer-configuration regression tests.
+- Passed all 83 automated tests and an installed Windows validation that created the `POS Printer Emulator` queue with `EPSON TM-T88V Receipt5` on `127.0.0.1:9100` and successfully sent the wizard Test Receipt.
+
 ## v0.3.22 — 2026-07-18
 
 - Restored near-instant Test Receipt display by returning the complete generated receipt from the sample endpoint and selecting it immediately while Activity refreshes in the background.

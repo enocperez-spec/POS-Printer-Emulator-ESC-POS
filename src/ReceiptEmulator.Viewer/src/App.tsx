@@ -51,7 +51,7 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.22',
+  version: '0.3.23',
   license: {
     mode: 'Trial', hasProAccess: false, isEnterprise: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
