@@ -12,12 +12,12 @@ public sealed class UpdateServiceTests
     {
         using var client = CreateClient("""
             {
-              "tag_name": "v0.3.25",
-              "html_url": "https://github.com/example/releases/tag/v0.3.25",
+              "tag_name": "v0.3.26",
+              "html_url": "https://github.com/example/releases/tag/v0.3.26",
               "assets": [
                 {
-                  "name": "POSPrinterEmulatorSetup-0.3.25-win-x64.exe",
-                  "browser_download_url": "https://github.com/example/releases/download/v0.3.25/setup.exe"
+                  "name": "POSPrinterEmulatorSetup-0.3.26-win-x64.exe",
+                  "browser_download_url": "https://github.com/example/releases/download/v0.3.26/setup.exe"
                 }
               ]
             }
@@ -28,7 +28,7 @@ public sealed class UpdateServiceTests
 
         Assert.True(status.CheckSucceeded);
         Assert.True(status.UpdateAvailable);
-        Assert.Equal("0.3.25", status.LatestVersion);
+        Assert.Equal("0.3.26", status.LatestVersion);
         Assert.EndsWith("setup.exe", status.DownloadUrl);
     }
 

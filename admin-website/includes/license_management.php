@@ -106,8 +106,8 @@ function canonical_installation_uuid(string $value): string
 
 function canonical_paid_tier(string $value): string
 {
-    if (!in_array($value, ['Pro', 'Enterprise'], true)) {
-        throw new InvalidArgumentException('Choose Pro or Enterprise.');
+    if (!in_array($value, ['Lite', 'Pro', 'Enterprise'], true)) {
+        throw new InvalidArgumentException('Choose Lite, Pro, or Enterprise.');
     }
     return $value;
 }

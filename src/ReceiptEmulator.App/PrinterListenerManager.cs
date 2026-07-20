@@ -14,7 +14,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
     private readonly PrinterListenerConfigurationService _configurations;
     private readonly PrinterProfileService _profiles;
     private readonly IPrinterListenerJobSink _sink;
-    private readonly Func<bool> _hasEnterpriseAccess;
+    private readonly Func<int> _maximumListeners;
     private readonly ServiceRuntimeState _legacyState;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<PrinterListenerManager> _logger;
@@ -34,7 +34,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
             configurations,
             profiles,
             new ReceiptProcessorListenerJobSink(processor),
-            () => license.GetStatus().IsEnterprise,
+            () => license.MaximumListeners,
             legacyState,
             loggerFactory,
             logger)
@@ -45,7 +45,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         PrinterListenerConfigurationService configurations,
         PrinterProfileService profiles,
         IPrinterListenerJobSink sink,
-        Func<bool> hasEnterpriseAccess,
+        Func<int> maximumListeners,
         ServiceRuntimeState legacyState,
         ILoggerFactory loggerFactory,
         ILogger<PrinterListenerManager> logger)
@@ -53,7 +53,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         _configurations = configurations;
         _profiles = profiles;
         _sink = sink;
-        _hasEnterpriseAccess = hasEnterpriseAccess;
+        _maximumListeners = maximumListeners;
         _legacyState = legacyState;
         _loggerFactory = loggerFactory;
         _logger = logger;
@@ -83,7 +83,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
 
     public PrinterListenerCollectionStatus GetStatus()
     {
-        var enterpriseEnabled = _hasEnterpriseAccess();
+        var maximumListeners = Math.Clamp(_maximumListeners(), 1, PrinterListenerDefaults.MaximumListeners);
         PrinterListenerRuntimeStatus[] listeners;
         try
         {
@@ -113,7 +113,8 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         }
 
         return new PrinterListenerCollectionStatus(
-            enterpriseEnabled,
+            maximumListeners > 1,
+            maximumListeners,
             listeners.Count(listener => listener.State is PrinterListenerRuntimeStates.Starting
                 or PrinterListenerRuntimeStates.Listening
                 or PrinterListenerRuntimeStates.Stopping),
@@ -136,7 +137,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         PrinterListenerInput input,
         CancellationToken cancellationToken = default)
     {
-        EnsureEnterpriseAccess();
+        EnsureMultipleListenerAccess();
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {
@@ -171,7 +172,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         PrinterListenerInput input,
         CancellationToken cancellationToken = default)
     {
-        EnsureEnterpriseAccess();
+        EnsureMultipleListenerAccess();
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {
@@ -188,7 +189,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
 
     public async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
-        EnsureEnterpriseAccess();
+        EnsureMultipleListenerAccess();
         if (id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The default printer listener cannot be deleted.");
         await _lifecycle.WaitAsync(cancellationToken);
@@ -234,7 +235,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         string id,
         CancellationToken cancellationToken = default)
     {
-        EnsureEnterpriseAccess();
+        EnsureMultipleListenerAccess();
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {
@@ -369,7 +370,7 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         bool enabled,
         CancellationToken cancellationToken)
     {
-        EnsureEnterpriseAccess();
+        EnsureMultipleListenerAccess();
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {
@@ -463,10 +464,10 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
     private void RefreshLegacyState() =>
         _legacyState.Listening = _runtimes.Values.Any(runtime => runtime.GetStatus().Listening);
 
-    private void EnsureEnterpriseAccess()
+    private void EnsureMultipleListenerAccess()
     {
-        if (!_hasEnterpriseAccess())
-            throw new UnauthorizedAccessException("Multiple printer listeners require an Enterprise license.");
+        if (_maximumListeners() <= 1)
+            throw new UnauthorizedAccessException("Multiple printer listeners require a Pro or Enterprise license.");
     }
 
     private static PrinterListenerInput ToInput(PrinterListenerConfiguration configuration) => new(

@@ -44,16 +44,19 @@ public sealed class LicenseService
 
     public string RootPath { get; }
 
-    public bool HasProAccess
+    public bool HasPaidAccess
     {
         get
         {
             lock (_sync)
             {
-                return GetValidatedLicense()?.Tier is LicenseTier.Pro or LicenseTier.Enterprise;
+                return IsPaid(GetValidatedLicense()?.Tier ?? LicenseTier.Trial);
             }
         }
     }
+
+    // Retained for source compatibility while callers migrate to the unambiguous paid-access name.
+    public bool HasProAccess => HasPaidAccess;
 
     public bool HasEnterpriseAccess
     {
@@ -72,31 +75,34 @@ public sealed class LicenseService
         {
             RollDateForward();
             var license = GetValidatedLicense();
-            var hasProAccess = license?.Tier is LicenseTier.Pro or LicenseTier.Enterprise;
+            var tier = license?.Tier ?? LicenseTier.Trial;
+            var isPaid = IsPaid(tier);
             var isEnterprise = license?.Tier == LicenseTier.Enterprise;
-            var mode = license?.Tier.ToString() ?? LicenseTier.Trial.ToString();
+            var maximumListeners = GetMaximumListeners(tier);
+            var mode = tier.ToString();
             return new LicenseStatus(
                 mode,
-                hasProAccess,
+                isPaid,
                 isEnterprise,
+                maximumListeners,
                 TrialDailyLimit,
                 _trialState.Used,
-                hasProAccess ? -1 : Math.Max(0, TrialDailyLimit - _trialState.Used),
+                isPaid ? -1 : Math.Max(0, TrialDailyLimit - _trialState.Used),
                 _trialState.Date,
                 _registration.CustomerName,
                 _registration.EmailAddress,
                 license?.LicenseId,
                 new FeatureStatus(
-                    History: hasProAccess,
-                    Exports: hasProAccess,
-                    PremiumFeatures: hasProAccess,
-                    Watermark: !hasProAccess,
-                    StoredLogos: hasProAccess,
-                    PrinterState: hasProAccess,
-                    PrinterProfiles: hasProAccess,
-                    Updates: hasProAccess,
-                    Support: hasProAccess,
-                    MultipleListeners: isEnterprise));
+                    History: isPaid,
+                    Exports: isPaid,
+                    PremiumFeatures: isPaid,
+                    Watermark: !isPaid,
+                    StoredLogos: isPaid,
+                    PrinterState: isPaid,
+                    PrinterProfiles: isPaid,
+                    Updates: isPaid,
+                    Support: isPaid,
+                    MultipleListeners: maximumListeners > 1));
         }
     }
 
@@ -164,6 +170,19 @@ public sealed class LicenseService
             SavePersistedJson(_registrationPath, _registration);
         }
     }
+
+    public int MaximumListeners
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return GetMaximumListeners(GetValidatedLicense()?.Tier ?? LicenseTier.Trial);
+            }
+        }
+    }
+
+    public bool CanManageMultipleListeners => MaximumListeners > 1;
 
     public LicenseStorageDiagnostics GetStorageDiagnostics()
     {
@@ -473,6 +492,16 @@ public sealed class LicenseService
     }
 
     private static TrialState NewTrialState() => new(DateOnly.FromDateTime(DateTime.Now), 0);
+
+    internal static bool IsPaid(LicenseTier tier) =>
+        tier is LicenseTier.Lite or LicenseTier.Pro or LicenseTier.Enterprise;
+
+    internal static int GetMaximumListeners(LicenseTier tier) => tier switch
+    {
+        LicenseTier.Pro => 2,
+        LicenseTier.Enterprise => PrinterListenerDefaults.MaximumListeners,
+        _ => 1
+    };
 
     internal sealed record FileSnapshot(bool Exists, byte[]? Content);
     private sealed record TrialState(DateOnly Date, int Used);

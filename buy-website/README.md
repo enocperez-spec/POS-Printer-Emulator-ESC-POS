@@ -5,7 +5,7 @@ PHP customer purchase site for `https://buy.posprinteremulator.com`. All owner c
 ## Purchase flow
 
 1. The browser collects the customer/company name and email address.
-2. The server creates the PayPal order using the configured price; the browser never controls the amount.
+2. The customer chooses Lite, Pro, or Enterprise. The server creates the PayPal order using that tier's configured price; the browser never controls the amount.
 3. After PayPal approval, the server captures and verifies the payment status, amount, and currency.
 4. The order enters `PAID_AWAITING_APPROVAL`.
 5. The owner signs in at `admin.posprinteremulator.com`, approves the order, and the Buy server generates a key compatible with the desktop application.
@@ -26,7 +26,9 @@ The target host was probed on July 14, 2026 and reported PHP 8.4 with all requir
 
 ## Protected configuration
 
-Copy `private/config.example.php` to `private/config.php` and fill in the fallback price, PayPal settings, Admin API token, and email addresses. Place the existing matching `vendor-private-key.pem` in `private/`.
+Copy `private/config.example.php` to `private/config.php` and fill in the fallback prices, PayPal settings, Admin API token, and email addresses. Lite defaults to `$24.99`; all three paid prices can be changed from Purchase Pricing in the Admin Portal. Place the existing matching `vendor-private-key.pem` in `private/`.
+
+Public and in-app upgrade links may preselect a paid level with `?tier=Lite`, `?tier=Pro`, or `?tier=Enterprise`. Invalid or unavailable values are ignored safely.
 
 Both protected files are ignored by Git and denied by `.htaccess`. Never commit or email the private signing key or PayPal secret.
 

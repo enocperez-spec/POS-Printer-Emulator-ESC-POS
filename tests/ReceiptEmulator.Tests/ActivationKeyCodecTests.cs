@@ -8,6 +8,15 @@ namespace ReceiptEmulator.Tests;
 public sealed class ActivationKeyCodecTests
 {
     [Fact]
+    public void LicenseTierBytesRemainBackwardCompatible()
+    {
+        Assert.Equal(0, (byte)LicenseTier.Trial);
+        Assert.Equal(1, (byte)LicenseTier.Pro);
+        Assert.Equal(2, (byte)LicenseTier.Enterprise);
+        Assert.Equal(3, (byte)LicenseTier.Lite);
+    }
+
+    [Fact]
     public void IssuedKeyValidatesForMatchingRegistration()
     {
         using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -37,6 +46,21 @@ public sealed class ActivationKeyCodecTests
 
         Assert.True(valid, error);
         Assert.Equal(LicenseTier.Enterprise, license?.Tier);
+    }
+
+    [Fact]
+    public void LiteKeyPreservesLiteTier()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(), "Contoso Lite", "lite@contoso.example", LicenseTier.Lite);
+
+        var valid = ActivationKeyCodec.TryValidateWithPublicKey(
+            activationKey, "Contoso Lite", "lite@contoso.example",
+            vendorKey.ExportSubjectPublicKeyInfoPem(), out var license, out var error);
+
+        Assert.True(valid, error);
+        Assert.Equal(LicenseTier.Lite, license?.Tier);
     }
 
     [Fact]

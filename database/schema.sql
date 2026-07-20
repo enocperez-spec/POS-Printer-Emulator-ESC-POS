@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS installations (
     customer_name VARCHAR(160) NOT NULL,
     email_address VARCHAR(254) NOT NULL,
     app_version VARCHAR(32) NOT NULL,
-    license_mode ENUM('Trial', 'Pro', 'Enterprise') NOT NULL DEFAULT 'Trial',
+    license_mode ENUM('Trial', 'Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Trial',
     license_id CHAR(36) NULL,
     first_seen_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_seen_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     license_id CHAR(36) NOT NULL,
     customer_name VARCHAR(160) NOT NULL,
     email_address VARCHAR(254) NOT NULL,
-    license_tier ENUM('Pro', 'Enterprise') NOT NULL DEFAULT 'Pro',
+    license_tier ENUM('Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Pro',
     activation_key VARCHAR(512) NOT NULL,
     issued_at DATETIME(6) NOT NULL,
     created_by VARCHAR(80) NOT NULL DEFAULT 'owner',
@@ -168,9 +168,10 @@ VALUES
     ('v0.3.22', 'v0.3.22', 'Release', 'Receipt workflow regression fixes', 'Released', 322, 'Restore fast Test Receipt feedback and reliable paid-history cleanup.', 'Immediate complete Test Receipt response and selection; background Activity refresh; redundant detail-fetch avoidance; SQLite-authoritative Clear All; best-effort obsolete legacy JSON cleanup; plain-language delete failures; regression and end-to-end timing coverage.', 'Core receipt workflows must be reliable before the next feature release.', 'Test Receipt appears without a multi-second delay, Clear All removes paid history without HTTP 500, deletion remains durable, and all automated and end-to-end tests pass.', '2026-07-18 00:00:00.000000'),
     ('v0.3.23', 'v0.3.23', 'Release', 'Activation and Printer Setup Wizard fixes', 'Released', 323, 'Correct High-severity Enterprise activation and Windows printer installation failures.', 'Resilient Enterprise activation and storage recovery; safe malformed-key handling; unique temporary persistence; native Windows AddPrinter queue creation; retained Epson driver, TCP/IP port, verification, rollback, and error reporting; automated and installed Windows verification.', 'Core activation and printer setup must be reliable before the next feature release.', 'Valid Enterprise activation avoids HTTP 500, the wizard creates the Epson queue on 127.0.0.1:9100 without Invalid parameter, the Test Receipt sends successfully, and all 83 tests pass.', '2026-07-19 00:00:00.000000'),
     ('v0.3.24', 'v0.3.24', 'Release', 'Upgrade licensing and Printer Setup safeguards', 'Released', 324, 'Preserve paid licensing through updates and prevent Windows printer-port conflicts.', 'Matched registration and activation recovery; hardened-folder ACL repair; license-aware post-update health; Trial-safe activation diagnostics; sequential Windows port selection; automatic Enterprise listener alignment; repeated conflict checks; rollback; installed validation.', 'Upgrade and printer setup reliability must be restored before the next feature release.', 'Paid activation survives upgrade and maintenance reinstall, Trial can export activation diagnostics, a second Enterprise printer receives a test job on the first free port, and all 105 tests pass.', '2026-07-19 00:00:00.000000'),
-    ('v0.3.25', 'v0.3.25', 'Release', 'Receipt comparison and automated validation', 'Next', 325, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Deterministic captures and profiles are required for meaningful comparisons.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-    ('v0.3.26', 'v0.3.26', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 326, 'Guide nontechnical customers through connection problems and support collection.', 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.', 'Diagnostics should understand the completed listener, profile, capture, and comparison system.', 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-    ('v0.3.27', 'v0.3.27', 'Release', 'Guided update installation and restart', 'Planned', 327, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+    ('v0.3.25', 'v0.3.25', 'Release', 'Four-tier licensing and upgrade paths', 'Released', 325, 'Add an affordable Lite license while preserving every existing Pro and Enterprise activation key and purchase record.', 'Trial, Lite, Pro, and Enterprise licensing; Lite activation tier byte 3 with legacy key compatibility; Lite $24.99 server-controlled pricing; tier-targeted purchase links; PayPal fulfillment and email; Admin Portal issuance, replacement, Trial upgrade, audits, and purchase synchronization; Lite single-listener access, Pro capacity up to two listeners, and Enterprise capacity up to fifteen.', 'The commercial and activation contracts must stay aligned before Lite keys are sold or upgraded.', 'Existing Pro and Enterprise keys remain valid, a Lite purchase completes through activation and telemetry, all three paid tiers can be issued or replaced safely, targeted purchase links preselect the requested tier, and automated licensing and commerce tests pass.', '2026-07-19 00:00:00.000000'),
+    ('v0.3.26', 'v0.3.26', 'Release', 'Receipt comparison and automated validation', 'Next', 326, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Deterministic captures and profiles are required for meaningful comparisons.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
+    ('v0.3.27', 'v0.3.27', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 327, 'Guide nontechnical customers through connection problems and support collection.', 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.', 'Diagnostics should understand the completed listener, profile, capture, and comparison system.', 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
+    ('v0.3.28', 'v0.3.28', 'Release', 'Guided update installation and restart', 'Planned', 328, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
@@ -220,12 +221,46 @@ SET status = 'Released',
 WHERE item_key = 'v0.3.24';
 
 UPDATE development_roadmap
-SET status = 'Next'
+SET title = 'Four-tier licensing and upgrade paths',
+    status = 'Released',
+    priority_rank = 325,
+    purpose = 'Add an affordable Lite license while preserving every existing Pro and Enterprise activation key and purchase record.',
+    planned_scope = 'Trial, Lite, Pro, and Enterprise licensing; Lite activation tier byte 3 with legacy key compatibility; Lite $24.99 server-controlled pricing; tier-targeted purchase links; PayPal fulfillment and email; Admin Portal issuance, replacement, Trial upgrade, audits, and purchase synchronization; Lite single-listener access, Pro capacity up to two listeners, and Enterprise capacity up to fifteen.',
+    priority_reason = 'The commercial and activation contracts must stay aligned before Lite keys are sold or upgraded.',
+    completion_criteria = 'Existing Pro and Enterprise keys remain valid, a Lite purchase completes through activation and telemetry, all three paid tiers can be issued or replaced safely, targeted purchase links preselect the requested tier, and automated licensing and commerce tests pass.',
+    completed_at = COALESCE(completed_at, '2026-07-19 00:00:00.000000')
 WHERE item_key = 'v0.3.25';
 
 UPDATE development_roadmap
+SET version_label = 'v0.3.26', title = 'Receipt comparison and automated validation', status = 'Next', priority_rank = 326,
+    purpose = 'Provide repeatable compatibility and regression testing.',
+    planned_scope = 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
+    priority_reason = 'Deterministic captures and profiles are required for meaningful comparisons.',
+    completion_criteria = 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.',
+    completed_at = NULL
+WHERE item_key = 'v0.3.26';
+
+UPDATE development_roadmap
+SET version_label = 'v0.3.27', title = 'Enhanced support and connection diagnostics', status = 'Planned', priority_rank = 327,
+    purpose = 'Guide nontechnical customers through connection problems and support collection.',
+    planned_scope = 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
+    priority_reason = 'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
+    completion_criteria = 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.',
+    completed_at = NULL
+WHERE item_key = 'v0.3.27';
+
+UPDATE development_roadmap
+SET version_label = 'v0.3.28', title = 'Guided update installation and restart', status = 'Planned', priority_rank = 328,
+    purpose = 'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
+    planned_scope = 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
+    priority_reason = 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
+    completion_criteria = 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.',
+    completed_at = NULL
+WHERE item_key = 'v0.3.28';
+
+UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
-WHERE item_key = 'v0.3.27' AND (github_url IS NULL OR github_url = '');
+WHERE item_key = 'v0.3.28' AND (github_url IS NULL OR github_url = '');
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'

@@ -4,6 +4,17 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.25 — 2026-07-19
+
+- Released four license levels across the desktop application, activation keys, telemetry, purchase workflow, Admin Portal, database, and documentation: Trial, Lite, Pro, and Enterprise.
+- Added Lite at a fixed one-time price of $24.99 with the common paid feature set and one total printer listener.
+- Gave Pro the same paid features with two total listeners and Enterprise all paid features with up to 15 total listeners. Pro and Enterprise prices remain server-controlled and are displayed on the Buy page.
+- Trial remains limited to five completed jobs per day, session-only Activity, a visible watermark, locked paid features, and one total listener.
+- Preserved existing paid activation keys as Pro, added safe replacement-key upgrades without reinstalling, and retained listener definitions that exceed a temporarily lower allowance without running or deleting them.
+- Fixed protected-schema deployment so semicolons inside release and backlog descriptions are not mistaken for SQL statement boundaries.
+- Passed all 113 automated desktop tests, all PHP commerce contracts, PHP and JavaScript syntax checks, 15-page SEO validation, real Lite activation against the local service, rendered Trial/Lite/Pro/Enterprise Settings plus desktop/mobile pricing checks, and an installed v0.3.24 Enterprise-to-v0.3.25 upgrade that preserved registration and activation.
+- Receipt comparison moves to v0.3.26, enhanced support diagnostics to v0.3.27, and guided update installation to v0.3.28.
+
 ## v0.3.24 — 2026-07-19
 
 - Fixed **BUG-011**, which could leave an updated Pro or Enterprise installation in Trial and then fail while saving the activation key inside the hardened application-data folder.

@@ -258,7 +258,7 @@ public static class PrinterSetupManager
             }
 
             throw new InvalidOperationException(
-                $"Installing an additional printer on port {request.Port} requires an Enterprise License so the emulator can listen on that port.");
+                $"Installing an additional printer on port {request.Port} requires a Pro or Enterprise License with an available printer-listener slot.");
         }
 
         listResponse.EnsureSuccessStatusCode();
@@ -311,7 +311,7 @@ public static class PrinterSetupManager
             throw new InvalidOperationException($"The emulator created port {request.Port}, but it did not start listening.");
         }
 
-        Log($"Created Enterprise printer listener '{created.Name}' on port {created.Port} for Windows printer setup.");
+        Log($"Created printer listener '{created.Name}' on port {created.Port} for Windows printer setup.");
         return created.Id;
     }
 

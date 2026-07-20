@@ -51,9 +51,9 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.24',
+  version: '0.3.25',
   license: {
-    mode: 'Trial', hasProAccess: false, isEnterprise: false, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
+    mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
     features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false },
   },
@@ -111,6 +111,7 @@ function App() {
   const [captureBusy, setCaptureBusy] = useState(false)
   const [exporting, setExporting] = useState<'text' | 'raw' | 'capture'>()
   const captureFileRef = useRef<HTMLInputElement>(null)
+  const multipleListenersEnabled = status.license.features.multipleListeners === true && status.license.maximumListeners > 1
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -138,7 +139,7 @@ function App() {
   }, [listenerFilter])
 
   useEffect(() => {
-    if (!status.license.isEnterprise) {
+    if (!multipleListenersEnabled) {
       setListeners([])
       setListenerFilter('all')
       return
@@ -159,7 +160,7 @@ function App() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [status.license.isEnterprise])
+  }, [multipleListenersEnabled])
 
   const checkForUpdates = useCallback(async (force = false) => {
     const result = await api.checkUpdates(force)
@@ -404,7 +405,7 @@ function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
           <p>{isAll
             ? listenerName
               ? `Every job for ${listenerName} will be permanently removed. Jobs belonging to other printers will be kept.`
-              : 'Every job in Activity will be permanently removed, including saved Pro or Enterprise history.'
+              : 'Every job in Activity will be permanently removed, including saved paid-license history.'
             : `“${request.label}” will be permanently removed from Activity and saved history.`}</p>
         </div>
         <div className="confirm-actions">
@@ -425,10 +426,11 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   onSettings: (section: SettingsSection) => void
 }) {
   const listenerSummary = status.listenerSummary
-  const listenerStateLabel = status.license.isEnterprise && listenerSummary
+  const multipleListenersEnabled = status.license.features.multipleListeners === true && status.license.maximumListeners > 1
+  const listenerStateLabel = multipleListenersEnabled && listenerSummary
     ? `${listenerSummary.running} of ${listenerSummary.total} listeners running`
     : status.listening ? 'Running (listening)' : 'Listener stopped'
-  const listenerFact = status.license.isEnterprise && listenerSummary
+  const listenerFact = multipleListenersEnabled && listenerSummary
     ? `${listenerSummary.total} printers · ${listenerSummary.faulted} faulted`
     : status.listener
   const serviceLive = listenerSummary ? listenerSummary.running > 0 : status.listening
@@ -441,9 +443,9 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
       <div className={`service-state ${serviceLive ? 'is-live' : 'is-down'}`}>
         <span className="state-dot" /> {listenerStateLabel}
       </div>
-      <div className="header-fact"><span>{status.license.isEnterprise && listenerSummary ? 'Listeners' : 'Listener'}</span> {listenerFact}</div>
+      <div className="header-fact"><span>{multipleListenersEnabled && listenerSummary ? 'Listeners' : 'Listener'}</span> {listenerFact}</div>
       <div className="header-actions">
-        <button className="sample-button" onClick={onSample} disabled={busy || (!status.license.hasProAccess && status.license.remaining === 0)}>
+        <button className="sample-button" onClick={onSample} disabled={busy || (!status.license.isPaid && status.license.remaining === 0)}>
           <FlaskConical size={16} /> {busy ? 'Rendering…' : 'Test receipt'}
         </button>
         <button
@@ -486,7 +488,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listeners, 
       <div className="pane-heading">
         <strong>Activity</strong>
         <div className="pane-actions">
-          <button onClick={onImport} disabled={!importEnabled || importing} aria-label="Import receipt capture" title={importEnabled ? 'Import .bin or .ppecapture receipt' : 'Capture import requires a Pro or Enterprise License'}><Upload size={15} /></button>
+          <button onClick={onImport} disabled={!importEnabled || importing} aria-label="Import receipt capture" title={importEnabled ? 'Import .bin or .ppecapture receipt' : 'Capture import requires a Lite, Pro, or Enterprise License'}><Upload size={15} /></button>
           <button onClick={onClearAll} disabled={totalJobs === 0} aria-label="Clear all jobs" title="Clear all jobs"><Trash2 size={15} /></button>
           <button onClick={onCollapse} aria-label="Collapse Activity panel" title="Collapse Activity panel"><PanelLeftClose size={17} /></button>
         </div>
@@ -528,7 +530,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listeners, 
         )}
       </div>
       <div className="rail-footer">
-        {historyEnabled ? `Showing ${jobs.length} saved job${jobs.length === 1 ? '' : 's'}` : `Showing ${jobs.length} session job${jobs.length === 1 ? '' : 's'} · History requires Pro`}
+        {historyEnabled ? `Showing ${jobs.length} saved job${jobs.length === 1 ? '' : 's'}` : `Showing ${jobs.length} session job${jobs.length === 1 ? '' : 's'} · History requires Lite`}
       </div>
     </aside>
   )
@@ -560,21 +562,21 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onR
         <span className="toolbar-spacer" />
         {job && (license.features.exports
           ? <button className="toolbar-link" onClick={() => onDownload('text')} disabled={exporting !== undefined}><FileText size={16} /> {exporting === 'text' ? 'Saving…' : 'Text'}</button>
-          : <button className="premium-disabled" disabled title="Available with a Pro or Enterprise License"><LockKeyhole size={15} /> Text</button>)}
+          : <button className="premium-disabled" disabled title="Available with a Lite, Pro, or Enterprise License"><LockKeyhole size={15} /> Text</button>)}
         {job && (license.features.exports
           ? <button className="toolbar-link" onClick={() => onDownload('raw')} disabled={exporting !== undefined}><Download size={16} /> {exporting === 'raw' ? 'Saving…' : 'Raw'}</button>
-          : <button className="premium-disabled" disabled title="Available with a Pro or Enterprise License"><LockKeyhole size={15} /> Raw</button>)}
+          : <button className="premium-disabled" disabled title="Available with a Lite, Pro, or Enterprise License"><LockKeyhole size={15} /> Raw</button>)}
         {job && (license.features.exports
           ? <button className="toolbar-link" onClick={() => onDownload('capture')} disabled={exporting !== undefined}><Package size={16} /> {exporting === 'capture' ? 'Saving…' : 'Capture'}</button>
-          : <button className="premium-disabled" disabled title="Available with a Pro or Enterprise License"><LockKeyhole size={15} /> Capture</button>)}
+          : <button className="premium-disabled" disabled title="Available with a Lite, Pro, or Enterprise License"><LockKeyhole size={15} /> Capture</button>)}
         {job && <button onClick={onReplay} disabled={!license.features.premiumFeatures || replaying}
           className={!license.features.premiumFeatures ? 'premium-disabled' : ''}
-          title={!license.features.premiumFeatures ? 'Available with a Pro or Enterprise License' : 'Replay this receipt without sending it from the POS again'}>
+          title={!license.features.premiumFeatures ? 'Available with a Lite, Pro, or Enterprise License' : 'Replay this receipt without sending it from the POS again'}>
           {!license.features.premiumFeatures && <LockKeyhole size={15} />}<Play size={15} /> {replaying ? 'Replaying…' : 'Replay'}
         </button>}
         <button onClick={() => window.print()} disabled={!license.features.premiumFeatures}
           className={!license.features.premiumFeatures ? 'premium-disabled' : ''}
-          title={!license.features.premiumFeatures ? 'Available with a Pro or Enterprise License' : undefined}>
+          title={!license.features.premiumFeatures ? 'Available with a Lite, Pro, or Enterprise License' : undefined}>
           {!license.features.premiumFeatures && <LockKeyhole size={15} />}<Printer size={16} /> Print / PDF
         </button>
       </div>
@@ -661,6 +663,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   onActivated: (license: ServiceStatus['license']) => void
 }) {
   const features = status.license.features
+  const multipleListenersEnabled = features.multipleListeners === true && status.license.maximumListeners > 1
   const canAccess = (candidate: SettingsSection) => candidate === 'logos' ? features.storedLogos
     : candidate === 'state' ? features.printerState
       : candidate === 'profiles' ? features.printerProfiles
@@ -669,7 +672,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           : true
   const [section, setSection] = useState<SettingsSection>(canAccess(initialSection) ? initialSection : 'license')
   const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
-  const lockedTitle = 'Requires a Pro or Enterprise License'
+  const lockedTitle = 'Requires a Lite, Pro, or Enterprise License'
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -682,20 +685,20 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
             <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
-            <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{status.license.isEnterprise && (features.multipleListeners ?? true) ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Enterprise</span>}</button>
-            <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
-            <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
-            <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
-            <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? lockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
-            <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')} disabled={!features.support} title={!features.support ? lockedTitle : undefined}><LifeBuoy size={18} /><span>Support</span>{features.support ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
+            <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{multipleListenersEnabled ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
+            <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+            <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+            <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+            <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? lockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+            <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')} disabled={!features.support} title={!features.support ? lockedTitle : undefined}><LifeBuoy size={18} /><span>Support</span>{features.support ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
           </nav>
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
-            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings isEnterprise={status.license.isEnterprise && (features.multipleListeners ?? true)} onChanged={onListenersChanged} /></Suspense>}
+            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings canManage={multipleListenersEnabled} licenseMode={status.license.mode} maximumListeners={status.license.maximumListeners} onChanged={onListenersChanged} /></Suspense>}
             {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
-            {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} isEnterprise={status.license.isEnterprise} />}
+            {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
             {section === 'support' && features.support && <SupportSettings status={status} />}
           </div>
@@ -714,6 +717,15 @@ function LicenseSettings({ status, onActivated }: {
   const [activationKey, setActivationKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
+  const [changingLicense, setChangingLicense] = useState(!status.license.isPaid)
+  const showActivationForm = !status.license.isPaid || changingLicense
+  const upgradeGuidance = status.license.mode === 'Lite'
+    ? 'Upgrade to Pro for up to 2 printer listeners, or Enterprise for up to 15.'
+    : status.license.mode === 'Pro'
+      ? 'Upgrade to Enterprise for up to 15 printer listeners.'
+      : status.license.mode === 'Enterprise'
+        ? 'Enter a replacement Enterprise key whenever this installation is reissued.'
+        : 'Lite unlocks all paid features with one listener; Pro supports 2 and Enterprise supports up to 15.'
 
   async function activate(event: FormEvent) {
     event.preventDefault()
@@ -722,6 +734,7 @@ function LicenseSettings({ status, onActivated }: {
     try {
       const license = await api.activate({ customerName, emailAddress, activationKey })
       setActivationKey('')
+      setChangingLicense(false)
       onActivated(license)
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'The activation key could not be validated.')
@@ -732,39 +745,47 @@ function LicenseSettings({ status, onActivated }: {
 
   return (
     <div className="settings-panel license-settings">
-      <div className={`license-hero ${status.license.hasProAccess ? 'is-paid' : ''} ${status.license.isEnterprise ? 'is-enterprise' : ''}`}>
-        <div className="license-hero-icon">{status.license.hasProAccess ? <CheckCircle2 size={27} /> : <KeyRound size={27} />}</div>
+      <div className={`license-hero ${status.license.isPaid ? 'is-paid' : ''} ${status.license.isEnterprise ? 'is-enterprise' : ''}`}>
+        <div className="license-hero-icon">{status.license.isPaid ? <CheckCircle2 size={27} /> : <KeyRound size={27} />}</div>
         <div>
-          <h2>{status.license.hasProAccess ? `${status.license.mode} License activated` : 'Trial License'}</h2>
-          <p>{status.license.hasProAccess
+          <h2>{status.license.isPaid ? `${status.license.mode} License activated` : 'Trial License'}</h2>
+          <p>{status.license.isPaid
             ? `${status.license.mode} features are unlocked, including unlimited receipt jobs, saved history, and exports.`
             : `${status.license.remaining} of ${status.license.dailyLimit} emulated print jobs remain today.`}</p>
         </div>
       </div>
 
       <div className="license-summary">
-        <div><span>Status</span><strong>{status.license.hasProAccess ? `Activated · ${status.license.mode} License` : 'Trial License'}</strong></div>
-        <div><span>Activation key</span><strong>{status.license.hasProAccess ? 'Validated and stored securely' : 'No activation key installed'}</strong></div>
+        <div><span>Status</span><strong>{status.license.isPaid ? `Activated · ${status.license.mode} License` : 'Trial License'}</strong></div>
+        <div><span>Activation key</span><strong>{status.license.isPaid ? 'Validated and stored securely' : 'No activation key installed'}</strong></div>
+        <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
       </div>
 
-      {status.license.hasProAccess ? (
+      {status.license.isPaid ? (
         <div className="registered-details">
           <div><span>Registered to</span><strong>{status.license.customerName}</strong></div>
           <div><span>Email</span><strong>{status.license.emailAddress}</strong></div>
+          <p className="settings-note">{upgradeGuidance}</p>
+          {!showActivationForm && <button className="secondary-action" type="button" onClick={() => setChangingLicense(true)}><KeyRound size={16} /> Change or upgrade license</button>}
           <p className="settings-note">Your activation key is never included in support diagnostics.</p>
         </div>
-      ) : (
+      ) : null}
+
+      {showActivationForm ? (
         <form className="activation-form" onSubmit={activate}>
           <label>Customer or company name<input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" /></label>
           <label>Email address<input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" /></label>
           <label className="key-field">Activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
           {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
           {message && <a className="download-diagnostics activation-diagnostics" href="/api/support/activation-diagnostics" download><Download size={17} /> Download Activation Diagnostics</a>}
-          <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : 'Validate and activate'}</button>
-          <p className="activation-note">A Pro or Enterprise activation key unlocks its license level immediately without reinstalling.</p>
+          <div className="settings-actions">
+            <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : status.license.isPaid ? 'Validate replacement key' : 'Validate and activate'}</button>
+            {status.license.isPaid && <button type="button" disabled={busy} onClick={() => { setChangingLicense(false); setActivationKey(''); setMessage(undefined) }}>Cancel</button>}
+          </div>
+          <p className="activation-note">A Lite, Pro, or Enterprise activation key unlocks its license level immediately without reinstalling. Any replacement key must match the customer information entered above.</p>
         </form>
-      )}
+      ) : null}
     </div>
   )
 }

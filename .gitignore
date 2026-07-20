@@ -5,6 +5,7 @@
 artifacts/
 tmp/
 website/downloads/*.exe
+website/downloads/*.sha256
 website/.vite/
 .docx-review/
 src/ReceiptEmulator.App/wwwroot/

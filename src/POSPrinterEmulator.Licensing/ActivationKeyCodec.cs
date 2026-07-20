@@ -8,7 +8,8 @@ public enum LicenseTier : byte
 {
     Trial = 0,
     Pro = 1,
-    Enterprise = 2
+    Enterprise = 2,
+    Lite = 3
 }
 
 public sealed record ActivationLicense(Guid LicenseId, DateTimeOffset IssuedAt, LicenseTier Tier);
@@ -37,9 +38,9 @@ public static class ActivationKeyCodec
         LicenseTier tier)
     {
         ValidateRegistration(customerName, emailAddress);
-        if (tier is not LicenseTier.Pro and not LicenseTier.Enterprise)
+        if (tier is not LicenseTier.Lite and not LicenseTier.Pro and not LicenseTier.Enterprise)
         {
-            throw new ArgumentOutOfRangeException(nameof(tier), "Activation keys can only be issued for Pro or Enterprise licenses.");
+            throw new ArgumentOutOfRangeException(nameof(tier), "Activation keys can only be issued for Lite, Pro, or Enterprise licenses.");
         }
 
         var payload = new byte[TieredPayloadLength];
@@ -137,7 +138,7 @@ public static class ActivationKeyCodec
             var licenseId = new Guid(payload.Slice(1, 16));
             var issuedAt = DateTimeOffset.FromUnixTimeSeconds(BinaryPrimitives.ReadInt64BigEndian(payload.Slice(17, 8)));
             var tier = token[0] == 1 ? LicenseTier.Pro : (LicenseTier)payload[57];
-            if (tier is not LicenseTier.Pro and not LicenseTier.Enterprise)
+            if (tier is not LicenseTier.Lite and not LicenseTier.Pro and not LicenseTier.Enterprise)
             {
                 error = "The activation key contains an unsupported license level.";
                 return false;

@@ -76,13 +76,13 @@ app.MapGet("/api/status", (PrinterListenerManager listeners, LicenseService lice
 });
 
 app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, LicenseService license, CancellationToken cancellationToken) =>
-    !license.HasProAccess
-        ? Results.Problem("Check for Updates requires a Pro or Enterprise License.", statusCode: 403)
+    !license.HasPaidAccess
+        ? Results.Problem("Check for Updates requires a Lite, Pro, or Enterprise License.", statusCode: 403)
         : Results.Ok(await updates.CheckAsync(force == true, cancellationToken)));
 
 app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license) =>
-    !license.HasProAccess
-        ? Results.Problem("Check for Updates requires a Pro or Enterprise License.", statusCode: 403)
+    !license.HasPaidAccess
+        ? Results.Problem("Check for Updates requires a Lite, Pro, or Enterprise License.", statusCode: 403)
         : updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
@@ -96,16 +96,20 @@ app.MapGet("/api/printer-setup/available-port", (
 {
     try
     {
+        var currentListeners = listeners.GetStatus().Listeners.Select(listener => listener.Configuration).ToArray();
         var selection = PrinterSetupManager.GetAvailablePort(
             printerName,
             ipAddress,
             startingPort ?? PrinterListenerDefaults.DefaultPort,
-            listeners.GetStatus().Listeners.Select(listener => listener.Configuration));
-        if (selection.AutomaticallyAdjusted && !license.HasEnterpriseAccess)
+            currentListeners);
+        var reusesListener = currentListeners.Any(listener =>
+            listener.Port == selection.Port &&
+            PrinterSetupManager.IsListenerCompatibleForPrinterSetup(listener, ipAddress));
+        if (!reusesListener && currentListeners.Length >= license.MaximumListeners)
         {
             return Results.Problem(
                 $"{selection.Message} " +
-                $"Installing an additional printer on port {selection.Port} requires an Enterprise License so the emulator can listen on that port.",
+                $"The {license.GetStatus().Mode} License supports up to {license.MaximumListeners} printer listener{(license.MaximumListeners == 1 ? string.Empty : "s")}. Upgrade the license or reuse an existing compatible listener.",
                 statusCode: 403);
         }
         return Results.Ok(selection);
@@ -118,10 +122,10 @@ app.MapGet("/api/printer-setup/available-port", (
 
 app.MapGet("/api/listeners", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     var response = listeners.GetStatus().Listeners.Select(listener => listener.ToResponse(profiles)).ToArray();
-    return Results.Ok(new PrinterListenerCollectionResponse(response, PrinterListenerDefaults.MaximumListeners));
+    return Results.Ok(new PrinterListenerCollectionResponse(response, license.MaximumListeners));
 });
 
 app.MapPost("/api/listeners", async (
@@ -131,8 +135,8 @@ app.MapPost("/api/listeners", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     try { return Results.Ok((await listeners.CreateAsync(request, cancellationToken)).ToResponse(profiles)); }
     catch (Exception exception) { return ListenerProblem(exception); }
 });
@@ -145,8 +149,8 @@ app.MapPut("/api/listeners/{id}", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     try
     {
         var updated = await listeners.UpdateAsync(id, request, cancellationToken);
@@ -163,8 +167,8 @@ app.MapDelete("/api/listeners/{id}", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     try
     {
         await listeners.DeleteAsync(id, cancellationToken);
@@ -180,8 +184,8 @@ app.MapPost("/api/listeners/{id}/start", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     try { return Results.Ok((await listeners.StartListenerAsync(id, cancellationToken)).ToResponse(profiles)); }
     catch (Exception exception) { return ListenerProblem(exception); }
 });
@@ -193,8 +197,8 @@ app.MapPost("/api/listeners/{id}/stop", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     try { return Results.Ok((await listeners.StopListenerAsync(id, cancellationToken)).ToResponse(profiles)); }
     catch (Exception exception) { return ListenerProblem(exception); }
 });
@@ -206,27 +210,27 @@ app.MapPost("/api/listeners/{id}/restart", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Multiple printer listeners require an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     try { return Results.Ok((await listeners.RestartListenerAsync(id, cancellationToken)).ToResponse(profiles)); }
     catch (Exception exception) { return ListenerProblem(exception); }
 });
 
 app.MapGet("/api/printer-profiles", (PrinterProfileService profiles, LicenseService license) =>
-    !license.HasProAccess
-        ? Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403)
+    !license.HasPaidAccess
+        ? Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403)
         : Results.Ok(profiles.GetStatus()));
 
 app.MapPost("/api/printer-profiles", (PrinterProfileInput request, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try { return Results.Ok(profiles.Create(request)); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
 app.MapPut("/api/printer-profiles/{id}", (string id, PrinterProfileInput request, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try { return Results.Ok(profiles.Update(id, request)); }
     catch (KeyNotFoundException) { return Results.NotFound(); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
@@ -234,7 +238,7 @@ app.MapPut("/api/printer-profiles/{id}", (string id, PrinterProfileInput request
 
 app.MapPost("/api/printer-profiles/{id}/duplicate", (string id, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try { return Results.Ok(profiles.Duplicate(id)); }
     catch (KeyNotFoundException) { return Results.NotFound(); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
@@ -247,14 +251,14 @@ app.MapPost("/api/printer-profiles/select", async (
     LicenseService license,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try
     {
         var previous = profiles.GetSelected();
         var selected = profiles.Select(request.ProfileId);
         try
         {
-            if (license.HasEnterpriseAccess)
+            if (license.CanManageMultipleListeners)
             {
                 var current = listeners.Get(PrinterListenerDefaults.DefaultId).Configuration;
                 var input = new PrinterListenerInput(
@@ -290,7 +294,7 @@ app.MapDelete("/api/printer-profiles/{id}", (
     PrinterListenerConfigurationService listeners,
     LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     if (listeners.IsProfileInUse(id))
         return Results.Problem("This printer profile is assigned to a configured listener. Reassign that listener before deleting the profile.", statusCode: 409);
     try { return profiles.Delete(id) ? Results.NoContent() : Results.NotFound(); }
@@ -299,14 +303,14 @@ app.MapDelete("/api/printer-profiles/{id}", (
 
 app.MapGet("/api/printer-profiles/{id}/export", (string id, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try { return Results.File(profiles.Export(id), "application/vnd.pos-printer-emulator.profile+json", $"{id}{PrinterProfileService.FileExtension}"); }
     catch (KeyNotFoundException) { return Results.NotFound(); }
 });
 
 app.MapPost("/api/printer-profiles/import", async (HttpRequest request, PrinterProfileService profiles, LicenseService license, CancellationToken cancellationToken) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer Profiles requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer Profiles requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try
     {
         if (!request.HasFormContentType) return Results.Problem($"Choose a {PrinterProfileService.FileExtension} profile file.", statusCode: 400);
@@ -323,7 +327,7 @@ app.MapPost("/api/printer-profiles/import", async (HttpRequest request, PrinterP
 
 app.MapGet("/api/printer-state", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer State requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var capabilities = profiles.GetSelected().Capabilities;
     try
     {
@@ -338,7 +342,7 @@ app.MapGet("/api/printer-state", (PrinterListenerManager listeners, PrinterProfi
 
 app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer State requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try
     {
         var capabilities = profiles.GetSelected().Capabilities;
@@ -354,7 +358,7 @@ app.MapPut("/api/printer-state", (PrinterStateUpdateRequest request, PrinterList
 
 app.MapPost("/api/printer-state/reset", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Printer State requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Printer State requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var capabilities = profiles.GetSelected().Capabilities;
     try
     {
@@ -373,8 +377,8 @@ app.MapGet("/api/listeners/{id}/printer-state", (
     PrinterProfileService profiles,
     LicenseService license) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Per-listener printer state requires an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Per-listener printer state requires a Pro or Enterprise License.", statusCode: 403);
     try
     {
         var listener = listeners.Get(id);
@@ -395,8 +399,8 @@ app.MapPut("/api/listeners/{id}/printer-state", (
     PrinterProfileService profiles,
     LicenseService license) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Per-listener printer state requires an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Per-listener printer state requires a Pro or Enterprise License.", statusCode: 403);
     try
     {
         var listener = listeners.Get(id);
@@ -417,8 +421,8 @@ app.MapPost("/api/listeners/{id}/printer-state/reset", (
     PrinterProfileService profiles,
     LicenseService license) =>
 {
-    if (!license.HasEnterpriseAccess)
-        return Results.Problem("Per-listener printer state requires an Enterprise License.", statusCode: 403);
+    if (!license.CanManageMultipleListeners)
+        return Results.Problem("Per-listener printer state requires a Pro or Enterprise License.", statusCode: 403);
     try
     {
         var listener = listeners.Get(id);
@@ -433,20 +437,20 @@ app.MapPost("/api/listeners/{id}/printer-state/reset", (
 });
 
 app.MapGet("/api/stored-graphics", (StoredGraphicService graphics, LicenseService license) =>
-    !license.HasProAccess
-        ? Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403)
+    !license.HasPaidAccess
+        ? Results.Problem("Stored Logos requires a Lite, Pro, or Enterprise License.", statusCode: 403)
         : Results.Ok(graphics.List()));
 
 app.MapGet("/api/stored-graphics/{keyCode}/content", (string keyCode, StoredGraphicService graphics, LicenseService license) =>
-    !license.HasProAccess
-        ? Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403)
+    !license.HasPaidAccess
+        ? Results.Problem("Stored Logos requires a Lite, Pro, or Enterprise License.", statusCode: 403)
         : graphics.TryRead(keyCode, out var content, out var contentType)
         ? Results.File(content, contentType)
         : Results.NotFound());
 
 app.MapPost("/api/stored-graphics/{keyCode}", async (string keyCode, HttpRequest request, StoredGraphicService graphics, LicenseService license, CancellationToken cancellationToken) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Stored Logos requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try
     {
         if (!request.HasFormContentType) return Results.Problem("Choose an image file to import.", statusCode: 400);
@@ -465,7 +469,7 @@ app.MapPost("/api/stored-graphics/{keyCode}", async (string keyCode, HttpRequest
 
 app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGraphicService graphics, LicenseService license, CancellationToken cancellationToken) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Stored Logos requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Stored Logos requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try { return await graphics.DeleteAsync(keyCode, cancellationToken) ? Results.NoContent() : Results.NotFound(); }
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
@@ -473,7 +477,7 @@ app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGra
 app.MapGet("/api/support/diagnostics", (LicenseService license, PrinterListenerManager listeners,
     ReceiptStore store, SupportLogProvider logs, StoredGraphicService graphics, PrinterProfileService profiles) =>
 {
-    if (!license.HasProAccess) return Results.Problem("Support requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess) return Results.Problem("Support requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var status = license.GetStatus();
     var selectedProfile = profiles.GetSelected();
     var listenerStatus = listeners.GetStatus();
@@ -578,7 +582,7 @@ app.MapPost("/api/license/activate", async (
 
     try
     {
-        store.EnableProHistory();
+        store.EnablePaidHistory();
     }
     catch (Exception exception)
     {
@@ -643,8 +647,8 @@ app.MapPost("/api/captures/import", async (
     PrinterOptions options,
     CancellationToken cancellationToken) =>
 {
-    if (!license.HasProAccess)
-        return Results.Problem("Capture import requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess)
+        return Results.Problem("Capture import requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     try
     {
         if (!request.HasFormContentType)
@@ -684,8 +688,8 @@ app.MapPost("/api/captures/import", async (
 
 app.MapPost("/api/jobs/{id:guid}/replay", (Guid id, ReceiptStore store, ReceiptProcessor processor, LicenseService license) =>
 {
-    if (!license.HasProAccess)
-        return Results.Problem("Receipt replay requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess)
+        return Results.Problem("Receipt replay requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var source = store.Get(id);
     if (source is null) return Results.NotFound();
     var replayed = processor.Replay(source, out var rejection);
@@ -696,8 +700,8 @@ app.MapPost("/api/jobs/{id:guid}/replay", (Guid id, ReceiptStore store, ReceiptP
 
 app.MapGet("/api/jobs/{id:guid}/capture", (Guid id, ReceiptStore store, CapturePackageService captures, LicenseService license) =>
 {
-    if (!license.HasProAccess)
-        return Results.Problem("Capture-package export requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess)
+        return Results.Problem("Capture-package export requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var job = store.Get(id);
     return job is null
         ? Results.NotFound()
@@ -709,16 +713,16 @@ app.MapGet("/api/jobs/{id:guid}/capture", (Guid id, ReceiptStore store, CaptureP
 
 app.MapGet("/api/jobs/{id:guid}/raw", (Guid id, ReceiptStore store, LicenseService license) =>
 {
-    if (!license.HasProAccess)
-        return Results.Problem("Raw-data export requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess)
+        return Results.Problem("Raw-data export requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var job = store.Get(id);
     return job is null ? Results.NotFound() : Results.File(job.RawPayload, "application/octet-stream", $"receipt-{id:N}.bin");
 });
 
 app.MapGet("/api/jobs/{id:guid}/text", (Guid id, ReceiptStore store, LicenseService license) =>
 {
-    if (!license.HasProAccess)
-        return Results.Problem("Text export requires a Pro or Enterprise License.", statusCode: 403);
+    if (!license.HasPaidAccess)
+        return Results.Problem("Text export requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var job = store.Get(id);
     return job is null
         ? Results.NotFound()

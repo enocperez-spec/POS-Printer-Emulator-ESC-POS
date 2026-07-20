@@ -17,10 +17,12 @@ import {
   X,
 } from 'lucide-react'
 import { api } from './api'
-import type { PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterProfile } from './types'
+import type { LicenseStatus, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterProfile } from './types'
 
 type Props = {
-  isEnterprise: boolean
+  canManage: boolean
+  licenseMode: LicenseStatus['mode']
+  maximumListeners: number
   onChanged?: (listeners: PrinterListener[]) => void
 }
 
@@ -63,7 +65,7 @@ function numberLabel(value: number | undefined) {
   return (value ?? 0).toLocaleString()
 }
 
-export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
+export function PrinterListenersSettings({ canManage, licenseMode, maximumListeners, onChanged }: Props) {
   const [collection, setCollection] = useState<PrinterListenerCollection>()
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [editingId, setEditingId] = useState<string | 'new'>()
@@ -81,7 +83,7 @@ export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
   }, [onChanged])
 
   useEffect(() => {
-    if (!isEnterprise) return
+    if (!canManage) return
     let cancelled = false
     void Promise.all([api.printerListeners(), api.printerProfiles()])
       .then(([listeners, profileStatus]) => {
@@ -99,15 +101,15 @@ export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [isEnterprise, onChanged, refreshListeners])
+  }, [canManage, onChanged, refreshListeners])
 
   const runningCount = useMemo(
     () => collection?.listeners.filter(listener => listener.listening || listener.status === 'Running' || listener.status === 'Listening').length ?? 0,
     [collection],
   )
 
-  if (!isEnterprise) {
-    return <EnterpriseUpgradePanel />
+  if (!canManage) {
+    return <MultipleListenerUpgradePanel licenseMode={licenseMode} maximumListeners={maximumListeners} />
   }
 
   function beginCreate() {
@@ -208,7 +210,7 @@ export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
     <div className="settings-panel printer-listeners-settings">
       <div className="listener-heading">
         <div>
-          <span className="enterprise-eyebrow"><Crown size={13} /> Enterprise</span>
+          <span className="enterprise-eyebrow"><Crown size={13} /> {licenseMode} · up to {collection?.maximumListeners ?? maximumListeners}</span>
           <h2>Printer Listeners</h2>
           <p>Run independent virtual receipt printers on this computer. Each printer has its own port, profile, state, queue, and counters.</p>
         </div>
@@ -239,7 +241,7 @@ export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
       ) : null}
 
       {!collection ? (
-        <div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Enterprise printer listeners…</div>
+        <div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading printer listeners…</div>
       ) : (
         <div className="listener-list">
           {listeners.map(listener => (
@@ -258,7 +260,7 @@ export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
             />
           ))}
           {listeners.length === 0 ? (
-            <div className="listener-empty"><Server size={28} /><strong>No printer listeners configured</strong><span>Add the first Enterprise printer to begin listening for POS print jobs.</span></div>
+            <div className="listener-empty"><Server size={28} /><strong>No printer listeners configured</strong><span>Add the first virtual printer to begin listening for POS print jobs.</span></div>
           ) : null}
         </div>
       )}
@@ -267,20 +269,20 @@ export function PrinterListenersSettings({ isEnterprise, onChanged }: Props) {
   )
 }
 
-function EnterpriseUpgradePanel() {
+function MultipleListenerUpgradePanel({ licenseMode, maximumListeners }: { licenseMode: LicenseStatus['mode']; maximumListeners: number }) {
   return (
     <div className="settings-panel enterprise-upgrade-panel">
       <div className="enterprise-upgrade-icon"><Crown size={30} /></div>
-      <span>Enterprise feature</span>
+      <span>Pro and Enterprise feature</span>
       <h2>Run multiple virtual receipt printers</h2>
-      <p>Trial and Pro Licenses include one local listener. An Enterprise License unlocks independently configured printers for multiple counters, kitchens, departments, or test environments.</p>
+      <p>Your {licenseMode} License includes {maximumListeners} local listener. Upgrade to Pro for up to 2 independently configured printers, or Enterprise for up to 15.</p>
       <ul>
         <li><Check size={15} /> Separate TCP port and printer profile for each listener</li>
         <li><Check size={15} /> Independent state, queue, counters, and failure handling</li>
         <li><Check size={15} /> Filter Activity and diagnostics by printer</li>
       </ul>
-      <a className="enterprise-upgrade-action" href="https://www.posprinteremulator.com/#pricing" target="_blank" rel="noreferrer"><Crown size={16} /> View Enterprise License options</a>
-      <small>Your current installation can be upgraded with an Enterprise activation key—no reinstall is required.</small>
+      <a className="enterprise-upgrade-action" href="https://www.posprinteremulator.com/pricing" target="_blank" rel="noreferrer"><Crown size={16} /> Compare license options</a>
+      <small>Enter a replacement key under License to upgrade this installation without reinstalling.</small>
     </div>
   )
 }

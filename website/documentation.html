@@ -6,7 +6,7 @@
     <title>POS Printer Emulator Documentation</title>
     <meta
       name="description"
-      content="Set up POS Printer Emulator on Windows, configure one or more TCP/IP receipt printers, test ESC/POS receipts, inspect jobs, and activate Pro or Enterprise features."
+      content="Set up POS Printer Emulator on Windows, configure TCP/IP receipt printers, inspect ESC/POS jobs, and understand Trial, Lite, Pro, and Enterprise licensing."
     />
     <link
       rel="canonical"
@@ -19,7 +19,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260715" />
+    <link rel="stylesheet" href="styles.css?v=20260719-tiers" />
     <link rel="stylesheet" href="seo-pages.css?v=20260715" />
   </head>
   <body>
@@ -53,14 +53,20 @@
           <h1>POS Printer Emulator Documentation</h1>
           <p>
             Install the Windows application, connect your POS over TCP/IP,
-            inspect ESC/POS receipts, manage jobs, and activate a Pro or
-            Enterprise License.
+            inspect ESC/POS receipts, manage jobs, and activate the appropriate
+            Trial, Lite, Pro, or Enterprise level.
           </p>
         </div>
       </section>
       <section class="page-body">
         <div class="shell article-layout">
           <article class="article-content">
+            <div class="callout">
+              <p>
+                <strong>Current release:</strong> v0.3.25 is now available with
+                Lite and the revised total-listener allowances described below.
+              </p>
+            </div>
             <h2>Quick start</h2>
             <ol class="numbered-steps">
               <li>
@@ -95,7 +101,7 @@
             <h3>Receipt preview</h3>
             <p>
               Displays the rendered thermal receipt. Zoom, return to actual
-              size, view extracted text or raw content, and use Pro Version
+              size, view extracted text or raw content, and use paid-license
               print/PDF tools. Trial previews include a watermark.
             </p>
             <h3>Commands, Raw data, and Job details</h3>
@@ -119,31 +125,32 @@
             </p>
             <h2>Printer Profiles</h2>
             <p>
-              Pro and Enterprise customers can open Settings → Printer Profiles
-              to select a built-in Epson TM-T88V or generic ESC/POS profile,
-              create custom profiles, and import or export
+              Lite, Pro, and Enterprise customers can open Settings → Printer
+              Profiles to select a built-in Epson TM-T88V or generic ESC/POS
+              profile, create custom profiles, and import or export
               <code>.ppeprofile</code> files. Profiles define paper width,
               printable dots, code pages, image limits, and supported printer
               capabilities so receipts can be validated against the target
               printer. Printer Profiles are locked in the Trial License.
             </p>
-            <h2>Enterprise Printer Listeners</h2>
+            <h2>Printer Listener Allowances</h2>
             <p>
-              An Enterprise License unlocks Settings → Printer Listeners so one
-              Windows installation can emulate multiple independent receipt
-              printers. Assign each printer a unique name, TCP port, network
-              address, and printer profile; then start, stop, restart, and
-              monitor it without interrupting the other listeners. Each printer
-              keeps its own simulated state, buffer, connection counters, and
-              error status. Trial and Pro Licenses retain one local listener.
+              In v0.3.25, Trial and Lite allow one total listener, Pro allows
+              two, and Enterprise allows up to 15. Pro and Enterprise unlock
+              Settings → Printer Listeners for their additional endpoints.
+              Assign each printer a unique name, TCP port, network address, and
+              printer profile; then start, stop, restart, and monitor it without
+              interrupting the other listeners. Each printer keeps its own
+              simulated state, buffer, connection counters, and error status.
             </p>
             <h2>Registration and activation</h2>
             <p>
               Enter the customer or company name and email requested during
               setup. Every installation begins in Trial Mode. To activate, open
               Settings, enter the unique activation key supplied after purchase,
-              and validate it. The purchased Pro or Enterprise features unlock
-              immediately without another download.
+              and validate it. The purchased Lite, Pro, or Enterprise level
+              unlocks immediately without another download. Lite is $24.99;
+              current Pro and Enterprise prices are shown on the Buy page.
             </p>
             <h2>Trial limits</h2>
             <ul>
@@ -175,10 +182,10 @@
           </article>
           <aside class="sidebar-card">
             <h2>Documentation links</h2>
-            <p>Version 0.3.24</p>
+            <p>Version 0.3.25</p>
             <a
               class="button button-primary"
-              href="downloads/POSPrinterEmulatorSetup-0.3.24-win-x64.exe"
+              href="downloads/POSPrinterEmulatorSetup-0.3.25-win-x64.exe"
               download
               >Download for Windows</a
             >

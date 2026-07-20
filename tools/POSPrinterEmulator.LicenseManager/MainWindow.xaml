@@ -26,7 +26,7 @@
         <Image Source="Branding/pos-printer-emulator-icon.png" Width="56" Height="56" Stretch="UniformToFill" />
         <StackPanel Grid.Column="1" Margin="16,2,0,0">
           <TextBlock Text="License Manager" FontFamily="Segoe UI Semibold" FontSize="24" Foreground="{StaticResource NavyBrush}" />
-          <TextBlock Text="Generate signed Pro and Enterprise activation keys" FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
+          <TextBlock Text="Generate signed Lite, Pro, and Enterprise activation keys" FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
         </StackPanel>
         <Border Grid.Column="2" Background="#E7F9FC" CornerRadius="15" Padding="12,6" VerticalAlignment="Center">
           <TextBlock Text="VENDOR TOOL" FontFamily="Segoe UI Semibold" FontSize="11" Foreground="#007C98" />
@@ -62,6 +62,7 @@
 
           <TextBlock Text="License level" FontFamily="Segoe UI Semibold" FontSize="13" Foreground="{StaticResource NavyBrush}" Margin="0,0,0,7" />
           <ComboBox x:Name="LicenseTierComboBox" SelectedIndex="0" Margin="0,0,0,22">
+            <ComboBoxItem Content="Lite" Tag="Lite" />
             <ComboBoxItem Content="Pro" Tag="Pro" />
             <ComboBoxItem Content="Enterprise" Tag="Enterprise" />
           </ComboBox>

@@ -105,8 +105,9 @@ public sealed record FeatureStatus(
 
 public sealed record LicenseStatus(
     string Mode,
-    bool HasProAccess,
+    bool IsPaid,
     bool IsEnterprise,
+    int MaximumListeners,
     int DailyLimit,
     int UsedToday,
     int Remaining,
@@ -114,7 +115,11 @@ public sealed record LicenseStatus(
     string CustomerName,
     string EmailAddress,
     Guid? LicenseId,
-    FeatureStatus Features);
+    FeatureStatus Features)
+{
+    // Kept in the JSON contract for compatibility with pre-Lite viewer bundles.
+    public bool HasProAccess => IsPaid;
+}
 
 public sealed record ActivationRequest(string CustomerName, string EmailAddress, string ActivationKey);
 

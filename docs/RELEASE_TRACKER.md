@@ -12,9 +12,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.24 — released 2026-07-19**
+**Current public release: v0.3.25 — released 2026-07-19**
 
-**Next release: v0.3.25 — Receipt comparison and automated validation**
+**Next release: v0.3.26 — Receipt comparison and automated validation**
 
 ## Completed releases
 
@@ -47,10 +47,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.22 | Released | Test Receipt performance and reliable Clear All job deletion |
 | v0.3.23 | Released | Enterprise activation and Printer Setup Wizard maintenance fixes |
 | v0.3.24 | Released | Upgrade licensing and Printer Setup safeguards |
+| v0.3.25 | Released | Four-tier licensing and upgrade paths |
 
 ## Scheduled releases
 
-The scheduled order is dependency-driven: licensing tiers establish the commercial feature boundary; profiles define printer behavior; SQLite supplies transactional listener-ready storage; multiple listeners reuse both; comparison uses deterministic captures and profiles; enhanced diagnostics can report across the complete system.
+The scheduled order is dependency-driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances before more paid workflows are added; comparison then uses deterministic captures and profiles; enhanced diagnostics can report across the complete system; and the guided updater closes the remaining in-application update lifecycle.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -245,9 +246,32 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Completion verification:** All 105 automated tests pass. An installed Enterprise v0.3.23 system upgraded and completed a v0.3.24 maintenance reinstall without reactivation or re-entering registration. Trial-safe Activation Diagnostics passed authorization and privacy checks. With an existing Windows queue on 9100, the installed service selected 9101, created the matching Enterprise listener and an `EPSON TM-T88V Receipt5` queue, received its 112-byte ESC/POS test job, and then selected 9102 for the next printer. Setup retains conflict checks before, during, and after queue creation and rolls back incomplete state.
 
-### v0.3.25 — Receipt comparison and automated validation
+### v0.3.25 — Four-tier licensing and upgrade paths
 
-**Status:** Planned after v0.3.24 maintenance release
+**Status:** Released — 2026-07-19
+
+**Purpose:** Introduce an affordable single-printer Lite License while giving Pro customers a two-printer workflow and reserving larger multi-printer environments for Enterprise, without removing the paid features current customers already use.
+
+**Released scope:**
+
+- Model **Trial**, **Lite**, **Pro**, and **Enterprise** consistently in activation keys, license validation, desktop status and feature gates, vendor tools, telemetry, purchasing, administration, documentation, and release reporting.
+- Keep every new installation in Trial by default with five completed jobs per day, session-only Activity, the TRIAL watermark, locked paid features, and one total listener.
+- Add a **Lite License** at a published one-time price of **$24.99**, with unlimited jobs, persistent local history, no watermark, exports, printer profiles, Stored Logos, Printer State, updates, support, capture/import/replay, and one total listener.
+- Keep the **Pro License** entitled to the same paid features as Lite and add listener management for **two total listeners**. Pro and Enterprise prices remain server-controlled and are displayed on the Buy page.
+- Keep the **Enterprise License** entitled to all paid features and the full multi-listener workflow for **up to 15 total listeners**, including per-listener ports, profiles, state, buffers, counters, lifecycle controls, and Activity filtering.
+- Enforce total-listener allowances as **Trial 1 / Lite 1 / Pro 2 / Enterprise 15** in the local API, listener runtime, and Settings UI instead of relying only on hidden or disabled controls.
+- Preserve valid existing Pro and Enterprise activation keys through the upgrade, and avoid deleting saved listener definitions when a lower active allowance temporarily prevents all of them from running.
+- Show the active tier, allowance, usage, and upgrade path in plain language; activation must unlock the purchased tier immediately without reinstalling.
+- Update the public pricing comparison and owner-facing pricing/license tools without hard-coding Pro or Enterprise amounts into the application or repository.
+- Add unit, authorization, persistence, migration, listener-limit, downgrade/upgrade, telemetry, purchase, and rendered-interface regression coverage.
+
+**Complete when:** Trial, Lite, Pro, and Enterprise keys validate as their exact tiers; all paid features work for every paid tier; one, one, two, and fifteen total listeners are enforced respectively after activation and restart; existing Pro and Enterprise customers retain their license and saved data; Lite is offered for $24.99; Pro and Enterprise amounts come from the Buy service; and automated plus installed-upgrade tests pass before the release is marked public.
+
+**Completion verification:** All 113 desktop tests and all three PHP commerce contract suites pass. A real Lite key activated the local service and unlocked the paid feature set with a one-listener allowance. Trial, Lite, Pro, and Enterprise Settings plus desktop/mobile pricing rendered with the expected 1/1/2/15 allowances and no browser-console failures. The all-in-one v0.3.25 installer passed release packaging checks, and an installed v0.3.24 Enterprise system upgraded to v0.3.25 with the service running, the listener active, and the same customer, email, license ID, and Enterprise status intact.
+
+### v0.3.26 — Receipt comparison and automated validation
+
+**Status:** Next
 
 **Purpose:** Turn the emulator into a repeatable compatibility-testing tool for POS changes, printer migrations, and regression testing.
 
@@ -264,7 +288,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.26 — Enhanced support package and connection diagnostics
+### v0.3.27 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -283,7 +307,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
-### v0.3.27 — Guided update installation and restart
+### v0.3.28 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -311,7 +335,7 @@ The scheduled order is dependency-driven: licensing tiers establish the commerci
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.27.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.28.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 
@@ -392,7 +416,7 @@ These items remain unnumbered until the order is approved. The priority below is
 - Preserve receipt width, long-page layout, images, barcodes, QR codes, and watermark rules.
 - Support individual and selected-job batch export with safe filenames.
 - Add export metadata and deterministic-output tests.
-- Keep premium export controls aligned with Trial, Pro, and Enterprise license rules.
+- Keep premium export controls aligned with Trial, Lite, Pro, and Enterprise license rules.
 
 ### Priority 7 — Hardened Thermal adapter
 

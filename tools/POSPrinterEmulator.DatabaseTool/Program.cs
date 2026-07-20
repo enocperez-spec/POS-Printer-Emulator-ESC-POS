@@ -1,5 +1,6 @@
 using MySqlConnector;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 const string HostVariable = "PPE_DB_HOST";
@@ -42,7 +43,7 @@ if (command == "smoke-test")
             installationId,
             customerName = "Deployment Smoke Test",
             emailAddress = "smoke-test@posprinteremulator.com",
-            appVersion = "0.3.24",
+            appVersion = "0.3.25",
             licenseMode = "Trial",
             licenseId = (string?)null
         });
@@ -61,7 +62,7 @@ if (command == "smoke-test")
                 count = 1,
                 customerName = "Deployment Smoke Test",
                 emailAddress = "smoke-test@posprinteremulator.com",
-                appVersion = "0.3.24",
+                appVersion = "0.3.25",
                 licenseMode = "Trial",
                 licenseId = (string?)null
             })
@@ -171,8 +172,7 @@ static async Task ApplyAsync(MySqlConnection connection, string schemaPath)
     }
 
     var scriptText = await File.ReadAllTextAsync(schemaPath);
-    var statements = scriptText
-        .Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    var statements = SplitSqlStatements(scriptText);
     foreach (var statement in statements)
     {
         await using var command = new MySqlCommand(statement, connection);
@@ -180,6 +180,114 @@ static async Task ApplyAsync(MySqlConnection connection, string schemaPath)
     }
 
     Console.WriteLine($"Schema applied successfully ({statements.Length} statements). Database: {connection.Database}");
+}
+
+static string[] SplitSqlStatements(string scriptText)
+{
+    var statements = new List<string>();
+    var buffer = new StringBuilder();
+    char? quote = null;
+    var escaped = false;
+    var lineComment = false;
+    var blockComment = false;
+
+    for (var index = 0; index < scriptText.Length; index++)
+    {
+        var character = scriptText[index];
+        var next = index + 1 < scriptText.Length ? scriptText[index + 1] : '\0';
+
+        if (lineComment)
+        {
+            if (character == '\n')
+            {
+                lineComment = false;
+                buffer.Append(character);
+            }
+            continue;
+        }
+
+        if (blockComment)
+        {
+            if (character == '*' && next == '/')
+            {
+                blockComment = false;
+                index++;
+            }
+            continue;
+        }
+
+        if (quote is not null)
+        {
+            buffer.Append(character);
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (character == '\\')
+            {
+                escaped = true;
+            }
+            else if (character == quote)
+            {
+                if (next == quote)
+                {
+                    buffer.Append(next);
+                    index++;
+                }
+                else
+                {
+                    quote = null;
+                }
+            }
+            continue;
+        }
+
+        if (character is '\'' or '"' or '`')
+        {
+            quote = character;
+            buffer.Append(character);
+        }
+        else if (character == '#' || (character == '-' && next == '-' &&
+                 (index + 2 >= scriptText.Length || char.IsWhiteSpace(scriptText[index + 2]))))
+        {
+            lineComment = true;
+            if (character == '-')
+            {
+                index++;
+            }
+        }
+        else if (character == '/' && next == '*')
+        {
+            blockComment = true;
+            index++;
+        }
+        else if (character == ';')
+        {
+            var statement = buffer.ToString().Trim();
+            if (statement.Length > 0)
+            {
+                statements.Add(statement);
+            }
+            buffer.Clear();
+        }
+        else
+        {
+            buffer.Append(character);
+        }
+    }
+
+    if (quote is not null || blockComment)
+    {
+        throw new InvalidDataException("The schema contains an incomplete SQL statement.");
+    }
+
+    var trailingStatement = buffer.ToString().Trim();
+    if (trailingStatement.Length > 0)
+    {
+        statements.Add(trailingStatement);
+    }
+
+    return statements.ToArray();
 }
 
 static string RequiredEnvironmentVariable(string name) =>

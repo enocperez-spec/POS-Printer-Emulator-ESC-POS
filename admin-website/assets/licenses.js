@@ -120,7 +120,11 @@
       setText('manage-license-id', selected.licenseId);
       setText('manage-tier', selected.tier);
       setText('manage-status', selected.status);
-      targetTier.value = selected.tier === 'Pro' ? 'Enterprise' : 'Pro';
+      const tierOrder = ['Lite', 'Pro', 'Enterprise'];
+      const currentTierIndex = tierOrder.indexOf(selected.tier);
+      targetTier.value = currentTierIndex >= 0 && currentTierIndex < tierOrder.length - 1
+        ? tierOrder[currentTierIndex + 1]
+        : 'Pro';
       dialog.querySelector('.tier-action').hidden = selected.state !== 'Enabled';
       dialog.querySelector('[data-prepare-action="change_tier"]').hidden = selected.state !== 'Enabled';
       dialog.querySelector('[data-prepare-action="deactivate"]').hidden = selected.state !== 'Enabled';
@@ -146,7 +150,7 @@
       setText('trial-customer', selected.customer);
       setText('trial-email', selected.email);
       setText('trial-installation-id', selected.installationId);
-      trialTargetTier.value = 'Pro';
+      trialTargetTier.value = 'Lite';
       showView('trial');
       dialog.showModal();
       trialTargetTier.focus();
