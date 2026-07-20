@@ -12,6 +12,11 @@ SET status = 'Released',
 WHERE item_key = 'v0.3.25';
 
 UPDATE development_roadmap
+SET status = 'Released',
+    completed_at = COALESCE(completed_at, '2026-07-20 00:00:00.000000')
+WHERE item_key = 'v0.3.26';
+
+UPDATE development_roadmap
 SET status = 'Next',
     completed_at = NULL
-WHERE item_key = 'v0.3.26';
+WHERE item_key = 'v0.3.27';

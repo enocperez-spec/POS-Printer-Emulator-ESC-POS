@@ -44,6 +44,11 @@
   border-color: #7666ad;
 }
 
+.status.active { color: #caffbd; background: #173f24; border-color: #4e8841; }
+.status.expired { color: #ffe7a8; background: #4c3918; border-color: #94712d; }
+.status.notapplicable { color: #c7d3de; background: #263443; border-color: #586b7c; }
+.status + small { display: block; margin-top: 4px; color: var(--muted); white-space: nowrap; }
+
 .lite-dot { background: #2d9db0; }
 .pro-dot { background: var(--green); }
 .enterprise-dot { background: #8e79d8; }

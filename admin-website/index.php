@@ -2,11 +2,13 @@
 declare(strict_types=1);
 
 require __DIR__ . '/includes/auth.php';
+require __DIR__ . '/includes/license_management.php';
 require_authentication();
 
 $requestedDays = (int)($_GET['days'] ?? 30);
 $days = in_array($requestedDays, [7, 30, 90], true) ? $requestedDays : 30;
 $pdo = database();
+ensure_license_management_schema($pdo);
 $summary = $pdo->query(
     "SELECT
         SUM(license_mode = 'Trial') AS trials,
@@ -47,6 +49,7 @@ for ($index = 0; $index < $days; $index++) {
 
 $installations = $pdo->query(
     'SELECT installation_uuid, customer_name, email_address, app_version, license_mode, license_id,
+            maintenance_status, maintenance_expires_at,
             last_seen_at, launch_count, print_job_count
      FROM installations ORDER BY last_seen_at DESC LIMIT 500'
 )->fetchAll();
@@ -81,7 +84,7 @@ $co2Metric = static fn(float $grams): string => $grams >= 1000000
 </section>
 <section class="visuals"><article class="chart-panel"><div class="panel-title"><h2>Usage activity</h2><span>Last <?= $days ?> days</span></div><div class="legend"><span class="launches">Application launches</span><span class="jobs">Emulated print jobs</span></div><svg id="usage-chart" viewBox="0 0 760 260" role="img" aria-label="Application launches and emulated print jobs over time"></svg></article>
 <article class="distribution"><h2>License distribution</h2><div class="donut-wrap"><div class="donut <?= (int)($summary['installations'] ?? 0) === 0 ? 'empty' : '' ?>" style="--full: <?= (int)($summary['installations'] ?? 0) > 0 ? round((((int)$summary['lite_licenses'] + (int)$summary['pro_licenses'] + (int)$summary['enterprise_licenses']) / (int)$summary['installations']) * 100, 2) : 0 ?>%"><div><strong><?= $metric($summary['installations'] ?? 0) ?></strong><span>installations</span></div></div><ul><li><i class="lite-dot"></i><span>Lite</span><strong><?= $metric($summary['lite_licenses'] ?? 0) ?></strong></li><li><i class="pro-dot"></i><span>Pro</span><strong><?= $metric($summary['pro_licenses'] ?? 0) ?></strong></li><li><i class="enterprise-dot"></i><span>Enterprise</span><strong><?= $metric($summary['enterprise_licenses'] ?? 0) ?></strong></li><li><i class="trial-dot"></i><span>Trial</span><strong><?= $metric($summary['trials'] ?? 0) ?></strong></li></ul></div></article></section>
-<section class="table-panel" id="installations"><div class="table-toolbar"><h2>Installations</h2><div><label class="search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="Search customers"></label><label><span class="sr-only">License filter</span><select id="license-filter"><option value="all">All licenses</option><option value="Enterprise">Enterprise</option><option value="Pro">Pro</option><option value="Lite">Lite</option><option value="Trial">Trial</option></select></label></div></div><div class="table-scroll"><table><thead><tr><th>Company</th><th>Email</th><th>Version</th><th>License</th><th>Last seen (UTC)</th><th>Launches</th><th>Print jobs</th></tr></thead><tbody id="installation-rows">
-<?php foreach ($installations as $installation): ?><tr data-license="<?= htmlspecialchars($installation['license_mode']) ?>"><td><?= htmlspecialchars($installation['customer_name'] ?: 'Unregistered') ?></td><td><?= htmlspecialchars($installation['email_address'] ?: '—') ?></td><td><?= htmlspecialchars($installation['app_version']) ?></td><td><span class="status <?= strtolower($installation['license_mode']) ?>"><?= htmlspecialchars($installation['license_mode']) ?></span></td><td><?= htmlspecialchars((new DateTimeImmutable($installation['last_seen_at'], new DateTimeZone('UTC')))->format('M j, Y g:i A')) ?></td><td><?= $metric($installation['launch_count']) ?></td><td><?= $metric($installation['print_job_count']) ?></td></tr><?php endforeach; ?>
-<?php if (!$installations): ?><tr class="empty-row"><td colspan="7">No installations have reported usage yet.</td></tr><?php endif; ?></tbody></table></div><footer><span id="visible-count">Showing <?= count($installations) ?> installations</span></footer></section></main></div>
+<section class="table-panel" id="installations"><div class="table-toolbar"><h2>Installations</h2><div><label class="search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="Search customers"></label><label><span class="sr-only">License filter</span><select id="license-filter"><option value="all">All licenses</option><option value="Enterprise">Enterprise</option><option value="Pro">Pro</option><option value="Lite">Lite</option><option value="Trial">Trial</option></select></label></div></div><div class="table-scroll"><table><thead><tr><th>Company</th><th>Email</th><th>Version</th><th>License</th><th>Maintenance</th><th>Last seen (UTC)</th><th>Launches</th><th>Print jobs</th></tr></thead><tbody id="installation-rows">
+<?php foreach ($installations as $installation): ?><tr data-license="<?= htmlspecialchars($installation['license_mode']) ?>"><td><?= htmlspecialchars($installation['customer_name'] ?: 'Unregistered') ?></td><td><?= htmlspecialchars($installation['email_address'] ?: '—') ?></td><td><?= htmlspecialchars($installation['app_version']) ?></td><td><span class="status <?= strtolower($installation['license_mode']) ?>"><?= htmlspecialchars($installation['license_mode']) ?></span></td><td><span class="status <?= strtolower((string)$installation['maintenance_status']) ?>"><?= htmlspecialchars((string)$installation['maintenance_status']) ?></span><?php if(!empty($installation['maintenance_expires_at'])):?><small><?=htmlspecialchars((new DateTimeImmutable((string)$installation['maintenance_expires_at'],new DateTimeZone('UTC')))->format('M j, Y'))?></small><?php endif;?></td><td><?= htmlspecialchars((new DateTimeImmutable($installation['last_seen_at'], new DateTimeZone('UTC')))->format('M j, Y g:i A')) ?></td><td><?= $metric($installation['launch_count']) ?></td><td><?= $metric($installation['print_job_count']) ?></td></tr><?php endforeach; ?>
+<?php if (!$installations): ?><tr class="empty-row"><td colspan="8">No installations have reported usage yet.</td></tr><?php endif; ?></tbody></table></div><footer><span id="visible-count">Showing <?= count($installations) ?> installations</span></footer></section></main></div>
 <script id="usage-data" type="application/json"><?= json_encode($series, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script><script src="assets/admin.js?v=20260714-2"></script></body></html>

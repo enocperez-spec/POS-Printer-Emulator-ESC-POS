@@ -240,7 +240,9 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         emailAddress = status.EmailAddress,
         appVersion = ProductInfo.Version,
         licenseMode = status.Mode,
-        licenseId = status.LicenseId
+        licenseId = status.LicenseId,
+        maintenanceStatus = status.Maintenance.State,
+        maintenanceExpiresAt = status.Maintenance.ExpiresAt
     };
 
     private TelemetryState? LoadState()

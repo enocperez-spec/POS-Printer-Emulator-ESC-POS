@@ -28,7 +28,21 @@ try
         var customer = GetRequiredOption(args, "--customer");
         var email = GetRequiredOption(args, "--email");
         var tier = Enum.Parse<LicenseTier>(GetOption(args, "--tier") ?? nameof(LicenseTier.Pro), ignoreCase: true);
-        var activationKey = ActivationKeyCodec.Issue(File.ReadAllText(privateKeyPath), customer, email, tier);
+        var privateKey = File.ReadAllText(privateKeyPath);
+        var maintenanceExpiration = GetOption(args, "--maintenance-expires");
+        var activationKey = maintenanceExpiration is null
+            ? ActivationKeyCodec.Issue(privateKey, customer, email, tier)
+            : ActivationKeyCodec.Issue(
+                privateKey,
+                customer,
+                email,
+                tier,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.Parse(
+                    maintenanceExpiration,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal |
+                    System.Globalization.DateTimeStyles.AdjustToUniversal));
         Console.WriteLine(activationKey);
     }
     else if (command == "verify")
@@ -40,7 +54,10 @@ try
         {
             throw new InvalidOperationException(error);
         }
-        Console.WriteLine($"Valid {license!.Tier} activation key. License ID: {license.LicenseId}; issued: {license.IssuedAt:u}");
+        var maintenance = license!.MaintenanceExpiresAt is { } expiresAt
+            ? $"; maintenance through: {expiresAt:u}"
+            : "; maintenance: legacy coverage applies";
+        Console.WriteLine($"Valid {license.Tier} activation key. License ID: {license.LicenseId}; issued: {license.IssuedAt:u}{maintenance}");
     }
     else
     {
@@ -53,10 +70,16 @@ try
             Issue a customer activation key:
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "C:\secure\license-keys\vendor-private-key.pem" --customer "Company Name" --email "customer@example.com" --tier Lite
 
+            Preserve a specific maintenance date when replacing an existing permanent license:
+              add --maintenance-expires "2027-07-19T23:59:59Z"
+
             Paid license levels:
               Lite        All paid features with one printer listener
               Pro         All paid features with up to two printer listeners
               Enterprise  All enterprise features with up to fifteen printer listeners
+
+            Every newly issued paid key includes one year of Application Maintenance and Support.
+            The paid application license remains permanent when maintenance expires.
 
             Verify any activation key against the public key built into the application:
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- verify --key "PPE1-..." --customer "Company Name" --email "customer@example.com"

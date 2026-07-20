@@ -41,7 +41,10 @@ function db(): PDO
         public_id TEXT NOT NULL UNIQUE,
         customer_name TEXT NOT NULL,
         email TEXT NOT NULL,
+        order_type TEXT NOT NULL DEFAULT 'LICENSE',
         license_tier TEXT NOT NULL DEFAULT 'Pro',
+        renewal_license_id TEXT,
+        renewal_registration_digest TEXT,
         paypal_order_id TEXT UNIQUE,
         paypal_capture_id TEXT UNIQUE,
         amount TEXT NOT NULL,
@@ -53,11 +56,26 @@ function db(): PDO
         paid_at TEXT,
         approved_at TEXT,
         emailed_at TEXT,
+        maintenance_previous_expires_at TEXT,
+        maintenance_new_expires_at TEXT,
+        maintenance_token TEXT,
         last_error TEXT
     )");
     $orderColumns = $db->query('PRAGMA table_info(orders)')->fetchAll();
     if (!in_array('license_tier', array_column($orderColumns, 'name'), true)) {
         $db->exec("ALTER TABLE orders ADD COLUMN license_tier TEXT NOT NULL DEFAULT 'Pro'");
+    }
+    $orderColumnNames = array_column($db->query('PRAGMA table_info(orders)')->fetchAll(), 'name');
+    $orderAdditions = [
+        'order_type' => "ALTER TABLE orders ADD COLUMN order_type TEXT NOT NULL DEFAULT 'LICENSE'",
+        'renewal_license_id' => 'ALTER TABLE orders ADD COLUMN renewal_license_id TEXT',
+        'renewal_registration_digest' => 'ALTER TABLE orders ADD COLUMN renewal_registration_digest TEXT',
+        'maintenance_previous_expires_at' => 'ALTER TABLE orders ADD COLUMN maintenance_previous_expires_at TEXT',
+        'maintenance_new_expires_at' => 'ALTER TABLE orders ADD COLUMN maintenance_new_expires_at TEXT',
+        'maintenance_token' => 'ALTER TABLE orders ADD COLUMN maintenance_token TEXT',
+    ];
+    foreach ($orderAdditions as $column => $statement) {
+        if (!in_array($column,$orderColumnNames,true)) $db->exec($statement);
     }
     $db->exec("CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,6 +201,31 @@ function clean_license_tier(string $tier): string
     return $tier;
 }
 
+function clean_purchase_product(string $product): string
+{
+    $product = strtolower(trim($product));
+    if (!in_array($product,['license','maintenance'],true)) {
+        throw new InvalidArgumentException('Select a valid purchase type.');
+    }
+    return $product;
+}
+
+function clean_license_id(string $licenseId): string
+{
+    $licenseId = strtolower(trim($licenseId));
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/',$licenseId)) {
+        throw new InvalidArgumentException('Enter the License ID shown in Settings > License.');
+    }
+    return $licenseId;
+}
+
+function maintenance_registration_digest(string $customerName, string $emailAddress): string
+{
+    $customer = strtoupper(trim(preg_replace('/[ \t\r\n\f\v]+/', ' ', $customerName) ?? '', " \t\r\n\f\v"));
+    $email = strtolower(trim($emailAddress, " \t\r\n\f\v"));
+    return hash('sha256',$customer . "\n" . $email);
+}
+
 function configured_license_offers(): array
 {
     $currency = strtoupper((string) config('license.currency'));
@@ -205,6 +248,16 @@ function configured_license_offers(): array
     ];
 }
 
+function configured_maintenance_offers(): array
+{
+    $currency = strtoupper((string)config('license.currency'));
+    return [
+        'Lite'=>['tier'=>'Lite','price'=>number_format((float)(config('maintenance.lite_price') ?? 9.99),2,'.',''),'currency'=>$currency],
+        'Pro'=>['tier'=>'Pro','price'=>number_format((float)(config('maintenance.pro_price') ?? 19.99),2,'.',''),'currency'=>$currency],
+        'Enterprise'=>['tier'=>'Enterprise','price'=>number_format((float)(config('maintenance.enterprise_price') ?? 59.99),2,'.',''),'currency'=>$currency],
+    ];
+}
+
 function license_offers(): array
 {
     $offers = configured_license_offers();
@@ -222,10 +275,30 @@ function license_offers(): array
     return $offers;
 }
 
+function maintenance_offers(): array
+{
+    $offers = configured_maintenance_offers();
+    $rows = db()->query("SELECT setting_key,setting_value FROM site_settings WHERE setting_key IN ('lite_maintenance_price','pro_maintenance_price','enterprise_maintenance_price','maintenance_currency')")->fetchAll();
+    $settings=[];
+    foreach($rows as $row)$settings[$row['setting_key']]=$row['setting_value'];
+    foreach(paid_license_tiers() as $tier){
+        $key=strtolower($tier).'_maintenance_price';
+        $offers[$tier]['price']=$settings[$key]??$offers[$tier]['price'];
+        if(isset($settings['maintenance_currency']))$offers[$tier]['currency']=$settings['maintenance_currency'];
+    }
+    return $offers;
+}
+
 function license_offer(string $tier = 'Pro'): array
 {
     $tier = clean_license_tier($tier);
     return license_offers()[$tier];
+}
+
+function maintenance_offer(string $tier): array
+{
+    $tier=clean_license_tier($tier);
+    return maintenance_offers()[$tier];
 }
 
 function update_license_offer(string $tier, string $price, string $currency): array
@@ -254,6 +327,55 @@ function update_license_offer(string $tier, string $price, string $currency): ar
         'price' => $normalized,
         'currency' => $currency,
     ];
+}
+
+function update_maintenance_offer(string $tier, string $price, string $currency): array
+{
+    $tier=clean_license_tier($tier);
+    $price=trim($price);
+    $currency=strtoupper(trim($currency));
+    if(!preg_match('/^\d{1,6}(?:\.\d{1,2})?$/',$price)||(float)$price<0.50||(float)$price>999999.99){
+        throw new InvalidArgumentException('Enter a price between 0.50 and 999,999.99.');
+    }
+    if($currency!=='USD')throw new InvalidArgumentException('USD is currently the supported checkout currency.');
+    $normalized=number_format((float)$price,2,'.','');
+    $savedAt=now_utc();
+    $priceKey=strtolower($tier).'_maintenance_price';
+    db()->beginTransaction();
+    try{
+        $q=db()->prepare('INSERT INTO site_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at');
+        $q->execute([$priceKey,$normalized,$savedAt]);
+        $q->execute(['maintenance_currency',$currency,$savedAt]);
+        $audit=db()->prepare('INSERT INTO admin_audit(event,details,created_at) VALUES(?,?,?)');
+        $audit->execute(['MAINTENANCE_PRICE_UPDATED',json_encode(['tier'=>$tier,'price'=>$normalized,'currency'=>$currency]),$savedAt]);
+        db()->commit();
+    }catch(Throwable $e){if(db()->inTransaction())db()->rollBack();throw $e;}
+    return ['tier'=>$tier,'price'=>$normalized,'currency'=>$currency];
+}
+
+function maintenance_service_request(array $payload): array
+{
+    $baseUrl=(string)(config('maintenance.base_url')??'https://admin.posprinteremulator.com');
+    $token=(string)(config('maintenance.api_token')??'');
+    $parts=parse_url($baseUrl);
+    if(!is_array($parts)||strtolower((string)($parts['scheme']??''))!=='https'||empty($parts['host'])||$token===''){
+        throw new RuntimeException('Maintenance service is not configured.');
+    }
+    $curl=curl_init(rtrim($baseUrl,'/').'/api/maintenance-entitlement.php');
+    curl_setopt_array($curl,[
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_POST=>true,
+        CURLOPT_HTTPHEADER=>['Accept: application/json','Content-Type: application/json','X-PPE-Admin-Token: '.$token],
+        CURLOPT_POSTFIELDS=>json_encode($payload,JSON_THROW_ON_ERROR),
+        CURLOPT_TIMEOUT=>20,
+    ]);
+    $body=curl_exec($curl);$status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);$error=curl_error($curl);curl_close($curl);
+    $data=json_decode((string)$body,true);
+    if($status<200||$status>=300||!is_array($data)){
+        $message=is_array($data)?(string)($data['error']??''):'';
+        throw new DomainException($message!==''?$message:'The maintenance service could not be reached. '.$error);
+    }
+    return $data;
 }
 
 function audit(int $orderId, string $event, ?string $details = null): void

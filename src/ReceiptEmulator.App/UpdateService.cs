@@ -127,7 +127,7 @@ public sealed class PeriodicUpdateChecker(UpdateService updates, LicenseService 
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (license.HasPaidAccess)
+                if (license.HasMaintenanceAccess)
                 {
                     await updates.CheckAsync(false, stoppingToken);
                 }

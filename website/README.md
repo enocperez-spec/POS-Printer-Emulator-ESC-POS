@@ -5,6 +5,7 @@ This directory contains the static production website for `posprinteremulator.co
 ## Contents
 
 - `index.html`: public product, feature, licensing, download, and FAQ page.
+- `application-maintenance-support.html`: canonical permanent-license and optional annual maintenance policy, renewal pricing, and renewal links.
 - `privacy.html`: privacy information.
 - `styles.css` and `script.js`: responsive presentation and interactions.
 - `assets`: optimized website branding and the current application screenshot.

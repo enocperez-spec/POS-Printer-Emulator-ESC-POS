@@ -7,17 +7,30 @@ namespace ReceiptEmulator;
 public sealed class LicenseService
 {
     public const int TrialDailyLimit = 5;
+    public static readonly DateTimeOffset GrandfatheredMaintenanceExpiresAt =
+        new(2027, 7, 19, 23, 59, 59, TimeSpan.Zero);
     private readonly object _sync = new();
     private readonly string _trialStatePath;
     private readonly string _registrationPath;
     private readonly string _activationPath;
+    private readonly string _maintenancePath;
     private readonly string _publicKeyPem;
+    private readonly Func<DateTimeOffset> _utcNow;
     private TrialState _trialState;
     private RegistrationInfo _registration;
     private ActivationRecord? _activation;
+    private MaintenanceRecord? _maintenance;
     private Exception? _lastStorageError;
 
     public LicenseService(IHostEnvironment environment, IConfiguration? configuration = null)
+        : this(environment, configuration, () => DateTimeOffset.UtcNow)
+    {
+    }
+
+    internal LicenseService(
+        IHostEnvironment environment,
+        IConfiguration? configuration,
+        Func<DateTimeOffset> utcNow)
     {
         var configuredRoot = configuration?["Data:Root"];
         RootPath = !string.IsNullOrWhiteSpace(configuredRoot)
@@ -29,13 +42,16 @@ public sealed class LicenseService
         _trialStatePath = Path.Combine(RootPath, "trial-state.json");
         _registrationPath = Path.Combine(RootPath, "registration.json");
         _activationPath = Path.Combine(RootPath, "license.json");
+        _maintenancePath = Path.Combine(RootPath, "maintenance.json");
         _publicKeyPem = environment.IsEnvironment("Testing") &&
                         !string.IsNullOrWhiteSpace(configuration?["Licensing:PublicKeyPem"])
             ? configuration!["Licensing:PublicKeyPem"]!
             : ActivationKeyCodec.PublicKeyPem;
+        _utcNow = utcNow;
         _trialState = Load<TrialState>(_trialStatePath) ?? NewTrialState();
         _registration = Load<RegistrationInfo>(_registrationPath) ?? new RegistrationInfo(string.Empty, string.Empty);
         _activation = Load<ActivationRecord>(_activationPath);
+        _maintenance = Load<MaintenanceRecord>(_maintenancePath);
     }
 
     public static string DefaultRootPath => Path.Combine(
@@ -69,6 +85,17 @@ public sealed class LicenseService
         }
     }
 
+    public bool HasMaintenanceAccess
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return GetMaintenanceStatus(GetValidatedLicense()).IsActive;
+            }
+        }
+    }
+
     public LicenseStatus GetStatus()
     {
         lock (_sync)
@@ -80,6 +107,7 @@ public sealed class LicenseService
             var isEnterprise = license?.Tier == LicenseTier.Enterprise;
             var maximumListeners = GetMaximumListeners(tier);
             var mode = tier.ToString();
+            var maintenance = GetMaintenanceStatus(license);
             return new LicenseStatus(
                 mode,
                 isPaid,
@@ -92,6 +120,7 @@ public sealed class LicenseService
                 _registration.CustomerName,
                 _registration.EmailAddress,
                 license?.LicenseId,
+                maintenance,
                 new FeatureStatus(
                     History: isPaid,
                     Exports: isPaid,
@@ -100,8 +129,8 @@ public sealed class LicenseService
                     StoredLogos: isPaid,
                     PrinterState: isPaid,
                     PrinterProfiles: isPaid,
-                    Updates: isPaid,
-                    Support: isPaid,
+                    Updates: maintenance.IsActive,
+                    Support: maintenance.IsActive,
                     MultipleListeners: maximumListeners > 1));
         }
     }
@@ -145,12 +174,110 @@ public sealed class LicenseService
                 throw new InvalidOperationException(error);
             }
 
-            var registration = new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant());
+            var registration = new RegistrationInfo(
+                ActivationKeyCodec.NormalizeCustomerName(customerName),
+                ActivationKeyCodec.CanonicalizeEmail(emailAddress));
             var activation = new ActivationRecord(activationKey.Trim(), DateTimeOffset.UtcNow);
 
             SaveActivationPair(registration, activation);
             _registration = registration;
             _activation = activation;
+            if (_maintenance is not null && !IsMaintenanceRecordFor(license))
+            {
+                _maintenance = null;
+                try
+                {
+                    if (File.Exists(_maintenancePath)) File.Delete(_maintenancePath);
+                }
+                catch (Exception exception)
+                {
+                    _lastStorageError = exception;
+                }
+            }
+            return GetStatus();
+        }
+    }
+
+    public LicenseStatus InstallMaintenanceEntitlement(string entitlementToken)
+    {
+        lock (_sync)
+        {
+            var license = GetValidatedLicense()
+                ?? throw new InvalidOperationException("Activate a Lite, Pro, or Enterprise License before applying maintenance.");
+            if (!MaintenanceEntitlementCodec.TryValidateWithPublicKey(
+                    entitlementToken,
+                    _publicKeyPem,
+                    out var entitlement,
+                    out var error) || entitlement is null)
+            {
+                throw new InvalidOperationException(error);
+            }
+            if (entitlement.LicenseId != license.LicenseId || entitlement.Tier != license.Tier)
+            {
+                throw new InvalidOperationException("This maintenance renewal key was issued for a different license or license tier.");
+            }
+
+            var compactToken = string.Concat(entitlementToken.Where(character => !char.IsWhiteSpace(character)));
+            if (entitlement.MaintenanceExpiresAt <= _utcNow())
+            {
+                throw new InvalidOperationException("This maintenance renewal period has already expired.");
+            }
+            if (IsMaintenanceRecordFor(license) &&
+                (_maintenance?.RemoteStatus?.ToLowerInvariant() is "expired" or "revoked") &&
+                _maintenance.RemoteCheckedAt is { } unavailableCheckedAt &&
+                entitlement.IssuedAt <= unavailableCheckedAt)
+            {
+                throw new InvalidOperationException(
+                    "This maintenance renewal key predates the latest maintenance status. Refresh again or apply the newer renewal key.");
+            }
+
+            var current = GetMaintenanceStatus(license);
+            if (current.ExpiresAt is { } currentExpiration &&
+                entitlement.MaintenanceExpiresAt < currentExpiration)
+            {
+                throw new InvalidOperationException("This maintenance renewal key does not extend the current coverage period.");
+            }
+            var record = new MaintenanceRecord(
+                compactToken,
+                _utcNow(),
+                RemoteStatus: "active",
+                RemoteCheckedAt: _utcNow(),
+                RemoteExpiresAt: entitlement.MaintenanceExpiresAt,
+                LicenseId: license.LicenseId,
+                Tier: license.Tier);
+            SavePersistedJson(_maintenancePath, record);
+            _maintenance = record;
+            return GetStatus();
+        }
+    }
+
+    public LicenseStatus RecordMaintenanceUnavailable(
+        string remoteStatus,
+        DateTimeOffset? remoteExpiresAt)
+    {
+        lock (_sync)
+        {
+            var license = GetValidatedLicense()
+                ?? throw new InvalidOperationException("Activate a Lite, Pro, or Enterprise License before refreshing maintenance.");
+            var normalized = remoteStatus.Trim().ToLowerInvariant();
+            if (normalized is not "expired" and not "revoked")
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(remoteStatus),
+                    "Only an authoritative expired or revoked status can disable maintenance locally.");
+            }
+
+            var existingRecordMatches = IsMaintenanceRecordFor(license);
+            var record = new MaintenanceRecord(
+                existingRecordMatches ? _maintenance?.EntitlementToken : null,
+                existingRecordMatches ? _maintenance?.InstalledAt ?? _utcNow() : _utcNow(),
+                RemoteStatus: normalized,
+                RemoteCheckedAt: _utcNow(),
+                RemoteExpiresAt: remoteExpiresAt,
+                LicenseId: license.LicenseId,
+                Tier: license.Tier);
+            SavePersistedJson(_maintenancePath, record);
+            _maintenance = record;
             return GetStatus();
         }
     }
@@ -166,7 +293,9 @@ public sealed class LicenseService
             }
 
             ActivationKeyCodec.ValidateRegistration(customerName, emailAddress);
-            _registration = new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant());
+            _registration = new RegistrationInfo(
+                ActivationKeyCodec.NormalizeCustomerName(customerName),
+                ActivationKeyCodec.CanonicalizeEmail(emailAddress));
             SavePersistedJson(_registrationPath, _registration);
         }
     }
@@ -193,6 +322,7 @@ public sealed class LicenseService
                 Directory.Exists(RootPath),
                 File.Exists(_registrationPath),
                 File.Exists(_activationPath),
+                File.Exists(_maintenancePath),
                 _lastStorageError?.GetType().FullName,
                 _lastStorageError?.Message);
         }
@@ -206,7 +336,9 @@ public sealed class LicenseService
         ActivationKeyCodec.ValidateRegistration(customerName, emailAddress);
         Directory.CreateDirectory(rootPath);
         var registrationPath = Path.Combine(rootPath, "registration.json");
-        SaveJson(registrationPath, new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant()));
+        SaveJson(registrationPath, new RegistrationInfo(
+            ActivationKeyCodec.NormalizeCustomerName(customerName),
+            ActivationKeyCodec.CanonicalizeEmail(emailAddress)));
     }
 
     public static string? GetRequiredPersistedLicenseModeAtDefaultPath() =>
@@ -229,7 +361,9 @@ public sealed class LicenseService
         GetRequiredPersistedLicenseMode(
             rootPath,
             publicKeyPem,
-            new RegistrationInfo(customerName.Trim(), emailAddress.Trim().ToLowerInvariant()));
+            new RegistrationInfo(
+                ActivationKeyCodec.NormalizeCustomerName(customerName),
+                ActivationKeyCodec.CanonicalizeEmail(emailAddress)));
 
     internal static string? GetRequiredPersistedLicenseMode(string rootPath, string publicKeyPem)
         => GetRequiredPersistedLicenseMode(rootPath, publicKeyPem, registrationOverride: null);
@@ -290,12 +424,14 @@ public sealed class LicenseService
         Directory.CreateDirectory(DefaultRootPath);
         RestoreUpgradeFile("registration.json");
         RestoreUpgradeFile("license.json");
+        RestoreUpgradeFile("maintenance.json");
     }
 
     public static void CompleteUpgradeStateAtDefaultPath()
     {
         DeleteUpgradeFile("registration.json");
         DeleteUpgradeFile("license.json");
+        DeleteUpgradeFile("maintenance.json");
     }
 
     private ActivationLicense? GetValidatedLicense()
@@ -327,6 +463,104 @@ public sealed class LicenseService
             out _)
             ? license
             : null;
+    }
+
+    private MaintenanceStatus GetMaintenanceStatus(ActivationLicense? license)
+    {
+        if (license is null || !IsPaid(license.Tier))
+        {
+            return new MaintenanceStatus(
+                IsApplicable: false,
+                IsActive: false,
+                IsGrandfathered: false,
+                ExpiresAt: null,
+                State: "NotApplicable",
+                RenewalUrl: null,
+                Message: "Annual maintenance is included for one year with a paid license purchase.");
+        }
+
+        var baseExpiration = license.MaintenanceExpiresAt ?? GrandfatheredMaintenanceExpiresAt;
+        var renewal = GetValidatedMaintenanceEntitlement(license);
+        var expiration = renewal is not null && renewal.MaintenanceExpiresAt > baseExpiration
+            ? renewal.MaintenanceExpiresAt
+            : baseExpiration;
+        var grandfathered = license.MaintenanceExpiresAt is null &&
+                            (renewal is null || renewal.MaintenanceExpiresAt <= GrandfatheredMaintenanceExpiresAt);
+        var recordMatches = IsMaintenanceRecordFor(license);
+        var authoritativeUnavailable = recordMatches &&
+                                       (_maintenance?.RemoteStatus?.ToLowerInvariant() is "expired" or "revoked");
+        if (recordMatches &&
+            _maintenance?.RemoteStatus?.Equals("expired", StringComparison.OrdinalIgnoreCase) == true &&
+            _maintenance.RemoteExpiresAt is { } remoteExpiration)
+        {
+            expiration = remoteExpiration;
+        }
+        var active = !authoritativeUnavailable && _utcNow() <= expiration;
+        var expirationDate = expiration.UtcDateTime.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var renewalUrl = $"https://buy.posprinteremulator.com/?product=maintenance&tier={license.Tier}";
+        var state = recordMatches &&
+                    _maintenance?.RemoteStatus?.Equals("revoked", StringComparison.OrdinalIgnoreCase) == true
+            ? "Revoked"
+            : active ? "Active" : "Expired";
+        var message = state == "Revoked"
+            ? $"Maintenance coverage for this {license.Tier} License was revoked. Permanent licensed features continue working."
+            : active
+            ? grandfathered
+                ? $"Legacy-license maintenance includes updates and technical support through {expirationDate}."
+                : $"Application updates and technical support are included through {expirationDate}."
+            : $"Maintenance expired on {expirationDate}. Your permanent {license.Tier} License and installed features continue working.";
+
+        return new MaintenanceStatus(
+            IsApplicable: true,
+            IsActive: active,
+            IsGrandfathered: grandfathered,
+            ExpiresAt: expiration,
+            State: state,
+            RenewalUrl: renewalUrl,
+            Message: message);
+    }
+
+    private MaintenanceEntitlement? GetValidatedMaintenanceEntitlement(ActivationLicense license)
+    {
+        if (_maintenance is null)
+        {
+            _maintenance = Load<MaintenanceRecord>(_maintenancePath);
+        }
+        if (_maintenance is null || string.IsNullOrWhiteSpace(_maintenance.EntitlementToken) ||
+            !MaintenanceEntitlementCodec.TryValidateWithPublicKey(
+                _maintenance.EntitlementToken,
+                _publicKeyPem,
+                out var entitlement,
+                out _) ||
+            entitlement is null ||
+            entitlement.LicenseId != license.LicenseId ||
+            entitlement.Tier != license.Tier)
+        {
+            return null;
+        }
+
+        return entitlement;
+    }
+
+    private bool IsMaintenanceRecordFor(ActivationLicense license)
+    {
+        if (_maintenance is null) return false;
+        if (_maintenance.LicenseId is not null || _maintenance.Tier is not null)
+        {
+            return _maintenance.LicenseId == license.LicenseId && _maintenance.Tier == license.Tier;
+        }
+        if (string.IsNullOrWhiteSpace(_maintenance.EntitlementToken) ||
+            !MaintenanceEntitlementCodec.TryValidateWithPublicKey(
+                _maintenance.EntitlementToken,
+                _publicKeyPem,
+                out var entitlement,
+                out _) ||
+            entitlement is null)
+        {
+            return false;
+        }
+
+        return entitlement.LicenseId == license.LicenseId && entitlement.Tier == license.Tier;
     }
 
     private T? Load<T>(string path)
@@ -506,4 +740,12 @@ public sealed class LicenseService
     internal sealed record FileSnapshot(bool Exists, byte[]? Content);
     private sealed record TrialState(DateOnly Date, int Used);
     private sealed record ActivationRecord(string ActivationKey, DateTimeOffset ActivatedAt);
+    private sealed record MaintenanceRecord(
+        string? EntitlementToken,
+        DateTimeOffset InstalledAt,
+        string? RemoteStatus = null,
+        DateTimeOffset? RemoteCheckedAt = null,
+        DateTimeOffset? RemoteExpiresAt = null,
+        Guid? LicenseId = null,
+        LicenseTier? Tier = null);
 }

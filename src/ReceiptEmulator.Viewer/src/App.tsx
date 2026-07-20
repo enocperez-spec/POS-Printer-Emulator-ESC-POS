@@ -51,10 +51,11 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.25',
+  version: '0.3.26',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
+    maintenance: { isApplicable: false, isActive: false, isGrandfathered: false, state: 'NotApplicable', message: 'Annual maintenance is included for one year with a paid license purchase.' },
     features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false },
   },
 }
@@ -71,6 +72,10 @@ function formatBytes(value: number) {
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value))
+}
+
+function formatMaintenanceDate(value?: string) {
+  return value ? new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(value)) : 'Not applicable'
 }
 
 function saveDownload(blob: Blob, fileName: string) {
@@ -331,7 +336,7 @@ function App() {
           <button onClick={() => setError(undefined)}>Dismiss</button>
         </div>
       )}
-      {updateStatus?.updateAvailable && !updateNoticeDismissed && (
+      {status.license.features.updates && updateStatus?.updateAvailable && !updateNoticeDismissed && (
         <div className="update-banner" role="status">
           <RefreshCw size={16} />
           <span><strong>Update available:</strong> POS Printer Emulator {updateStatus.latestVersion}</span>
@@ -667,12 +672,17 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   const canAccess = (candidate: SettingsSection) => candidate === 'logos' ? features.storedLogos
     : candidate === 'state' ? features.printerState
       : candidate === 'profiles' ? features.printerProfiles
-      : candidate === 'updates' ? features.updates
-        : candidate === 'support' ? features.support
+        : candidate === 'updates' ? features.updates
           : true
   const [section, setSection] = useState<SettingsSection>(canAccess(initialSection) ? initialSection : 'license')
+  useEffect(() => {
+    if (!canAccess(section)) setSection('license')
+  }, [features.printerProfiles, features.printerState, features.storedLogos, features.updates, section])
   const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
   const lockedTitle = 'Requires a Lite, Pro, or Enterprise License'
+  const updatesLockedTitle = status.license.isPaid
+    ? 'Renew Application Maintenance and Support to check for updates'
+    : lockedTitle
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -689,8 +699,8 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
             <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
-            <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? lockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
-            <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')} disabled={!features.support} title={!features.support ? lockedTitle : undefined}><LifeBuoy size={18} /><span>Support</span>{features.support ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+            <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? updatesLockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />{status.license.isPaid ? 'Renew' : 'Lite'}</span>}</button>
+            <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
           </nav>
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
@@ -700,7 +710,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
-            {section === 'support' && features.support && <SupportSettings status={status} />}
+            {section === 'support' && <SupportSettings status={status} />}
           </div>
         </div>
       </section>
@@ -718,6 +728,11 @@ function LicenseSettings({ status, onActivated }: {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
   const [changingLicense, setChangingLicense] = useState(!status.license.isPaid)
+  const [maintenanceKey, setMaintenanceKey] = useState('')
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false)
+  const [maintenanceRefreshBusy, setMaintenanceRefreshBusy] = useState(false)
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string>()
+  const [maintenanceMessageKind, setMaintenanceMessageKind] = useState<'success' | 'info' | 'error'>('info')
   const showActivationForm = !status.license.isPaid || changingLicense
   const upgradeGuidance = status.license.mode === 'Lite'
     ? 'Upgrade to Pro for up to 2 printer listeners, or Enterprise for up to 15.'
@@ -743,6 +758,40 @@ function LicenseSettings({ status, onActivated }: {
     }
   }
 
+  async function applyMaintenance(event: FormEvent) {
+    event.preventDefault()
+    setMaintenanceBusy(true)
+    setMaintenanceMessage(undefined)
+    try {
+      const license = await api.applyMaintenance({ entitlementToken: maintenanceKey })
+      setMaintenanceKey('')
+      setMaintenanceMessage('Maintenance coverage was updated successfully.')
+      setMaintenanceMessageKind('success')
+      onActivated(license)
+    } catch (cause) {
+      setMaintenanceMessage(cause instanceof Error ? cause.message : 'The maintenance renewal key could not be validated.')
+      setMaintenanceMessageKind('error')
+    } finally {
+      setMaintenanceBusy(false)
+    }
+  }
+
+  async function refreshMaintenance() {
+    setMaintenanceRefreshBusy(true)
+    setMaintenanceMessage(undefined)
+    try {
+      const result = await api.refreshMaintenance()
+      setMaintenanceMessage(result.message)
+      setMaintenanceMessageKind(result.license.maintenance.isActive ? 'success' : 'info')
+      onActivated(result.license)
+    } catch (cause) {
+      setMaintenanceMessage(cause instanceof Error ? cause.message : 'Maintenance status could not be refreshed.')
+      setMaintenanceMessageKind('error')
+    } finally {
+      setMaintenanceRefreshBusy(false)
+    }
+  }
+
   return (
     <div className="settings-panel license-settings">
       <div className={`license-hero ${status.license.isPaid ? 'is-paid' : ''} ${status.license.isEnterprise ? 'is-enterprise' : ''}`}>
@@ -761,6 +810,33 @@ function LicenseSettings({ status, onActivated }: {
         <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
       </div>
+
+      {status.license.isPaid && (
+        <section className={`maintenance-card ${status.license.maintenance.isActive ? 'is-active' : 'is-expired'}`}>
+          <div className="maintenance-heading">
+            <div><RefreshCw size={18} /><strong>Application Maintenance and Support</strong></div>
+            <span>{status.license.maintenance.isActive ? 'Active' : status.license.maintenance.state}</span>
+          </div>
+          <p>{status.license.maintenance.message}</p>
+          <dl>
+            <div><dt>Coverage ends</dt><dd>{formatMaintenanceDate(status.license.maintenance.expiresAt)}</dd></div>
+            <div><dt>Permanent license</dt><dd>{status.license.mode} features remain available</dd></div>
+          </dl>
+          {status.license.maintenance.isGrandfathered && <small>Grandfathered coverage for licenses issued before v0.3.26.</small>}
+          <div className="maintenance-actions">
+            <button type="button" onClick={refreshMaintenance} disabled={maintenanceRefreshBusy}><RefreshCw className={maintenanceRefreshBusy ? 'spin' : ''} size={15} /> {maintenanceRefreshBusy ? 'Refreshing…' : 'Refresh maintenance status'}</button>
+            {status.license.maintenance.renewalUrl && <a href={status.license.maintenance.renewalUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Renew optional annual maintenance</a>}
+          </div>
+          {maintenanceMessage && <div className={maintenanceMessageKind === 'success' ? 'maintenance-success' : maintenanceMessageKind === 'error' ? 'maintenance-error' : 'maintenance-message'} role={maintenanceMessageKind === 'error' ? 'alert' : 'status'}>{maintenanceMessage}</div>}
+          <details className="maintenance-key-panel">
+            <summary>Apply a maintenance renewal key</summary>
+            <form onSubmit={applyMaintenance}>
+              <label>Renewal key<textarea required rows={3} value={maintenanceKey} onChange={event => setMaintenanceKey(event.target.value)} placeholder="PPEM1-…" spellCheck={false} /></label>
+              <button className="secondary-action" type="submit" disabled={maintenanceBusy}><KeyRound size={16} /> {maintenanceBusy ? 'Applying…' : 'Apply renewal key'}</button>
+            </form>
+          </details>
+        </section>
+      )}
 
       {status.license.isPaid ? (
         <div className="registered-details">
@@ -836,19 +912,26 @@ function UpdatesSettings({ status, updateStatus, onCheckUpdates }: {
 }
 
 function SupportSettings({ status }: { status: ServiceStatus }) {
+  const maintenance = status.license.maintenance
+  const assistedSupport = maintenance.isActive
   return (
     <div className="settings-panel support-settings">
-      <div className="settings-status-card">
+      <div className={`settings-status-card ${assistedSupport ? 'is-current' : ''}`}>
         <div className="settings-status-icon"><LifeBuoy size={25} /></div>
-        <div><h2>Support diagnostics</h2><p>Save a text report and send it to support when you need help.</p></div>
+        <div><h2>{assistedSupport ? 'Technical support is available' : 'Local support tools'}</h2><p>{assistedSupport ? `Assisted support is included through ${formatMaintenanceDate(maintenance.expiresAt)}.` : status.license.isPaid ? 'Assisted support requires renewed maintenance. Diagnostic export remains available.' : 'Diagnostic export is available locally. Assisted support is included with a paid license and active maintenance.'}</p></div>
       </div>
       <div className="support-detail-grid">
         <div><span>Application</span><strong>POS Printer Emulator {status.version}</strong></div>
         <div><span>Listener</span><strong>{status.listener}</strong></div>
         <div><span>Service</span><strong>{status.listening ? 'Running' : 'Stopped'}</strong></div>
         <div><span>License</span><strong>{status.license.mode} License</strong></div>
+        <div><span>Maintenance</span><strong>{maintenance.state}{maintenance.expiresAt ? ` · ${formatMaintenanceDate(maintenance.expiresAt)}` : ''}</strong></div>
       </div>
       <a className="download-diagnostics" href="/api/support/diagnostics" download><Download size={17} /> Download diagnostic log</a>
+      <div className="settings-actions support-actions">
+        {assistedSupport && <a href="mailto:support@posprinteremulator.com"><LifeBuoy size={16} /> Contact technical support</a>}
+        {!assistedSupport && maintenance.renewalUrl && <a className="primary-action" href={maintenance.renewalUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Renew maintenance</a>}
+      </div>
       <div className="privacy-callout"><LockKeyhole size={17} /><p>The report includes application events, version, service status, and basic system details. It does not include receipt contents or activation keys.</p></div>
     </div>
   )

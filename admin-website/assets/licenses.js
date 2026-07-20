@@ -112,6 +112,8 @@
         tier: button.dataset.tier,
         status: button.dataset.status,
         state: button.dataset.controlState,
+        maintenanceStatus: button.dataset.maintenanceStatus,
+        maintenanceExpires: button.dataset.maintenanceExpires,
         rowVersion: button.dataset.rowVersion,
       };
       returnFocus = button;
@@ -120,6 +122,8 @@
       setText('manage-license-id', selected.licenseId);
       setText('manage-tier', selected.tier);
       setText('manage-status', selected.status);
+      setText('manage-maintenance-status', selected.maintenanceStatus);
+      setText('manage-maintenance-expires', `Through ${selected.maintenanceExpires} UTC`);
       const tierOrder = ['Lite', 'Pro', 'Enterprise'];
       const currentTierIndex = tierOrder.indexOf(selected.tier);
       targetTier.value = currentTierIndex >= 0 && currentTierIndex < tierOrder.length - 1
@@ -131,6 +135,10 @@
       dialog.querySelector('[data-prepare-action="reactivate"]').hidden = selected.state !== 'Deactivated';
       dialog.querySelector('[data-prepare-action="revoke"]').hidden = !['Enabled', 'Deactivated'].includes(selected.state);
       dialog.querySelector('[data-prepare-action="delete"]').hidden = selected.state === 'Deleted';
+      dialog.querySelector('.maintenance-actions').hidden = selected.state !== 'Enabled';
+      dialog.querySelector('[data-prepare-action="extend_maintenance"]').hidden = selected.state !== 'Enabled';
+      dialog.querySelector('[data-prepare-action="revoke_maintenance"]').hidden = selected.state !== 'Enabled' || selected.maintenanceStatus === 'revoked';
+      dialog.querySelector('[data-prepare-action="restore_maintenance"]').hidden = selected.state !== 'Enabled' || selected.maintenanceStatus !== 'revoked';
       showView('manage');
       updateTierButton();
       dialog.showModal();
@@ -185,6 +193,21 @@
         title: 'Confirm license deletion',
         description: 'Delete this license from normal License Manager views? The audit tombstone will remain, but this action cannot be undone. The current offline desktop version may continue working until online enforcement is released.',
         label: 'Delete license record',
+      },
+      extend_maintenance: {
+        title: 'Confirm maintenance extension',
+        description: `Extend ${selected.customer}'s Application Maintenance and Support by one year? Active coverage is extended from its current end date; lapsed coverage starts today.`,
+        label: 'Extend maintenance one year',
+      },
+      revoke_maintenance: {
+        title: 'Confirm maintenance revocation',
+        description: 'Disable update downloads and technical support for this license? The permanent application license and all purchased features will continue working.',
+        label: 'Revoke maintenance access',
+      },
+      restore_maintenance: {
+        title: 'Confirm maintenance restoration',
+        description: 'Restore maintenance access through the existing coverage expiration date? This does not extend the expiration date.',
+        label: 'Restore maintenance access',
       },
       upgrade_trial: {
         title: 'Confirm Trial upgrade key',

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -156,7 +157,6 @@ internal static class ReceiptLabBuild
 
     private static async Task InstallerAsync(bool skipPublish)
     {
-        SynchronizeReleaseVersion(checkOnly: false);
         if (!skipPublish)
         {
             await PublishAsync();
@@ -171,8 +171,25 @@ internal static class ReceiptLabBuild
         var installerDefinition = Path.Combine(Root, "installer", "ReceiptLab.iss");
         Console.WriteLine("Compiling the POS Printer Emulator Windows installer...");
         await RunProcessAsync(compiler, [installerDefinition], Root);
-        SynchronizeReleaseVersion(checkOnly: false);
-        Console.WriteLine($"Installer created in {Path.Combine(Root, "artifacts", "installer")}");
+
+        var installerDirectory = Path.Combine(Root, "artifacts", "installer");
+        var installerPath = Path.Combine(
+            installerDirectory,
+            $"POSPrinterEmulatorSetup-{ReadProductVersion()}-win-x64.exe");
+        if (!File.Exists(installerPath))
+        {
+            throw new InvalidOperationException($"The expected installer was not created: {installerPath}");
+        }
+
+        await using var installerStream = File.OpenRead(installerPath);
+        var checksum = Convert.ToHexString(await SHA256.HashDataAsync(installerStream)).ToLowerInvariant();
+        var checksumPath = installerPath + ".sha256";
+        await File.WriteAllTextAsync(
+            checksumPath,
+            $"{checksum}  {Path.GetFileName(installerPath)}{Environment.NewLine}");
+
+        Console.WriteLine($"Installer created at {installerPath}");
+        Console.WriteLine($"SHA-256 checksum created at {checksumPath}");
     }
 
     private static async Task VerifyPublishedApplicationsAsync()
@@ -285,7 +302,7 @@ internal static class ReceiptLabBuild
 
     private static void SynchronizeReleaseVersion(bool checkOnly)
     {
-        var displayVersion = ReadProductVersion();
+        var displayVersion = checkOnly ? ReadPublicReleaseVersion() : ReadProductVersion();
         var installerPath = Path.Combine(
             Root,
             "artifacts",
@@ -312,6 +329,14 @@ internal static class ReceiptLabBuild
                 $"Release {displayVersion} is not synchronized in: {string.Join(", ", changed)}. Run the sync-release command and commit the results.");
         }
 
+        if (!checkOnly)
+        {
+            var manifestPath = Path.Combine(Root, "website", "release.json");
+            File.WriteAllText(
+                manifestPath,
+                JsonSerializer.Serialize(new { currentVersion = displayVersion }, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);
+        }
+
         Console.WriteLine(changed.Count == 0
             ? $"Website release details match application version {displayVersion}."
             : $"Synchronized release {displayVersion}: {string.Join(", ", changed)}");
@@ -330,6 +355,24 @@ internal static class ReceiptLabBuild
         }
 
         return versionMatch.Groups["version"].Value;
+    }
+
+    private static string ReadPublicReleaseVersion()
+    {
+        var manifestPath = Path.Combine(Root, "website", "release.json");
+        if (!File.Exists(manifestPath))
+        {
+            throw new InvalidOperationException("website/release.json is missing. It must identify the current public release.");
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        var version = document.RootElement.GetProperty("currentVersion").GetString();
+        if (version is null || !Regex.IsMatch(version, "^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+        {
+            throw new InvalidOperationException("website/release.json contains an invalid currentVersion.");
+        }
+
+        return version;
     }
 
     private static string SynchronizeWebsiteReleaseText(string text, string displayVersion, FileInfo? installer)
@@ -645,8 +688,8 @@ internal static class ReceiptLabBuild
               installer                     Build the complete Windows installer
               installer --skip-publish      Repackage the existing publish output
               license-manager               Publish the vendor License Manager UI
-              sync-release                  Sync ProductInfo.Version to website labels and download links
-              sync-release --check          Fail if the public website version is stale (used by GitHub)
+              sync-release                  Promote ProductInfo.Version to the public website manifest, labels, and download links
+              sync-release --check          Verify website pages against website/release.json without promoting a candidate
               check-seo                     Validate canonical URLs, metadata, structured data, sitemap, and performance assets
               send-sample                   Send a sample ESC/POS job to localhost:9100
               send-sample --host HOST --port PORT --title TITLE

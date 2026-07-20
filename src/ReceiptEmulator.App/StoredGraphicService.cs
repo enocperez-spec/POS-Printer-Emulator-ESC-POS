@@ -29,6 +29,11 @@ public sealed class StoredGraphicService
 
     public IReadOnlyList<StoredGraphicInfo> List()
     {
+        if (!Directory.Exists(_directory))
+        {
+            return [];
+        }
+
         var graphics = new List<StoredGraphicInfo>();
         foreach (var metadataPath in Directory.EnumerateFiles(_directory, "*.json"))
         {
@@ -78,6 +83,7 @@ public sealed class StoredGraphicService
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            Directory.CreateDirectory(_directory);
             var contentPath = Path.Combine(_directory, storedFileName);
             var temporaryContent = contentPath + ".tmp";
             var metadataPath = Path.Combine(_directory, normalizedKey + ".json");
@@ -108,6 +114,11 @@ public sealed class StoredGraphicService
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            if (!Directory.Exists(_directory))
+            {
+                return false;
+            }
+
             var found = false;
             foreach (var path in Directory.EnumerateFiles(_directory, normalizedKey + ".*"))
             {

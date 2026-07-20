@@ -134,7 +134,8 @@ $licenseWhere = $showDeleted ? '' : "WHERE l.control_state <> 'Deleted'";
 $licenses = $pdo->query(
     "SELECT l.license_id, l.customer_name, l.email_address, l.license_tier, l.activation_key,
             l.issued_at, l.control_state, l.deactivated_at, l.revoked_at, l.deleted_at,
-            l.superseded_by_license_id, l.license_source, l.source_reference, l.row_version,
+            l.superseded_by_license_id, l.license_source, l.source_reference,
+            l.maintenance_expires_at, l.maintenance_revoked_at, l.row_version,
             EXISTS(
                 SELECT 1 FROM installations i
                 WHERE i.license_id = l.license_id AND i.license_mode IN ('Lite', 'Pro', 'Enterprise')
@@ -163,6 +164,13 @@ $licenseEvents = $pdo->query(
             new_tier, replacement_license_id, reason, performed_by, created_at
      FROM issued_license_events ORDER BY created_at DESC LIMIT 100'
 )->fetchAll();
+$maintenanceEvents = $pdo->query(
+    'SELECT m.license_id, l.customer_name, m.event_type, m.previous_expires_at, m.new_expires_at,
+            m.reason, m.performed_by, m.created_at
+     FROM license_maintenance_events m
+     LEFT JOIN issued_licenses l ON l.license_id = m.license_id
+     ORDER BY m.created_at DESC LIMIT 100'
+)->fetchAll();
 
 $licenseStatus = static function (array $license): string {
     $state = (string)$license['control_state'];
@@ -190,7 +198,7 @@ $licenseStatus = static function (array $license): string {
   </header>
   <aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a class="active" href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a><a href="https://posprinteremulator.com/privacy.html"><span aria-hidden="true">⚙</span>Settings</a></nav><p>The private signing key stays protected on the server.</p></aside>
   <main class="license-main">
-    <div class="page-heading"><div><h1>License Manager</h1><p>Issue, replace, deactivate, revoke, and audit Lite, Pro, and Enterprise licenses.</p></div></div>
+    <div class="page-heading"><div><h1>License Manager</h1><p>Manage permanent licenses and optional annual Application Maintenance and Support.</p></div></div>
 
     <?php if ($flash !== null): ?><div class="license-flash <?= e((string)$flash['type']) ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>"><?= e((string)$flash['message']) ?></div><?php endif; ?>
     <?php if ($syncWarning !== ''): ?><div class="license-flash warning" role="status"><?= e($syncWarning) ?></div><?php endif; ?>
@@ -217,9 +225,15 @@ $licenseStatus = static function (array $license): string {
 
     <section class="table-panel license-table">
       <div class="table-toolbar"><div><h2>Issued licenses</h2><p><?= count($licenses) ?> recorded keys<?= $showDeleted ? ', including deleted' : '' ?></p></div><div><label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">Search issued licenses</span><input id="license-search" type="search" placeholder="Search customers, email, or ID"></label><label><span class="sr-only">Status filter</span><select id="status-filter"><option value="all">All statuses</option><option value="Activated">Activated</option><option value="Issued">Issued</option><option value="Deactivated">Deactivated</option><option value="Revoked">Revoked</option><?php if ($showDeleted): ?><option value="Deleted">Deleted</option><?php endif; ?></select></label><a class="history-toggle" href="<?= $showDeleted ? '/licenses.php' : '/licenses.php?show_deleted=1' ?>"><?= $showDeleted ? 'Hide deleted' : 'Show deleted' ?></a></div></div>
-      <div class="table-scroll"><table><thead><tr><th scope="col">Customer</th><th scope="col">Email</th><th scope="col">Level</th><th scope="col">Source</th><th scope="col">Issued (UTC)</th><th scope="col">License ID</th><th scope="col">Status</th><th scope="col">Key</th><th scope="col">Actions</th></tr></thead><tbody id="license-rows">
-      <?php foreach ($licenses as $license): $status = $licenseStatus($license); ?><tr data-status="<?= e($status) ?>"><td><?= e((string)$license['customer_name']) ?></td><td><?= e((string)$license['email_address']) ?></td><td><?= e((string)$license['license_tier']) ?></td><td><?= e((string)$license['license_source']) ?></td><td><?= e((new DateTimeImmutable((string)$license['issued_at'], new DateTimeZone('UTC')))->format('M j, Y g:i A')) ?></td><td class="mono"><?= e((string)$license['license_id']) ?></td><td><span class="license-status <?= strtolower(e($status)) ?>"><?= e($status) ?></span></td><td><?php if ((string)$license['control_state'] === 'Enabled'): ?><button type="button" class="table-copy" data-key="<?= e((string)$license['activation_key']) ?>">Copy</button><?php else: ?>—<?php endif; ?></td><td><?php if ($status !== 'Deleted'): ?><button type="button" class="manage-license" data-license-id="<?= e((string)$license['license_id']) ?>" data-customer="<?= e((string)$license['customer_name']) ?>" data-email="<?= e((string)$license['email_address']) ?>" data-tier="<?= e((string)$license['license_tier']) ?>" data-status="<?= e($status) ?>" data-control-state="<?= e((string)$license['control_state']) ?>" data-row-version="<?= (int)$license['row_version'] ?>">Manage</button><?php else: ?><span class="muted-action">Archived</span><?php endif; ?></td></tr><?php endforeach; ?>
-      <?php if (!$licenses): ?><tr class="empty-row"><td colspan="9">No activation keys match this view.</td></tr><?php endif; ?></tbody></table></div><footer><span id="license-count" aria-live="polite">Showing <?= count($licenses) ?> licenses</span></footer>
+      <div class="table-scroll"><table><thead><tr><th scope="col">Customer</th><th scope="col">Email</th><th scope="col">Level</th><th scope="col">Source</th><th scope="col">Issued (UTC)</th><th scope="col">License ID</th><th scope="col">License</th><th scope="col">Maintenance</th><th scope="col">Key</th><th scope="col">Actions</th></tr></thead><tbody id="license-rows">
+      <?php foreach ($licenses as $license): $status = $licenseStatus($license); $maintenanceStatus=maintenance_status($license); ?><tr data-status="<?= e($status) ?>"><td><?= e((string)$license['customer_name']) ?></td><td><?= e((string)$license['email_address']) ?></td><td><?= e((string)$license['license_tier']) ?></td><td><?= e((string)$license['license_source']) ?></td><td><?= e((new DateTimeImmutable((string)$license['issued_at'], new DateTimeZone('UTC')))->format('M j, Y g:i A')) ?></td><td class="mono"><?= e((string)$license['license_id']) ?></td><td><span class="license-status <?= strtolower(e($status)) ?>"><?= e($status) ?></span></td><td><span class="maintenance-status <?= e($maintenanceStatus) ?>"><?= e(ucfirst($maintenanceStatus)) ?></span><small><?= e((new DateTimeImmutable((string)$license['maintenance_expires_at'],new DateTimeZone('UTC')))->format('M j, Y')) ?></small></td><td><?php if ((string)$license['control_state'] === 'Enabled'): ?><button type="button" class="table-copy" data-key="<?= e((string)$license['activation_key']) ?>">Copy</button><?php else: ?>—<?php endif; ?></td><td><?php if ($status !== 'Deleted'): ?><button type="button" class="manage-license" data-license-id="<?= e((string)$license['license_id']) ?>" data-customer="<?= e((string)$license['customer_name']) ?>" data-email="<?= e((string)$license['email_address']) ?>" data-tier="<?= e((string)$license['license_tier']) ?>" data-status="<?= e($status) ?>" data-control-state="<?= e((string)$license['control_state']) ?>" data-maintenance-status="<?= e($maintenanceStatus) ?>" data-maintenance-expires="<?= e((string)$license['maintenance_expires_at']) ?>" data-row-version="<?= (int)$license['row_version'] ?>">Manage</button><?php else: ?><span class="muted-action">Archived</span><?php endif; ?></td></tr><?php endforeach; ?>
+      <?php if (!$licenses): ?><tr class="empty-row"><td colspan="10">No activation keys match this view.</td></tr><?php endif; ?></tbody></table></div><footer><span id="license-count" aria-live="polite">Showing <?= count($licenses) ?> licenses</span></footer>
+    </section>
+
+    <section class="table-panel license-table audit-table">
+      <div class="table-toolbar"><div><h2>Recent maintenance activity</h2><p>Renewals and manual maintenance actions do not change the permanent license.</p></div></div>
+      <div class="table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Customer</th><th>Event</th><th>Previous</th><th>New coverage</th><th>License ID</th><th>Performed by</th><th>Reason</th></tr></thead><tbody>
+      <?php foreach($maintenanceEvents as $event):?><tr><td><?=e((new DateTimeImmutable((string)$event['created_at'],new DateTimeZone('UTC')))->format('M j, Y g:i A'))?></td><td><?=e((string)($event['customer_name']??'—'))?></td><td><?=e(str_replace('_',' ',(string)$event['event_type']))?></td><td><?=e((string)($event['previous_expires_at']??'—'))?></td><td><?=e((string)($event['new_expires_at']??'—'))?></td><td class="mono"><?=e((string)$event['license_id'])?></td><td><?=e((string)$event['performed_by'])?></td><td><?=e((string)($event['reason']??'—'))?></td></tr><?php endforeach;?><?php if(!$maintenanceEvents):?><tr class="empty-row"><td colspan="8">No maintenance actions have been recorded yet.</td></tr><?php endif;?></tbody></table></div>
     </section>
 
     <section class="table-panel license-table trial-table">
@@ -242,9 +256,10 @@ $licenseStatus = static function (array $license): string {
   <div class="dialog-header"><div><span class="eyebrow">License controls</span><h2 id="license-dialog-title">Manage license</h2></div><button type="button" class="dialog-close" data-dialog-close aria-label="Close">×</button></div>
   <section id="license-manage-view">
     <p id="license-dialog-description">Review the selected customer and choose an action.</p>
-    <dl class="license-summary"><div><dt>Customer</dt><dd id="manage-customer"></dd></div><div><dt>Email</dt><dd id="manage-email"></dd></div><div><dt>License ID</dt><dd id="manage-license-id" class="mono"></dd></div><div><dt>Current level</dt><dd id="manage-tier"></dd></div><div><dt>Status</dt><dd id="manage-status"></dd></div></dl>
+    <dl class="license-summary"><div><dt>Customer</dt><dd id="manage-customer"></dd></div><div><dt>Email</dt><dd id="manage-email"></dd></div><div><dt>License ID</dt><dd id="manage-license-id" class="mono"></dd></div><div><dt>Current level</dt><dd id="manage-tier"></dd></div><div><dt>License status</dt><dd id="manage-status"></dd></div><div><dt>Maintenance</dt><dd><span id="manage-maintenance-status"></span><small id="manage-maintenance-expires"></small></dd></div></dl>
     <div class="tier-action"><label>Replacement license level<select id="manage-target-tier"><option value="Lite">Lite</option><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label><button type="button" class="dialog-action" data-prepare-action="change_tier">Change license type</button></div>
     <div class="lifecycle-actions"><button type="button" class="dialog-action" data-prepare-action="deactivate">Deactivate</button><button type="button" class="dialog-action" data-prepare-action="reactivate">Reactivate</button><button type="button" class="dialog-action danger" data-prepare-action="revoke">Revoke</button><button type="button" class="dialog-action danger-outline" data-prepare-action="delete">Delete</button></div>
+    <div class="maintenance-actions"><strong>Application Maintenance and Support</strong><p>These controls affect updates and support only. The permanent license and purchased features continue working.</p><div><button type="button" class="dialog-action" data-prepare-action="extend_maintenance">Extend one year</button><button type="button" class="dialog-action danger-outline" data-prepare-action="revoke_maintenance">Revoke maintenance</button><button type="button" class="dialog-action" data-prepare-action="restore_maintenance">Restore maintenance</button></div></div>
   </section>
   <section id="trial-manage-view" hidden>
     <p id="trial-dialog-description">Generate a signed paid key for this Trial installation. The customer must enter the key in the application.</p>

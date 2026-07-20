@@ -52,6 +52,12 @@ builder.Services.AddHttpClient<UpdateService>(client =>
     client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+builder.Services.AddHttpClient<MaintenanceRefreshService>(client =>
+{
+    client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddHostedService(services => services.GetRequiredService<PrinterListenerManager>());
 builder.Services.AddHostedService<PeriodicUpdateChecker>();
 
@@ -76,13 +82,13 @@ app.MapGet("/api/status", (PrinterListenerManager listeners, LicenseService lice
 });
 
 app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, LicenseService license, CancellationToken cancellationToken) =>
-    !license.HasPaidAccess
-        ? Results.Problem("Check for Updates requires a Lite, Pro, or Enterprise License.", statusCode: 403)
+    !license.HasMaintenanceAccess
+        ? Results.Problem("Check for Updates requires active Application Maintenance and Support coverage.", statusCode: 403)
         : Results.Ok(await updates.CheckAsync(force == true, cancellationToken)));
 
 app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license) =>
-    !license.HasPaidAccess
-        ? Results.Problem("Check for Updates requires a Lite, Pro, or Enterprise License.", statusCode: 403)
+    !license.HasMaintenanceAccess
+        ? Results.Problem("Check for Updates requires active Application Maintenance and Support coverage.", statusCode: 403)
         : updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
 
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
@@ -477,7 +483,6 @@ app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGra
 app.MapGet("/api/support/diagnostics", (LicenseService license, PrinterListenerManager listeners,
     ReceiptStore store, SupportLogProvider logs, StoredGraphicService graphics, PrinterProfileService profiles) =>
 {
-    if (!license.HasPaidAccess) return Results.Problem("Support requires a Lite, Pro, or Enterprise License.", statusCode: 403);
     var status = license.GetStatus();
     var selectedProfile = profiles.GetSelected();
     var listenerStatus = listeners.GetStatus();
@@ -492,6 +497,8 @@ app.MapGet("/api/support/diagnostics", (LicenseService license, PrinterListenerM
         .AppendLine($"Listening printer listeners: {listenerStatus.ListeningCount}")
         .AppendLine($"License mode: {status.Mode}")
         .AppendLine($"License ID: {status.LicenseId?.ToString() ?? "None"}")
+        .AppendLine($"Maintenance status: {status.Maintenance.State}")
+        .AppendLine($"Maintenance expiration: {status.Maintenance.ExpiresAt?.ToString("O") ?? "Not applicable"}")
         .AppendLine($"Printer profile: {selectedProfile.Name} ({selectedProfile.Id})")
         .AppendLine($"Profile paper: {selectedProfile.PaperWidthMm} mm / {selectedProfile.PrintableDots} dots")
         .AppendLine($"Receipt jobs currently listed: {store.GetSummaries().Count}")
@@ -540,10 +547,13 @@ app.MapGet("/api/support/activation-diagnostics", (LicenseService license) =>
         .AppendLine($"Runtime: {Environment.Version}")
         .AppendLine($"64-bit process: {Environment.Is64BitProcess}")
         .AppendLine($"License mode: {status.Mode}")
+        .AppendLine($"Maintenance status: {status.Maintenance.State}")
+        .AppendLine($"Maintenance expiration: {status.Maintenance.ExpiresAt?.ToString("O") ?? "Not applicable"}")
         .AppendLine($"Data path: {storage.DataPath}")
         .AppendLine($"Data directory exists: {storage.DataDirectoryExists}")
         .AppendLine($"Registration file exists: {storage.RegistrationFileExists}")
         .AppendLine($"License file exists: {storage.LicenseFileExists}")
+        .AppendLine($"Maintenance file exists: {storage.MaintenanceFileExists}")
         .AppendLine($"Last storage error type: {storage.LastErrorType ?? "None"}")
         .AppendLine($"Last storage error: {storage.LastErrorMessage ?? "None"}")
         .AppendLine()
@@ -606,6 +616,43 @@ app.MapPost("/api/license/activate", async (
 
     telemetry.RecordActivation();
     return Results.Ok(license.GetStatus());
+});
+
+app.MapPost("/api/license/maintenance/apply", (
+    MaintenanceEntitlementRequest request,
+    LicenseService license,
+    ILoggerFactory loggerFactory) =>
+{
+    try
+    {
+        return Results.Ok(license.InstallMaintenanceEntitlement(request.EntitlementToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
+    catch (Exception exception)
+    {
+        loggerFactory.CreateLogger("MaintenanceEntitlement")
+            .LogError(exception, "A validated maintenance entitlement could not be saved to local storage");
+        return Results.Problem(
+            "The maintenance renewal could not be saved on this computer. Download Activation Diagnostics and try again.",
+            statusCode: 500);
+    }
+});
+
+app.MapPost("/api/license/maintenance/refresh", async (
+    MaintenanceRefreshService maintenance,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await maintenance.RefreshAsync(cancellationToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
 });
 
 app.MapGet("/api/jobs", (string? listenerId, ReceiptStore store) => store.GetSummaries(listenerId));

@@ -24,6 +24,7 @@ $query = db()->prepare(
             license_tier,
             activation_key,
             public_id AS order_reference,
+            maintenance_new_expires_at AS maintenance_expires_at,
             COALESCE(approved_at, created_at) AS issued_at
      FROM orders
      WHERE id > ?

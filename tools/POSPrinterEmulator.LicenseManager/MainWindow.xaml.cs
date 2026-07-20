@@ -61,7 +61,7 @@ public partial class MainWindow : Window
                 tier);
 
             ActivationKeyTextBox.Text = activationKey;
-            IssuedToTextBlock.Text = $"{tier} License issued to {customerName} · {emailAddress.ToLowerInvariant()}";
+            IssuedToTextBlock.Text = $"{tier} License issued to {customerName} · {ActivationKeyCodec.CanonicalizeEmail(emailAddress)} · Includes one year of maintenance and support";
             ResultPanel.Visibility = Visibility.Visible;
             ActivationKeyTextBox.Focus();
             ActivationKeyTextBox.SelectAll();

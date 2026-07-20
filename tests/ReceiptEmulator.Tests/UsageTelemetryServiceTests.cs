@@ -45,6 +45,13 @@ public sealed class UsageTelemetryServiceTests
                 Assert.Equal(HttpMethod.Post, request.Method);
                 Assert.Equal("www.posprinteremulator.com", request.RequestUri!.Host);
             });
+            Assert.All(handler.Payloads, payload =>
+            {
+                Assert.Equal("NotApplicable", payload.GetProperty("maintenanceStatus").GetString());
+                Assert.Equal(JsonValueKind.Null, payload.GetProperty("maintenanceExpiresAt").ValueKind);
+                Assert.False(payload.TryGetProperty("activationKey", out _));
+                Assert.False(payload.TryGetProperty("entitlementToken", out _));
+            });
         }
         finally
         {
@@ -56,6 +63,7 @@ public sealed class UsageTelemetryServiceTests
     private sealed class TelemetryHandler : HttpMessageHandler
     {
         public List<HttpRequestMessage> Requests { get; } = [];
+        public List<JsonElement> Payloads { get; } = [];
         public TaskCompletionSource<int> PrintJobsReported { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int PrintJobAttempts { get; private set; }
 
@@ -63,6 +71,7 @@ public sealed class UsageTelemetryServiceTests
         {
             Requests.Add(new HttpRequestMessage(request.Method, request.RequestUri));
             var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            Payloads.Add(body.RootElement.Clone());
             var action = body.RootElement.GetProperty("action").GetString();
             if (action == "register")
             {

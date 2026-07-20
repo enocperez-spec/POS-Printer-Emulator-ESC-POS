@@ -142,6 +142,21 @@ try {
     } elseif ($licenseModeColumn && str_contains((string)$licenseModeColumn['Type'], "'Full'")) {
         $pdo->exec("ALTER TABLE installations MODIFY license_mode ENUM('Trial', 'Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Trial'");
     }
+    $installationColumns=[];
+    foreach($pdo->query('SHOW COLUMNS FROM installations')->fetchAll() as $column){
+        $installationColumns[(string)$column['Field']]=true;
+    }
+    if(!isset($installationColumns['maintenance_status'])){
+        $pdo->exec("ALTER TABLE installations ADD COLUMN maintenance_status ENUM('NotApplicable','Active','Expired','Revoked') NOT NULL DEFAULT 'NotApplicable' AFTER license_id");
+    }else{
+        $maintenanceStatusColumn=$pdo->query("SHOW COLUMNS FROM installations LIKE 'maintenance_status'")->fetch();
+        if($maintenanceStatusColumn&&!str_contains((string)$maintenanceStatusColumn['Type'],"'Revoked'")){
+            $pdo->exec("ALTER TABLE installations MODIFY maintenance_status ENUM('NotApplicable','Active','Expired','Revoked') NOT NULL DEFAULT 'NotApplicable'");
+        }
+    }
+    if(!isset($installationColumns['maintenance_expires_at'])){
+        $pdo->exec('ALTER TABLE installations ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER maintenance_status');
+    }
     $tierColumn = $pdo->query("SHOW COLUMNS FROM issued_licenses LIKE 'license_tier'")->fetch();
     if (!$tierColumn) {
         $pdo->exec("ALTER TABLE issued_licenses ADD COLUMN license_tier ENUM('Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Pro' AFTER email_address");

@@ -75,3 +75,4 @@ img{height:auto}
 .compare-cell:not(:nth-child(4n + 1)){border-left:1px solid var(--line)}
 .trial-icon,.check{flex-basis:30px;width:30px;height:30px;font-size:12px}
 @media (max-width:780px){.comparison-table{grid-template-columns:repeat(4,minmax(130px,1fr));overflow-x:auto}.compare-head{padding:16px 8px;font-size:14px}.compare-cell{min-height:106px;padding:12px 8px}}
+.compare-intro .compare-note{margin-top:18px;font-size:15px;line-height:1.6}

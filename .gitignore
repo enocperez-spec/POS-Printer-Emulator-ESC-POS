@@ -14,3 +14,5 @@ src/ReceiptEmulator.App/wwwroot/
 *.suo
 /admin-website/private/config.php
 /admin-website/private/purchase-site.php
+/admin-website/private/vendor-private-key.pem
+/admin-website/private/two-factor.json

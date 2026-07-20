@@ -12,9 +12,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.25 — released 2026-07-19**
+**Current public release: v0.3.26 — released 2026-07-20**
 
-**Next release: v0.3.26 — Receipt comparison and automated validation**
+**Current development: v0.3.27 — Receipt comparison and automated validation**
+
+**Next release after v0.3.27: v0.3.28 — Enhanced support package and connection diagnostics**
 
 ## Completed releases
 
@@ -48,10 +50,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.23 | Released | Enterprise activation and Printer Setup Wizard maintenance fixes |
 | v0.3.24 | Released | Upgrade licensing and Printer Setup safeguards |
 | v0.3.25 | Released | Four-tier licensing and upgrade paths |
+| v0.3.26 | Released | Annual Application Maintenance and Support |
 
 ## Scheduled releases
 
-The scheduled order is dependency-driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances before more paid workflows are added; comparison then uses deterministic captures and profiles; enhanced diagnostics can report across the complete system; and the guided updater closes the remaining in-application update lifecycle.
+The scheduled order is dependency-driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; comparison then uses deterministic captures and profiles; enhanced diagnostics can report across the complete system; and the guided updater closes the remaining in-application update lifecycle.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -269,7 +272,32 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 
 **Completion verification:** All 113 desktop tests and all three PHP commerce contract suites pass. A real Lite key activated the local service and unlocked the paid feature set with a one-listener allowance. Trial, Lite, Pro, and Enterprise Settings plus desktop/mobile pricing rendered with the expected 1/1/2/15 allowances and no browser-console failures. The all-in-one v0.3.25 installer passed release packaging checks, and an installed v0.3.24 Enterprise system upgraded to v0.3.25 with the service running, the listener active, and the same customer, email, license ID, and Enterprise status intact.
 
-### v0.3.26 — Receipt comparison and automated validation
+### v0.3.26 — Annual Application Maintenance and Support
+
+**Status:** Released — 2026-07-20
+
+**Purpose:** Keep Lite, Pro, and Enterprise licenses permanent while providing a clear, optional way to fund ongoing application updates, upgrades, and assisted technical support.
+
+**Released scope:**
+
+- Keep every paid software license as a **one-time purchase**. POS Printer Emulator is not converted into a subscription, and the purchased application plus all features already unlocked continue working permanently.
+- Include **one year of Application Maintenance and Support** with every new Lite, Pro, or Enterprise purchase, measured from the license purchase date.
+- Cover application updates and upgrades, assisted technical support, and access to **Settings → Check for Updates** while maintenance is active.
+- After coverage expires, keep the installed application, local receipt history, listener allowance, and every existing licensed feature working. Disable assisted support and update checking/downloads until maintenance is renewed.
+- Keep local troubleshooting information, health checks, activation diagnostics, and privacy-safe log export available even when maintenance is expired so customers are never blocked from diagnosing activation or local operation.
+- Offer optional, non-recurring, one-time annual renewals at **Lite $9.99**, **Pro $19.99**, and **Enterprise $59.99**. Do not create automatic billing or a PayPal subscription agreement.
+- Add 12 months to the existing maintenance expiration date when a customer renews early. When coverage has already expired, begin the renewed 12-month period on the confirmed payment date.
+- Restore update and assisted-support access immediately after a successful renewal. A renewed customer can obtain the current eligible release and every new release published during the renewed coverage period without replacing the permanent license.
+- Grandfather every paid license issued before this release with maintenance through **2027-07-19**, preventing an existing customer from unexpectedly losing update or support access.
+- Show active, expiring, expired, and renewed maintenance status plus the coverage end date in the application, purchase flow, renewal flow, Admin Portal, license records, and customer-facing documentation.
+- Preserve offline receipt emulation when the entitlement service is temporarily unavailable, while using signed or cached maintenance proof to protect update downloads and assisted-support access.
+- Add authorization, date-boundary, renewal, grandfathering, upgrade, downgrade, payment-verification, and installed-upgrade regression coverage.
+
+**Complete when:** New paid purchases receive exactly 12 months of maintenance; existing paid licenses receive coverage through 2027-07-19; permanent licensed functionality remains usable after expiration; update checking/downloads and assisted support follow the maintenance state; local diagnostics remain available; early and lapsed renewals calculate their dates correctly; renewal payments are one-time transactions; and automated plus installed-upgrade tests pass before the release is marked public.
+
+**Completion verification:** All 138 desktop tests, all PHP commerce/database/site contracts, 39-file PHP lint, TypeScript and JavaScript validation, 16-page SEO validation, release-manifest synchronization, bundled SQLite verification, and repository diff checks pass. Browser QA rendered the policy page and renewal checkout at desktop/mobile sizes, switched all three renewal tiers at $9.99/$19.99/$59.99, and showed no console errors. Isolated live-app QA confirmed that an expired Lite license retains its paid features, update checks return HTTP 403, diagnostics return HTTP 200 without an activation key, and a renewed Lite license immediately restores update access. The all-in-one v0.3.26 installer and SHA-256 checksum passed packaging checks. An installed v0.3.25 Enterprise system upgraded to v0.3.26 with installer exit code 0 while preserving its paid tier, customer registration, license ID, and listener allowance; maintenance loaded as Active with the grandfathered expiration present.
+
+### v0.3.27 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -288,7 +316,7 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.27 — Enhanced support package and connection diagnostics
+### v0.3.28 — Enhanced support package and connection diagnostics
 
 **Status:** Planned
 
@@ -307,7 +335,7 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 
 **Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
-### v0.3.28 — Guided update installation and restart
+### v0.3.29 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -335,7 +363,7 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.28.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.29.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 

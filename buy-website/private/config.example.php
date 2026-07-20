@@ -11,6 +11,15 @@ return [
         'enterprise_price' => '0.00', // The Admin Portal can override this value.
         'currency' => 'USD',
     ],
+    'maintenance' => [
+        'lite_price' => '9.99', // Optional one-time annual renewal; editable in the Admin Portal.
+        'pro_price' => '19.99',
+        'enterprise_price' => '59.99',
+        'base_url' => 'https://admin.posprinteremulator.com',
+        // Use a unique random token dedicated to Buy -> Admin maintenance calls.
+        // It must be different from admin_api_token below.
+        'api_token' => 'REPLACE_WITH_DISTINCT_MAINTENANCE_SERVICE_TOKEN',
+    ],
     'paypal' => [
         'client_id' => 'REPLACE_WITH_PAYPAL_CLIENT_ID',
         'secret' => 'REPLACE_WITH_PAYPAL_SECRET',

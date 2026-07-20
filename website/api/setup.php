@@ -115,6 +115,39 @@ try {
     foreach ($statements as $statement) {
         $pdo->exec($statement);
     }
+    $installationColumns=[];
+    foreach($pdo->query('SHOW COLUMNS FROM installations')->fetchAll() as $column){
+        $installationColumns[(string)$column['Field']]=true;
+    }
+    if(!isset($installationColumns['maintenance_status'])){
+        $pdo->exec("ALTER TABLE installations ADD COLUMN maintenance_status ENUM('NotApplicable','Active','Expired','Revoked') NOT NULL DEFAULT 'NotApplicable' AFTER license_id");
+    }else{
+        $maintenanceStatusColumn=$pdo->query("SHOW COLUMNS FROM installations LIKE 'maintenance_status'")->fetch();
+        if($maintenanceStatusColumn&&!str_contains((string)$maintenanceStatusColumn['Type'],"'Revoked'")){
+            $pdo->exec("ALTER TABLE installations MODIFY maintenance_status ENUM('NotApplicable','Active','Expired','Revoked') NOT NULL DEFAULT 'NotApplicable'");
+        }
+    }
+    if(!isset($installationColumns['maintenance_expires_at'])){
+        $pdo->exec('ALTER TABLE installations ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER maintenance_status');
+    }
+    $licenseColumns=[];
+    foreach($pdo->query('SHOW COLUMNS FROM issued_licenses')->fetchAll() as $column){
+        $licenseColumns[(string)$column['Field']]=true;
+    }
+    if(!isset($licenseColumns['maintenance_expires_at'])){
+        $pdo->exec('ALTER TABLE issued_licenses ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER source_reference');
+    }
+    if(!isset($licenseColumns['maintenance_revoked_at'])){
+        $pdo->exec('ALTER TABLE issued_licenses ADD COLUMN maintenance_revoked_at DATETIME(6) NULL AFTER maintenance_expires_at');
+    }
+    $pdo->exec("UPDATE issued_licenses SET maintenance_expires_at='2027-07-19 23:59:59.000000' WHERE maintenance_expires_at IS NULL");
+    $pdo->exec(
+        "INSERT IGNORE INTO license_maintenance_events
+            (license_id,event_type,new_expires_at,source_reference,reason,performed_by,created_at)
+         SELECT license_id,'LEGACY_GRANDFATHERED',maintenance_expires_at,CONCAT('grandfather:',license_id),
+                'Existing paid license granted maintenance through July 19, 2027.','schema-migration',UTC_TIMESTAMP(6)
+         FROM issued_licenses WHERE maintenance_expires_at='2027-07-19 23:59:59.000000'"
+    );
     json_response(['ok' => true, 'statements' => count($statements)]);
 } catch (InvalidArgumentException|JsonException $exception) {
     json_response(['error' => $exception->getMessage()], 400);
