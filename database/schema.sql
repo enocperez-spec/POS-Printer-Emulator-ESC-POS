@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS installations (
     app_version VARCHAR(32) NOT NULL,
     license_mode ENUM('Trial', 'Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Trial',
     license_id CHAR(36) NULL,
+    maintenance_status ENUM('NotApplicable', 'Active', 'Expired', 'Revoked') NOT NULL DEFAULT 'NotApplicable',
+    maintenance_expires_at DATETIME(6) NULL,
     first_seen_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_seen_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_launch_at DATETIME(6) NULL,
@@ -53,6 +55,8 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     superseded_by_license_id CHAR(36) NULL,
     license_source ENUM('Manual', 'Purchase') NOT NULL DEFAULT 'Manual',
     source_reference VARCHAR(64) NULL,
+    maintenance_expires_at DATETIME(6) NULL,
+    maintenance_revoked_at DATETIME(6) NULL,
     row_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -63,6 +67,31 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     KEY ix_issued_licenses_revoked_at (revoked_at),
     KEY ix_issued_licenses_control_state (control_state),
     KEY ix_issued_licenses_source_reference (source_reference)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS license_maintenance_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    license_id CHAR(36) NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    previous_expires_at DATETIME(6) NULL,
+    new_expires_at DATETIME(6) NULL,
+    source_reference VARCHAR(80) NULL,
+    reason VARCHAR(500) NULL,
+    performed_by VARCHAR(80) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_license_maintenance_source (license_id, source_reference),
+    KEY ix_license_maintenance_license (license_id),
+    KEY ix_license_maintenance_created (created_at),
+    KEY ix_license_maintenance_event (event_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS maintenance_refresh_rate_limits (
+    bucket_hash BINARY(32) NOT NULL,
+    hits INT UNSIGNED NOT NULL,
+    reset_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (bucket_hash),
+    KEY ix_maintenance_rate_reset (reset_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS issued_license_events (
@@ -169,9 +198,10 @@ VALUES
     ('v0.3.23', 'v0.3.23', 'Release', 'Activation and Printer Setup Wizard fixes', 'Released', 323, 'Correct High-severity Enterprise activation and Windows printer installation failures.', 'Resilient Enterprise activation and storage recovery; safe malformed-key handling; unique temporary persistence; native Windows AddPrinter queue creation; retained Epson driver, TCP/IP port, verification, rollback, and error reporting; automated and installed Windows verification.', 'Core activation and printer setup must be reliable before the next feature release.', 'Valid Enterprise activation avoids HTTP 500, the wizard creates the Epson queue on 127.0.0.1:9100 without Invalid parameter, the Test Receipt sends successfully, and all 83 tests pass.', '2026-07-19 00:00:00.000000'),
     ('v0.3.24', 'v0.3.24', 'Release', 'Upgrade licensing and Printer Setup safeguards', 'Released', 324, 'Preserve paid licensing through updates and prevent Windows printer-port conflicts.', 'Matched registration and activation recovery; hardened-folder ACL repair; license-aware post-update health; Trial-safe activation diagnostics; sequential Windows port selection; automatic Enterprise listener alignment; repeated conflict checks; rollback; installed validation.', 'Upgrade and printer setup reliability must be restored before the next feature release.', 'Paid activation survives upgrade and maintenance reinstall, Trial can export activation diagnostics, a second Enterprise printer receives a test job on the first free port, and all 105 tests pass.', '2026-07-19 00:00:00.000000'),
     ('v0.3.25', 'v0.3.25', 'Release', 'Four-tier licensing and upgrade paths', 'Released', 325, 'Add an affordable Lite license while preserving every existing Pro and Enterprise activation key and purchase record.', 'Trial, Lite, Pro, and Enterprise licensing; Lite activation tier byte 3 with legacy key compatibility; Lite $24.99 server-controlled pricing; tier-targeted purchase links; PayPal fulfillment and email; Admin Portal issuance, replacement, Trial upgrade, audits, and purchase synchronization; Lite single-listener access, Pro capacity up to two listeners, and Enterprise capacity up to fifteen.', 'The commercial and activation contracts must stay aligned before Lite keys are sold or upgraded.', 'Existing Pro and Enterprise keys remain valid, a Lite purchase completes through activation and telemetry, all three paid tiers can be issued or replaced safely, targeted purchase links preselect the requested tier, and automated licensing and commerce tests pass.', '2026-07-19 00:00:00.000000'),
-    ('v0.3.26', 'v0.3.26', 'Release', 'Receipt comparison and automated validation', 'Next', 326, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Deterministic captures and profiles are required for meaningful comparisons.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-    ('v0.3.27', 'v0.3.27', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 327, 'Guide nontechnical customers through connection problems and support collection.', 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.', 'Diagnostics should understand the completed listener, profile, capture, and comparison system.', 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
-    ('v0.3.28', 'v0.3.28', 'Release', 'Guided update installation and restart', 'Planned', 328, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+    ('v0.3.26', 'v0.3.26', 'Release', 'Annual Application Maintenance and Support', 'Released', 326, 'Keep permanent-license ownership separate from optional annual updates and technical support.', 'One included year for new paid licenses; existing-license grandfathering through July 19, 2027; optional one-time Lite $9.99, Pro $19.99, and Enterprise $59.99 renewals; signed entitlement refresh; server-verified PayPal renewal orders; Admin pricing, status, history, extension, and revocation controls; telemetry without keys or receipt data.', 'Maintenance must be implemented before future releases are delivered under the coverage policy.', 'Permanent paid features keep working after coverage ends, early and lapsed renewals calculate correctly and idempotently, only covered customers receive signed update entitlements, and commerce, licensing, migration, and telemetry tests pass.', '2026-07-20 00:00:00.000000'),
+    ('v0.3.27', 'v0.3.27', 'Release', 'Receipt comparison and automated validation', 'Next', 327, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Deterministic captures and profiles are required for meaningful comparisons.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
+    ('v0.3.28', 'v0.3.28', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 328, 'Guide nontechnical customers through connection problems and support collection.', 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.', 'Diagnostics should understand the completed listener, profile, capture, and comparison system.', 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
+    ('v0.3.29', 'v0.3.29', 'Release', 'Guided update installation and restart', 'Planned', 329, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
@@ -232,35 +262,45 @@ SET title = 'Four-tier licensing and upgrade paths',
 WHERE item_key = 'v0.3.25';
 
 UPDATE development_roadmap
-SET version_label = 'v0.3.26', title = 'Receipt comparison and automated validation', status = 'Next', priority_rank = 326,
+SET version_label = 'v0.3.26', title = 'Annual Application Maintenance and Support', status = 'Released', priority_rank = 326,
+    purpose = 'Keep permanent-license ownership separate from optional annual updates and technical support.',
+    planned_scope = 'One included year for new paid licenses; existing-license grandfathering through July 19, 2027; optional one-time Lite $9.99, Pro $19.99, and Enterprise $59.99 renewals; signed entitlement refresh; server-verified PayPal renewal orders; Admin pricing, status, history, extension, and revocation controls; telemetry without keys or receipt data.',
+    priority_reason = 'Maintenance must be implemented before future releases are delivered under the coverage policy.',
+    completion_criteria = 'Permanent paid features keep working after coverage ends, early and lapsed renewals calculate correctly and idempotently, only covered customers receive signed update entitlements, and commerce, licensing, migration, and telemetry tests pass.',
+    completed_at = COALESCE(completed_at, '2026-07-20 00:00:00.000000')
+WHERE item_key = 'v0.3.26';
+
+UPDATE development_roadmap
+SET version_label = 'v0.3.27', title = 'Receipt comparison and automated validation', status = 'Next', priority_rank = 327,
     purpose = 'Provide repeatable compatibility and regression testing.',
     planned_scope = 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
     priority_reason = 'Deterministic captures and profiles are required for meaningful comparisons.',
     completion_criteria = 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.',
     completed_at = NULL
-WHERE item_key = 'v0.3.26';
+WHERE item_key = 'v0.3.27';
 
 UPDATE development_roadmap
-SET version_label = 'v0.3.27', title = 'Enhanced support and connection diagnostics', status = 'Planned', priority_rank = 327,
+SET version_label = 'v0.3.28', title = 'Enhanced support and connection diagnostics', status = 'Planned', priority_rank = 328,
     purpose = 'Guide nontechnical customers through connection problems and support collection.',
     planned_scope = 'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
     priority_reason = 'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
     completion_criteria = 'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.',
     completed_at = NULL
-WHERE item_key = 'v0.3.27';
-
-UPDATE development_roadmap
-SET version_label = 'v0.3.28', title = 'Guided update installation and restart', status = 'Planned', priority_rank = 328,
-    purpose = 'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
-    planned_scope = 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
-    priority_reason = 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
-    completion_criteria = 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.',
-    completed_at = NULL
 WHERE item_key = 'v0.3.28';
+
+INSERT INTO development_roadmap
+    (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
+VALUES
+    ('v0.3.29','v0.3.29','Release','Guided update installation and restart','Planned',329,
+     'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
+     'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
+     'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
+     'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.')
+ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),title=VALUES(title),status=VALUES(status),priority_rank=VALUES(priority_rank),purpose=VALUES(purpose),planned_scope=VALUES(planned_scope),priority_reason=VALUES(priority_reason),completion_criteria=VALUES(completion_criteria),completed_at=NULL;
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
-WHERE item_key = 'v0.3.28' AND (github_url IS NULL OR github_url = '');
+WHERE item_key = 'v0.3.29' AND (github_url IS NULL OR github_url = '');
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
@@ -296,7 +336,23 @@ VALUES
     ('BUG-009', 'Enterprise activation returned HTTP 500 during optional storage initialization', 'High', 'Released', 'v0.3.22', 'v0.3.23', 'v0.3.23', 'Customers with a valid Enterprise key could not complete activation.', 'A valid signed key should unlock Enterprise immediately and optional storage recovery should be reported separately.', 'Paid-history or listener storage initialization could throw after signature validation and turn activation into HTTP 500.', 'Validate a signed Enterprise key while forcing optional storage initialization to fail.', 'Activation succeeds, malformed keys fail safely, forced storage-failure regression tests pass, and all 83 tests pass.', UTC_TIMESTAMP(6)),
     ('BUG-010', 'Printer Setup Wizard failed with Invalid parameter while creating queue', 'High', 'Released', 'v0.3.22 and earlier wizard implementation', 'v0.3.23', 'v0.3.23', 'Customers could not finish automated Windows printer installation.', 'The wizard should create the Epson queue and RAW TCP/IP port without manual Windows configuration.', 'WMI Put attempted to assign the read-only Win32_Printer Name property and raised System.Management.ManagementException.', 'Run the Printer Setup Wizard with the Epson driver installed and select Install Printer.', 'Native AddPrinter regression coverage passes; installed Windows validation created POS Printer Emulator with EPSON TM-T88V Receipt5 on 127.0.0.1:9100 and sent the wizard Test Receipt.', UTC_TIMESTAMP(6)),
     ('BUG-011', 'Upgrade could lose paid activation and fail to save the license', 'High', 'Released', 'v0.3.23', 'v0.3.24', 'v0.3.24', 'Updating could leave a paid installation in Trial and prevent reactivation.', 'Registration and activation must survive updates as one validated pair.', 'Hardened data permissions and partial persistence could hide or reject the saved paid license.', 'Upgrade a registered paid v0.3.23 installation over protected application-data files.', 'All 105 tests pass; installed Enterprise upgrade and maintenance-reinstall tests preserve registration and activation without re-entry.', UTC_TIMESTAMP(6)),
-    ('BUG-012', 'Printer Setup Wizard could reuse an assigned TCP/IP port', 'Medium', 'Released', 'v0.3.23 and earlier', 'v0.3.24', 'v0.3.24', 'A second Windows printer could be assigned a conflicting endpoint.', 'The wizard should select the first free port and keep the matching emulator listener available.', 'Port 9100 could be reused without a complete conflict check.', 'Install a differently named printer while an existing queue already uses port 9100.', 'All 105 tests pass; installed Enterprise validation selected 9101, aligned its listener, delivered a 112-byte test job, and selected 9102 next.', UTC_TIMESTAMP(6));
+    ('BUG-012', 'Printer Setup Wizard could reuse an assigned TCP/IP port', 'Medium', 'Released', 'v0.3.23 and earlier', 'v0.3.24', 'v0.3.24', 'A second Windows printer could be assigned a conflicting endpoint.', 'The wizard should select the first free port and keep the matching emulator listener available.', 'Port 9100 could be reused without a complete conflict check.', 'Install a differently named printer while an existing queue already uses port 9100.', 'All 105 tests pass; installed Enterprise validation selected 9101, aligned its listener, delivered a 112-byte test job, and selected 9102 next.', UTC_TIMESTAMP(6)),
+    ('BUG-013', 'Support diagnostics failed when Stored Logos directory was absent', 'Medium', 'Released', 'v0.3.26 development build', 'v0.3.26', 'v0.3.26', 'Customers could not save the always-available privacy-safe diagnostic file when optional logo storage had not been created or had been removed.', 'Diagnostics should treat optional Stored Logos storage as empty and remain available regardless of maintenance state.', 'Diagnostic export enumerated a missing optional directory and returned HTTP 500.', 'Remove or omit the Stored Logos directory, then download diagnostics from Settings Support or Activation Diagnostics.', 'Missing logo storage is treated as empty, imports recreate it safely, six Stored Graphic tests pass, and live expired-maintenance verification returns the diagnostic file with HTTP 200 while update checks remain HTTP 403.', '2026-07-20 00:00:00.000000');
+
+UPDATE development_bugs
+SET title = 'Support diagnostics failed when Stored Logos directory was absent',
+    severity = 'Medium',
+    status = 'Released',
+    affected_versions = 'v0.3.26 development build',
+    target_release = 'v0.3.26',
+    fixed_version = 'v0.3.26',
+    customer_impact = 'Customers could not save the always-available privacy-safe diagnostic file when optional logo storage had not been created or had been removed.',
+    expected_behavior = 'Diagnostics should treat optional Stored Logos storage as empty and remain available regardless of maintenance state.',
+    actual_behavior = 'Diagnostic export enumerated a missing optional directory and returned HTTP 500.',
+    reproduction_steps = 'Remove or omit the Stored Logos directory, then download diagnostics from Settings Support or Activation Diagnostics.',
+    verification = 'Missing logo storage is treated as empty, imports recreate it safely, six Stored Graphic tests pass, and live expired-maintenance verification returns the diagnostic file with HTTP 200 while update checks remain HTTP 403.',
+    resolved_at = COALESCE(resolved_at, '2026-07-20 00:00:00.000000')
+WHERE bug_key = 'BUG-013';
 
 UPDATE development_bugs
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/8'

@@ -31,6 +31,15 @@ export type LicenseStatus = {
   customerName: string
   emailAddress: string
   licenseId?: string
+  maintenance: {
+    isApplicable: boolean
+    isActive: boolean
+    isGrandfathered: boolean
+    expiresAt?: string
+    state: 'NotApplicable' | 'Active' | 'Expired' | 'Revoked'
+    renewalUrl?: string
+    message: string
+  }
   features: FeatureStatus
 }
 
@@ -98,6 +107,17 @@ export type ActivationRequest = {
   customerName: string
   emailAddress: string
   activationKey: string
+}
+
+export type MaintenanceEntitlementRequest = {
+  entitlementToken: string
+}
+
+export type MaintenanceRefreshResult = {
+  license: LicenseStatus
+  updated: boolean
+  remoteStatus: 'active' | 'expired' | 'revoked' | 'not_found'
+  message: string
 }
 
 export type UpdateStatus = {

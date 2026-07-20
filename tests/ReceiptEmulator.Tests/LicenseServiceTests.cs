@@ -3,6 +3,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using POSPrinterEmulator.Licensing;
 using System.Security.Cryptography;
+using System.Buffers.Binary;
+using System.Text;
+using System.Text.Json;
 
 namespace ReceiptEmulator.Tests;
 
@@ -34,6 +37,9 @@ public sealed class LicenseServiceTests
         Assert.False(service.HasEnterpriseAccess);
         Assert.False(status.IsPaid);
         Assert.False(service.HasPaidAccess);
+        Assert.False(service.HasMaintenanceAccess);
+        Assert.False(status.Maintenance.IsApplicable);
+        Assert.Equal("NotApplicable", status.Maintenance.State);
         Assert.Equal(1, status.MaximumListeners);
     }
 
@@ -74,7 +80,266 @@ public sealed class LicenseServiceTests
         Assert.True(status.Features.PrinterProfiles);
         Assert.True(status.Features.Updates);
         Assert.True(status.Features.Support);
+        Assert.True(status.Maintenance.IsActive);
+        Assert.NotNull(status.Maintenance.ExpiresAt);
         Assert.Equal(-1, status.Remaining);
+    }
+
+    [Fact]
+    public void VersionTwoPaidLicenseIsGrandfatheredThroughJulyNineteenth2027()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var now = new DateTimeOffset(2027, 7, 19, 20, 0, 0, TimeSpan.Zero);
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var activationKey = IssueVersionTwoKey(
+            vendorKey,
+            "Grandfathered Customer",
+            "grandfathered@example.com",
+            LicenseTier.Pro,
+            new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero));
+
+        var active = service.Activate(
+            "Grandfathered Customer",
+            "grandfathered@example.com",
+            activationKey);
+
+        Assert.True(active.Maintenance.IsActive);
+        Assert.True(active.Maintenance.IsGrandfathered);
+        Assert.Equal(LicenseService.GrandfatheredMaintenanceExpiresAt, active.Maintenance.ExpiresAt);
+        Assert.True(active.Features.Updates);
+        Assert.True(active.Features.Support);
+
+        now = new DateTimeOffset(2027, 7, 20, 0, 0, 0, TimeSpan.Zero);
+        var expired = service.GetStatus();
+
+        Assert.False(expired.Maintenance.IsActive);
+        Assert.Equal("Expired", expired.Maintenance.State);
+        Assert.False(expired.Features.Updates);
+        Assert.False(expired.Features.Support);
+        Assert.True(expired.Features.History);
+        Assert.True(expired.Features.Exports);
+        Assert.True(expired.Features.PremiumFeatures);
+        Assert.Equal(2, expired.MaximumListeners);
+        Assert.True(service.HasPaidAccess);
+    }
+
+    [Fact]
+    public void ExpiredMaintenanceDoesNotDisablePermanentPaidFeatures()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var issuedAt = new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var service = new LicenseService(
+            new TestEnvironment(),
+            configuration,
+            () => issuedAt.AddYears(2));
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Permanent Customer",
+            "permanent@example.com",
+            LicenseTier.Lite,
+            issuedAt,
+            issuedAt.AddYears(1));
+
+        var status = service.Activate("Permanent Customer", "permanent@example.com", activationKey);
+
+        Assert.True(status.IsPaid);
+        Assert.False(status.Maintenance.IsActive);
+        Assert.False(service.HasMaintenanceAccess);
+        Assert.False(status.Features.Updates);
+        Assert.False(status.Features.Support);
+        Assert.True(status.Features.History);
+        Assert.True(status.Features.Exports);
+        Assert.True(status.Features.PremiumFeatures);
+        Assert.True(status.Features.StoredLogos);
+        Assert.True(status.Features.PrinterState);
+        Assert.True(status.Features.PrinterProfiles);
+        Assert.False(status.Features.Watermark);
+    }
+
+    [Fact]
+    public void SignedRenewalRestoresMaintenanceWithoutChangingThePermanentLicense()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var issuedAt = new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var now = issuedAt.AddYears(2);
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Renewal Customer",
+            "renewal@example.com",
+            LicenseTier.Enterprise,
+            issuedAt,
+            issuedAt.AddYears(1));
+        var activated = service.Activate("Renewal Customer", "renewal@example.com", activationKey);
+        var renewedThrough = now.AddYears(1);
+        var renewalToken = MaintenanceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            activated.LicenseId!.Value,
+            LicenseTier.Enterprise,
+            now,
+            renewedThrough);
+
+        var renewed = service.InstallMaintenanceEntitlement(renewalToken);
+        var reloaded = new LicenseService(new TestEnvironment(), configuration, () => now).GetStatus();
+
+        Assert.True(renewed.Maintenance.IsActive);
+        Assert.Equal(renewedThrough, renewed.Maintenance.ExpiresAt);
+        Assert.True(renewed.Features.Updates);
+        Assert.True(renewed.Features.Support);
+        Assert.Equal("Enterprise", renewed.Mode);
+        Assert.Equal(15, renewed.MaximumListeners);
+        Assert.Equal(activated.LicenseId, renewed.LicenseId);
+        Assert.Equal(renewed.Maintenance, reloaded.Maintenance);
+        Assert.True(File.Exists(Path.Combine(root, "maintenance.json")));
+
+        var reapplied = service.InstallMaintenanceEntitlement(renewalToken);
+        Assert.Equal(renewed.Maintenance, reapplied.Maintenance);
+    }
+
+    [Fact]
+    public void RenewalMustMatchTheActiveLicenseIdAndTier()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var issuedAt = new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var now = issuedAt.AddYears(2);
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Bound Customer",
+            "bound@example.com",
+            LicenseTier.Pro,
+            issuedAt,
+            issuedAt.AddYears(1));
+        service.Activate("Bound Customer", "bound@example.com", activationKey);
+        var wrongLicense = MaintenanceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            Guid.NewGuid(),
+            LicenseTier.Pro,
+            now,
+            now.AddYears(1));
+        var wrongTier = MaintenanceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            service.GetStatus().LicenseId!.Value,
+            LicenseTier.Enterprise,
+            now,
+            now.AddYears(1));
+
+        Assert.Contains("different license", Assert.Throws<InvalidOperationException>(() =>
+            service.InstallMaintenanceEntitlement(wrongLicense)).Message);
+        Assert.Contains("different license", Assert.Throws<InvalidOperationException>(() =>
+            service.InstallMaintenanceEntitlement(wrongTier)).Message);
+        Assert.False(File.Exists(Path.Combine(root, "maintenance.json")));
+    }
+
+    [Fact]
+    public void RenewalCannotShortenExistingMaintenanceCoverage()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var issuedAt = new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var now = issuedAt.AddMonths(1);
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Coverage Customer",
+            "coverage@example.com",
+            LicenseTier.Lite,
+            issuedAt,
+            issuedAt.AddYears(1));
+        var license = service.Activate("Coverage Customer", "coverage@example.com", activationKey);
+        var shorterToken = MaintenanceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            license.LicenseId!.Value,
+            LicenseTier.Lite,
+            now,
+            issuedAt.AddMonths(6));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            service.InstallMaintenanceEntitlement(shorterToken));
+
+        Assert.Contains("does not extend", exception.Message);
+        Assert.Equal(issuedAt.AddYears(1), service.GetStatus().Maintenance.ExpiresAt);
+    }
+
+    [Fact]
+    public void MaintenanceFileFromTheOriginalTokenOnlySchemaStillLoads()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var issuedAt = new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var now = issuedAt.AddYears(2);
+        var firstRun = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Schema Customer",
+            "schema@example.com",
+            LicenseTier.Pro,
+            issuedAt,
+            issuedAt.AddYears(1));
+        var activated = firstRun.Activate("Schema Customer", "schema@example.com", activationKey);
+        var token = MaintenanceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            activated.LicenseId!.Value,
+            LicenseTier.Pro,
+            now.AddMinutes(-1),
+            now.AddYears(1));
+        File.WriteAllText(
+            Path.Combine(root, "maintenance.json"),
+            JsonSerializer.Serialize(new { EntitlementToken = token, InstalledAt = now }));
+
+        var reloaded = new LicenseService(new TestEnvironment(), configuration, () => now).GetStatus();
+
+        Assert.True(reloaded.Maintenance.IsActive);
+        Assert.Equal(now.AddYears(1), reloaded.Maintenance.ExpiresAt);
+    }
+
+    [Fact]
+    public void MaintenanceStatusFromAnOldLicenseDoesNotDisableAReplacementLicense()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var now = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var firstKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Replacement Customer",
+            "replacement@example.com",
+            LicenseTier.Pro,
+            now.AddDays(-10),
+            now.AddYears(1));
+        var first = service.Activate("Replacement Customer", "replacement@example.com", firstKey);
+        service.RecordMaintenanceUnavailable("revoked", null);
+        Assert.False(service.GetStatus().Maintenance.IsActive);
+
+        var replacementKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Replacement Customer",
+            "replacement@example.com",
+            LicenseTier.Enterprise,
+            now,
+            now.AddYears(1));
+        var replacement = service.Activate(
+            "Replacement Customer",
+            "replacement@example.com",
+            replacementKey);
+
+        Assert.NotEqual(first.LicenseId, replacement.LicenseId);
+        Assert.Equal("Enterprise", replacement.Mode);
+        Assert.True(replacement.Maintenance.IsActive);
+        Assert.Equal("Active", replacement.Maintenance.State);
+        Assert.True(replacement.Features.Updates);
+        Assert.False(File.Exists(Path.Combine(root, "maintenance.json")));
     }
 
     [Fact]
@@ -116,6 +381,61 @@ public sealed class LicenseServiceTests
         Assert.True(activated.IsEnterprise);
         Assert.True(afterUpgrade.GetStatus().IsEnterprise);
         Assert.True(afterUpgrade.HasProAccess);
+    }
+
+    [Fact]
+    public void VersionThreeUnicodeRegistrationRemainsValidAfterReload()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var issuedAt = new DateTimeOffset(2026, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "José   Café",
+            "JOSÉ@EXAMPLE.COM",
+            LicenseTier.Lite,
+            issuedAt,
+            issuedAt.AddYears(1));
+
+        new LicenseService(new TestEnvironment(), configuration).Activate(
+            "José   Café",
+            "JOSÉ@EXAMPLE.COM",
+            activationKey);
+        var reloaded = new LicenseService(new TestEnvironment(), configuration).GetStatus();
+
+        Assert.Equal("Lite", reloaded.Mode);
+        Assert.Equal("José Café", reloaded.CustomerName);
+        Assert.Equal("josÉ@example.com", reloaded.EmailAddress);
+        Assert.True(reloaded.IsPaid);
+    }
+
+    [Fact]
+    public void TierReplacementWithPastMaintenanceStillActivatesPermanentFeatures()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var now = new DateTimeOffset(2028, 7, 20, 12, 0, 0, TimeSpan.Zero);
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        var replacementKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Tier Replacement",
+            "replacement@example.com",
+            LicenseTier.Enterprise,
+            now,
+            now.AddYears(-1));
+
+        var status = service.Activate("Tier Replacement", "replacement@example.com", replacementKey);
+
+        Assert.Equal("Enterprise", status.Mode);
+        Assert.True(status.IsPaid);
+        Assert.True(status.Features.History);
+        Assert.True(status.Features.PremiumFeatures);
+        Assert.Equal(15, status.MaximumListeners);
+        Assert.False(status.Maintenance.IsActive);
+        Assert.False(status.Features.Updates);
+        Assert.False(status.Features.Support);
     }
 
     [Fact]
@@ -307,5 +627,44 @@ public sealed class LicenseServiceTests
         public string ApplicationName { get; set; } = "ReceiptEmulator.Tests";
         public string ContentRootPath { get; set; } = Path.GetTempPath();
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static string NewRoot() =>
+        Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+
+    private static IConfiguration Configuration(string root, ECDsa vendorKey) =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Data:Root"] = root,
+            ["Licensing:PublicKeyPem"] = vendorKey.ExportSubjectPublicKeyInfoPem()
+        }).Build();
+
+    private static string IssueVersionTwoKey(
+        ECDsa vendorKey,
+        string customerName,
+        string emailAddress,
+        LicenseTier tier,
+        DateTimeOffset issuedAt)
+    {
+        var payload = new byte[58];
+        payload[0] = 2;
+        Guid.NewGuid().TryWriteBytes(payload.AsSpan(1, 16));
+        BinaryPrimitives.WriteInt64BigEndian(payload.AsSpan(17, 8), issuedAt.ToUnixTimeSeconds());
+
+        static byte[] RegistrationHash(string value)
+        {
+            var normalized = string.Join(' ', value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+            return SHA256.HashData(Encoding.UTF8.GetBytes(normalized)).AsSpan(0, 16).ToArray();
+        }
+
+        RegistrationHash(customerName).CopyTo(payload, 25);
+        RegistrationHash(emailAddress.ToLowerInvariant()).CopyTo(payload, 41);
+        payload[57] = (byte)tier;
+        var signature = vendorKey.SignData(
+            payload,
+            HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        return "PPE1-" + Convert.ToBase64String(payload.Concat(signature).ToArray())
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }

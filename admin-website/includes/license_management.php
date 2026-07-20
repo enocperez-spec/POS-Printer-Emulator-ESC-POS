@@ -7,11 +7,27 @@ function ensure_license_management_schema(PDO $pdo): void
     if ($ready) {
         return;
     }
-    $lock = $pdo->query("SELECT GET_LOCK('ppe_license_management_schema_v1', 10)")->fetchColumn();
+    $lock = $pdo->query("SELECT GET_LOCK('ppe_license_management_schema_v2', 10)")->fetchColumn();
     if ((int)$lock !== 1) {
         throw new RuntimeException('The License Manager database upgrade is busy. Try again shortly.');
     }
     try {
+        $installationColumns = [];
+        foreach ($pdo->query('SHOW COLUMNS FROM installations')->fetchAll() as $column) {
+            $installationColumns[(string)$column['Field']] = true;
+        }
+        if (!isset($installationColumns['maintenance_status'])) {
+            $pdo->exec("ALTER TABLE installations ADD COLUMN maintenance_status ENUM('NotApplicable', 'Active', 'Expired', 'Revoked') NOT NULL DEFAULT 'NotApplicable' AFTER license_id");
+        } else {
+            $maintenanceStatusColumn = $pdo->query("SHOW COLUMNS FROM installations LIKE 'maintenance_status'")->fetch();
+            if ($maintenanceStatusColumn && !str_contains((string)$maintenanceStatusColumn['Type'], "'Revoked'")) {
+                $pdo->exec("ALTER TABLE installations MODIFY maintenance_status ENUM('NotApplicable', 'Active', 'Expired', 'Revoked') NOT NULL DEFAULT 'NotApplicable'");
+            }
+        }
+        if (!isset($installationColumns['maintenance_expires_at'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER maintenance_status');
+        }
+
         $columns = [];
         foreach ($pdo->query('SHOW COLUMNS FROM issued_licenses')->fetchAll() as $column) {
             $columns[(string)$column['Field']] = true;
@@ -24,7 +40,9 @@ function ensure_license_management_schema(PDO $pdo): void
             'superseded_by_license_id' => 'ALTER TABLE issued_licenses ADD COLUMN superseded_by_license_id CHAR(36) NULL AFTER deleted_at',
             'license_source' => "ALTER TABLE issued_licenses ADD COLUMN license_source ENUM('Manual', 'Purchase') NOT NULL DEFAULT 'Manual' AFTER superseded_by_license_id",
             'source_reference' => 'ALTER TABLE issued_licenses ADD COLUMN source_reference VARCHAR(64) NULL AFTER license_source',
-            'row_version' => 'ALTER TABLE issued_licenses ADD COLUMN row_version BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER source_reference',
+            'maintenance_expires_at' => 'ALTER TABLE issued_licenses ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER source_reference',
+            'maintenance_revoked_at' => 'ALTER TABLE issued_licenses ADD COLUMN maintenance_revoked_at DATETIME(6) NULL AFTER maintenance_expires_at',
+            'row_version' => 'ALTER TABLE issued_licenses ADD COLUMN row_version BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER maintenance_revoked_at',
             'updated_at' => 'ALTER TABLE issued_licenses ADD COLUMN updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) AFTER created_at',
         ];
         foreach ($additions as $name => $statement) {
@@ -71,6 +89,48 @@ function ensure_license_management_schema(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS license_maintenance_events (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                license_id CHAR(36) NOT NULL,
+                event_type VARCHAR(40) NOT NULL,
+                previous_expires_at DATETIME(6) NULL,
+                new_expires_at DATETIME(6) NULL,
+                source_reference VARCHAR(80) NULL,
+                reason VARCHAR(500) NULL,
+                performed_by VARCHAR(80) NOT NULL,
+                created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_license_maintenance_source (license_id, source_reference),
+                KEY ix_license_maintenance_license (license_id),
+                KEY ix_license_maintenance_created (created_at),
+                KEY ix_license_maintenance_event (event_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS maintenance_refresh_rate_limits (
+                bucket_hash BINARY(32) NOT NULL,
+                hits INT UNSIGNED NOT NULL,
+                reset_at DATETIME(6) NOT NULL,
+                PRIMARY KEY (bucket_hash),
+                KEY ix_maintenance_rate_reset (reset_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdo->exec(
+            "UPDATE issued_licenses
+             SET maintenance_expires_at = '2027-07-19 23:59:59.000000'
+             WHERE maintenance_expires_at IS NULL"
+        );
+        $pdo->exec(
+            "INSERT IGNORE INTO license_maintenance_events
+                (license_id, event_type, new_expires_at, source_reference, reason, performed_by, created_at)
+             SELECT license_id, 'LEGACY_GRANDFATHERED', maintenance_expires_at,
+                    CONCAT('grandfather:', license_id),
+                    'Existing paid license granted maintenance through July 19, 2027.',
+                    'schema-migration', UTC_TIMESTAMP(6)
+             FROM issued_licenses
+             WHERE maintenance_expires_at = '2027-07-19 23:59:59.000000'"
+        );
+        $pdo->exec(
             "INSERT INTO issued_license_events
                 (license_id, customer_name, email_address, event_type, new_state, new_tier, reason, performed_by, created_at)
              SELECT l.license_id, l.customer_name, l.email_address, 'LEGACY_IMPORTED', l.control_state,
@@ -82,7 +142,7 @@ function ensure_license_management_schema(PDO $pdo): void
         );
         $ready = true;
     } finally {
-        $pdo->query("SELECT RELEASE_LOCK('ppe_license_management_schema_v1')")->fetchColumn();
+        $pdo->query("SELECT RELEASE_LOCK('ppe_license_management_schema_v2')")->fetchColumn();
     }
 }
 
@@ -110,6 +170,68 @@ function canonical_paid_tier(string $value): string
         throw new InvalidArgumentException('Choose Lite, Pro, or Enterprise.');
     }
     return $value;
+}
+
+function maintenance_registration_digest(string $customerName, string $emailAddress): string
+{
+    $customer = strtoupper(trim(preg_replace('/[ \t\r\n\f\v]+/', ' ', $customerName) ?? '', " \t\r\n\f\v"));
+    $email = strtolower(trim($emailAddress, " \t\r\n\f\v"));
+    return hash('sha256', $customer . "\n" . $email);
+}
+
+function maintenance_status(array $license, ?DateTimeImmutable $now = null): string
+{
+    if (!hash_equals('Enabled', (string)($license['control_state'] ?? '')) ||
+        !empty($license['maintenance_revoked_at'])) {
+        return 'revoked';
+    }
+    $expiresAt = trim((string)($license['maintenance_expires_at'] ?? ''));
+    if ($expiresAt === '') {
+        return 'expired';
+    }
+    $now ??= new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $expiration = new DateTimeImmutable($expiresAt, new DateTimeZone('UTC'));
+    return $expiration >= $now ? 'active' : 'expired';
+}
+
+function calculate_maintenance_renewal_expiration(string $currentExpiresAt, string $capturedAt): string
+{
+    $utc = new DateTimeZone('UTC');
+    try {
+        $current = new DateTimeImmutable($currentExpiresAt, $utc);
+        $captured = new DateTimeImmutable($capturedAt, $utc);
+    } catch (Throwable) {
+        throw new InvalidArgumentException('The maintenance renewal date is invalid.');
+    }
+    $base = $current > $captured ? $current : $captured;
+    return $base->modify('+1 year')->setTimezone($utc)->format('Y-m-d H:i:s');
+}
+
+function record_maintenance_event(
+    PDO $pdo,
+    string $licenseId,
+    string $eventType,
+    string $actor,
+    ?string $previousExpiresAt,
+    ?string $newExpiresAt,
+    ?string $sourceReference = null,
+    ?string $reason = null
+): void {
+    $statement = $pdo->prepare(
+        'INSERT INTO license_maintenance_events
+            (license_id, event_type, previous_expires_at, new_expires_at, source_reference, reason, performed_by)
+         VALUES
+            (:license_id, :event_type, :previous_expires_at, :new_expires_at, :source_reference, :reason, :performed_by)'
+    );
+    $statement->execute([
+        'license_id' => canonical_license_uuid($licenseId),
+        'event_type' => substr($eventType, 0, 40),
+        'previous_expires_at' => $previousExpiresAt,
+        'new_expires_at' => $newExpiresAt,
+        'source_reference' => $sourceReference !== null ? substr($sourceReference, 0, 80) : null,
+        'reason' => $reason !== null ? substr($reason, 0, 500) : null,
+        'performed_by' => substr($actor !== '' ? $actor : 'owner', 0, 80),
+    ]);
 }
 
 function record_license_event(PDO $pdo, array $license, string $eventType, string $actor, array $changes = []): void
@@ -143,7 +265,9 @@ function insert_issued_license(
     string $actor,
     string $source = 'Manual',
     ?string $sourceReference = null,
-    string $eventType = 'ISSUED'
+    string $eventType = 'ISSUED',
+    string $maintenanceEventType = 'INITIAL_INCLUDED',
+    ?string $maintenanceReason = null
 ): void {
     if (!in_array($source, ['Manual', 'Purchase'], true)) {
         throw new InvalidArgumentException('The license source is invalid.');
@@ -151,10 +275,10 @@ function insert_issued_license(
     $statement = $pdo->prepare(
         'INSERT INTO issued_licenses
             (license_id, customer_name, email_address, license_tier, activation_key, issued_at,
-             created_by, control_state, license_source, source_reference)
+             created_by, control_state, license_source, source_reference, maintenance_expires_at)
          VALUES
             (:license_id, :customer_name, :email_address, :license_tier, :activation_key, :issued_at,
-             :created_by, \'Enabled\', :license_source, :source_reference)'
+             :created_by, \'Enabled\', :license_source, :source_reference, :maintenance_expires_at)'
     );
     $statement->execute([
         'license_id' => canonical_license_uuid((string)$issued['license_id']),
@@ -166,11 +290,24 @@ function insert_issued_license(
         'created_by' => substr($actor !== '' ? $actor : 'owner', 0, 80),
         'license_source' => $source,
         'source_reference' => $sourceReference,
+        'maintenance_expires_at' => (string)($issued['maintenance_expires_at'] ??
+            (new DateTimeImmutable((string)$issued['issued_at'], new DateTimeZone('UTC')))->modify('+1 year')->format('Y-m-d H:i:s')),
     ]);
     record_license_event($pdo, $issued, $eventType, $actor, [
         'new_state' => 'Enabled',
         'new_tier' => (string)$issued['license_tier'],
     ]);
+    record_maintenance_event(
+        $pdo,
+        (string)$issued['license_id'],
+        $maintenanceEventType,
+        $actor,
+        null,
+        (string)($issued['maintenance_expires_at'] ??
+            (new DateTimeImmutable((string)$issued['issued_at'], new DateTimeZone('UTC')))->modify('+1 year')->format('Y-m-d H:i:s')),
+        'initial:' . canonical_license_uuid((string)$issued['license_id']),
+        $maintenanceReason ?? 'One year of Application Maintenance and Support included with the permanent license.'
+    );
 }
 
 function find_license_for_update(PDO $pdo, string $licenseId): array
@@ -178,7 +315,7 @@ function find_license_for_update(PDO $pdo, string $licenseId): array
     $statement = $pdo->prepare(
         'SELECT license_id, customer_name, email_address, license_tier, activation_key, issued_at,
                 control_state, deactivated_at, revoked_at, deleted_at, superseded_by_license_id,
-                license_source, source_reference, row_version
+                license_source, source_reference, maintenance_expires_at, maintenance_revoked_at, row_version
          FROM issued_licenses WHERE license_id = :license_id FOR UPDATE'
     );
     $statement->execute(['license_id' => canonical_license_uuid($licenseId)]);
@@ -215,7 +352,10 @@ function manage_issued_license(
     ?string $targetTier = null,
     string $reason = ''
 ): array {
-    if (!in_array($action, ['change_tier', 'deactivate', 'reactivate', 'revoke', 'delete'], true)) {
+    if (!in_array($action, [
+        'change_tier', 'deactivate', 'reactivate', 'revoke', 'delete',
+        'extend_maintenance', 'revoke_maintenance', 'restore_maintenance',
+    ], true)) {
         throw new InvalidArgumentException('The requested license action is invalid.');
     }
     $reason = trim(preg_replace('/\s+/', ' ', $reason) ?? '');
@@ -245,14 +385,24 @@ function manage_issued_license(
             if ($newTier === $tier) {
                 throw new DomainException("This is already a {$tier} license.");
             }
-            $replacement = $keyIssuer((string)$license['customer_name'], (string)$license['email_address'], $newTier);
+            if (!empty($license['maintenance_revoked_at'])) {
+                throw new DomainException('Restore maintenance before changing this license level.');
+            }
+            $replacement = $keyIssuer(
+                (string)$license['customer_name'],
+                (string)$license['email_address'],
+                $newTier,
+                (string)$license['maintenance_expires_at']
+            );
             insert_issued_license(
                 $pdo,
                 $replacement,
                 $actor,
                 (string)$license['license_source'],
                 $license['source_reference'] !== null ? (string)$license['source_reference'] : null,
-                'REPLACEMENT_ISSUED'
+                'REPLACEMENT_ISSUED',
+                'COVERAGE_TRANSFERRED',
+                'Existing Application Maintenance and Support coverage transferred to the replacement license.'
             );
             $update = $pdo->prepare(
                 "UPDATE issued_licenses SET control_state = 'Revoked', revoked_at = UTC_TIMESTAMP(6),
@@ -278,6 +428,55 @@ function manage_issued_license(
             ]);
             $result['issued'] = $replacement;
             $result['message'] = "A replacement {$newTier} key was generated. The customer must enter the new key in the application.";
+        } elseif ($action === 'extend_maintenance') {
+            if ($state !== 'Enabled') {
+                throw new DomainException('Maintenance can be extended only for an enabled permanent license.');
+            }
+            if (!empty($license['maintenance_revoked_at'])) {
+                throw new DomainException('Restore maintenance before extending its coverage period.');
+            }
+            $now = gmdate('Y-m-d H:i:s');
+            $previous = (string)$license['maintenance_expires_at'];
+            $newExpiration = calculate_maintenance_renewal_expiration($previous, $now);
+            $update = $pdo->prepare(
+                "UPDATE issued_licenses SET maintenance_expires_at = :expiration,
+                        row_version = row_version + 1
+                 WHERE license_id = :license_id AND row_version = :row_version"
+            );
+            $update->execute(['expiration'=>$newExpiration,'license_id'=>$license['license_id'],'row_version'=>$expectedVersion]);
+            if ($update->rowCount() !== 1) {
+                throw new DomainException('This license changed before maintenance could be extended.');
+            }
+            record_maintenance_event($pdo,(string)$license['license_id'],'MANUAL_EXTENDED',$actor,$previous,$newExpiration,null,$reason ?: 'Extended one year in the Admin Portal.');
+            $result['message'] = 'Application Maintenance and Support was extended through ' . $newExpiration . ' UTC.';
+        } elseif ($action === 'revoke_maintenance') {
+            if ($state !== 'Enabled' || !empty($license['maintenance_revoked_at'])) {
+                throw new DomainException('Maintenance is already unavailable for this license.');
+            }
+            $update = $pdo->prepare(
+                "UPDATE issued_licenses SET maintenance_revoked_at = UTC_TIMESTAMP(6), row_version = row_version + 1
+                 WHERE license_id = :license_id AND row_version = :row_version"
+            );
+            $update->execute(['license_id'=>$license['license_id'],'row_version'=>$expectedVersion]);
+            if ($update->rowCount() !== 1) {
+                throw new DomainException('This license changed before maintenance could be revoked.');
+            }
+            record_maintenance_event($pdo,(string)$license['license_id'],'MAINTENANCE_REVOKED',$actor,(string)$license['maintenance_expires_at'],(string)$license['maintenance_expires_at'],null,$reason ?: 'Maintenance access revoked in the Admin Portal.');
+            $result['message'] = 'Updates and technical support were revoked. The permanent license remains active.';
+        } elseif ($action === 'restore_maintenance') {
+            if ($state !== 'Enabled' || empty($license['maintenance_revoked_at'])) {
+                throw new DomainException('Maintenance is not revoked for this license.');
+            }
+            $update = $pdo->prepare(
+                "UPDATE issued_licenses SET maintenance_revoked_at = NULL, row_version = row_version + 1
+                 WHERE license_id = :license_id AND row_version = :row_version"
+            );
+            $update->execute(['license_id'=>$license['license_id'],'row_version'=>$expectedVersion]);
+            if ($update->rowCount() !== 1) {
+                throw new DomainException('This license changed before maintenance could be restored.');
+            }
+            record_maintenance_event($pdo,(string)$license['license_id'],'MAINTENANCE_RESTORED',$actor,(string)$license['maintenance_expires_at'],(string)$license['maintenance_expires_at'],null,$reason ?: 'Maintenance access restored in the Admin Portal.');
+            $result['message'] = 'Maintenance access was restored through the existing expiration date.';
         } elseif ($action === 'deactivate') {
             if ($state !== 'Enabled') {
                 throw new DomainException('Only an enabled license can be deactivated.');
@@ -414,13 +613,101 @@ function upgrade_trial_installation(
     }
 }
 
+function apply_paid_maintenance_renewal(
+    PDO $pdo,
+    string $licenseId,
+    string $licenseTier,
+    string $registrationDigest,
+    string $capturedAt,
+    string $sourceReference,
+    string $actor = 'purchase-renewal'
+): array {
+    $licenseTier = canonical_paid_tier($licenseTier);
+    $licenseId = canonical_license_uuid($licenseId);
+    $registrationDigest = strtolower(trim($registrationDigest));
+    if (!preg_match('/^[0-9a-f]{64}$/', $registrationDigest)) {
+        throw new InvalidArgumentException('The renewal registration digest is invalid.');
+    }
+    $sourceReference = trim($sourceReference);
+    if ($sourceReference === '' || strlen($sourceReference) > 80 || !preg_match('/^[A-Za-z0-9:_-]+$/', $sourceReference)) {
+        throw new InvalidArgumentException('The renewal order reference is invalid.');
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $license = find_license_for_update($pdo, $licenseId);
+        if (!hash_equals($registrationDigest, maintenance_registration_digest((string)$license['customer_name'], (string)$license['email_address'])) ||
+            !hash_equals($licenseTier, (string)$license['license_tier'])) {
+            throw new DomainException('The renewal details do not match an issued license.');
+        }
+        if (!hash_equals('Enabled', (string)$license['control_state'])) {
+            throw new DomainException('This permanent license is not eligible for maintenance renewal.');
+        }
+        if (!empty($license['maintenance_revoked_at'])) {
+            throw new DomainException('Maintenance was revoked by the Admin Portal. Restore it before accepting a renewal.');
+        }
+
+        $existing = $pdo->prepare(
+            'SELECT new_expires_at FROM license_maintenance_events
+             WHERE license_id = :license_id AND source_reference = :source_reference LIMIT 1'
+        );
+        $existing->execute(['license_id'=>$licenseId,'source_reference'=>$sourceReference]);
+        $existingExpiration = $existing->fetchColumn();
+        if (is_string($existingExpiration) && $existingExpiration !== '') {
+            $pdo->commit();
+            return [
+                'license_id'=>$licenseId,
+                'license_tier'=>$licenseTier,
+                'maintenance_expires_at'=>$existingExpiration,
+                'maintenance_token'=>issue_maintenance_token($licenseId,$licenseTier,$existingExpiration),
+                'idempotent'=>true,
+            ];
+        }
+
+        try {
+            $captureTime = (new DateTimeImmutable($capturedAt, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('UTC'));
+        } catch (Throwable) {
+            throw new InvalidArgumentException('The verified payment time is invalid.');
+        }
+        if ($captureTime > new DateTimeImmutable('+5 minutes', new DateTimeZone('UTC'))) {
+            throw new InvalidArgumentException('The verified payment time cannot be in the future.');
+        }
+        $previous = (string)$license['maintenance_expires_at'];
+        $newExpiration = calculate_maintenance_renewal_expiration($previous,$captureTime->format('Y-m-d H:i:s'));
+        $update = $pdo->prepare(
+            'UPDATE issued_licenses
+             SET maintenance_expires_at = :expiration, row_version = row_version + 1
+             WHERE license_id = :license_id'
+        );
+        $update->execute(['expiration'=>$newExpiration,'license_id'=>$licenseId]);
+        record_maintenance_event(
+            $pdo,$licenseId,'PAID_RENEWAL',$actor,$previous,$newExpiration,$sourceReference,
+            'One-time annual Application Maintenance and Support renewal.'
+        );
+        $pdo->commit();
+        return [
+            'license_id'=>$licenseId,
+            'license_tier'=>$licenseTier,
+            'maintenance_expires_at'=>$newExpiration,
+            'maintenance_token'=>issue_maintenance_token($licenseId,$licenseTier,$newExpiration),
+            'idempotent'=>false,
+        ];
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
 function sync_purchase_licenses(PDO $pdo, array $licenses, string $actor = 'purchase-sync'): int
 {
     $imported = 0;
     $pdo->beginTransaction();
     try {
         $exists = $pdo->prepare(
-            'SELECT customer_name, email_address, license_tier, activation_key, license_source, source_reference
+            'SELECT customer_name, email_address, license_tier, activation_key, license_source, source_reference,
+                    maintenance_expires_at, maintenance_revoked_at
              FROM issued_licenses WHERE license_id = :license_id'
         );
         foreach ($licenses as $license) {
@@ -435,6 +722,7 @@ function sync_purchase_licenses(PDO $pdo, array $licenses, string $actor = 'purc
                 'license_tier' => canonical_paid_tier((string)($license['license_tier'] ?? '')),
                 'activation_key' => (string)($license['activation_key'] ?? ''),
                 'issued_at' => (string)($license['issued_at'] ?? gmdate('Y-m-d H:i:s')),
+                'maintenance_expires_at' => (string)($license['maintenance_expires_at'] ?? '2027-07-19 23:59:59'),
             ];
             if ($issued['customer_name'] === '' || $issued['activation_key'] === '') {
                 throw new InvalidArgumentException('The Buy website returned an incomplete license record.');
@@ -449,6 +737,19 @@ function sync_purchase_licenses(PDO $pdo, array $licenses, string $actor = 'purc
                     !hash_equals((string)$existing['license_tier'], $issued['license_tier']) ||
                     !hash_equals((string)$existing['activation_key'], $issued['activation_key'])) {
                     throw new DomainException('A purchase license conflicts with an existing License Manager record.');
+                }
+                if ((string)$existing['maintenance_expires_at'] < $issued['maintenance_expires_at']) {
+                    $updateCoverage = $pdo->prepare(
+                        'UPDATE issued_licenses SET maintenance_expires_at = :expiration,
+                                row_version = row_version + 1
+                         WHERE license_id = :license_id'
+                    );
+                    $updateCoverage->execute(['expiration'=>$issued['maintenance_expires_at'],'license_id'=>$licenseId]);
+                    record_maintenance_event(
+                        $pdo,$licenseId,'PURCHASE_SYNC_UPDATED',$actor,(string)$existing['maintenance_expires_at'],
+                        $issued['maintenance_expires_at'],'purchase-sync:' . substr((string)($license['order_reference'] ?? $licenseId),0,60),
+                        'Maintenance entitlement refreshed from the verified purchase service.'
+                    );
                 }
                 continue;
             }

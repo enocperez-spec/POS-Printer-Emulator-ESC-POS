@@ -8,6 +8,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 - RAW TCP/IP listener on `0.0.0.0:9100` with cut-command and idle-timeout job framing.
 - Four-tier licensing in v0.3.25 provides total listener allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15; managed listeners retain independent ports, profiles, state, buffers, counters, and Activity filtering.
+- Annual Application Maintenance and Support in v0.3.26 keeps paid licenses permanent, includes one year of updates and assisted support with new purchases, and offers later annual renewals as optional one-time purchases rather than subscriptions.
 - Receipt preview with persistent Light and Dark viewing modes.
 - Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
@@ -26,7 +27,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.25 is the current public release. It introduces the Trial/Lite/Pro/Enterprise model described below.
+> **Release status:** v0.3.26 is the current public release, released July 20, 2026. The next planned release is v0.3.27 Receipt Comparison and Automated Validation.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -34,7 +35,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.25-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.26-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -77,7 +78,7 @@ After purchase, open **License** in the application and enter the customer/compa
 - unlimited emulated print jobs;
 - persistent print-job history of up to 500 jobs;
 - watermark-free receipt previews;
-- text and raw-data exports, Print/PDF, printer profiles, Stored Logos, Printer State, updates, support, capture/import/replay, and all other paid controls.
+- text and raw-data exports, Print/PDF, printer profiles, Stored Logos, Printer State, capture/import/replay, and all other permanent paid controls.
 
 The paid feature set is the same across Lite, Pro, and Enterprise. The license level controls the total number of printer listeners:
 
@@ -88,9 +89,17 @@ The paid feature set is the same across Lite, Pro, and Enterprise. The license l
 
 Activation is validated offline using a public-key signature. The customer does not reinstall the application or download another package. Activation keys are tied to the registered customer/company name and email address.
 
+### Annual Application Maintenance and Support (v0.3.26)
+
+Lite, Pro, and Enterprise remain permanent, one-time-purchase licenses. Each new paid license includes one year of Application Maintenance and Support covering application updates and upgrades, assisted technical support, and access to **Settings → Check for Updates**. The annual plan is not a software subscription and does not use automatic recurring billing.
+
+When maintenance expires, the purchased application, currently installed version, licensed features, receipt history, and listener allowance continue working permanently. Update checking/downloads and assisted support pause until the customer chooses to renew. Local troubleshooting information, health checks, activation diagnostics, and privacy-safe log export remain available without active maintenance.
+
+Optional one-year renewals are **Lite $9.99**, **Pro $19.99**, and **Enterprise $59.99**. An early renewal adds 12 months to the existing expiration date; a renewal after expiration begins on the confirmed payment date and immediately restores eligible update and assisted-support access. Paid customers licensed before v0.3.26 are grandfathered with maintenance through **2027-07-19**.
+
 ## License and usage dashboard
 
-Version 0.3.25 reports installation registration, Trial, Lite, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
+Version 0.3.26 reports installation registration, Trial, Lite, Pro, or Enterprise status, maintenance status and coverage date, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
@@ -146,9 +155,18 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.25-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.26-win-x64.exe`
 
-The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
+The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
+
+The public version is recorded separately in `website/release.json`. After the candidate has passed release testing and the release is approved, promote `ProductInfo.Version` to the website labels and download links explicitly:
+
+```console
+dotnet run --project tools/ReceiptLab.Build -- sync-release
+dotnet run --project tools/ReceiptLab.Build -- sync-release --check
+```
+
+Do not run `sync-release` merely to package or test an unreleased candidate.
 
 The packaged executable also provides Windows installer commands used by Inno Setup:
 
@@ -166,7 +184,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.25 artifacts/installer/POSPrinterEmulatorSetup-0.3.25-win-x64.exe --title "POS Printer Emulator 0.3.25" --notes "Adds Lite licensing, preserves existing paid keys, and enforces 1, 2, and 15-listener paid-tier allowances."
+gh release create v0.3.26 artifacts/installer/POSPrinterEmulatorSetup-0.3.26-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.26-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.26" --notes "Adds optional annual Application Maintenance and Support while keeping Lite, Pro, and Enterprise licenses permanent."
 ```
 
 ## Issue customer activation keys
@@ -218,9 +236,10 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.23 — Activation and Printer Setup Wizard fixes:** Prevent valid Enterprise activation from failing when optional paid storage cannot initialize, and create Windows printer queues through the native printer API without the WMI `Invalid parameter` failure.
 - **Released in v0.3.24 — Upgrade licensing and Printer Setup safeguards:** Preserve paid licensing during updates, recover from hardened-folder persistence failures, provide Trial-safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100.
 - **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
-- **v0.3.26 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.27 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
-- **v0.3.28 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
+- **Next in v0.3.27 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.28 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
+- **v0.3.29 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

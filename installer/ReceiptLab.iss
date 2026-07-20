@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.25"
+#define MyAppVersion "0.3.26"
 #define MyAppPublisher "POS Printer Emulator"
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -300,6 +300,7 @@ var
   ResultCode: Integer;
   RegistrationPath: String;
   LicensePath: String;
+  MaintenancePath: String;
 begin
   if not RegistrationIsValid(False) then
   begin
@@ -323,12 +324,14 @@ begin
 
   RegistrationPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\registration.json');
   LicensePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\license.json');
+  MaintenancePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\maintenance.json');
   if FileExists(RegistrationPath + '.upgrade-backup') or
-     FileExists(LicensePath + '.upgrade-backup') then
+     FileExists(LicensePath + '.upgrade-backup') or
+     FileExists(MaintenancePath + '.upgrade-backup') then
   begin
     if not RestorePreservedUpgradeState then
     begin
-      Result := 'Setup could not restore the protected registration and license from the earlier update attempt. The recovery files were retained; run setup as an administrator and try again.';
+      Result := 'Setup could not restore the protected registration, license, and maintenance entitlement from the earlier update attempt. The recovery files were retained; run setup as an administrator and try again.';
       exit;
     end;
 
@@ -362,6 +365,15 @@ begin
         exit;
       end;
       Log('Preserved the existing activation license for this upgrade.');
+    end;
+    if FileExists(MaintenancePath) then
+    begin
+      if not CopyFile(MaintenancePath, MaintenancePath + '.upgrade-backup', True) then
+      begin
+        Result := 'Setup could not preserve the existing maintenance entitlement. Close POS Printer Emulator and run setup again.';
+        exit;
+      end;
+      Log('Preserved the existing maintenance entitlement for this upgrade.');
     end;
   end;
 
@@ -401,7 +413,8 @@ begin
   DataPath := ExpandConstant('{commonappdata}\POSPrinterEmulator');
   Result :=
     RestorePreservedUpgradeFile(DataPath + '\registration.json') and
-    RestorePreservedUpgradeFile(DataPath + '\license.json');
+    RestorePreservedUpgradeFile(DataPath + '\license.json') and
+    RestorePreservedUpgradeFile(DataPath + '\maintenance.json');
 end;
 
 function CompletePreservedUpgradeState: Boolean;
@@ -422,6 +435,12 @@ begin
     Log('Could not remove the completed activation upgrade backup.');
     Result := False;
   end;
+  if FileExists(DataPath + '\maintenance.json.upgrade-backup') and
+     (not DeleteFile(DataPath + '\maintenance.json.upgrade-backup')) then
+  begin
+    Log('Could not remove the completed maintenance upgrade backup.');
+    Result := False;
+  end;
 end;
 
 procedure FailAndRestorePreservedUpgradeState(const FailureMessage: String);
@@ -429,7 +448,7 @@ begin
   SetupFailed := True;
   if not RestorePreservedUpgradeState then
     RaiseException(FailureMessage + #13#10 + #13#10 +
-      'Setup also could not restore the protected registration and activation files. The recovery copies were retained.')
+      'Setup also could not restore the protected registration, activation, and maintenance files. The recovery copies were retained.')
   else
     RaiseException(FailureMessage);
 end;
@@ -446,7 +465,7 @@ begin
     if not RestorePreservedUpgradeState then
     begin
       SetupFailed := True;
-      RaiseException('POS Printer Emulator could not restore the existing registration and license. The preserved copies were not removed.');
+      RaiseException('POS Printer Emulator could not restore the existing registration, license, and maintenance entitlement. The preserved copies were not removed.');
     end;
 
     if not IsWebView2Installed then

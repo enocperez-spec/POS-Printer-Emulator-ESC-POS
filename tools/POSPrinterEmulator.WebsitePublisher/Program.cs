@@ -26,6 +26,8 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher publish <local-directory> [remote-directory]");
     Console.WriteLine("  website-publisher configure <schema-file> [remote-directory]");
     Console.WriteLine("  website-publisher upload-schema <schema-file> [remote-directory]");
+    Console.WriteLine("  website-publisher upload-protected <local-file> <private/remote-file> [remote-directory]");
+    Console.WriteLine("  website-publisher download-protected <private/remote-file> <local-file> [remote-directory]");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
     return 0;
@@ -86,6 +88,22 @@ try
             }
 
             UploadSchema(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
+            break;
+        case "upload-protected":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException("The upload-protected command requires a local file and a private remote path.");
+            }
+
+            UploadProtectedFile(client, Path.GetFullPath(args[1]), args[2], args.Length > 3 ? args[3] : ".");
+            break;
+        case "download-protected":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException("The download-protected command requires a private remote path and a local file.");
+            }
+
+            DownloadProtectedFile(client, args[1], Path.GetFullPath(args[2]), args.Length > 3 ? args[3] : ".");
             break;
         default:
             throw new ArgumentException($"Unknown command: {args[0]}");
@@ -279,6 +297,74 @@ static void UploadSchema(SftpClient client, string schemaPath, string remoteDire
     using var schema = File.OpenRead(schemaPath);
     client.UploadFile(schema, CombineRemote(privateDirectory, "schema.sql"), true);
     Console.WriteLine("Uploaded the protected database schema without changing server credentials.");
+}
+
+static void UploadProtectedFile(SftpClient client, string localPath, string relativeRemotePath, string remoteDirectory)
+{
+    if (!File.Exists(localPath))
+    {
+        throw new FileNotFoundException("The protected local file was not found.", localPath);
+    }
+
+    var normalized = relativeRemotePath.Replace('\\', '/').TrimStart('/');
+    var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    if (segments.Length < 2 || !segments[0].Equals("private", StringComparison.OrdinalIgnoreCase) ||
+        segments.Any(segment => segment is "." or ".."))
+    {
+        throw new ArgumentException("The protected remote path must stay beneath private/.", nameof(relativeRemotePath));
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    var remotePath = CombineRemote(remoteRoot, string.Join('/', segments));
+    var parent = remotePath[..remotePath.LastIndexOf('/')];
+    EnsureDirectory(client, parent, new HashSet<string>(StringComparer.Ordinal));
+    using var input = File.OpenRead(localPath);
+    client.UploadFile(input, remotePath, true);
+    if (client.GetAttributes(remotePath).Size != input.Length)
+    {
+        throw new IOException("The protected file upload could not be verified.");
+    }
+
+    Console.WriteLine($"Uploaded and size-verified protected file {normalized} ({input.Length:N0} bytes).");
+}
+
+static void DownloadProtectedFile(SftpClient client, string relativeRemotePath, string localPath, string remoteDirectory)
+{
+    var normalized = relativeRemotePath.Replace('\\', '/').TrimStart('/');
+    var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    if (segments.Length < 2 || !segments[0].Equals("private", StringComparison.OrdinalIgnoreCase) ||
+        segments.Any(segment => segment is "." or ".."))
+    {
+        throw new ArgumentException("The protected remote path must stay beneath private/.", nameof(relativeRemotePath));
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    var remotePath = CombineRemote(remoteRoot, string.Join('/', segments));
+    if (!client.Exists(remotePath))
+    {
+        throw new FileNotFoundException("The protected remote file was not found.", remotePath);
+    }
+
+    Directory.CreateDirectory(Path.GetDirectoryName(localPath) ?? Directory.GetCurrentDirectory());
+    using var output = File.Create(localPath);
+    client.DownloadFile(remotePath, output);
+    var remoteSize = client.GetAttributes(remotePath).Size;
+    if (output.Length != remoteSize)
+    {
+        throw new IOException("The protected file download could not be verified.");
+    }
+
+    Console.WriteLine($"Downloaded and size-verified protected file {normalized} ({output.Length:N0} bytes).");
 }
 
 static void UploadText(SftpClient client, string remotePath, string content)

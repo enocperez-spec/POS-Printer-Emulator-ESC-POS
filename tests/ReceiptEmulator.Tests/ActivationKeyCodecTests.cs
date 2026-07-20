@@ -31,6 +31,8 @@ public sealed class ActivationKeyCodecTests
         Assert.NotNull(license);
         Assert.NotEqual(Guid.Empty, license.LicenseId);
         Assert.Equal(LicenseTier.Pro, license.Tier);
+        Assert.NotNull(license.MaintenanceExpiresAt);
+        Assert.Equal(license.IssuedAt.AddYears(1), license.MaintenanceExpiresAt);
     }
 
     [Fact]
@@ -81,6 +83,126 @@ public sealed class ActivationKeyCodecTests
         var valid = ActivationKeyCodec.TryValidateWithPublicKey(
             activationKey, "Legacy Customer", "legacy@example.com",
             vendorKey.ExportSubjectPublicKeyInfoPem(), out var license, out var error);
+
+        Assert.True(valid, error);
+        Assert.Equal(LicenseTier.Pro, license?.Tier);
+        Assert.Null(license?.MaintenanceExpiresAt);
+    }
+
+    [Fact]
+    public void VersionThreeKeyCarriesTheSignedMaintenanceExpiration()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+        var expiresAt = issuedAt.AddYears(1);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Maintenance Customer",
+            "maintenance@example.com",
+            LicenseTier.Lite,
+            issuedAt,
+            expiresAt);
+
+        var valid = ActivationKeyCodec.TryValidateWithPublicKey(
+            activationKey,
+            "Maintenance Customer",
+            "maintenance@example.com",
+            vendorKey.ExportSubjectPublicKeyInfoPem(),
+            out var license,
+            out var error);
+
+        Assert.True(valid, error);
+        Assert.Equal(issuedAt, license?.IssuedAt);
+        Assert.Equal(expiresAt, license?.MaintenanceExpiresAt);
+    }
+
+    [Fact]
+    public void VersionThreeKeyCanCarryAnAlreadyExpiredMaintenanceDateForTierReplacement()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+        var expiresAt = issuedAt.AddYears(-1);
+
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "Maintenance Customer",
+            "maintenance@example.com",
+            LicenseTier.Pro,
+            issuedAt,
+            expiresAt);
+
+        var valid = ActivationKeyCodec.TryValidateWithPublicKey(
+            activationKey,
+            "Maintenance Customer",
+            "maintenance@example.com",
+            vendorKey.ExportSubjectPublicKeyInfoPem(),
+            out var license,
+            out var error);
+
+        Assert.True(valid, error);
+        Assert.Equal(expiresAt, license?.MaintenanceExpiresAt);
+    }
+
+    [Fact]
+    public void RegistrationDigestUsesTheCrossPlatformCanonicalFormat()
+    {
+        var digest = ActivationKeyCodec.CreateRegistrationDigest(
+            "  Northwind\t Market  ",
+            " OWNER@NORTHWIND.EXAMPLE ");
+
+        Assert.Equal(
+            "58bc64ba32a49be9f133b7a3c8e4ae7f45663760542c5c15747525fb66944c21",
+            digest);
+    }
+
+    [Fact]
+    public void RegistrationDigestPreservesNonAsciiCaseWithFixedAsciiCaseFolding()
+    {
+        var digest = ActivationKeyCodec.CreateRegistrationDigest(
+            "  José\tCafé  ",
+            " José@Example.COM ");
+
+        Assert.Equal("JOSé CAFé", ActivationKeyCodec.CanonicalizeCustomer("  José\tCafé  "));
+        Assert.Equal("José Café", ActivationKeyCodec.NormalizeCustomerName("  José\tCafé  "));
+        Assert.Equal("josé@example.com", ActivationKeyCodec.CanonicalizeEmail(" José@Example.COM "));
+        Assert.Equal(
+            "3edccffc4c9e391af25c7d5c7b612cc192b2fb3872dac8588d83eb6ad075a47d",
+            digest);
+    }
+
+    [Fact]
+    public void VersionThreePayloadUsesTheFixedCrossPlatformRegistrationHashes()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            "José Café",
+            "José@Example.COM",
+            LicenseTier.Lite,
+            issuedAt,
+            issuedAt.AddYears(1));
+        var encoded = activationKey["PPE1-".Length..].Replace('-', '+').Replace('_', '/');
+        encoded += new string('=', (4 - encoded.Length % 4) % 4);
+        var token = Convert.FromBase64String(encoded);
+
+        Assert.Equal("e0c8551396be02bc6377ac3d893048aa", Convert.ToHexString(token.AsSpan(25, 16)).ToLowerInvariant());
+        Assert.Equal("b0a53cf19e34d05b57bced7365c6b00d", Convert.ToHexString(token.AsSpan(41, 16)).ToLowerInvariant());
+    }
+
+    [Fact]
+    public void LegacyUnicodeRegistrationHashStillValidates()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var activationKey = IssueLegacyKey(vendorKey, "José Café", "JOSÉ@example.com");
+
+        var valid = ActivationKeyCodec.TryValidateWithPublicKey(
+            activationKey,
+            "José Café",
+            "JOSÉ@example.com",
+            vendorKey.ExportSubjectPublicKeyInfoPem(),
+            out var license,
+            out var error);
 
         Assert.True(valid, error);
         Assert.Equal(LicenseTier.Pro, license?.Tier);

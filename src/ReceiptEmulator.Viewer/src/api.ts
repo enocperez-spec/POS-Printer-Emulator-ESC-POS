@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+import type { ActivationRequest, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -106,6 +106,12 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   }),
+  applyMaintenance: (request: MaintenanceEntitlementRequest) => json<LicenseStatus>('/api/license/maintenance/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  }),
+  refreshMaintenance: () => json<MaintenanceRefreshResult>('/api/license/maintenance/refresh', { method: 'POST' }),
   checkUpdates: (force = false) => json<UpdateStatus>(`/api/updates/check?force=${force}`),
   printerSetupStatus: () => json<PrinterSetupStatus>('/api/printer-setup/status'),
   availablePrinterPort: (printerName: string, ipAddress: string, startingPort = 9100) =>

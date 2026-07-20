@@ -355,6 +355,33 @@ button { color: inherit; }
 .license-summary strong { overflow-wrap: anywhere; }
 .settings-panel .activation-form { margin: 0 -28px -26px; }
 .settings-panel .registered-details { padding-inline: 0; }
+.maintenance-card { display: grid; gap: 13px; margin: 20px 0 4px; padding: 17px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
+.maintenance-card.is-active { border-color: #a9dbba; background: #effaf3; }
+.maintenance-card.is-expired { border-color: #edbe8a; background: var(--amber-soft); }
+.maintenance-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.maintenance-heading > div { display: flex; align-items: center; gap: 8px; }
+.maintenance-heading svg { color: var(--blue); }
+.maintenance-heading span { padding: 4px 8px; border-radius: 99px; color: var(--green); background: color-mix(in srgb, var(--green) 12%, var(--surface)); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.maintenance-card.is-expired .maintenance-heading span { color: #8c4100; background: color-mix(in srgb, #d97b00 12%, var(--surface)); }
+.maintenance-card p, .maintenance-card small { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.maintenance-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--border); }
+.maintenance-card dl div { display: grid; gap: 4px; padding: 10px 12px; background: var(--surface); font-size: 10px; }
+.maintenance-card dt { color: var(--muted); }
+.maintenance-card dd { margin: 0; font-weight: 750; }
+.maintenance-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.maintenance-actions a, .maintenance-actions button { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface); font-size: 10px; font-weight: 750; text-decoration: none; cursor: pointer; }
+.maintenance-actions a { color: #fff; border-color: var(--blue); background: var(--blue); }
+.maintenance-actions button:disabled { opacity: .6; cursor: wait; }
+.maintenance-key-panel { border-top: 1px solid var(--border); padding-top: 11px; }
+.maintenance-key-panel summary { color: var(--text); font-size: 11px; font-weight: 750; cursor: pointer; }
+.maintenance-key-panel form { display: grid; gap: 10px; margin-top: 11px; }
+.maintenance-key-panel label { display: grid; gap: 6px; color: var(--text); font-size: 10px; font-weight: 700; }
+.maintenance-key-panel textarea { min-height: 70px; padding: 9px 10px; resize: vertical; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface); font: 10px/1.4 "Cascadia Mono", Consolas, monospace; }
+.maintenance-key-panel button { width: fit-content; min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface); font-size: 10px; font-weight: 750; cursor: pointer; }
+.maintenance-key-panel button:disabled { opacity: .6; cursor: wait; }
+.maintenance-success { padding: 9px 11px; border: 1px solid #a9dbba; border-radius: 7px; color: var(--green); background: #effaf3; font-size: 10px; }
+.maintenance-message { padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface); font-size: 10px; line-height: 1.45; }
+.maintenance-error { padding: 9px 11px; border: 1px solid #edbe8a; border-radius: 7px; color: #8c4100; background: var(--amber-soft); font-size: 10px; line-height: 1.45; }
 .settings-status-card { display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-muted); }
 .settings-status-card.update-available { border-color: #9bc4ed; background: #eff7ff; }
 .settings-status-card.is-current { border-color: #a9dbba; background: #effaf3; }
@@ -399,6 +426,7 @@ button { color: inherit; }
 .stored-graphic-card button.confirm-delete { color: #fff; border-color: #b42318; background: #b42318; }
 .stored-graphic-card button:disabled { opacity: .6; cursor: wait; }
 .download-diagnostics { width: 100%; }
+.support-actions { margin-top: 12px; }
 .privacy-callout { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; padding: 12px; border-radius: 8px; color: var(--muted); background: var(--surface-muted); font-size: 11px; line-height: 1.5; }
 .privacy-callout svg { flex: 0 0 auto; color: var(--green); }
 .privacy-callout p { margin: 0; }
@@ -574,6 +602,9 @@ html[data-theme="dark"] .confirm-icon { color: #ff8c82; background: #3b2225; }
 html[data-theme="dark"] .update-banner { color: #b8d8fb; border-color: #315d86; background: #142942; }
 html[data-theme="dark"] .settings-status-card.update-available { border-color: #315d86; background: #142942; }
 html[data-theme="dark"] .settings-status-card.is-current { border-color: #2c6941; background: #173022; }
+html[data-theme="dark"] .maintenance-card.is-active { border-color: #2c6941; background: #173022; }
+html[data-theme="dark"] .maintenance-card.is-expired { border-color: #705529; background: #302516; }
+html[data-theme="dark"] .maintenance-success { border-color: #2c6941; color: #79d998; background: #173022; }
 html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; background: #302516; }
 
 @media (max-width: 1050px) {
@@ -621,6 +652,7 @@ html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; b
   .settings-panel .license-hero { margin: -20px -18px 0; }
   .settings-panel .activation-form { margin: 0 -18px -20px; }
   .license-summary { grid-template-columns: 1fr; margin-inline: -18px; }
+  .maintenance-card dl { grid-template-columns: 1fr; }
   .support-detail-grid { grid-template-columns: 1fr; }
   .stored-graphic-fields { grid-template-columns: 1fr; }
   .stored-graphic-card { grid-template-columns: 62px minmax(0, 1fr); }

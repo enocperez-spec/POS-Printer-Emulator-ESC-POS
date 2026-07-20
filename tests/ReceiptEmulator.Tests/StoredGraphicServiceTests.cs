@@ -27,6 +27,23 @@ public sealed class StoredGraphicServiceTests : IDisposable
         Assert.Empty(service.List());
     }
 
+    [Fact]
+    public async Task MissingStorageDirectoryBehavesLikeAnEmptyStoreAndIsRecreatedOnImport()
+    {
+        var service = new StoredGraphicService(_root);
+        Directory.Delete(Path.Combine(_root, "stored-graphics"));
+
+        Assert.Empty(service.List());
+        Assert.False(await service.DeleteAsync("00"));
+        Assert.False(service.TryRead("00", out _, out _));
+
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        await using var stream = new MemoryStream(png);
+        await service.ImportAsync("00", "Restored logo", "logo.png", stream);
+
+        Assert.Single(service.List());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("0")]

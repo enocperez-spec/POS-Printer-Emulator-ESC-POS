@@ -28,7 +28,8 @@ function resolve_managed_license(
 
     try {
         $find = $pdo->prepare(
-            'SELECT license_tier, control_state, customer_name, email_address
+            'SELECT license_tier, control_state, customer_name, email_address,
+                    maintenance_expires_at, maintenance_revoked_at
              FROM issued_licenses WHERE license_id = :license_id' . ($lock ? ' LOCK IN SHARE MODE' : '')
         );
         $find->execute(['license_id' => $licenseId]);
@@ -56,7 +57,33 @@ function resolve_managed_license(
         'mode' => in_array($managed['license_tier'], ['Lite', 'Pro', 'Enterprise'], true) ? (string)$managed['license_tier'] : $mode,
         'license_id' => $licenseId,
         'control_state' => 'Enabled',
+        'maintenance_status' => !empty($managed['maintenance_revoked_at']) ? 'Revoked' :
+            (empty($managed['maintenance_expires_at']) || strtotime((string)$managed['maintenance_expires_at'] . ' UTC') < time() ? 'Expired' : 'Active'),
+        'maintenance_expires_at' => empty($managed['maintenance_expires_at']) ? null : (string)$managed['maintenance_expires_at'],
     ];
+}
+
+function resolve_maintenance_telemetry(array $body, array $managedLicense): array
+{
+    if (($managedLicense['mode'] ?? 'Trial') === 'Trial') {
+        return ['status'=>'NotApplicable','expires_at'=>null];
+    }
+    if (isset($managedLicense['maintenance_status'])) {
+        return [
+            'status'=>(string)$managedLicense['maintenance_status'],
+            'expires_at'=>$managedLicense['maintenance_expires_at'] ?? null,
+        ];
+    }
+    $status=(string)($body['maintenanceStatus']??'NotApplicable');
+    if(!in_array($status,['NotApplicable','Active','Expired','Revoked'],true)){
+        throw new InvalidArgumentException('Invalid maintenanceStatus.');
+    }
+    $expiresAt=null;
+    if(isset($body['maintenanceExpiresAt'])&&$body['maintenanceExpiresAt']!==null&&trim((string)$body['maintenanceExpiresAt'])!==''){
+        try{$expiresAt=(new DateTimeImmutable((string)$body['maintenanceExpiresAt']))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');}
+        catch(Throwable){throw new InvalidArgumentException('Invalid maintenanceExpiresAt.');}
+    }
+    return ['status'=>$status,'expires_at'=>$expiresAt];
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -88,10 +115,13 @@ try {
                 $emailAddress,
                 true
             );
+            $maintenance=resolve_maintenance_telemetry($body,$managedLicense);
             $statement = $pdo->prepare(
                 'INSERT INTO installations
-                    (installation_uuid, token_hash, customer_name, email_address, app_version, license_mode, license_id)
-                 VALUES (:uuid, UNHEX(SHA2(:token, 256)), :customer, :email, :version, :mode, :license_id)');
+                    (installation_uuid, token_hash, customer_name, email_address, app_version, license_mode, license_id,
+                     maintenance_status, maintenance_expires_at)
+                 VALUES (:uuid, UNHEX(SHA2(:token, 256)), :customer, :email, :version, :mode, :license_id,
+                         :maintenance_status, :maintenance_expires_at)');
             $statement->execute([
                 'uuid' => strtolower($installationUuid),
                 'token' => $token,
@@ -100,6 +130,8 @@ try {
                 'version' => $appVersion,
                 'mode' => $managedLicense['mode'],
                 'license_id' => $managedLicense['license_id'],
+                'maintenance_status'=>$maintenance['status'],
+                'maintenance_expires_at'=>$maintenance['expires_at'],
             ]);
             $pdo->commit();
         } catch (PDOException $exception) {
@@ -116,6 +148,8 @@ try {
             'token' => $token,
             'serverLicenseMode' => $managedLicense['mode'],
             'licenseControlState' => $managedLicense['control_state'],
+            'serverMaintenanceStatus' => $maintenance['status'],
+            'serverMaintenanceExpiresAt' => $maintenance['expires_at'],
         ], 201);
     }
 
@@ -159,6 +193,7 @@ try {
         $emailAddress,
         true
     );
+    $maintenance=resolve_maintenance_telemetry($body,$managedLicense);
     $mode = $managedLicense['mode'];
     $licenseId = $managedLicense['license_id'];
     $update = $pdo->prepare(
@@ -168,6 +203,8 @@ try {
             app_version = :version,
             license_mode = :mode,
             license_id = :license_id,
+            maintenance_status = :maintenance_status,
+            maintenance_expires_at = :maintenance_expires_at,
             last_seen_at = UTC_TIMESTAMP(6),
             last_launch_at = IF(:has_launches = 1, UTC_TIMESTAMP(6), last_launch_at),
             last_print_job_at = IF(:has_jobs = 1, UTC_TIMESTAMP(6), last_print_job_at),
@@ -181,6 +218,8 @@ try {
         'version' => $appVersion,
         'mode' => $mode,
         'license_id' => $licenseId,
+        'maintenance_status'=>$maintenance['status'],
+        'maintenance_expires_at'=>$maintenance['expires_at'],
         'has_launches' => $launches > 0 ? 1 : 0,
         'has_jobs' => $jobs > 0 ? 1 : 0,
         'launch_increment' => $launches,
@@ -203,6 +242,8 @@ try {
         'ok' => true,
         'serverLicenseMode' => $managedLicense['mode'],
         'licenseControlState' => $managedLicense['control_state'],
+        'serverMaintenanceStatus' => $maintenance['status'],
+        'serverMaintenanceExpiresAt' => $maintenance['expires_at'],
     ]);
 } catch (InvalidArgumentException|JsonException $exception) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {

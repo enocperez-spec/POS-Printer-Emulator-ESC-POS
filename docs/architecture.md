@@ -39,6 +39,8 @@ New installations store the customer/company name and email address in `%Program
 
 The local activation API validates the signed key, persists it, enables the purchased Lite, Pro, or Enterprise level, loads any existing paid history, removes the trial watermark, and unlocks the authorized controls immediately. All paid tiers receive the same paid feature set. Listener configuration and runtime authorization enforce total allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15. Editing a local license record cannot create a valid signature.
 
+v0.3.26 adds a separate maintenance entitlement to the permanent license boundary. The signed license continues authorizing the purchased application features indefinitely; maintenance dates authorize only application update checking/downloads and assisted technical support. New paid purchases receive 12 months from purchase, pre-v0.3.26 paid licenses are grandfathered through 2027-07-19, early renewal extends the existing end date, and lapsed renewal begins on its confirmed payment date. Cached or signed entitlement proof keeps receipt emulation independent from an entitlement-service outage, and local diagnostics remain available even when maintenance is expired.
+
 The self-contained C# service executable also owns the Windows installation lifecycle. Inno Setup invokes its `--install-windows` and `--uninstall-windows` modes to create or remove the Windows Service, configure a private/domain program-scoped RAW TCP firewall rule, verify viewer health, and remove service-owned data. The program rule covers validated Enterprise listener ports without exposing the localhost viewer or requiring per-port customer firewall changes. Setup also checks for WebView2 and installs the bundled Microsoft bootstrapper when it is missing.
 
 Repository automation is provided by the `tools/ReceiptLab.Build` .NET console project. It coordinates the viewer build, service and desktop builds, tests, self-contained publish, prerequisite packaging, installer compilation, and sample TCP sender without PowerShell scripts.
@@ -71,12 +73,13 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 9. **v0.3.23 — Activation and Printer Setup Wizard fixes (released 2026-07-19).** Keep valid Enterprise activation independent from optional storage recovery and create Windows printer queues through the native printer API instead of assigning the read-only WMI printer name.
 10. **v0.3.24 — Upgrade licensing and Printer Setup safeguards (released 2026-07-19).** Preserve paid licensing through updates, make license persistence compatible with hardened Windows data folders, give Trial users safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100 with matching Enterprise listeners.
 11. **v0.3.25 — Four-tier licensing and upgrade paths (released 2026-07-19).** Introduce Lite at $24.99, retain the common paid feature set, and enforce total listener allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15.
-12. **v0.3.26 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-13. **v0.3.27 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
-14. **v0.3.28 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
-15. Service-to-viewer authentication and installer repair mode.
-16. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
-17. Optional online activation revocation and license transfer workflow.
-18. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-19. PNG export and deterministic PDF generation.
-20. Production code-signing and expanded unattended deployment validation.
+12. **v0.3.26 — Annual Application Maintenance and Support (released 2026-07-20).** Keep paid licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, and grandfathered existing-customer coverage.
+13. **v0.3.27 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+14. **v0.3.28 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
+15. **v0.3.29 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+16. Service-to-viewer authentication and installer repair mode.
+17. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
+18. Optional online activation revocation and license transfer workflow.
+19. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+20. PNG export and deterministic PDF generation.
+21. Production code-signing and expanded unattended deployment validation.

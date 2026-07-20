@@ -4,6 +4,18 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.26 — 2026-07-20
+
+- Keeps every Lite, Pro, and Enterprise license permanent while adding an independent annual Application Maintenance and Support entitlement.
+- Includes one year of updates and assisted technical support with every new paid license. Existing paid licenses are grandfathered through July 19, 2027.
+- Adds backward-compatible v3 activation keys carrying the included maintenance date and signed renewal entitlements tied to the existing license ID and tier.
+- Keeps paid receipt-emulation features working after maintenance expires while locking update checks, update downloads, and assisted support behind an optional renewal. Local diagnostics remain available.
+- Adds one-time, non-subscription renewal checkout at $9.99 for Lite, $19.99 for Pro, and $59.99 for Enterprise, with server-controlled pricing and verified PayPal capture.
+- Adds Admin Portal maintenance status, history, pricing, extension, and revocation workflows with confirmation and audit records.
+- Preserves maintenance entitlement data during in-place Windows upgrades and exposes a privacy-minimized signed entitlement refresh flow without transmitting activation keys.
+- Fixes **BUG-013** so always-available support diagnostics still download when the optional Stored Logos directory has not been created or was removed.
+- Passed all 138 desktop tests, the complete PHP commerce/database/site contract suite, PHP/JavaScript/TypeScript validation, desktop/mobile browser QA, expired-and-renewed entitlement checks, and an installed v0.3.25 Enterprise-to-v0.3.26 upgrade that preserved the paid tier, registration, license ID, listener allowance, and active grandfathered maintenance coverage.
+
 ## v0.3.25 — 2026-07-19
 
 - Released four license levels across the desktop application, activation keys, telemetry, purchase workflow, Admin Portal, database, and documentation: Trial, Lite, Pro, and Enterprise.
@@ -13,7 +25,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Preserved existing paid activation keys as Pro, added safe replacement-key upgrades without reinstalling, and retained listener definitions that exceed a temporarily lower allowance without running or deleting them.
 - Fixed protected-schema deployment so semicolons inside release and backlog descriptions are not mistaken for SQL statement boundaries.
 - Passed all 113 automated desktop tests, all PHP commerce contracts, PHP and JavaScript syntax checks, 15-page SEO validation, real Lite activation against the local service, rendered Trial/Lite/Pro/Enterprise Settings plus desktop/mobile pricing checks, and an installed v0.3.24 Enterprise-to-v0.3.25 upgrade that preserved registration and activation.
-- Receipt comparison moves to v0.3.26, enhanced support diagnostics to v0.3.27, and guided update installation to v0.3.28.
+- Receipt comparison moves to v0.3.27, enhanced support diagnostics to v0.3.28, and guided update installation to v0.3.29.
 
 ## v0.3.24 — 2026-07-19
 

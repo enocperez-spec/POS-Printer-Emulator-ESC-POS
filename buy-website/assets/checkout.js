@@ -19,6 +19,8 @@ const createOrder = async () => {
       customerName: form.customerName.value,
       email: form.email.value,
       licenseTier: form.licenseTier.value,
+      product: body.dataset.product || 'license',
+      licenseId: form.licenseId?.value || '',
     }),
   });
   const data = await response.json();
@@ -35,9 +37,10 @@ const updateSelectedTier = () => {
   const selected = tierInputs.find((input) => input.checked);
   if (!selected) return;
   const currency = selected.dataset.currency || 'USD';
-  if (selectedTierPill) selectedTierPill.textContent = `${selected.value} License`;
+  const renewal = body.dataset.product === 'maintenance';
+  if (selectedTierPill) selectedTierPill.textContent = `${selected.value} ${renewal ? 'Maintenance' : 'License'}`;
   if (selectedPrice) selectedPrice.textContent = currency === 'USD' ? `$${Number(selected.dataset.price).toFixed(2)}` : selected.dataset.price;
-  if (selectedCurrency) selectedCurrency.textContent = `${currency} · one-time`;
+  if (selectedCurrency) selectedCurrency.textContent = `${currency} · ${renewal ? 'one-time renewal' : 'one-time'}`;
 };
 
 tierInputs.forEach((input) => input.addEventListener('change', updateSelectedTier));

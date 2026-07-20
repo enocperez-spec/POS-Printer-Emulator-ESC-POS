@@ -2,5 +2,5 @@ namespace ReceiptEmulator;
 
 public static class ProductInfo
 {
-    public const string Version = "0.3.25";
+    public const string Version = "0.3.26";
 }
