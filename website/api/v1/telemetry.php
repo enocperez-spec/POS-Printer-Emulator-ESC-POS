@@ -17,7 +17,7 @@ function resolve_managed_license(
     bool $lock = false
 ): array
 {
-    $mode = in_array($reportedMode, ['Pro', 'Enterprise'], true) ? (string)$reportedMode : 'Trial';
+    $mode = in_array($reportedMode, ['Lite', 'Pro', 'Enterprise'], true) ? (string)$reportedMode : 'Trial';
     if ($licenseId === null || $licenseId === '') {
         return ['mode' => 'Trial', 'license_id' => null, 'control_state' => 'Trial'];
     }
@@ -53,7 +53,7 @@ function resolve_managed_license(
         return ['mode' => 'Trial', 'license_id' => null, 'control_state' => (string)$managed['control_state']];
     }
     return [
-        'mode' => in_array($managed['license_tier'], ['Pro', 'Enterprise'], true) ? (string)$managed['license_tier'] : $mode,
+        'mode' => in_array($managed['license_tier'], ['Lite', 'Pro', 'Enterprise'], true) ? (string)$managed['license_tier'] : $mode,
         'license_id' => $licenseId,
         'control_state' => 'Enabled',
     ];

@@ -19,9 +19,11 @@ export type ListenerSummary = {
 }
 
 export type LicenseStatus = {
-  mode: 'Trial' | 'Pro' | 'Enterprise'
+  mode: 'Trial' | 'Lite' | 'Pro' | 'Enterprise'
+  isPaid: boolean
   hasProAccess: boolean
   isEnterprise: boolean
+  maximumListeners: number
   dailyLimit: number
   usedToday: number
   remaining: number

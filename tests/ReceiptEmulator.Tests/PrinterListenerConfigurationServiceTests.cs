@@ -8,10 +8,10 @@ namespace ReceiptEmulator.Tests;
 public sealed class PrinterListenerConfigurationServiceTests
 {
     [Fact]
-    public void TrialUsesOneMemoryOnlyDefaultAndRejectsEnterpriseChanges()
+    public void SingleListenerTierUsesOneMemoryOnlyDefaultAndRejectsManagedChanges()
     {
         var root = NewRoot();
-        var (service, _) = CreateService(root, enterprise: false);
+        var (service, _) = CreateService(root, maximumListeners: 1);
 
         var listener = Assert.Single(service.GetAll());
 
@@ -23,10 +23,10 @@ public sealed class PrinterListenerConfigurationServiceTests
     }
 
     [Fact]
-    public void EnterprisePrepareBindCommitFlowPersistsWithoutPrematureMutation()
+    public void ManagedPrepareBindCommitFlowPersistsWithoutPrematureMutation()
     {
         var root = NewRoot();
-        var (service, _) = CreateService(root, enterprise: true);
+        var (service, _) = CreateService(root, maximumListeners: 15);
         Assert.Single(service.GetAll());
 
         var prepared = service.PrepareCreate(ValidInput("Kitchen", 9101) with
@@ -39,7 +39,7 @@ public sealed class PrinterListenerConfigurationServiceTests
         service.Commit(prepared);
 
         Assert.Equal(2, service.GetAll().Count);
-        var (reloaded, _) = CreateService(root, enterprise: true);
+        var (reloaded, _) = CreateService(root, maximumListeners: 15);
         Assert.Equal(prepared, reloaded.Find(prepared.Id));
 
         var update = reloaded.PrepareUpdate(prepared.Id, ValidInput("Kitchen Expo", 9102));
@@ -47,13 +47,13 @@ public sealed class PrinterListenerConfigurationServiceTests
         Assert.Equal(9102, reloaded.Find(prepared.Id)!.Port);
         reloaded.Remove(prepared.Id);
         Assert.Null(reloaded.Find(prepared.Id));
-        Assert.Single(CreateService(root, enterprise: true).Service.GetAll());
+        Assert.Single(CreateService(root, maximumListeners: 15).Service.GetAll());
     }
 
     [Fact]
     public void RejectsInvalidReservedAndConflictingListenerEndpoints()
     {
-        var (service, _) = CreateService(NewRoot(), enterprise: true);
+        var (service, _) = CreateService(NewRoot(), maximumListeners: 15);
         service.Commit(service.PrepareCreate(ValidInput("Kitchen", 9101)));
 
         Assert.Throws<ArgumentException>(() => service.PrepareCreate(ValidInput("Zero", 0)));
@@ -63,14 +63,68 @@ public sealed class PrinterListenerConfigurationServiceTests
         Assert.Throws<ArgumentException>(() => service.Remove(PrinterListenerDefaults.DefaultId));
     }
 
+    [Theory]
+    [InlineData(2)]
+    [InlineData(15)]
+    public void EnforcesLicensedListenerCap(int maximumListeners)
+    {
+        var (service, _) = CreateService(NewRoot(), maximumListeners);
+
+        for (var index = 1; index < maximumListeners; index++)
+        {
+            service.Commit(service.PrepareCreate(ValidInput($"Listener {index + 1}", 9200 + index)));
+        }
+
+        Assert.Equal(maximumListeners, service.GetAll().Count);
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            service.PrepareCreate(ValidInput("Over limit", 9300)));
+        Assert.Contains(maximumListeners.ToString(), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LowerTierHidesButPreservesConfigurationsAboveItsCapAndBlocksNewOnes()
+    {
+        var root = NewRoot();
+        var (enterprise, _) = CreateService(root, maximumListeners: 15);
+        for (var index = 1; index < 15; index++)
+        {
+            enterprise.Commit(enterprise.PrepareCreate(ValidInput($"Listener {index + 1}", 9400 + index)));
+        }
+
+        var database = new ReceiptDatabase(root);
+        database.UpsertListenerConfiguration(new PrinterListenerConfiguration(
+            "preserved-over-cap",
+            "Preserved over cap",
+            PrinterListenerDefaults.DefaultBindAddress,
+            9499,
+            PrinterProfileService.EpsonTmT88VId,
+            true,
+            PrinterListenerDefaults.DefaultIdleJobTimeoutMilliseconds,
+            PrinterListenerDefaults.DefaultMaximumJobBytes,
+            new PrinterListenerBufferConfiguration(),
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            DateTimeOffset.UtcNow.AddMinutes(1)));
+        Assert.Equal(16, database.LoadListenerConfigurations().Count);
+
+        var (pro, _) = CreateService(root, maximumListeners: 2);
+        Assert.Equal(2, pro.GetAll().Count);
+        Assert.Equal(16, database.LoadListenerConfigurations().Count);
+        Assert.Throws<InvalidOperationException>(() => pro.PrepareCreate(ValidInput("Blocked", 9500)));
+        Assert.Equal(16, database.LoadListenerConfigurations().Count);
+
+        pro.Remove(pro.GetAll()[1].Id);
+        Assert.Equal(2, pro.GetAll().Count);
+        Assert.Equal(15, database.LoadListenerConfigurations().Count);
+    }
+
     private static (PrinterListenerConfigurationService Service, LicenseService License) CreateService(
         string root,
-        bool enterprise)
+        int maximumListeners)
     {
         var license = new LicenseService(new TestEnvironment(), Configuration(root));
         var profiles = new PrinterProfileService(license);
         var options = new PrinterOptions();
-        return (new PrinterListenerConfigurationService(license, options, profiles, () => enterprise), license);
+        return (new PrinterListenerConfigurationService(license, options, profiles, () => maximumListeners), license);
     }
 
     private static PrinterListenerInput ValidInput(string name, int port) => new(

@@ -26,6 +26,28 @@
 .metrics .full .metric-icon { stroke: var(--green); }
 .donut.empty { background: #21415d; }
 
+.status.lite {
+  color: #dffaff;
+  background: #0b4a59;
+  border-color: #2d9db0;
+}
+
+.status.pro {
+  color: #d9ffd0;
+  background: #285d2f;
+  border-color: #5c9b48;
+}
+
+.status.enterprise {
+  color: #e9e2ff;
+  background: #3b2f68;
+  border-color: #7666ad;
+}
+
+.lite-dot { background: #2d9db0; }
+.pro-dot { background: var(--green); }
+.enterprise-dot { background: #8e79d8; }
+
 .impact-panel {
   margin-top: 20px;
   padding: 24px 26px;

@@ -9,7 +9,7 @@ public static class PrinterListenerDefaults
     public const int DefaultPort = 9100;
     public const int DefaultIdleJobTimeoutMilliseconds = 1500;
     public const int DefaultMaximumJobBytes = 4 * 1024 * 1024;
-    public const int MaximumListeners = 16;
+    public const int MaximumListeners = 15;
 }
 
 public static class PrinterListenerOverflowBehaviors
@@ -80,10 +80,15 @@ public sealed record PrinterListenerRuntimeStatus(
     PrinterListenerCounters Counters);
 
 public sealed record PrinterListenerCollectionStatus(
-    bool EnterpriseEnabled,
+    bool MultipleListenersEnabled,
+    int MaximumListeners,
     int RunningCount,
     int ListeningCount,
-    IReadOnlyList<PrinterListenerRuntimeStatus> Listeners);
+    IReadOnlyList<PrinterListenerRuntimeStatus> Listeners)
+{
+    // Retained for compatibility with existing diagnostics and tests while callers migrate.
+    public bool EnterpriseEnabled => MultipleListenersEnabled;
+}
 
 public sealed record PrinterListenerSummary(
     int Total,

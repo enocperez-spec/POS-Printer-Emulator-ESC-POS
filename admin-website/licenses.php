@@ -137,7 +137,7 @@ $licenses = $pdo->query(
             l.superseded_by_license_id, l.license_source, l.source_reference, l.row_version,
             EXISTS(
                 SELECT 1 FROM installations i
-                WHERE i.license_id = l.license_id AND i.license_mode IN ('Pro', 'Enterprise')
+                WHERE i.license_id = l.license_id AND i.license_mode IN ('Lite', 'Pro', 'Enterprise')
             ) AS activated
      FROM issued_licenses l
      {$licenseWhere}
@@ -190,7 +190,7 @@ $licenseStatus = static function (array $license): string {
   </header>
   <aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a class="active" href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a><a href="https://posprinteremulator.com/privacy.html"><span aria-hidden="true">⚙</span>Settings</a></nav><p>The private signing key stays protected on the server.</p></aside>
   <main class="license-main">
-    <div class="page-heading"><div><h1>License Manager</h1><p>Issue, replace, deactivate, revoke, and audit Pro and Enterprise licenses.</p></div></div>
+    <div class="page-heading"><div><h1>License Manager</h1><p>Issue, replace, deactivate, revoke, and audit Lite, Pro, and Enterprise licenses.</p></div></div>
 
     <?php if ($flash !== null): ?><div class="license-flash <?= e((string)$flash['type']) ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>"><?= e((string)$flash['message']) ?></div><?php endif; ?>
     <?php if ($syncWarning !== ''): ?><div class="license-flash warning" role="status"><?= e($syncWarning) ?></div><?php endif; ?>
@@ -204,7 +204,7 @@ $licenseStatus = static function (array $license): string {
           <input type="hidden" name="issue_token" value="<?= e($issueToken) ?>">
           <label>Customer or company name<input name="customer_name" maxlength="160" required></label>
           <label>Email address<input type="email" name="email_address" maxlength="254" required></label>
-          <label>License level<select name="license_tier"><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label>
+          <label>License level<select name="license_tier"><option value="Lite">Lite</option><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label>
           <label class="confirmation-check"><input type="checkbox" name="confirmed" value="yes" required><span>I confirm the customer information and license level are correct.</span></label>
           <button class="primary-button" type="submit"><span aria-hidden="true">＋</span> Generate activation key</button>
         </form>
@@ -243,13 +243,13 @@ $licenseStatus = static function (array $license): string {
   <section id="license-manage-view">
     <p id="license-dialog-description">Review the selected customer and choose an action.</p>
     <dl class="license-summary"><div><dt>Customer</dt><dd id="manage-customer"></dd></div><div><dt>Email</dt><dd id="manage-email"></dd></div><div><dt>License ID</dt><dd id="manage-license-id" class="mono"></dd></div><div><dt>Current level</dt><dd id="manage-tier"></dd></div><div><dt>Status</dt><dd id="manage-status"></dd></div></dl>
-    <div class="tier-action"><label>Replacement license level<select id="manage-target-tier"><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label><button type="button" class="dialog-action" data-prepare-action="change_tier">Change license type</button></div>
+    <div class="tier-action"><label>Replacement license level<select id="manage-target-tier"><option value="Lite">Lite</option><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label><button type="button" class="dialog-action" data-prepare-action="change_tier">Change license type</button></div>
     <div class="lifecycle-actions"><button type="button" class="dialog-action" data-prepare-action="deactivate">Deactivate</button><button type="button" class="dialog-action" data-prepare-action="reactivate">Reactivate</button><button type="button" class="dialog-action danger" data-prepare-action="revoke">Revoke</button><button type="button" class="dialog-action danger-outline" data-prepare-action="delete">Delete</button></div>
   </section>
   <section id="trial-manage-view" hidden>
     <p id="trial-dialog-description">Generate a signed paid key for this Trial installation. The customer must enter the key in the application.</p>
     <dl class="license-summary"><div><dt>Customer</dt><dd id="trial-customer"></dd></div><div><dt>Email</dt><dd id="trial-email"></dd></div><div><dt>Current level</dt><dd>Trial</dd></div><div><dt>Installation ID</dt><dd id="trial-installation-id" class="mono"></dd></div></dl>
-    <div class="tier-action"><label>New license level<select id="trial-target-tier"><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label><button type="button" class="dialog-action" data-prepare-action="upgrade_trial">Review upgrade</button></div>
+    <div class="tier-action"><label>New license level<select id="trial-target-tier"><option value="Lite">Lite</option><option value="Pro">Pro</option><option value="Enterprise">Enterprise</option></select></label><button type="button" class="dialog-action" data-prepare-action="upgrade_trial">Review upgrade</button></div>
   </section>
   <section id="license-confirm-view" hidden>
     <button type="button" class="dialog-back" data-dialog-back>← Back</button><h3 id="confirm-title">Confirm action</h3><p id="confirm-description"></p>
@@ -269,6 +269,6 @@ $licenseStatus = static function (array $license): string {
     </form>
   </section>
 </dialog>
-<script src="assets/licenses.js?v=20260718-1"></script>
+<script src="assets/licenses.js?v=20260719-lite"></script>
 </body>
 </html>

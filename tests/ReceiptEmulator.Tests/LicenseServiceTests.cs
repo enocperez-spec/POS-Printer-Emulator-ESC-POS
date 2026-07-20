@@ -32,6 +32,49 @@ public sealed class LicenseServiceTests
         Assert.False(status.Features.Support);
         Assert.False(status.Features.MultipleListeners);
         Assert.False(service.HasEnterpriseAccess);
+        Assert.False(status.IsPaid);
+        Assert.False(service.HasPaidAccess);
+        Assert.Equal(1, status.MaximumListeners);
+    }
+
+    [Theory]
+    [InlineData(LicenseTier.Lite, 1, false)]
+    [InlineData(LicenseTier.Pro, 2, true)]
+    [InlineData(LicenseTier.Enterprise, 15, true)]
+    public void PaidTierUnlocksCurrentPaidFeaturesAndItsListenerAllowance(
+        LicenseTier tier,
+        int maximumListeners,
+        bool multipleListeners)
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Data:Root"] = root,
+            ["Licensing:PublicKeyPem"] = vendorKey.ExportSubjectPublicKeyInfoPem()
+        }).Build();
+        var service = new LicenseService(new TestEnvironment(), configuration);
+        var activationKey = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(), "Tier Customer", "tier@example.com", tier);
+
+        var status = service.Activate("Tier Customer", "tier@example.com", activationKey);
+
+        Assert.Equal(tier.ToString(), status.Mode);
+        Assert.True(status.IsPaid);
+        Assert.True(status.HasProAccess);
+        Assert.True(service.HasPaidAccess);
+        Assert.Equal(maximumListeners, status.MaximumListeners);
+        Assert.Equal(multipleListeners, status.Features.MultipleListeners);
+        Assert.True(status.Features.History);
+        Assert.True(status.Features.Exports);
+        Assert.True(status.Features.PremiumFeatures);
+        Assert.False(status.Features.Watermark);
+        Assert.True(status.Features.StoredLogos);
+        Assert.True(status.Features.PrinterState);
+        Assert.True(status.Features.PrinterProfiles);
+        Assert.True(status.Features.Updates);
+        Assert.True(status.Features.Support);
+        Assert.Equal(-1, status.Remaining);
     }
 
     [Fact]

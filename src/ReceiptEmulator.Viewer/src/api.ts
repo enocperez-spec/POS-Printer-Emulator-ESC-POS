@@ -44,7 +44,7 @@ function normalizeListeners(response: ListenerCollectionResponse): PrinterListen
   const entries = response.listeners
   if (entries.length === 0 || !('configuration' in entries[0])) return response as PrinterListenerCollection
   return {
-    maximumListeners: response.maximumListeners ?? 16,
+    maximumListeners: response.maximumListeners ?? 15,
     listeners: (entries as RuntimeListenerResponse[]).map(runtime => {
       const counters = runtime.counters ?? {}
       const state = runtime.state === 'Listening' ? 'Listening'

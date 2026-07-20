@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+function activation_tier_value(string $licenseTier): int
+{
+    return match ($licenseTier) {
+        'Pro' => 1,
+        'Enterprise' => 2,
+        'Lite' => 3,
+        default => throw new InvalidArgumentException('Invalid license level.'),
+    };
+}
+
 function issue_activation_key(string $customerName, string $emailAddress, string $licenseTier = 'Pro'): array
 {
     $privateKeyPem = @file_get_contents(BUY_ROOT . '/private/vendor-private-key.pem');
@@ -11,7 +21,7 @@ function issue_activation_key(string $customerName, string $emailAddress, string
         $normalized = strtoupper(trim((string) preg_replace('/\s+/', ' ', $value)));
         return substr(hash('sha256', $normalized, true), 0, 16);
     };
-    $tierValue = match ($licenseTier) { 'Pro' => 1, 'Enterprise' => 2, default => throw new InvalidArgumentException('Invalid license level.') };
+    $tierValue = activation_tier_value($licenseTier);
     $payload = chr(2) . $guidBytes . pack('N2', 0, $timestamp) . $hash($customerName) . $hash($emailAddress) . chr($tierValue);
     if (!openssl_sign($payload, $der, $privateKey, OPENSSL_ALGO_SHA256)) throw new RuntimeException('The activation key could not be signed.');
     $offset = 0;

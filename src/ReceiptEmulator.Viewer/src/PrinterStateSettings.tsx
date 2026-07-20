@@ -23,7 +23,7 @@ const presets: Array<{ label: string; description: string; state: PrinterStateUp
   { label: 'Offline', description: 'Printer is unavailable', state: { ...readyState, online: false } },
 ]
 
-export function PrinterStateSettings({ listeners = [], isEnterprise = false }: { listeners?: PrinterListener[]; isEnterprise?: boolean }) {
+export function PrinterStateSettings({ listeners = [], multipleListeners = false }: { listeners?: PrinterListener[]; multipleListeners?: boolean }) {
   const [status, setStatus] = useState<PrinterStateStatus>()
   const [draft, setDraft] = useState<PrinterStateUpdate>(readyState)
   const [busy, setBusy] = useState(false)
@@ -32,11 +32,11 @@ export function PrinterStateSettings({ listeners = [], isEnterprise = false }: {
   const selectedListener = listeners.find(listener => listener.id === selectedListenerId) ?? listeners.find(listener => listener.isDefault)
 
   useEffect(() => {
-    if (!isEnterprise || listeners.length === 0) return
+    if (!multipleListeners || listeners.length === 0) return
     setSelectedListenerId(current => current && listeners.some(listener => listener.id === current)
       ? current
       : (listeners.find(listener => listener.isDefault) ?? listeners[0]).id)
-  }, [isEnterprise, listeners])
+  }, [multipleListeners, listeners])
 
   useEffect(() => {
     let active = true
@@ -91,10 +91,10 @@ export function PrinterStateSettings({ listeners = [], isEnterprise = false }: {
 
   return (
     <div className="settings-panel printer-state-settings">
-      {isEnterprise && listeners.length > 0 ? (
+      {multipleListeners && listeners.length > 0 ? (
         <label className="state-listener-select">
           <Network size={18} />
-          <span><strong>Printer listener</strong><small>Simulated state is managed independently for each Enterprise printer.</small></span>
+          <span><strong>Printer listener</strong><small>Simulated state is managed independently for each configured printer.</small></span>
           <select value={selectedListener?.id ?? ''} onChange={event => setSelectedListenerId(event.target.value)}>
             {listeners.map(listener => <option key={listener.id} value={listener.id}>{listener.name} · port {listener.port}</option>)}
           </select>

@@ -68,7 +68,7 @@ footer nav{display:flex;gap:22px}
 .faq{padding:70px 22px}
 footer{align-items:flex-start;gap:20px;flex-direction:column;padding:28px 22px}
 }
-.license-options{border:0;padding:0;margin:20px 0 8px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.license-options{border:0;padding:0;margin:20px 0 8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .license-options legend{font-size:.84rem;font-weight:800;margin-bottom:9px}
 .license-option{display:flex;align-items:center;gap:8px;border:1px solid #b9c7d7;border-radius:10px;padding:12px;margin:0;cursor:pointer}
 .license-option:has(input:checked){border-color:var(--blue);box-shadow:0 0 0 3px rgba(8,120,239,.12)}

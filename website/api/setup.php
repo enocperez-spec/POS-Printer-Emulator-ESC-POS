@@ -7,6 +7,87 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['error' => 'Not found.'], 404);
 }
 
+function split_sql_statements(string $sql): array
+{
+    $statements = [];
+    $buffer = '';
+    $quote = null;
+    $escaped = false;
+    $lineComment = false;
+    $blockComment = false;
+    $length = strlen($sql);
+
+    for ($index = 0; $index < $length; $index++) {
+        $character = $sql[$index];
+        $next = $index + 1 < $length ? $sql[$index + 1] : '';
+
+        if ($lineComment) {
+            if ($character === "\n") {
+                $lineComment = false;
+                $buffer .= $character;
+            }
+            continue;
+        }
+
+        if ($blockComment) {
+            if ($character === '*' && $next === '/') {
+                $blockComment = false;
+                $index++;
+            }
+            continue;
+        }
+
+        if ($quote !== null) {
+            $buffer .= $character;
+            if ($escaped) {
+                $escaped = false;
+            } elseif ($character === '\\') {
+                $escaped = true;
+            } elseif ($character === $quote) {
+                if ($next === $quote) {
+                    $buffer .= $next;
+                    $index++;
+                } else {
+                    $quote = null;
+                }
+            }
+            continue;
+        }
+
+        if ($character === "'" || $character === '"' || $character === '`') {
+            $quote = $character;
+            $buffer .= $character;
+        } elseif ($character === '#' || ($character === '-' && $next === '-' && ($index + 2 >= $length || ctype_space($sql[$index + 2])))) {
+            $lineComment = true;
+            if ($character === '-') {
+                $index++;
+            }
+        } elseif ($character === '/' && $next === '*') {
+            $blockComment = true;
+            $index++;
+        } elseif ($character === ';') {
+            $statement = trim($buffer);
+            if ($statement !== '') {
+                $statements[] = $statement;
+            }
+            $buffer = '';
+        } else {
+            $buffer .= $character;
+        }
+    }
+
+    if ($quote !== null || $blockComment) {
+        throw new RuntimeException('The protected schema contains an incomplete SQL statement.');
+    }
+
+    $statement = trim($buffer);
+    if ($statement !== '') {
+        $statements[] = $statement;
+    }
+
+    return $statements;
+}
+
 try {
     $body = json_request();
     if (!verify_admin_password((string)($body['username'] ?? ''), (string)($body['password'] ?? ''))) {
@@ -30,7 +111,7 @@ try {
         throw new RuntimeException('Schema file is unavailable.');
     }
 
-    $statements = array_filter(array_map('trim', explode(';', $schema)));
+    $statements = split_sql_statements($schema);
     foreach ($statements as $statement) {
         $pdo->exec($statement);
     }

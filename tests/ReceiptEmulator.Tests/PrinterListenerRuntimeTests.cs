@@ -60,7 +60,7 @@ public sealed class PrinterListenerRuntimeTests
     }
 
     [Fact]
-    public async Task NonEnterpriseDomainMutationIsRejectedWithoutCreatingSqlite()
+    public async Task SingleListenerDomainMutationIsRejectedWithoutCreatingSqlite()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
         var license = new LicenseService(new TestEnvironment(), new ConfigurationBuilder()
@@ -74,7 +74,7 @@ public sealed class PrinterListenerRuntimeTests
             configurations,
             profiles,
             new RecordingSink(),
-            () => false,
+            () => 1,
             new ServiceRuntimeState(),
             NullLoggerFactory.Instance,
             NullLogger<PrinterListenerManager>.Instance);
@@ -103,14 +103,15 @@ public sealed class PrinterListenerRuntimeTests
                          configurations,
                          profiles,
                          new RecordingSink(),
-                         () => false,
+                         () => 1,
                          new ServiceRuntimeState(),
                          NullLoggerFactory.Instance,
                          NullLogger<PrinterListenerManager>.Instance))
         {
             await manager.StartAsync(CancellationToken.None);
             var status = manager.GetStatus();
-            Assert.False(status.EnterpriseEnabled);
+            Assert.False(status.MultipleListenersEnabled);
+            Assert.Equal(1, status.MaximumListeners);
             Assert.Single(status.Listeners);
             Assert.Equal(PrinterListenerDefaults.DefaultId, status.Listeners[0].Configuration.Id);
             Assert.True(status.Listeners[0].Listening);
@@ -122,33 +123,34 @@ public sealed class PrinterListenerRuntimeTests
     }
 
     [Fact]
-    public async Task StatusFallsBackToActiveRuntimeWhenEnterpriseStorageCannotBeOpened()
+    public async Task StatusFallsBackToActiveRuntimeWhenManagedStorageCannotBeOpened()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
-        var enterprise = false;
+        var maximumListeners = 1;
         var license = new LicenseService(new TestEnvironment(), new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Data:Root"] = root })
             .Build());
         var options = new PrinterOptions { BindAddress = "127.0.0.1", Port = FreePort() };
         var profiles = new PrinterProfileService(license);
         var configurations = new PrinterListenerConfigurationService(
-            license, options, profiles, () => enterprise, NullLogger<PrinterListenerConfigurationService>.Instance);
+            license, options, profiles, () => maximumListeners, NullLogger<PrinterListenerConfigurationService>.Instance);
         await using (var manager = new PrinterListenerManager(
                          configurations,
                          profiles,
                          new RecordingSink(),
-                         () => enterprise,
+                         () => maximumListeners,
                          new ServiceRuntimeState(),
                          NullLoggerFactory.Instance,
                          NullLogger<PrinterListenerManager>.Instance))
         {
             await manager.StartAsync(CancellationToken.None);
             Directory.CreateDirectory(Path.Combine(root, ReceiptDatabase.FileName));
-            enterprise = true;
+            maximumListeners = 15;
 
             var status = manager.GetStatus();
 
-            Assert.True(status.EnterpriseEnabled);
+            Assert.True(status.MultipleListenersEnabled);
+            Assert.Equal(15, status.MaximumListeners);
             Assert.Single(status.Listeners);
             Assert.True(status.Listeners[0].Listening);
             Assert.Equal(PrinterListenerDefaults.DefaultId, status.Listeners[0].Configuration.Id);
@@ -240,12 +242,12 @@ public sealed class PrinterListenerRuntimeTests
         var options = new PrinterOptions { BindAddress = "127.0.0.1", Port = defaultPort };
         var profiles = new PrinterProfileService(license);
         var configurations = new PrinterListenerConfigurationService(
-            license, options, profiles, () => true, NullLogger<PrinterListenerConfigurationService>.Instance);
+            license, options, profiles, () => 15, NullLogger<PrinterListenerConfigurationService>.Instance);
         var manager = new PrinterListenerManager(
             configurations,
             profiles,
             sink,
-            () => true,
+            () => 15,
             new ServiceRuntimeState(),
             NullLoggerFactory.Instance,
             NullLogger<PrinterListenerManager>.Instance);

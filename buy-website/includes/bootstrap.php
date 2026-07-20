@@ -153,19 +153,45 @@ function clean_email(string $value): string
 function now_utc(): string { return gmdate('Y-m-d H:i:s'); }
 function random_public_id(): string { return strtoupper(bin2hex(random_bytes(8))); }
 
+function paid_license_tiers(): array
+{
+    return ['Lite', 'Pro', 'Enterprise'];
+}
+
+function select_purchase_tier(array $availableTiers, mixed $requestedTier): string
+{
+    $requested = null;
+    if (is_string($requestedTier)) {
+        try {
+            $requested = clean_license_tier($requestedTier);
+        } catch (InvalidArgumentException) {
+            $requested = null;
+        }
+    }
+    if ($requested !== null && in_array($requested, $availableTiers, true)) {
+        return $requested;
+    }
+    return in_array('Lite', $availableTiers, true) ? 'Lite' : ($availableTiers[0] ?? 'Lite');
+}
+
 function clean_license_tier(string $tier): string
 {
     $tier = ucfirst(strtolower(trim($tier)));
-    if (!in_array($tier, ['Pro', 'Enterprise'], true)) {
+    if (!in_array($tier, paid_license_tiers(), true)) {
         throw new InvalidArgumentException('Select a valid license level.');
     }
     return $tier;
 }
 
-function license_offers(): array
+function configured_license_offers(): array
 {
     $currency = strtoupper((string) config('license.currency'));
-    $offers = [
+    return [
+        'Lite' => [
+            'tier' => 'Lite',
+            'price' => number_format((float) (config('license.lite_price') ?? 24.99), 2, '.', ''),
+            'currency' => $currency,
+        ],
         'Pro' => [
             'tier' => 'Pro',
             'price' => number_format((float) (config('license.pro_price') ?? config('license.price')), 2, '.', ''),
@@ -177,14 +203,21 @@ function license_offers(): array
             'currency' => $currency,
         ],
     ];
-    $rows = db()->query("SELECT setting_key,setting_value FROM site_settings WHERE setting_key IN ('license_price','pro_license_price','enterprise_license_price','license_currency')")->fetchAll();
+}
+
+function license_offers(): array
+{
+    $offers = configured_license_offers();
+    $rows = db()->query("SELECT setting_key,setting_value FROM site_settings WHERE setting_key IN ('license_price','lite_license_price','pro_license_price','enterprise_license_price','license_currency')")->fetchAll();
     $settings = [];
     foreach ($rows as $row) $settings[$row['setting_key']] = $row['setting_value'];
+    $offers['Lite']['price'] = $settings['lite_license_price'] ?? $offers['Lite']['price'];
     $offers['Pro']['price'] = $settings['pro_license_price'] ?? $settings['license_price'] ?? $offers['Pro']['price'];
     $offers['Enterprise']['price'] = $settings['enterprise_license_price'] ?? $offers['Enterprise']['price'];
     if (isset($settings['license_currency'])) {
-        $offers['Pro']['currency'] = $settings['license_currency'];
-        $offers['Enterprise']['currency'] = $settings['license_currency'];
+        foreach (paid_license_tiers() as $tier) {
+            $offers[$tier]['currency'] = $settings['license_currency'];
+        }
     }
     return $offers;
 }

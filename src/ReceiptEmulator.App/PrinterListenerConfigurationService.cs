@@ -8,21 +8,21 @@ public sealed class PrinterListenerConfigurationService
     private const int ReservedViewerPort = 5187;
     private readonly object _sync = new();
     private readonly LicenseService _license;
-    private readonly Func<bool> _hasEnterpriseAccess;
+    private readonly Func<int> _maximumListeners;
     private readonly PrinterOptions _options;
     private readonly PrinterProfileService _profiles;
     private readonly ILogger<PrinterListenerConfigurationService>? _logger;
     private readonly DateTimeOffset _legacyCreatedAt = DateTimeOffset.UtcNow;
     private readonly List<PrinterListenerConfiguration> _listeners = [];
     private ReceiptDatabase? _database;
-    private bool _enterpriseLoaded;
+    private bool _managedListenersLoaded;
 
     public PrinterListenerConfigurationService(
         LicenseService license,
         PrinterOptions options,
         PrinterProfileService profiles,
         ILogger<PrinterListenerConfigurationService>? logger = null)
-        : this(license, options, profiles, () => license.HasEnterpriseAccess, logger)
+        : this(license, options, profiles, () => license.MaximumListeners, logger)
     {
     }
 
@@ -30,29 +30,31 @@ public sealed class PrinterListenerConfigurationService
         LicenseService license,
         PrinterOptions options,
         PrinterProfileService profiles,
-        Func<bool> hasEnterpriseAccess,
+        Func<int> maximumListeners,
         ILogger<PrinterListenerConfigurationService>? logger = null)
     {
         _license = license;
         _options = options;
         _profiles = profiles;
-        _hasEnterpriseAccess = hasEnterpriseAccess;
+        _maximumListeners = maximumListeners;
         _logger = logger;
     }
 
-    public bool HasEnterpriseAccess => _hasEnterpriseAccess();
+    public int MaximumListeners => Math.Clamp(_maximumListeners(), 1, PrinterListenerDefaults.MaximumListeners);
+
+    public bool CanManageMultipleListeners => MaximumListeners > 1;
 
     public IReadOnlyList<PrinterListenerConfiguration> GetAll()
     {
         lock (_sync)
         {
-            if (!HasEnterpriseAccess)
+            if (!CanManageMultipleListeners)
             {
                 return [CreateLegacyDefault()];
             }
 
-            EnsureEnterpriseLoadedUnsafe();
-            return _listeners.ToArray();
+            EnsureManagedListenersLoadedUnsafe();
+            return GetEffectiveListenersUnsafe().ToArray();
         }
     }
 
@@ -60,7 +62,7 @@ public sealed class PrinterListenerConfigurationService
     {
         lock (_sync)
         {
-            if (!HasEnterpriseAccess)
+            if (!CanManageMultipleListeners)
             {
                 var defaultListener = CreateLegacyDefault();
                 return id.Equals(defaultListener.Id, StringComparison.OrdinalIgnoreCase)
@@ -68,8 +70,8 @@ public sealed class PrinterListenerConfigurationService
                     : null;
             }
 
-            EnsureEnterpriseLoadedUnsafe();
-            return FindUnsafe(id);
+            EnsureManagedListenersLoadedUnsafe();
+            return FindEffectiveUnsafe(id);
         }
     }
 
@@ -77,13 +79,13 @@ public sealed class PrinterListenerConfigurationService
     {
         lock (_sync)
         {
-            if (!HasEnterpriseAccess)
+            if (!CanManageMultipleListeners)
             {
                 return CreateLegacyDefault();
             }
 
-            EnsureEnterpriseLoadedUnsafe();
-            return FindUnsafe(PrinterListenerDefaults.DefaultId)!;
+            EnsureManagedListenersLoadedUnsafe();
+            return FindEffectiveUnsafe(PrinterListenerDefaults.DefaultId)!;
         }
     }
 
@@ -111,9 +113,9 @@ public sealed class PrinterListenerConfigurationService
     {
         lock (_sync)
         {
-            EnsureEnterpriseAccess();
-            EnsureEnterpriseLoadedUnsafe();
-            var existing = FindUnsafe(id);
+            EnsureMultipleListenerAccess();
+            EnsureManagedListenersLoadedUnsafe();
+            var existing = FindEffectiveUnsafe(id);
             if (existing is null)
             {
                 return false;
@@ -147,8 +149,8 @@ public sealed class PrinterListenerConfigurationService
     {
         lock (_sync)
         {
-            EnsureEnterpriseAccess();
-            EnsureEnterpriseLoadedUnsafe();
+            EnsureMultipleListenerAccess();
+            EnsureManagedListenersLoadedUnsafe();
             var canonical = Validate(
                 ToInput(listener),
                 listener.Id,
@@ -162,9 +164,9 @@ public sealed class PrinterListenerConfigurationService
     {
         lock (_sync)
         {
-            EnsureEnterpriseAccess();
-            EnsureEnterpriseLoadedUnsafe();
-            var existing = FindUnsafe(id) ?? throw new KeyNotFoundException("The printer listener was not found.");
+            EnsureMultipleListenerAccess();
+            EnsureManagedListenersLoadedUnsafe();
+            var existing = FindEffectiveUnsafe(id) ?? throw new KeyNotFoundException("The printer listener was not found.");
             RemoveUnsafe(existing);
         }
     }
@@ -174,9 +176,9 @@ public sealed class PrinterListenerConfigurationService
         lock (_sync)
         {
             IReadOnlyList<PrinterListenerConfiguration> listeners;
-            if (HasEnterpriseAccess)
+            if (CanManageMultipleListeners)
             {
-                listeners = GetEnterpriseListenersUnsafe();
+                listeners = GetManagedListenersUnsafe();
             }
             else
             {
@@ -197,7 +199,7 @@ public sealed class PrinterListenerConfigurationService
                     catch (Exception exception)
                     {
                         _logger?.LogWarning(exception,
-                            "Preserved Enterprise listener configuration could not be checked before deleting profile {ProfileId}",
+                            "Preserved listener configuration could not be checked before deleting profile {ProfileId}",
                             profileId);
                         return true;
                     }
@@ -207,19 +209,19 @@ public sealed class PrinterListenerConfigurationService
         }
     }
 
-    private IReadOnlyList<PrinterListenerConfiguration> GetEnterpriseListenersUnsafe()
+    private IReadOnlyList<PrinterListenerConfiguration> GetManagedListenersUnsafe()
     {
-        EnsureEnterpriseLoadedUnsafe();
+        EnsureManagedListenersLoadedUnsafe();
         return _listeners;
     }
 
     private PrinterListenerConfiguration PrepareCreateUnsafe(PrinterListenerInput input)
     {
-        EnsureEnterpriseAccess();
-        EnsureEnterpriseLoadedUnsafe();
-        if (_listeners.Count >= PrinterListenerDefaults.MaximumListeners)
+        EnsureMultipleListenerAccess();
+        EnsureManagedListenersLoadedUnsafe();
+        if (_listeners.Count >= MaximumListeners)
         {
-            throw new InvalidOperationException($"Enterprise installations support up to {PrinterListenerDefaults.MaximumListeners} printer listeners.");
+            throw ListenerLimitReached();
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -228,18 +230,22 @@ public sealed class PrinterListenerConfigurationService
 
     private PrinterListenerConfiguration PrepareUpdateUnsafe(string id, PrinterListenerInput input)
     {
-        EnsureEnterpriseAccess();
-        EnsureEnterpriseLoadedUnsafe();
-        var existing = FindUnsafe(id) ?? throw new KeyNotFoundException("The printer listener was not found.");
+        EnsureMultipleListenerAccess();
+        EnsureManagedListenersLoadedUnsafe();
+        var existing = FindEffectiveUnsafe(id) ?? throw new KeyNotFoundException("The printer listener was not found.");
         return Validate(input, existing.Id, existing.CreatedAt, DateTimeOffset.UtcNow);
     }
 
     private void CommitUnsafe(PrinterListenerConfiguration listener)
     {
         var existing = FindUnsafe(listener.Id);
-        if (existing is null && _listeners.Count >= PrinterListenerDefaults.MaximumListeners)
+        if (existing is not null && FindEffectiveUnsafe(listener.Id) is null)
         {
-            throw new InvalidOperationException($"Enterprise installations support up to {PrinterListenerDefaults.MaximumListeners} printer listeners.");
+            throw new InvalidOperationException("This printer listener is preserved above the current license limit and cannot be changed until the license is upgraded or another active listener is removed.");
+        }
+        if (existing is null && _listeners.Count >= MaximumListeners)
+        {
+            throw ListenerLimitReached();
         }
 
         PersistUnsafe(listener);
@@ -269,9 +275,9 @@ public sealed class PrinterListenerConfigurationService
         _listeners.Remove(existing);
     }
 
-    private void EnsureEnterpriseLoadedUnsafe()
+    private void EnsureManagedListenersLoadedUnsafe()
     {
-        if (_enterpriseLoaded)
+        if (_managedListenersLoaded)
         {
             return;
         }
@@ -283,7 +289,7 @@ public sealed class PrinterListenerConfigurationService
         }
         catch (Exception exception)
         {
-            _logger?.LogError(exception, "Enterprise printer listener configuration could not be loaded");
+            _logger?.LogError(exception, "Printer listener configuration could not be loaded");
             throw new InvalidOperationException("Printer listener settings could not be loaded from local storage.", exception);
         }
 
@@ -295,7 +301,7 @@ public sealed class PrinterListenerConfigurationService
         }
 
         SortUnsafe();
-        _enterpriseLoaded = true;
+        _managedListenersLoaded = true;
     }
 
     private PrinterListenerConfiguration CreateLegacyDefault()
@@ -419,13 +425,23 @@ public sealed class PrinterListenerConfigurationService
     private ReceiptDatabase EnsureDatabaseUnsafe() =>
         _database ??= new ReceiptDatabase(_license.RootPath);
 
-    private void EnsureEnterpriseAccess()
+    private void EnsureMultipleListenerAccess()
     {
-        if (!HasEnterpriseAccess)
+        if (!CanManageMultipleListeners)
         {
-            throw new UnauthorizedAccessException("Multiple printer listeners require an Enterprise license.");
+            throw new UnauthorizedAccessException("Multiple printer listeners require a Pro or Enterprise license.");
         }
     }
+
+    private IReadOnlyList<PrinterListenerConfiguration> GetEffectiveListenersUnsafe() =>
+        _listeners.Take(MaximumListeners).ToArray();
+
+    private PrinterListenerConfiguration? FindEffectiveUnsafe(string id) =>
+        GetEffectiveListenersUnsafe().FirstOrDefault(listener =>
+            listener.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+    private InvalidOperationException ListenerLimitReached() => new(
+        $"The {_license.GetStatus().Mode} License supports up to {MaximumListeners} printer listener{(MaximumListeners == 1 ? string.Empty : "s")}.");
 
     private static PrinterListenerInput ToInput(PrinterListenerConfiguration listener) => new(
         listener.Name,

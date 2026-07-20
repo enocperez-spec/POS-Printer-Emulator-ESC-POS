@@ -1,6 +1,26 @@
 <?php
 declare(strict_types=1);
 
+function activation_tier_value(string $licenseTier): int
+{
+    return match ($licenseTier) {
+        'Pro' => 1,
+        'Enterprise' => 2,
+        'Lite' => 3,
+        default => throw new InvalidArgumentException('Choose a valid license level.'),
+    };
+}
+
+function activation_tier_name(int $tierValue): string
+{
+    return match ($tierValue) {
+        1 => 'Pro',
+        2 => 'Enterprise',
+        3 => 'Lite',
+        default => throw new InvalidArgumentException('The imported activation key level is invalid.'),
+    };
+}
+
 function issue_activation_key(string $customerName, string $emailAddress, string $licenseTier = 'Pro'): array
 {
     $customerName = trim(preg_replace('/\s+/', ' ', $customerName) ?? '');
@@ -11,11 +31,7 @@ function issue_activation_key(string $customerName, string $emailAddress, string
     if (strlen($emailAddress) > 254 || filter_var($emailAddress, FILTER_VALIDATE_EMAIL) === false) {
         throw new InvalidArgumentException('A valid email address is required.');
     }
-    $tierValue = match ($licenseTier) {
-        'Pro' => 1,
-        'Enterprise' => 2,
-        default => throw new InvalidArgumentException('Choose a valid license level.'),
-    };
+    $tierValue = activation_tier_value($licenseTier);
 
     $privateKeyPath = dirname(__DIR__) . '/private/vendor-private-key.pem';
     $privateKeyPem = file_get_contents($privateKeyPath);
@@ -138,11 +154,7 @@ function validate_activation_key_record(array $license): void
     $licenseId = dotnet_guid_string(substr($payload, 1, 16));
     $tier = $version === 1
         ? 'Pro'
-        : match (ord($payload[57])) {
-            1 => 'Pro',
-            2 => 'Enterprise',
-            default => throw new InvalidArgumentException('The imported activation key level is invalid.'),
-        };
+        : activation_tier_name(ord($payload[57]));
     if (!hash_equals($licenseId, canonical_license_uuid((string)($license['license_id'] ?? ''))) ||
         !hash_equals($tier, canonical_paid_tier((string)($license['license_tier'] ?? ''))) ||
         !hash_equals(substr($payload, 25, 16), registration_hash((string)($license['customer_name'] ?? ''))) ||

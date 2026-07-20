@@ -47,7 +47,7 @@ public sealed class ReceiptStore
 
     internal string DatabasePath => Path.Combine(_license.RootPath, ReceiptDatabase.FileName);
 
-    private bool HasPersistentHistory => _persistentHistoryOverride?.Invoke() ?? _license.HasProAccess;
+    private bool HasPersistentHistory => _persistentHistoryOverride?.Invoke() ?? _license.HasPaidAccess;
 
     public void Add(ReceiptJob job)
     {
@@ -66,7 +66,7 @@ public sealed class ReceiptStore
         }
     }
 
-    public void EnableProHistory()
+    public void EnablePaidHistory()
     {
         lock (_sync)
         {
@@ -93,6 +93,8 @@ public sealed class ReceiptStore
             }
         }
     }
+
+    public void EnableProHistory() => EnablePaidHistory();
 
     public IReadOnlyList<JobSummary> GetSummaries(string? listenerId = null)
     {

@@ -51,7 +51,12 @@ try
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- generate-keys --output "C:\secure\license-keys"
 
             Issue a customer activation key:
-              dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "C:\secure\license-keys\vendor-private-key.pem" --customer "Company Name" --email "customer@example.com" --tier Pro
+              dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "C:\secure\license-keys\vendor-private-key.pem" --customer "Company Name" --email "customer@example.com" --tier Lite
+
+            Paid license levels:
+              Lite        All paid features with one printer listener
+              Pro         All paid features with up to two printer listeners
+              Enterprise  All enterprise features with up to fifteen printer listeners
 
             Verify any activation key against the public key built into the application:
               dotnet run --project tools/POSPrinterEmulator.LicenseTool -- verify --key "PPE1-..." --customer "Company Name" --email "customer@example.com"

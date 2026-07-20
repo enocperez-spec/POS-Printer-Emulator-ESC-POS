@@ -5,7 +5,8 @@ return [
     'app_url' => 'https://buy.posprinteremulator.com',
     'environment' => 'production',
     'license' => [
-        'product_name' => 'POS Printer Emulator Pro Version',
+        'product_name' => 'POS Printer Emulator',
+        'lite_price' => '24.99', // The Admin Portal can override this value.
         'pro_price' => '0.00', // The Admin Portal can override this value.
         'enterprise_price' => '0.00', // The Admin Portal can override this value.
         'currency' => 'USD',

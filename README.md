@@ -7,10 +7,10 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 ## Highlights
 
 - RAW TCP/IP listener on `0.0.0.0:9100` with cut-command and idle-timeout job framing.
-- Enterprise-only management for up to 16 isolated printer listeners with independent ports, profiles, state, buffers, counters, and Activity filtering.
+- Four-tier licensing in v0.3.25 provides total listener allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15; managed listeners retain independent ports, profiles, state, buffers, counters, and Activity filtering.
 - Receipt preview with persistent Light and Dark viewing modes.
 - Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
-- Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features without reinstalling.
+- Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
 - Stored Logo imports that map local PNG, JPEG, or WebP artwork to Epson NV graphic keys used by POS receipts.
@@ -26,13 +26,15 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
+> **Release status:** v0.3.25 is the current public release. It introduces the Trial/Lite/Pro/Enterprise model described below.
+
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
 ## Install on Windows
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.24-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.25-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -44,15 +46,15 @@ After installation, open **Settings → Printer Setup Wizard**. The wizard asks 
 
 Open **Settings → Printer State** to simulate Ready, Paper Low, Paper Out, Cover Open, Cutter Error, Offline, and custom error conditions. Connected POS clients receive Epson-compatible `DLE EOT` real-time responses and `GS a` Automatic Status Back notifications whenever the simulated state changes.
 
-Pro and Enterprise customers can open **Settings → Printer Profiles** to select the protected EPSON TM-T88V or Generic ESC/POS profile, duplicate and customize a profile, configure paper and command capabilities, and import or export `.ppeprofile` files. Trial installations can see the feature but cannot open it or call its local APIs.
+Lite, Pro, and Enterprise customers can open **Settings → Printer Profiles** to select the protected EPSON TM-T88V or Generic ESC/POS profile, duplicate and customize a profile, configure paper and command capabilities, and import or export `.ppeprofile` files. Trial installations can see the feature but cannot open it or call its local APIs.
 
-Enterprise customers can open **Settings → Printer Listeners** to create and manage up to 16 independently named RAW TCP endpoints. Each listener has its own IPv4 bind address, unique port, printer profile, simulated state, optional job buffer, live counters, and start/stop/restart controls. Activity can be filtered by listener, and every saved job records the listener name and port that received it. Trial and Pro installations continue using the compatible, non-removable `0.0.0.0:9100` default listener.
+The v0.3.25 listener model gives Trial and Lite one total listener, Pro two total listeners, and Enterprise up to 15 total listeners. Pro and Enterprise customers can open **Settings → Printer Listeners** to create and manage their allowed RAW TCP endpoints. Each listener has its own IPv4 bind address, unique port, printer profile, simulated state, optional job buffer, live counters, and start/stop/restart controls. Activity can be filtered by listener, and every saved job records the listener name and port that received it.
 
 Open **Settings → Stored Logos** when a receipt references an image saved inside the physical printer rather than sending its pixels. Import a PNG, JPEG, or WebP image, enter the two-character Epson storage key shown by the command inspector (for example, `00`), and matching receipts will render that local logo automatically.
 
-Pro and Enterprise customers can use the **Import capture** button in Activity to open a raw `.bin` receipt or a portable `.ppecapture` package. Select any job and use **Capture** to export a checksum-protected package or **Replay** to run the exact saved bytes through the current parser and renderer. Imported and replayed jobs are labeled separately and remain local to the computer.
+Lite, Pro, and Enterprise customers can use the **Import capture** button in Activity to open a raw `.bin` receipt or a portable `.ppecapture` package. Select any job and use **Capture** to export a checksum-protected package or **Replay** to run the exact saved bytes through the current parser and renderer. Imported and replayed jobs are labeled separately and remain local to the computer.
 
-> The current development installer is not code-signed, so Windows SmartScreen may show a warning. Production releases should be signed with a trusted Windows code-signing certificate.
+> The current installer is not code-signed, so Windows SmartScreen may show a warning. A trusted Windows code-signing certificate remains planned for a future production-hardening release.
 
 ## Connect a POS application
 
@@ -64,26 +66,31 @@ Configure the POS system as a RAW or network receipt printer using:
 
 The diagnostic viewer remains local to the Windows computer at `http://127.0.0.1:5187`.
 
-Enterprise installations can assign additional unique ports under **Settings → Printer Listeners**. Configure each POS station with the host and port displayed for its assigned listener.
+Pro and Enterprise installations can assign additional unique ports under **Settings → Printer Listeners**, within their two- and 15-listener totals. Configure each POS station with the host and port displayed for its assigned listener.
 
-## Trial, Pro, and Enterprise versions
+## Trial, Lite, Pro, and Enterprise versions
 
 Every new installation begins in **Trial Mode**. Trial Mode permits five completed emulated print jobs per local calendar day. Trial jobs remain available only for the current service session, every receipt displays a visible trial watermark, and exports and premium controls are locked.
 
-After purchase, open **License** in the application and enter the customer/company name, email address, and activation key. A valid key immediately enables the **Pro Version** with:
+After purchase, open **License** in the application and enter the customer/company name, email address, and activation key. A valid Lite, Pro, or Enterprise key immediately enables:
 
 - unlimited emulated print jobs;
 - persistent print-job history of up to 500 jobs;
 - watermark-free receipt previews;
-- text and raw-data exports, Print/PDF, and all premium controls.
+- text and raw-data exports, Print/PDF, printer profiles, Stored Logos, Printer State, updates, support, capture/import/replay, and all other paid controls.
 
-An **Enterprise Version** includes every Pro feature plus multiple isolated printer listeners, per-listener profiles and printer state, optional buffering, live counters, independent lifecycle controls, and listener-based Activity filtering. Multiple-listener controls and APIs remain unavailable to Trial and Pro licenses.
+The paid feature set is the same across Lite, Pro, and Enterprise. The license level controls the total number of printer listeners:
+
+- **Trial:** one listener, five completed jobs per day, session-only Activity, TRIAL watermark, and paid features locked.
+- **Lite:** one listener and all paid features for a fixed one-time price of **$24.99**.
+- **Pro:** two total listeners and all paid features; the current price is shown on the Buy page and managed through the Admin Portal.
+- **Enterprise:** up to 15 total listeners and all paid features, including the full multi-listener workflow; the current price is shown on the Buy page and managed through the Admin Portal.
 
 Activation is validated offline using a public-key signature. The customer does not reinstall the application or download another package. Activation keys are tied to the registered customer/company name and email address.
 
 ## License and usage dashboard
 
-Version 0.3.24 reports installation registration, Trial, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
+Version 0.3.25 reports installation registration, Trial, Lite, Pro, or Enterprise status, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
@@ -139,7 +146,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.24-win-x64.exe`
+Output: `artifacts\installer\POSPrinterEmulatorSetup-0.3.25-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history.
 
@@ -159,7 +166,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.24 artifacts/installer/POSPrinterEmulatorSetup-0.3.24-win-x64.exe --title "POS Printer Emulator 0.3.24" --notes "Preserves paid licenses during upgrades, adds Trial-safe activation diagnostics, and prevents Windows printer-port conflicts."
+gh release create v0.3.25 artifacts/installer/POSPrinterEmulatorSetup-0.3.25-win-x64.exe --title "POS Printer Emulator 0.3.25" --notes "Adds Lite licensing, preserves existing paid keys, and enforces 1, 2, and 15-listener paid-tier allowances."
 ```
 
 ## Issue customer activation keys
@@ -177,7 +184,7 @@ The protected Admin Portal License Manager unifies manual and purchase-issued ke
 For unattended installation, provide the required registration fields:
 
 ```console
-POSPrinterEmulatorSetup-0.3.24-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
+POSPrinterEmulatorSetup-0.3.25-win-x64.exe /VERYSILENT /CustomerName="Company Name" /CustomerEmail="customer@example.com"
 ```
 
 ## Configuration
@@ -190,11 +197,11 @@ Development settings are stored in `src/ReceiptEmulator.App/appsettings.json`:
 - `Printer:MaximumJobBytes`: rejects oversized jobs.
 - `Viewer:Url`: local viewer binding; default `http://127.0.0.1:5187`.
 
-The `Printer` section supplies the compatible default listener for Trial and Pro installations and the initial Enterprise listener. Enterprise listener changes are validated and stored locally in SQLite through **Settings → Printer Listeners**.
+The `Printer` section supplies the compatible default listener for every installation. In v0.3.25, Pro and Enterprise listener changes are validated against their total allowances and stored locally in SQLite through **Settings → Printer Listeners**.
 
 ## Current MVP limitations
 
-Version 0.3.24 stores Pro and Enterprise history plus Enterprise listener configuration in one local SQLite database with a 500-job history limit, while Trial remains session-only. Existing JSON and v0.3.20 SQLite history migrate transactionally. Customer-facing database maintenance, receipt comparison, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
+Version 0.3.25 stores Lite, Pro, and Enterprise history plus paid listener configuration in one local SQLite database with a 500-job history limit, while Trial remains session-only. Existing JSON and earlier SQLite history migrate transactionally. Customer-facing database maintenance, receipt comparison, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
 
 ## Release roadmap
 
@@ -210,9 +217,10 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.22 — Receipt workflow regression fixes:** Restore near-instant Test Receipt display and reliable Clear All deletion when obsolete legacy history files are locked.
 - **Released in v0.3.23 — Activation and Printer Setup Wizard fixes:** Prevent valid Enterprise activation from failing when optional paid storage cannot initialize, and create Windows printer queues through the native printer API without the WMI `Invalid parameter` failure.
 - **Released in v0.3.24 — Upgrade licensing and Printer Setup safeguards:** Preserve paid licensing during updates, recover from hardened-folder persistence failures, provide Trial-safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100.
-- **v0.3.25 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.26 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
-- **v0.3.27 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
+- **v0.3.26 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.27 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
+- **v0.3.28 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

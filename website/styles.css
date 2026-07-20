@@ -63,3 +63,15 @@ img{height:auto}
 .seo-link-grid span{color:var(--muted);font-size:14px}
 @media (max-width:1100px){.seo-overview-grid{grid-template-columns:1fr;gap:45px}}
 @media (max-width:680px){.seo-link-grid{grid-template-columns:1fr}.seo-link-grid a{min-height:0}}
+
+/* v0.3.25 four-tier comparison */
+.comparison-table{grid-template-columns:repeat(4,minmax(0,1fr))}
+.compare-head{padding:20px 12px;font-size:17px}
+.compare-head.lite{background:#14627a}
+.compare-head.pro{background:var(--cyan);color:#00213a}
+.compare-head.enterprise{background:#493e76}
+.compare-cell{min-height:92px;padding:16px 12px;align-items:flex-start;gap:10px;font-size:13px;line-height:1.45}
+.compare-cell:nth-child(even){border-left:0}
+.compare-cell:not(:nth-child(4n + 1)){border-left:1px solid var(--line)}
+.trial-icon,.check{flex-basis:30px;width:30px;height:30px;font-size:12px}
+@media (max-width:780px){.comparison-table{grid-template-columns:repeat(4,minmax(130px,1fr));overflow-x:auto}.compare-head{padding:16px 8px;font-size:14px}.compare-cell{min-height:106px;padding:12px 8px}}
