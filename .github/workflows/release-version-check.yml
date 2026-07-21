@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Verify public website matches its release manifest
+      - name: Verify Admin Dev Support and public website match the release manifest
         run: dotnet run --project tools/ReceiptLab.Build -- sync-release --check
       - name: Validate public website SEO
         run: dotnet run --project tools/ReceiptLab.Build -- check-seo

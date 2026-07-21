@@ -91,8 +91,25 @@ $expectContains('license_maintenance_events',$schema,'Fresh database schema is m
 $expectContains('UNIQUE KEY uq_license_maintenance_source (license_id, source_reference)',$schema,'Renewal source references must be unique per license for idempotency.');
 $expectContains("'2027-07-19 23:59:59.000000'",$maintenanceMigration,'Existing paid licenses are not grandfathered through July 19, 2027.');
 $expectContains("('v0.3.26', 'v0.3.26', 'Release', 'Annual Application Maintenance and Support', 'Released'", $devSupport, 'Admin Dev Support does not mark v0.3.26 maintenance as released.');
+$publicRelease = json_decode(file_get_contents($root . '/website/release.json') ?: '{}', true);
+$publicVersion = is_array($publicRelease) ? (string)($publicRelease['currentVersion'] ?? '') : '';
+if ($publicVersion === '') {
+    $failures[] = 'The public release manifest does not identify a current version.';
+} else {
+    $expectContains(
+        "('v{$publicVersion}', 'v{$publicVersion}', 'Release'",
+        $devSupport,
+        "Admin Dev Support is missing the public v{$publicVersion} release."
+    );
+    if (!preg_match("/\\('v" . preg_quote($publicVersion, '/') . "',\\s*'v" . preg_quote($publicVersion, '/') . "',\\s*'Release',\\s*'[^']+',\\s*'Released'/", $devSupport)) {
+        $failures[] = "Admin Dev Support does not mark public v{$publicVersion} as released.";
+    }
+}
 $expectContains("('BUG-013', 'Support diagnostics failed when Stored Logos directory was absent'",$devSupport,'Admin Dev Support is missing released BUG-013.');
-$expectContains("('v0.3.27', 'v0.3.27', 'Release', 'Receipt comparison and automated validation', 'Next'", $devSupport, 'Receipt comparison was not moved to v0.3.27.');
+$expectContains("('v0.3.27', 'v0.3.27', 'Release', 'Enhanced support package and connection diagnostics', 'Next'", $devSupport, 'Enhanced support diagnostics was not promoted to v0.3.27.');
+$expectContains("('v0.3.28', 'v0.3.28', 'Release', 'Receipt comparison and automated validation', 'Planned'", $devSupport, 'Receipt comparison was not moved to v0.3.28.');
+$expectContains("WHEN 'v0.3.27' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'", $devSupport, 'Admin Dev Support is missing the v0.3.27 diagnostics issue link.');
+$expectContains("WHEN 'v0.3.28' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.28 comparison issue link.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
 $expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');

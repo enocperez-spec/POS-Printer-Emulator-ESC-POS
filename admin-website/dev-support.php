@@ -109,8 +109,32 @@ function migrate_dev_support_release_numbers(): void
                 && $byKey[$itemKey]['title'] === $title;
         }
 
-        if (!$hasCanonicalRelease && !$hasOldLayout && !$hasPartiallyShiftedLayout && $rows !== []) {
+        // Some production databases had the stale planned v0.3.20 row while
+        // v0.3.21-v0.3.24 had already been replaced by released records. Those
+        // rows must not be shifted again; remove only the stale v0.3.20 row and
+        // let the canonical release upserts below restore the release sequence.
+        $hasReleasedMixedLayout = isset(
+            $byKey['v0.3.20'],
+            $byKey['v0.3.22'],
+            $byKey['v0.3.23'],
+            $byKey['v0.3.24']
+        )
+            && in_array(
+                $byKey['v0.3.20']['title'],
+                ['Multiple printer listeners', 'Enterprise multiple printer listeners'],
+                true
+            )
+            && $byKey['v0.3.22']['title'] === 'Receipt workflow regression fixes'
+            && $byKey['v0.3.23']['title'] === 'Activation and Printer Setup Wizard fixes'
+            && $byKey['v0.3.24']['title'] === 'Upgrade licensing and Printer Setup safeguards';
+
+        if (!$hasCanonicalRelease && !$hasOldLayout && !$hasPartiallyShiftedLayout && !$hasReleasedMixedLayout && $rows !== []) {
             throw new RuntimeException('The release tracker has an unexpected v0.3.20-v0.3.24 layout.');
+        }
+
+        if ($hasReleasedMixedLayout) {
+            $deleteStaleRelease = $pdo->prepare('DELETE FROM development_roadmap WHERE id = ?');
+            $deleteStaleRelease->execute([$byKey['v0.3.20']['id']]);
         }
 
         if ($hasOldLayout) {
@@ -252,21 +276,36 @@ $releaseSync = database()->prepare(
          'One included year for new paid licenses; existing-license grandfathering through July 19, 2027; optional one-time Lite $9.99, Pro $19.99, and Enterprise $59.99 renewals; signed entitlement refresh; server-verified PayPal renewal orders; Admin pricing, status, history, extension, and revocation controls; telemetry without keys or receipt data.',
          'Maintenance must be implemented before future releases are delivered under the coverage policy.',
          'Permanent paid features keep working after coverage ends, early and lapsed renewals calculate correctly and idempotently, only covered customers receive signed update entitlements, and commerce, licensing, migration, and telemetry tests pass.', '2026-07-20 00:00:00.000000'),
-        ('v0.3.27', 'v0.3.27', 'Release', 'Receipt comparison and automated validation', 'Next', 327,
+        ('v0.3.27', 'v0.3.27', 'Release', 'Enhanced support package and connection diagnostics', 'Next', 327,
+         'Guide nontechnical customers through installation, printer, listener, and connection problems and produce privacy-reviewed support evidence.',
+         'Guided checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, Epson drivers, and local or POS connectivity; plain-language results; reviewed repair actions; copyable summaries; and previewed redacted ZIP support packages available locally to every license tier.',
+         'Customer diagnostics and package export reduce support time immediately and must remain available without active maintenance, while assisted support contact continues to follow the maintenance entitlement.',
+         'Common service, listener, port, firewall, queue, driver, storage, and connection failures are explained and safely repairable where supported, and a reviewed support package excludes receipt contents and licensing secrets by default.', NULL),
+        ('v0.3.28', 'v0.3.28', 'Release', 'Receipt comparison and automated validation', 'Planned', 328,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
-         'Deterministic captures and profiles are required for meaningful comparisons.',
+         'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.28', 'v0.3.28', 'Release', 'Enhanced support and connection diagnostics', 'Planned', 328,
-         'Guide nontechnical customers through connection problems and support collection.',
-         'Test the service, listeners, ports, firewall, queues, drivers, viewer, and local and remote connectivity, then create redacted reviewed support packages and offer repair actions.',
-         'Diagnostics should understand the completed listener, profile, capture, and comparison system.',
-         'Common connection problems are explained without Windows admin tools and a reviewed redacted support package can be produced.', NULL),
         ('v0.3.29', 'v0.3.29', 'Release', 'Guided update installation and restart', 'Planned', 329,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
-         'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL)
+         'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+        ('v0.3.30', 'v0.3.30', 'Release', 'Security remediation (Phase 1)', 'Released', 330,
+         'Resolve the actionable security findings from the completed deep review before adding more externally reachable functionality.',
+         'Credential rotation and separation; HTTPS, cookie, CSRF, authorization, input-validation, and rate-limit hardening; encrypted and redacted sensitive desktop data; license-boundary enforcement; signed update and installer verification; dependency, secret, and package-integrity checks; security regression coverage.',
+         'Security findings affecting the public website, Admin Portal, purchase flow, and Windows application must be remediated before feature development continues.',
+         'No critical or high findings remain, exposed credentials are rejected and absent from tracked files and logs, security tests pass, and trusted update and installer verification succeeds.', '2026-07-21 00:00:00.000000'),
+        ('v0.3.31', 'v0.3.31', 'Release', 'Secure development lifecycle (Phase 2)', 'Released', 331,
+         'Make security review and verification a repeatable requirement for every future product release.',
+         'Security checklist and threat-model notes; automated dependency, secret, static-analysis, package-signing, and HTTPS checks; API and desktop security regression suites; tracked findings and evidence; explicit security sign-off; scheduled lightweight and deep reviews.',
+         'The Phase 1 protections must remain enforceable as the website, Admin Portal, and desktop application evolve.',
+         'The documented checklist, CI gates, regression suites, tracker evidence, and release sign-off are exercised successfully on a complete release.', '2026-07-21 00:00:00.000000'),
+        ('v0.3.32', 'v0.3.32', 'Release', 'Updater installer-asset validation', 'Released', 332,
+         'Prevent documentation-only GitHub releases from being presented as installable Windows updates.',
+         'Require a trusted Windows executable release asset; clearly report releases without an installer; add installer and no-installer response regression tests; publish the self-contained v0.3.32 Windows installer and SHA-256 checksum.',
+         'Customers must receive a real installer asset instead of a GitHub release webpage when the desktop updater offers installation.',
+         'Installed customers receive a valid v0.3.32 installer download, while releases without a Windows installer cannot trigger an installation attempt.', '2026-07-21 00:00:00.000000')
      ON DUPLICATE KEY UPDATE
         version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
         status = VALUES(status), priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
@@ -331,12 +370,17 @@ database()->prepare(
      SET github_url = CASE item_key
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
+         WHEN 'v0.3.27' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
+         WHEN 'v0.3.28' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
          WHEN 'v0.3.29' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
+         WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
+         WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
          WHEN 'BACKLOG-007' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/9'
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.27', 'v0.3.28', 'v0.3.29', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.27', 'v0.3.28', 'v0.3.29', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

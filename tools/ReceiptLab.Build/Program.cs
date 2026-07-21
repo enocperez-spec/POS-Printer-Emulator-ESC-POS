@@ -311,6 +311,8 @@ internal static class ReceiptLabBuild
         var installer = File.Exists(installerPath) ? new FileInfo(installerPath) : null;
         var changed = new List<string>();
 
+        ValidateAdminDevSupportRelease(displayVersion);
+
         foreach (var websitePage in Directory.EnumerateFiles(
                      Path.Combine(Root, "website"),
                      "*.html",
@@ -355,6 +357,26 @@ internal static class ReceiptLabBuild
         }
 
         return versionMatch.Groups["version"].Value;
+    }
+
+    private static void ValidateAdminDevSupportRelease(string displayVersion)
+    {
+        var devSupportPath = Path.Combine(Root, "admin-website", "dev-support.php");
+        if (!File.Exists(devSupportPath))
+        {
+            throw new InvalidOperationException("admin-website/dev-support.php is missing.");
+        }
+
+        var devSupport = File.ReadAllText(devSupportPath);
+        var escapedVersion = Regex.Escape(displayVersion);
+        var releasedRow = new Regex(
+            $@"\('v{escapedVersion}',\s*'v{escapedVersion}',\s*'Release',\s*'[^']+',\s*'Released'",
+            RegexOptions.CultureInvariant);
+        if (!releasedRow.IsMatch(devSupport))
+        {
+            throw new InvalidOperationException(
+                $"Admin Dev Support is missing released v{displayVersion}. Add its released roadmap row before synchronizing or publishing the release.");
+        }
     }
 
     private static string ReadPublicReleaseVersion()
@@ -688,8 +710,8 @@ internal static class ReceiptLabBuild
               installer                     Build the complete Windows installer
               installer --skip-publish      Repackage the existing publish output
               license-manager               Publish the vendor License Manager UI
-              sync-release                  Promote ProductInfo.Version to the public website manifest, labels, and download links
-              sync-release --check          Verify website pages against website/release.json without promoting a candidate
+              sync-release                  Promote ProductInfo.Version after verifying Admin Dev Support, then update public website metadata
+              sync-release --check          Verify Admin Dev Support and website pages against website/release.json
               check-seo                     Validate canonical URLs, metadata, structured data, sitemap, and performance assets
               send-sample                   Send a sample ESC/POS job to localhost:9100
               send-sample --host HOST --port PORT --title TITLE

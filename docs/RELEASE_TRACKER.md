@@ -14,7 +14,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Current public release: v0.3.32 — released 2026-07-21**
 
-**Current development: v0.3.30 — Security remediation (Phase 1) follow-up verification**
+**Current development: v0.3.27 — Enhanced support package and connection diagnostics**
 
 **Next release after v0.3.27: v0.3.28 — Receipt comparison and automated validation**
 
@@ -66,6 +66,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.24 | Released | Upgrade licensing and Printer Setup safeguards |
 | v0.3.25 | Released | Four-tier licensing and upgrade paths |
 | v0.3.26 | Released | Annual Application Maintenance and Support |
+| v0.3.30 | Released | Security remediation (Phase 1) |
+| v0.3.31 | Released | Secure development lifecycle (Phase 2) |
+| v0.3.32 | Released | Updater installer-asset validation |
 
 ## Scheduled releases
 
