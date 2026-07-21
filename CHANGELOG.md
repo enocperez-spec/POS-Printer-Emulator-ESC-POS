@@ -6,6 +6,15 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.33 — 2026-07-21
+
+- Adds guided Connection Diagnostics for the local service and viewer, storage, printer listeners, configured ports, local health probes, recent job errors, Windows services, printer queues, Epson driver components, and the private/domain firewall rule. The diagnostics display emulator connection details but do not attempt to test unknown POS software.
+- Adds reviewed listener restart, Printer Setup Wizard, installation-repair guidance, and administrator-approved firewall repair actions.
+- Adds a previewed, redacted ZIP support package and Copy Support Summary workflow available locally on every license tier without uploading receipt contents, raw bytes, license secrets, contact details, or network addresses.
+- Replaces Contact Technical Support with a structured in-app Support Request for bug reports, feature requests, license issues, and other issues, including consented redacted logs and validated private attachments.
+- Routes authenticated requests through the Admin Portal, keeps GitHub credentials server-side, rate-limits submissions, stores contact information and attachments privately, and creates a redacted labeled GitHub issue with a customer reference.
+- Protects offline support-request drafts with Windows data protection and allows retry or deletion without re-entering the form.
+
 ## v0.3.32 — Updater installer-asset validation
 
 - Fixed the desktop updater rejecting a release because it received a GitHub release webpage instead of a Windows installer asset.

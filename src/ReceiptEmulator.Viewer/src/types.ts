@@ -131,6 +131,89 @@ export type UpdateStatus = {
   message: string
 }
 
+export type SupportRequestInput = {
+  requestType: 'Bug Report' | 'Feature Request' | 'License Issue' | 'Other Issue'
+  subject: string
+  description: string
+  stepsToReproduce?: string
+  expectedBehavior?: string
+  actualBehavior?: string
+  contactName: string
+  contactEmail: string
+  includeDiagnostics: boolean
+  consentToSubmit: boolean
+  attachments: { fileName: string; contentType: string; contentBase64: string }[]
+}
+
+export type SupportRequestPreview = {
+  applicationVersion: string
+  licenseTier: string
+  windowsVersion: string
+  listenerSummary: string
+  attachments: { fileName: string; contentType: string; size: number }[]
+  diagnosticsIncluded: boolean
+  removedByRedaction: string[]
+}
+
+export type SupportRequestResult = {
+  reference: string
+  state: 'Submitted' | 'SavedForRetry'
+  message: string
+  issueNumber?: number
+  issueUrl?: string
+}
+
+export type SupportRequestDraftSummary = {
+  reference: string
+  createdAt: string
+  requestType: string
+  subject: string
+}
+
+export type ConnectionDiagnosticCheck = {
+  id: string
+  area: string
+  title: string
+  status: 'Passed' | 'AttentionNeeded' | 'Failed' | 'Skipped'
+  summary: string
+  technicalDetails?: string
+  action?: 'RestartListener' | 'RepairFirewall' | 'OpenPrinterSetupWizard' | 'RepairInstallation'
+  listenerId?: string
+}
+
+export type PosConnectionDetail = {
+  listenerId: string
+  printerName: string
+  ipAddress: string
+  port: number
+  localOnly: boolean
+}
+
+export type ConnectionDiagnosticReport = {
+  packageId: string
+  generatedAt: string
+  applicationVersion: string
+  windowsVersion: string
+  checks: ConnectionDiagnosticCheck[]
+  connectionDetails: PosConnectionDetail[]
+  passed: number
+  attentionNeeded: number
+  failed: number
+  skipped: number
+}
+
+export type SupportPackagePreview = {
+  packageId: string
+  files: { fileName: string; category: string; description: string }[]
+  includedCategories: string[]
+  excludedCategories: string[]
+}
+
+export type ConnectionDiagnosticsResponse = {
+  report: ConnectionDiagnosticReport
+  packagePreview: SupportPackagePreview
+}
+
 export type StoredGraphic = {
   keyCode: string
   name: string

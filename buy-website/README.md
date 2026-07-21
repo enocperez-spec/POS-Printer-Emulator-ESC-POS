@@ -46,6 +46,8 @@ The target host was probed on July 14, 2026 and reported PHP 8.4 with all requir
 
 Copy `private/config.example.php` to `private/config.php` and fill in the fallback prices, PayPal settings, Admin API token, and email addresses. Lite defaults to `$24.99`; all three paid prices can be changed from Purchase Pricing in the Admin Portal. Place the existing matching `vendor-private-key.pem` in `private/`.
 
+For production, provide `PPE_ADMIN_API_TOKEN`, `PPE_MAINTENANCE_API_TOKEN`, and `PPE_PAYPAL_SECRET` as hosting-environment secrets. These values override the file settings, must be at least 32 characters for integration tokens, and must be different from one another. Rotate both integration tokens after any suspected exposure and verify the old values receive HTTP 401.
+
 Public and in-app upgrade links may preselect a paid level with `?tier=Lite`, `?tier=Pro`, or `?tier=Enterprise`. Invalid or unavailable values are ignored safely.
 
 Both protected files are ignored by Git and denied by `.htaccess`. Never commit or email the private signing key or PayPal secret.

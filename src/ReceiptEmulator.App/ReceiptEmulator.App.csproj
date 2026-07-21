@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ReceiptEmulator</RootNamespace>
     <AssemblyName>ReceiptEmulator</AssemblyName>
-    <Version>0.3.32</Version>
+    <Version>0.3.33</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.29" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageReference Include="System.Text.Json" Version="8.0.6" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />

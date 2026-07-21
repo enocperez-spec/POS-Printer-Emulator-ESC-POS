@@ -368,12 +368,12 @@ $releaseSync = database()->prepare(
          'One included year for new paid licenses; existing-license grandfathering through July 19, 2027; optional one-time Lite $9.99, Pro $19.99, and Enterprise $59.99 renewals; signed entitlement refresh; server-verified PayPal renewal orders; Admin pricing, status, history, extension, and revocation controls; telemetry without keys or receipt data.',
          'Maintenance must be implemented before future releases are delivered under the coverage policy.',
          'Permanent paid features keep working after coverage ends, early and lapsed renewals calculate correctly and idempotently, only covered customers receive signed update entitlements, and commerce, licensing, migration, and telemetry tests pass.', '2026-07-20 00:00:00.000000'),
-        ('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Next', 333,
-         'Guide nontechnical customers through installation, printer, listener, and connection problems and produce privacy-reviewed support evidence.',
-         'Guided checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, Epson drivers, and local or POS connectivity; plain-language results; reviewed repair actions; copyable summaries; and previewed redacted ZIP support packages available locally to every license tier.',
-         'Customer diagnostics and package export reduce support time immediately and must remain available without active maintenance, while assisted support contact continues to follow the maintenance entitlement.',
-         'Common service, listener, port, firewall, queue, driver, storage, and connection failures are explained and safely repairable where supported, and a reviewed support package excludes receipt contents and licensing secrets by default.', NULL),
-        ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Planned', 334,
+        ('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released', 333,
+         'Guide nontechnical customers through emulator, printer, listener, and Windows configuration problems and produce privacy-reviewed support evidence.',
+         'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.',
+         'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.',
+         'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.', UTC_TIMESTAMP(6)),
+        ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Next', 334,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.',
@@ -739,7 +739,7 @@ function lines(string $value): array
 <main class="dev-support-main"><div class="page-heading"><div><h1>Dev Support</h1><p>Track product releases and defects from the protected Admin Portal.</p></div></div>
 <?php if ($notice !== ''): ?><div class="dev-notice" role="status"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="dev-error" role="alert"><?= e($error) ?></div><?php endif; ?>
-<nav class="dev-tabs" aria-label="Dev Support sections"><a class="<?= $tab === 'releases' ? 'active' : '' ?>" href="?tab=releases" aria-current="<?= $tab === 'releases' ? 'page' : 'false' ?>">Release Tracker <span><?= $scheduledCount ?></span></a><a class="<?= $tab === 'bugs' ? 'active' : '' ?>" href="?tab=bugs" aria-current="<?= $tab === 'bugs' ? 'page' : 'false' ?>">Bug Tracker <span><?= $openBugCount ?></span></a></nav>
+<nav class="dev-tabs" aria-label="Dev Support sections"><a class="<?= $tab === 'releases' ? 'active' : '' ?>" href="?tab=releases" aria-current="<?= $tab === 'releases' ? 'page' : 'false' ?>">Release Tracker <span><?= $scheduledCount ?></span></a><a class="<?= $tab === 'bugs' ? 'active' : '' ?>" href="?tab=bugs" aria-current="<?= $tab === 'bugs' ? 'page' : 'false' ?>">Bug Tracker <span><?= $openBugCount ?></span></a><a href="/support-requests.php">Support Requests</a></nav>
 
 <?php if ($tab === 'releases'): ?>
 <section class="dev-metrics" aria-label="Release totals"><article><span>Current release</span><strong><?= e($currentRelease) ?></strong></article><article><span>Released</span><strong><?= $releasedCount ?></strong></article><article><span>Scheduled</span><strong><?= $scheduledCount ?></strong></article><article><span>Backlog</span><strong><?= $backlogCount ?></strong></article></section>

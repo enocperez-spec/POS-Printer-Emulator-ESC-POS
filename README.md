@@ -27,7 +27,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.32 is the current public release, released July 21, 2026. The next planned release is v0.3.33 Enhanced Support Package and Connection Diagnostics.
+> **Release status:** v0.3.33 is the current public release, released July 21, 2026. The next planned release is v0.3.34 Receipt Comparison and Automated Validation.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -103,7 +103,11 @@ Version 0.3.26 reports installation registration, Trial, Lite, Pro, or Enterpris
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
+Production operators should follow the [integration-token rotation runbook](docs/SECURITY_TOKEN_ROTATION.md) whenever purchase-site or Admin Portal credentials are created, rotated, or suspected of exposure.
+
 The MariaDB schema is stored in `database/schema.sql`. The C# utilities under `tools/POSPrinterEmulator.DatabaseTool` and `tools/POSPrinterEmulator.WebsitePublisher` provision the schema, verify the production API, publish the site, and upload protected server configuration. All database, SFTP, and dashboard credentials are supplied through temporary environment variables and must never be committed to Git.
+
+For v0.3.33 support requests, copy `admin-website/private/support.example.php` to the protected server-only `support.php` and supply a fine-grained GitHub token restricted to **Issues: Read and write** for the POS Printer Emulator repository. The token must never be included in the desktop application, source repository, public GitHub issue, deployment log, or browser response. The Admin Portal stores customer contact information, redacted diagnostics, and validated attachments privately; the public GitHub issue receives only the redacted technical report and support reference.
 
 ## Uninstall
 
@@ -237,8 +241,8 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.24 — Upgrade licensing and Printer Setup safeguards:** Preserve paid licensing during updates, recover from hardened-folder persistence failures, provide Trial-safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100.
 - **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
 - **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
-- **Next in v0.3.33 — Enhanced support package and connection diagnostics:** Add guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; provide safe repair actions and privacy-reviewed support packages that remain available locally on every license tier.
-- **v0.3.34 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **Released in v0.3.33 — Enhanced support package and connection diagnostics:** Adds guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; safe repair actions; privacy-reviewed support packages; and an in-app Support Request form that securely creates redacted GitHub issues through the backend. The release does not attempt to test unknown POS software implementations or store GitHub credentials in the desktop application.
+- **Next in v0.3.34 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
 - **v0.3.35 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.

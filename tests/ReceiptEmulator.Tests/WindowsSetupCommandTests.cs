@@ -8,6 +8,7 @@ public sealed class WindowsSetupCommandTests
     [InlineData("--install-windows", WindowsSetupAction.Install)]
     [InlineData("--uninstall-windows", WindowsSetupAction.Uninstall)]
     [InlineData("--health-check", WindowsSetupAction.HealthCheck)]
+    [InlineData("--repair-firewall", WindowsSetupAction.RepairFirewall)]
     [InlineData("--INSTALL-WINDOWS", WindowsSetupAction.Install)]
     public void ParseActionRecognizesSetupCommands(string argument, WindowsSetupAction expected)
     {

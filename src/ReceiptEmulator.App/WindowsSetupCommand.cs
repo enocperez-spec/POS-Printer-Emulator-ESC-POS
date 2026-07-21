@@ -13,7 +13,8 @@ public enum WindowsSetupAction
     Uninstall,
     HealthCheck,
     InstallPrinter,
-    PrintPrinterTest
+    PrintPrinterTest,
+    RepairFirewall
 }
 
 public static class WindowsSetupCommand
@@ -42,6 +43,7 @@ public static class WindowsSetupCommand
             "--health-check" => WindowsSetupAction.HealthCheck,
             "--install-printer" => WindowsSetupAction.InstallPrinter,
             "--print-printer-test" => WindowsSetupAction.PrintPrinterTest,
+            "--repair-firewall" => WindowsSetupAction.RepairFirewall,
             _ => WindowsSetupAction.None
         };
     }
@@ -100,6 +102,17 @@ public static class WindowsSetupCommand
         if (action == WindowsSetupAction.PrintPrinterTest)
         {
             return PrinterSetupManager.PrintTestReceipt(GetRequiredOption(arguments, "--printer-name"));
+        }
+
+        if (action == WindowsSetupAction.RepairFirewall)
+        {
+            var executablePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+                throw new InvalidOperationException("The POS Printer Emulator service executable path could not be determined.");
+            await RemoveFirewallRulesAsync(cancellationToken);
+            await RunRequiredProcessAsync(GetSystemExecutable("netsh.exe"), BuildFirewallRuleArguments(executablePath), cancellationToken);
+            Console.WriteLine("The private/domain POS Printer Emulator firewall rule was repaired.");
+            return 0;
         }
 
         if (action == WindowsSetupAction.Install)

@@ -1,0 +1,42 @@
+name: POS Printer Emulator support request
+description: Report a redacted product issue without sharing licenses, credentials, or receipt data.
+title: "[Support] "
+labels:
+  - support-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste activation keys, passwords, customer receipt data, email addresses, IP addresses, or private diagnostic packages into a public issue. Customers using the desktop application should prefer Settings → Support → Submit a Support Request so private material stays in the Admin Portal.
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Request type
+      options:
+        - Bug Report
+        - Feature Request
+        - License Issue
+        - Other Issue
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Redacted description
+      description: Explain the problem without including customer, receipt, network, or license secrets.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Application version
+      placeholder: 0.3.33
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed activation keys, credentials, receipt data, contact details, IP addresses, and private logs.
+          required: true

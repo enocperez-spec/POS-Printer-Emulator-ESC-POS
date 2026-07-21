@@ -104,6 +104,10 @@ public partial class MainWindow : Window
                 {
                     await RunPrinterTestAsync(request.PrinterName);
                 }
+                else if (request?.Type == "repair-firewall")
+                {
+                    await RunFirewallRepairAsync();
+                }
             }
             catch (Exception exception)
             {
@@ -128,7 +132,7 @@ public partial class MainWindow : Window
                     "Downloads"),
                 AddExtension = true,
                 OverwritePrompt = true,
-                Filter = "Receipt files|*.txt;*.bin;*.ppecapture|All files|*.*"
+                Filter = "Support and receipt files|*.zip;*.txt;*.bin;*.ppecapture|All files|*.*"
             };
 
             eventArgs.Handled = true;
@@ -257,6 +261,25 @@ public partial class MainWindow : Window
                 success = false,
                 message = exception.Message
             }, JsonOptions));
+        }
+    }
+
+    private async Task RunFirewallRepairAsync()
+    {
+        try
+        {
+            using var process = StartElevatedHelper("--repair-firewall");
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0) throw new InvalidOperationException("Windows did not complete the firewall repair.");
+            MessageBox.Show(this, "The private/domain POS Printer Emulator firewall rule was repaired. Run Connection Diagnostics again to verify it.", "POS Printer Emulator", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
+        {
+            MessageBox.Show(this, "Firewall repair was canceled before Windows administrator approval was granted.", "POS Printer Emulator", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"The firewall rule could not be repaired: {exception.Message}", "POS Printer Emulator", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

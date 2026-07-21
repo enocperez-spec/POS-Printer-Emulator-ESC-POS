@@ -1,4 +1,4 @@
-import type { ActivationRequest, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+import type { ActivationRequest, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -112,6 +112,17 @@ export const api = {
     body: JSON.stringify(request),
   }),
   refreshMaintenance: () => json<MaintenanceRefreshResult>('/api/license/maintenance/refresh', { method: 'POST' }),
+  runConnectionDiagnostics: () => json<ConnectionDiagnosticsResponse>('/api/support/connection-diagnostics', { method: 'POST' }),
+  restartDiagnosticListener: (id: string) => json<PrinterListener>(`/api/support/connection-diagnostics/listeners/${encodeURIComponent(id)}/restart`, { method: 'POST' }),
+  previewSupportRequest: (input: SupportRequestInput) => json<SupportRequestPreview>('/api/support/requests/preview', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
+  submitSupportRequest: (input: SupportRequestInput) => json<SupportRequestResult>('/api/support/requests', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
+  supportRequestDrafts: () => json<SupportRequestDraftSummary[]>('/api/support/requests/drafts'),
+  retrySupportRequest: (reference: string) => json<SupportRequestResult>(`/api/support/requests/drafts/${encodeURIComponent(reference)}/retry`, { method: 'POST' }),
+  deleteSupportRequestDraft: (reference: string) => request(`/api/support/requests/drafts/${encodeURIComponent(reference)}`, { method: 'DELETE' }),
   checkUpdates: (force = false) => json<UpdateStatus>(`/api/updates/check?force=${force}`),
   printerSetupStatus: () => json<PrinterSetupStatus>('/api/printer-setup/status'),
   availablePrinterPort: (printerName: string, ipAddress: string, startingPort = 9100) =>

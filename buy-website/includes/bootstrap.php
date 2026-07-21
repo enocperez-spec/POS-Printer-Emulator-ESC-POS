@@ -7,6 +7,9 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Frame-Options: DENY');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')) {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
 
 function config(?string $path = null): mixed
 {
@@ -17,12 +20,32 @@ function config(?string $path = null): mixed
             throw new RuntimeException('The purchase site has not been configured.');
         }
         $config = require $file;
+        // Integration credentials must be supplied by the hosting environment.
+        // Keep the file-based values only for non-secret settings and local setup;
+        // environment values always win so deployments can rotate tokens without
+        // editing or redeploying PHP source.
+        $config['admin_api_token'] = secret_config_value('PPE_ADMIN_API_TOKEN', $config['admin_api_token'] ?? null);
+        $config['maintenance']['api_token'] = secret_config_value('PPE_MAINTENANCE_API_TOKEN', $config['maintenance']['api_token'] ?? null);
+        $config['paypal']['secret'] = secret_config_value('PPE_PAYPAL_SECRET', $config['paypal']['secret'] ?? null);
     }
     if ($path === null) return $config;
     $value = $config;
     foreach (explode('.', $path) as $part) {
         if (!is_array($value) || !array_key_exists($part, $value)) return null;
         $value = $value[$part];
+    }
+    return $value;
+}
+
+function secret_config_value(string $environmentName, mixed $fallback): string
+{
+    $value = getenv($environmentName);
+    if ($value === false || trim($value) === '') {
+        $value = is_string($fallback) ? trim($fallback) : '';
+    }
+    // Never allow an example placeholder to authenticate an integration.
+    if ($value === '' || str_starts_with($value, 'REPLACE_WITH_')) {
+        return '';
     }
     return $value;
 }
@@ -128,7 +151,7 @@ function require_admin_api_token(): void
 {
     $providedToken = (string)($_SERVER['HTTP_X_PPE_ADMIN_TOKEN'] ?? '');
     $expectedToken = (string)config('admin_api_token');
-    if ($expectedToken === '' || !hash_equals($expectedToken, $providedToken)) {
+    if ($expectedToken === '' || strlen($expectedToken) < 32 || strlen($providedToken) !== strlen($expectedToken) || !hash_equals($expectedToken, $providedToken)) {
         json_response(['error' => 'Unauthorized.'], 401);
     }
 }

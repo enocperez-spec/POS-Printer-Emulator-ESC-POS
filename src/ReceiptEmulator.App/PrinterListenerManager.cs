@@ -236,6 +236,18 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         EnsureMultipleListenerAccess();
+        return await RestartExistingListenerAsync(id, cancellationToken);
+    }
+
+    public Task<PrinterListenerRuntimeStatus> RestartForDiagnosticsAsync(
+        string id,
+        CancellationToken cancellationToken = default) =>
+        RestartExistingListenerAsync(id, cancellationToken);
+
+    private async Task<PrinterListenerRuntimeStatus> RestartExistingListenerAsync(
+        string id,
+        CancellationToken cancellationToken)
+    {
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {

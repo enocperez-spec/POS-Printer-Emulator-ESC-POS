@@ -12,11 +12,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.32 — released 2026-07-21**
+**Current public release: v0.3.33 — released 2026-07-21**
 
-**Current development: v0.3.33 — Enhanced support package and connection diagnostics**
+**Current development: v0.3.34 — Receipt comparison and automated validation**
 
-**Next release after v0.3.33: v0.3.34 — Receipt comparison and automated validation**
+**Next release after v0.3.34: v0.3.35 — Guided update installation and restart**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -80,7 +80,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Purpose:** Make real customer print streams reproducible without repeatedly connecting the original POS system. This is the foundation for later profile, comparison, and diagnostic work.
 
-**Planned scope:**
+**Released scope:**
 
 - Capture the original ESC/POS bytes, connection metadata, received time, processing result, parsed-command summary, and renderer version for each job.
 - Import `.bin` files and supported POS Printer Emulator capture packages through the desktop interface.
@@ -317,7 +317,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.33 — Enhanced support package and connection diagnostics
 
-**Status:** Next
+**Status:** Released — 2026-07-21
 
 **GitHub:** [Issue #20 — Enhanced support package and connection diagnostics](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20)
 
@@ -336,15 +336,26 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Create a standard ZIP support package containing a text summary, machine-readable manifest, redacted application logs, application and Windows versions, listener/profile configuration summaries, diagnostic results, recent error metadata, printer/driver/firewall summaries, and a stable package identifier.
 - Preview every file and data category before export. Exclude receipt text, raw receipt bytes, imported captures, activation keys, maintenance keys, payment information, email addresses, Windows user names, and full local file paths by default.
 - Require explicit, separate consent before including registration details or selected receipt/capture evidence. Never include activation or maintenance keys.
-- Add **Copy Support Summary**, **Save Support Package**, and—only when maintenance is active—**Contact Technical Support** actions. Package creation and local diagnostics remain available to Trial users and customers whose maintenance has expired.
+- Add **Copy Support Summary**, **Save Support Package**, and **Submit a Support Request** actions. Package creation and local diagnostics remain available to Trial users and customers whose maintenance has expired; assisted-support service levels continue to follow the maintenance entitlement.
+- Build the in-app **Submit a Support Request** workflow for Bug Report, Feature Request, License Issue, and Other Issue.
+- Collect the subject, detailed description, optional reproduction steps, expected and actual behavior, and contact information; automatically add the application version, license tier, Windows version, and a redacted listener summary when available.
+- Allow optional screenshots and attachments with file-type, size, quantity, and malware-safe storage limits. Never execute uploaded content or accept paths outside the files explicitly selected by the customer.
+- For bug reports, offer diagnostic logs as an optional attachment. Show a preview of every file and data category, explain the redactions, and require explicit consent immediately before submission.
+- Remove or mask activation and maintenance keys, credentials, receipt contents and raw bytes, email addresses outside the private contact field, Windows user names, full paths, and IP addresses before any data leaves the computer.
+- Submit requests through an authenticated, rate-limited HTTPS backend that validates and redacts the request again, stores contact information privately, and creates the GitHub issue with the matching issue template and label. No GitHub credential is distributed with the desktop application.
+- Keep personal contact information and private attachments out of public GitHub issue bodies. The public issue contains only reviewed, redacted technical content and a backend-generated support reference.
+- Display confirmation, the support reference or GitHub issue number, a public issue link when available, and a **Copy reference** action.
+- Save failed or offline submissions locally as protected drafts, allow retry without data loss, and let the user review or delete the draft before retrying.
 - Keep the workflow offline-first. Do not upload a package automatically or transmit diagnostic data without a separate future feature and explicit customer consent.
-- Add deterministic redaction, authorization, corrupt-data, cancellation, timeout, all-license-tier, expired-maintenance, and installed-Windows diagnostic tests.
+- Add deterministic redaction, backend authorization, rate-limit, attachment-validation, consent, offline-draft, retry, corrupt-data, cancellation, timeout, all-license-tier, expired-maintenance, and installed-Windows diagnostic tests.
 
-**Complete when:** A customer can run the diagnostic workflow without administrator tools, identify a deliberately broken service, listener, port, firewall, queue, or Epson-driver configuration with a useful corrective action, safely repair supported problems, and export a reviewed package that contains no receipt contents or secret licensing data unless the customer explicitly adds permitted evidence. Trial and expired-maintenance installations retain local diagnostics and package export, while assisted-support contact follows the maintenance entitlement.
+**Complete when:** A customer can run the diagnostic workflow without administrator tools, identify a deliberately broken service, listener, port, firewall, queue, or Epson-driver configuration with a useful corrective action, safely repair supported problems, and export a reviewed package that contains no receipt contents or secret licensing data unless the customer explicitly adds permitted evidence. A consented support request creates the correctly labeled GitHub issue through the backend without exposing GitHub credentials, private contact data, receipt content, IP addresses, or secrets; offline drafts survive restart and retry successfully. Trial and expired-maintenance installations retain local diagnostics and package export, while assisted-support service levels continue to follow the maintenance entitlement.
+
+**Completion verification:** All 147 desktop tests, the production viewer build, desktop packaging build, PHP commerce/database/site contracts, PHP syntax checks, rendered Support UI checks, diagnostic-package preview, and ZIP download verification passed. The Trial tier retained local diagnostics and package export while assisted submission remained disabled without active maintenance. The self-contained v0.3.33 Windows installer and SHA-256 checksum were generated successfully.
 
 ### v0.3.34 — Receipt comparison and automated validation
 
-**Status:** Planned
+**Status:** Next
 
 **GitHub:** [Issue #21 — Receipt comparison and automated validation](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21)
 

@@ -94,6 +94,45 @@ CREATE TABLE IF NOT EXISTS maintenance_refresh_rate_limits (
     KEY ix_maintenance_rate_reset (reset_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS support_request_rate_limits (
+    bucket_hash BINARY(32) NOT NULL,
+    hits INT UNSIGNED NOT NULL,
+    reset_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (bucket_hash),
+    KEY ix_support_rate_reset (reset_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS support_requests (
+    reference_code VARCHAR(32) NOT NULL,
+    license_id CHAR(36) NOT NULL,
+    request_type ENUM('Bug Report', 'Feature Request', 'License Issue', 'Other Issue') NOT NULL,
+    subject VARCHAR(160) NOT NULL,
+    contact_name VARCHAR(160) NOT NULL,
+    contact_email VARCHAR(254) NOT NULL,
+    private_diagnostics MEDIUMTEXT NULL,
+    github_issue_number BIGINT UNSIGNED NULL,
+    github_issue_url VARCHAR(500) NULL,
+    state ENUM('Pending', 'Submitted') NOT NULL DEFAULT 'Pending',
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    submitted_at DATETIME(6) NULL,
+    PRIMARY KEY (reference_code),
+    KEY ix_support_license_created (license_id, created_at),
+    KEY ix_support_state_created (state, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS support_request_attachments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    reference_code VARCHAR(32) NOT NULL,
+    file_name VARCHAR(120) NOT NULL,
+    content_type VARCHAR(64) NOT NULL,
+    content MEDIUMBLOB NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    CONSTRAINT fk_support_attachment_request FOREIGN KEY (reference_code)
+        REFERENCES support_requests(reference_code) ON DELETE CASCADE,
+    KEY ix_support_attachment_reference (reference_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS issued_license_events (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     license_id CHAR(36) NOT NULL,
@@ -202,8 +241,8 @@ VALUES
     ('v0.3.30', 'v0.3.30', 'Release', 'Security remediation (Phase 1)', 'Released', 330, 'Resolve the actionable security findings from the completed deep review before adding more externally reachable functionality.', 'Credential rotation and separation; web and desktop boundary hardening; sensitive-data protection; signed update and installer verification; automated security checks and regression coverage.', 'Security findings affecting the public website, Admin Portal, purchase flow, and Windows application must be remediated before feature development continues.', 'No critical or high findings remain, exposed credentials are rejected and absent from tracked files and logs, security tests pass, and trusted update and installer verification succeeds.', '2026-07-21 00:00:00.000000'),
     ('v0.3.31', 'v0.3.31', 'Release', 'Secure development lifecycle (Phase 2)', 'Released', 331, 'Make security review and verification a repeatable requirement for every future product release.', 'Security checklist and threat-model notes; automated security checks; API and desktop regression suites; tracked evidence; explicit sign-off; scheduled reviews.', 'The Phase 1 protections must remain enforceable as the website, Admin Portal, and desktop application evolve.', 'The documented checklist, CI gates, regression suites, tracker evidence, and release sign-off are exercised successfully on a complete release.', '2026-07-21 00:00:00.000000'),
     ('v0.3.32', 'v0.3.32', 'Release', 'Updater installer-asset validation', 'Released', 332, 'Prevent documentation-only GitHub releases from being presented as installable Windows updates.', 'Require a trusted Windows executable asset, report releases without an installer, add regression tests, and publish the self-contained installer and checksum.', 'Customers must receive a real installer asset instead of a GitHub release webpage when the desktop updater offers installation.', 'Installed customers receive a valid v0.3.32 installer download, while releases without a Windows installer cannot trigger installation.', '2026-07-21 00:00:00.000000'),
-    ('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Next', 333, 'Guide nontechnical customers through installation, printer, listener, and connection problems and produce privacy-reviewed support evidence.', 'Guided checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, Epson drivers, and local or POS connectivity; plain-language results; reviewed repair actions; copyable summaries; and previewed redacted ZIP support packages available locally to every license tier.', 'Customer diagnostics and package export reduce support time immediately and must remain available without active maintenance, while assisted support contact continues to follow the maintenance entitlement.', 'Common service, listener, port, firewall, queue, driver, storage, and connection failures are explained and safely repairable where supported, and a reviewed support package excludes receipt contents and licensing secrets by default.', NULL),
-    ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Planned', 334, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
+    ('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released', 333, 'Guide nontechnical customers through emulator, printer, listener, and Windows configuration problems and produce privacy-reviewed support evidence.', 'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.', 'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.', 'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.', '2026-07-21 00:00:00.000000'),
+    ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Next', 334, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
     ('v0.3.35', 'v0.3.35', 'Release', 'Guided update installation and restart', 'Planned', 335, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
@@ -274,16 +313,16 @@ SET version_label = 'v0.3.26', title = 'Annual Application Maintenance and Suppo
 WHERE item_key = 'v0.3.26';
 
 UPDATE development_roadmap
-SET version_label = 'v0.3.33', title = 'Enhanced support package and connection diagnostics', status = 'Next', priority_rank = 333,
-    purpose = 'Guide nontechnical customers through installation, printer, listener, and connection problems and produce privacy-reviewed support evidence.',
-    planned_scope = 'Guided checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, Epson drivers, and local or POS connectivity; plain-language results; reviewed repair actions; copyable summaries; and previewed redacted ZIP support packages available locally to every license tier.',
-    priority_reason = 'Customer diagnostics and package export reduce support time immediately and must remain available without active maintenance, while assisted support contact continues to follow the maintenance entitlement.',
-    completion_criteria = 'Common service, listener, port, firewall, queue, driver, storage, and connection failures are explained and safely repairable where supported, and a reviewed support package excludes receipt contents and licensing secrets by default.',
-    completed_at = NULL
+SET version_label = 'v0.3.33', title = 'Enhanced support package and connection diagnostics', status = 'Released', priority_rank = 333,
+    purpose = 'Guide nontechnical customers through emulator, printer, listener, and Windows configuration problems and produce privacy-reviewed support evidence.',
+    planned_scope = 'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.',
+    priority_reason = 'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.',
+    completion_criteria = 'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.',
+    completed_at = COALESCE(completed_at, '2026-07-21 00:00:00.000000')
 WHERE item_key = 'v0.3.33';
 
 UPDATE development_roadmap
-SET version_label = 'v0.3.34', title = 'Receipt comparison and automated validation', status = 'Planned', priority_rank = 334,
+SET version_label = 'v0.3.34', title = 'Receipt comparison and automated validation', status = 'Next', priority_rank = 334,
     purpose = 'Provide repeatable compatibility and regression testing.',
     planned_scope = 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
     priority_reason = 'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.',

@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== '' && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')) {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
+
 function private_config(): array
 {
     static $config;

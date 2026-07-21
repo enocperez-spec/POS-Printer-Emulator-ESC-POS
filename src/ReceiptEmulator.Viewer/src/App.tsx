@@ -44,14 +44,14 @@ import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
 import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
-import type { JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, UpdateStatus } from './types'
+import type { ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.26',
+  version: '0.3.33',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -350,12 +350,14 @@ function App() {
           <CollapsedSide side="left" label="Activity" onExpand={() => setActivityCollapsed(false)} />
         ) : (
           <ActivityRail jobs={filteredJobs} totalJobs={jobs.length} selectedId={selectedId} query={query} onQuery={setQuery}
+            listenerEndpoint={status.listener}
             listeners={listeners} listenerFilter={listenerFilter} onListenerFilter={setListenerFilter}
             onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
             onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history}
             onImport={() => captureFileRef.current?.click()} importEnabled={status.license.features.premiumFeatures} importing={captureBusy} />
         )}
         <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics}
+          listenerEndpoint={status.listener}
           onReplay={replayJob} replaying={captureBusy} onDownload={downloadJob} exporting={exporting} />
         {inspectorCollapsed ? (
           <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
@@ -470,12 +472,13 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
   )
 }
 
-function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listeners, listenerFilter, onListenerFilter, onSelect, onDelete, onClearAll, onCollapse, historyEnabled, onImport, importEnabled, importing }: {
+function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listenerEndpoint, listeners, listenerFilter, onListenerFilter, onSelect, onDelete, onClearAll, onCollapse, historyEnabled, onImport, importEnabled, importing }: {
   jobs: JobSummary[]
   totalJobs: number
   selectedId?: string
   query: string
   onQuery: (value: string) => void
+  listenerEndpoint: string
   listeners: PrinterListener[]
   listenerFilter: string
   onListenerFilter: (listenerId: string) => void
@@ -530,7 +533,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listeners, 
           <div className="rail-empty">
             <CircleStop size={22} />
             <strong>No receipt jobs yet</strong>
-            <span>Send ESC/POS data to port 9100 or render the test receipt.</span>
+            <span>Send ESC/POS data to {listenerEndpoint} or render the test receipt.</span>
           </div>
         )}
       </div>
@@ -541,13 +544,14 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listeners, 
   )
 }
 
-function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onReplay, replaying, onDownload, exporting }: {
+function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, listenerEndpoint, onReplay, replaying, onDownload, exporting }: {
   job?: ReceiptJob
   zoom: number
   onZoom: (value: number) => void
   onSample: () => void
   license: ServiceStatus['license']
   storedGraphics: StoredGraphic[]
+  listenerEndpoint: string
   onReplay: () => void
   replaying: boolean
   onDownload: (format: 'text' | 'raw' | 'capture') => void
@@ -594,7 +598,7 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, onR
           <div className="preview-empty">
             <div className="empty-receipt"><Printer size={34} /></div>
             <h2>Ready for a receipt</h2>
-            <p>The listener is waiting on TCP port 9100. Use a POS terminal or render the built-in test job.</p>
+            <p>The listener is waiting on {listenerEndpoint}. Use a POS terminal or render the built-in test job.</p>
             <button className="primary-button" onClick={onSample}><FlaskConical size={16} /> Render test receipt</button>
           </div>
         )}
@@ -710,7 +714,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
-            {section === 'support' && <SupportSettings status={status} />}
+            {section === 'support' && <SupportSettings status={status} onOpenPrinterWizard={() => setSection('printer')} />}
           </div>
         </div>
       </section>
@@ -911,9 +915,109 @@ function UpdatesSettings({ status, updateStatus, onCheckUpdates }: {
   )
 }
 
-function SupportSettings({ status }: { status: ServiceStatus }) {
+function SupportSettings({ status, onOpenPrinterWizard }: { status: ServiceStatus; onOpenPrinterWizard: () => void }) {
   const maintenance = status.license.maintenance
   const assistedSupport = maintenance.isActive
+  const [showForm, setShowForm] = useState(false)
+  const [request, setRequest] = useState<SupportRequestInput>({
+    requestType: 'Bug Report', subject: '', description: '', stepsToReproduce: '', expectedBehavior: '', actualBehavior: '',
+    contactName: status.license.customerName ?? '', contactEmail: status.license.emailAddress ?? '', includeDiagnostics: false, consentToSubmit: false, attachments: [],
+  })
+  const [preview, setPreview] = useState<SupportRequestPreview>()
+  const [result, setResult] = useState<SupportRequestResult>()
+  const [drafts, setDrafts] = useState<SupportRequestDraftSummary[]>([])
+  const [message, setMessage] = useState<string>()
+  const [busy, setBusy] = useState(false)
+  const [diagnostics, setDiagnostics] = useState<ConnectionDiagnosticReport>()
+  const [packagePreview, setPackagePreview] = useState<SupportPackagePreview>()
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false)
+  const [diagnosticMessage, setDiagnosticMessage] = useState<string>()
+
+  useEffect(() => { api.supportRequestDrafts().then(setDrafts).catch(() => undefined) }, [])
+
+  async function reviewRequest(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setMessage(undefined)
+    try { setPreview(await api.previewSupportRequest({ ...request, consentToSubmit: false })) }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'The support request could not be reviewed.') }
+    finally { setBusy(false) }
+  }
+
+  async function submitRequest() {
+    setBusy(true); setMessage(undefined)
+    try {
+      const submitted = await api.submitSupportRequest({ ...request, consentToSubmit: true })
+      setResult(submitted); setPreview(undefined); setShowForm(false)
+      setDrafts(await api.supportRequestDrafts())
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'The support request could not be submitted.') }
+    finally { setBusy(false) }
+  }
+
+  function update<K extends keyof SupportRequestInput>(key: K, value: SupportRequestInput[K]) {
+    setRequest(current => ({ ...current, [key]: value, consentToSubmit: false })); setPreview(undefined); setResult(undefined)
+  }
+
+  async function retryDraft(reference: string) {
+    setBusy(true); setMessage(undefined)
+    try { setResult(await api.retrySupportRequest(reference)); setDrafts(await api.supportRequestDrafts()) }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'The saved request could not be retried.') }
+    finally { setBusy(false) }
+  }
+
+  async function deleteDraft(reference: string) {
+    await api.deleteSupportRequestDraft(reference); setDrafts(await api.supportRequestDrafts())
+  }
+
+  async function runDiagnostics() {
+    setDiagnosticsBusy(true); setDiagnosticMessage(undefined)
+    try {
+      const response = await api.runConnectionDiagnostics()
+      setDiagnostics(response.report); setPackagePreview(response.packagePreview)
+    } catch (error) { setDiagnosticMessage(error instanceof Error ? error.message : 'Connection diagnostics could not run.') }
+    finally { setDiagnosticsBusy(false) }
+  }
+
+  async function runDiagnosticAction(check: ConnectionDiagnosticCheck) {
+    if (check.action === 'OpenPrinterSetupWizard') { onOpenPrinterWizard(); return }
+    if (check.action === 'RepairInstallation') { setDiagnosticMessage('Run the latest POS Printer Emulator installer and choose repair. Your registration and license are preserved.'); return }
+    if (check.action === 'RepairFirewall') {
+      const desktop = (window as Window & { chrome?: { webview?: { postMessage: (message: unknown) => void } } }).chrome?.webview
+      if (!desktop) { setDiagnosticMessage('Firewall repair is available in the installed Windows desktop application.'); return }
+      if (!window.confirm('Windows will ask for administrator approval to recreate the private/domain POS Printer Emulator firewall rule. Continue?')) return
+      desktop.postMessage({ type: 'repair-firewall' }); setDiagnosticMessage('Waiting for Windows firewall repair approval…'); return
+    }
+    if (check.action === 'RestartListener' && check.listenerId) {
+      setDiagnosticsBusy(true); setDiagnosticMessage(undefined)
+      try { await api.restartDiagnosticListener(check.listenerId); await runDiagnostics() }
+      catch (error) { setDiagnosticMessage(error instanceof Error ? error.message : 'The printer listener could not be restarted.') }
+      finally { setDiagnosticsBusy(false) }
+    }
+  }
+
+  async function copySupportSummary() {
+    if (!diagnostics) return
+    const summary = [`POS Printer Emulator ${diagnostics.applicationVersion}`, `Package: ${diagnostics.packageId}`, `Results: ${diagnostics.passed} passed, ${diagnostics.attentionNeeded} attention, ${diagnostics.failed} failed, ${diagnostics.skipped} skipped`, '', ...diagnostics.checks.map(check => `[${diagnosticStatusLabel(check.status)}] ${check.title}: ${check.summary}`)].join('\n')
+    await navigator.clipboard.writeText(summary); setDiagnosticMessage('The support summary was copied.')
+  }
+
+  async function addAttachments(event: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (request.attachments.length + selected.length > 3) { setMessage('Attach no more than three files.'); return }
+    if (selected.some(file => !['png', 'jpg', 'jpeg', 'txt', 'log', 'zip'].includes(file.name.split('.').pop()?.toLowerCase() ?? ''))) { setMessage('Attachments must be PNG, JPEG, TXT, LOG, or ZIP files.'); return }
+    if (selected.some(file => file.size <= 0 || file.size > 5 * 1024 * 1024)) { setMessage('Each attachment must be between 1 byte and 5 MB.'); return }
+    if (request.attachments.reduce((total, file) => total + Math.ceil(file.contentBase64.length * .75), 0) + selected.reduce((total, file) => total + file.size, 0) > 10 * 1024 * 1024) { setMessage('Attachments may total no more than 10 MB.'); return }
+    setBusy(true); setMessage(undefined)
+    try {
+      const attachments = await Promise.all(selected.map(async file => ({
+        fileName: file.name,
+        contentType: supportAttachmentContentType(file),
+        contentBase64: await fileToBase64(file),
+      })))
+      update('attachments', [...request.attachments, ...attachments])
+    } catch { setMessage('One or more attachments could not be read.') }
+    finally { setBusy(false) }
+  }
+
   return (
     <div className="settings-panel support-settings">
       <div className={`settings-status-card ${assistedSupport ? 'is-current' : ''}`}>
@@ -927,14 +1031,83 @@ function SupportSettings({ status }: { status: ServiceStatus }) {
         <div><span>License</span><strong>{status.license.mode} License</strong></div>
         <div><span>Maintenance</span><strong>{maintenance.state}{maintenance.expiresAt ? ` · ${formatMaintenanceDate(maintenance.expiresAt)}` : ''}</strong></div>
       </div>
-      <a className="download-diagnostics" href="/api/support/diagnostics" download><Download size={17} /> Download diagnostic log</a>
+      <section className="connection-diagnostics">
+        <header><div><span>Local, privacy-safe checks</span><h3>Connection Diagnostics</h3><p>Checks this emulator, Windows printing, listeners, ports, drivers, and firewall configuration. It does not test or infer your POS software.</p></div><button className="primary-action" type="button" disabled={diagnosticsBusy} onClick={runDiagnostics}><RefreshCw size={16} className={diagnosticsBusy ? 'spin' : ''} /> {diagnosticsBusy ? 'Running checks…' : diagnostics ? 'Run again' : 'Run diagnostics'}</button></header>
+        {diagnosticMessage && <div className="diagnostic-message" role="status">{diagnosticMessage}</div>}
+        {diagnostics && <>
+          <div className="diagnostic-metrics"><div className="passed"><strong>{diagnostics.passed}</strong><span>Passed</span></div><div className="attention"><strong>{diagnostics.attentionNeeded}</strong><span>Attention needed</span></div><div className="failed"><strong>{diagnostics.failed}</strong><span>Failed</span></div><div className="skipped"><strong>{diagnostics.skipped}</strong><span>Skipped</span></div></div>
+          <div className="connection-guidance"><h4>Connection details for your POS software</h4>{diagnostics.connectionDetails.map(connection => <article key={connection.listenerId}><div><strong>{connection.printerName}</strong><span>{connection.localOnly ? 'POS software on this computer only' : 'Private/domain network connection'}</span></div><code>{connection.ipAddress}:{connection.port}</code><button type="button" onClick={() => navigator.clipboard.writeText(`${connection.ipAddress}:${connection.port}`)}>Copy</button></article>)}</div>
+          <div className="diagnostic-checks">{diagnostics.checks.map(check => <article className={`diagnostic-check ${check.status.toLowerCase()}`} key={check.id}><span className="diagnostic-state">{diagnosticStatusLabel(check.status)}</span><div><strong>{check.title}</strong><p>{check.summary}</p>{check.technicalDetails && <details><summary>Technical details</summary><pre>{check.technicalDetails}</pre></details>}</div>{check.action && <button type="button" disabled={diagnosticsBusy} onClick={() => runDiagnosticAction(check)}>{diagnosticActionLabel(check.action)}</button>}</article>)}</div>
+          <div className="support-package-actions"><button type="button" onClick={copySupportSummary}>Copy Support Summary</button><a className="primary-action" href={`/api/support/connection-diagnostics/package/${encodeURIComponent(diagnostics.packageId)}`} download><Download size={16} /> Save Support Package</a><a href="/api/support/diagnostics" download>Download legacy text log</a></div>
+          {packagePreview && <details className="support-package-preview"><summary>Preview Support Package contents</summary><p><strong>Package ID:</strong> {packagePreview.packageId}</p><h4>Files</h4><ul>{packagePreview.files.map(file => <li key={file.fileName}><code>{file.fileName}</code><span>{file.description}</span></li>)}</ul><h4>Excluded by default</h4><p>{packagePreview.excludedCategories.join(', ')}.</p></details>}
+        </>}
+      </section>
       <div className="settings-actions support-actions">
-        {assistedSupport && <a href="mailto:support@posprinteremulator.com"><LifeBuoy size={16} /> Contact technical support</a>}
+        <button className="primary-action" type="button" disabled={!assistedSupport} title={!assistedSupport ? 'Requires active Application Maintenance and Support' : undefined} onClick={() => setShowForm(value => !value)}><LifeBuoy size={16} /> Submit a Support Request</button>
         {!assistedSupport && maintenance.renewalUrl && <a className="primary-action" href={maintenance.renewalUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Renew maintenance</a>}
       </div>
       <div className="privacy-callout"><LockKeyhole size={17} /><p>The report includes application events, version, service status, and basic system details. It does not include receipt contents or activation keys.</p></div>
+      {showForm && <form className="support-request-form" onSubmit={reviewRequest}>
+        <div className="support-request-heading"><div><span>Private submission</span><h3>Support request details</h3></div><button type="button" onClick={() => setShowForm(false)} aria-label="Close support request"><X size={16} /></button></div>
+        <label>Request type<select value={request.requestType} onChange={event => update('requestType', event.target.value as SupportRequestInput['requestType'])}><option>Bug Report</option><option>Feature Request</option><option>License Issue</option><option>Other Issue</option></select></label>
+        <label className="wide">Subject<input required maxLength={160} value={request.subject} onChange={event => update('subject', event.target.value)} /></label>
+        <label className="wide">Detailed description<textarea required rows={4} maxLength={8000} value={request.description} onChange={event => update('description', event.target.value)} /></label>
+        {request.requestType === 'Bug Report' && <>
+          <label className="wide">Steps to reproduce<textarea rows={3} value={request.stepsToReproduce} onChange={event => update('stepsToReproduce', event.target.value)} /></label>
+          <label>Expected behavior<textarea rows={3} value={request.expectedBehavior} onChange={event => update('expectedBehavior', event.target.value)} /></label>
+          <label>Actual behavior<textarea rows={3} value={request.actualBehavior} onChange={event => update('actualBehavior', event.target.value)} /></label>
+        </>}
+        <label>Contact name<input required maxLength={160} value={request.contactName} onChange={event => update('contactName', event.target.value)} /></label>
+        <label>Email address<input required type="email" maxLength={254} value={request.contactEmail} onChange={event => update('contactEmail', event.target.value)} /></label>
+        <label className="support-attachments wide">Optional screenshots or attachments<input type="file" multiple accept=".png,.jpg,.jpeg,.txt,.log,.zip,image/png,image/jpeg,text/plain,application/zip" onChange={addAttachments} disabled={busy || request.attachments.length >= 3} /><small>PNG, JPEG, TXT, LOG, or ZIP. Up to 3 files, 5 MB each, 10 MB total.</small></label>
+        {request.attachments.length > 0 && <div className="support-attachment-list wide">{request.attachments.map((attachment, index) => <div key={`${attachment.fileName}-${index}`}><FileText size={14} /><span>{attachment.fileName}</span><button type="button" onClick={() => update('attachments', request.attachments.filter((_, candidate) => candidate !== index))}><X size={13} /> Remove</button></div>)}</div>}
+        <label className="support-consent wide"><input type="checkbox" checked={request.includeDiagnostics} onChange={event => update('includeDiagnostics', event.target.checked)} /><span>Include redacted diagnostic logs for this request. You will see the included categories before submission.</span></label>
+        {message && <div className="support-request-message" role="alert">{message}</div>}
+        <div className="support-form-actions wide"><button type="button" onClick={() => setShowForm(false)}>Cancel</button><button className="primary-action" type="submit" disabled={busy}>{busy ? 'Preparing…' : 'Review before submitting'}</button></div>
+      </form>}
+      {preview && <section className="support-request-preview">
+        <h3>Review what will be sent</h3>
+        <dl><div><dt>Application</dt><dd>{preview.applicationVersion}</dd></div><div><dt>Windows</dt><dd>{preview.windowsVersion}</dd></div><div><dt>Listener summary</dt><dd>{preview.listenerSummary}</dd></div><div><dt>Diagnostic logs</dt><dd>{preview.diagnosticsIncluded ? 'Included after redaction' : 'Not included'}</dd></div></dl>
+        {preview.attachments.length > 0 && <div className="support-preview-attachments"><strong>Private attachments</strong>{preview.attachments.map(file => <span key={file.fileName}>{file.fileName} · {formatBytes(file.size)}</span>)}<small>Attachments are retained privately for support staff and are not posted to the public GitHub issue. Remove any sensitive content you do not want to send.</small></div>}
+        <p><strong>Removed or masked:</strong> {preview.removedByRedaction.join(', ')}.</p>
+        <label className="support-consent"><input type="checkbox" checked={request.consentToSubmit} onChange={event => setRequest(current => ({ ...current, consentToSubmit: event.target.checked }))} /><span>I reviewed this information and consent to send it securely to POS Printer Emulator support.</span></label>
+        <div className="support-form-actions"><button type="button" onClick={() => setPreview(undefined)}>Back</button><button className="primary-action" type="button" disabled={busy || !request.consentToSubmit} onClick={submitRequest}>{busy ? 'Submitting…' : 'Submit Support Request'}</button></div>
+      </section>}
+      {result && <div className={`support-request-result ${result.state === 'Submitted' ? 'success' : 'queued'}`}><CheckCircle2 size={18} /><div><strong>{result.state === 'Submitted' ? 'Support request submitted' : 'Support request saved for retry'}</strong><p>{result.message}</p><code>{result.issueNumber ? `GitHub issue #${result.issueNumber}` : result.reference}</code><div>{result.issueUrl && <a href={result.issueUrl} target="_blank" rel="noreferrer">View issue <ExternalLink size={13} /></a>}<button type="button" onClick={() => navigator.clipboard.writeText(result.reference)}>Copy reference</button></div></div></div>}
+      {drafts.length > 0 && <section className="support-drafts"><h3>Saved support requests</h3>{drafts.map(draft => <article key={draft.reference}><div><strong>{draft.subject}</strong><span>{draft.requestType} · {draft.reference}</span></div><button type="button" disabled={busy} onClick={() => retryDraft(draft.reference)}><RefreshCw size={14} /> Retry</button><button type="button" onClick={() => deleteDraft(draft.reference)}><Trash2 size={14} /> Delete</button></article>)}</section>}
     </div>
   )
+}
+
+function diagnosticStatusLabel(status: ConnectionDiagnosticCheck['status']) {
+  return status === 'AttentionNeeded' ? 'Attention needed' : status
+}
+
+function diagnosticActionLabel(action: NonNullable<ConnectionDiagnosticCheck['action']>) {
+  if (action === 'RestartListener') return 'Restart listener'
+  if (action === 'RepairFirewall') return 'Repair firewall'
+  if (action === 'OpenPrinterSetupWizard') return 'Open Printer Setup Wizard'
+  return 'Repair installation'
+}
+
+function supportAttachmentContentType(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (extension === 'png') return 'image/png'
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  if (extension === 'zip') return 'application/zip'
+  return 'text/plain'
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error)
+    reader.onload = () => {
+      const value = String(reader.result ?? '')
+      resolve(value.slice(value.indexOf(',') + 1))
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 function launchUpdate(url: string) {

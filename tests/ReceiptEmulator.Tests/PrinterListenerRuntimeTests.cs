@@ -89,6 +89,34 @@ public sealed class PrinterListenerRuntimeTests
     }
 
     [Fact]
+    public async Task LocalDiagnosticsCanRestartExistingSingleTierListenerWithoutUnlockingManagement()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var license = new LicenseService(new TestEnvironment(), new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Data:Root"] = root })
+            .Build());
+        var options = new PrinterOptions { BindAddress = "127.0.0.1", Port = FreePort() };
+        var profiles = new PrinterProfileService(license);
+        var configurations = new PrinterListenerConfigurationService(
+            license, options, profiles, NullLogger<PrinterListenerConfigurationService>.Instance);
+        await using var manager = new PrinterListenerManager(
+            configurations, profiles, new RecordingSink(), () => 1, new ServiceRuntimeState(),
+            NullLoggerFactory.Instance, NullLogger<PrinterListenerManager>.Instance);
+        await manager.StartAsync(CancellationToken.None);
+
+        var restarted = await manager.RestartForDiagnosticsAsync(PrinterListenerDefaults.DefaultId);
+
+        Assert.True(restarted.Listening);
+        Assert.Equal(PrinterListenerRuntimeStates.Listening, restarted.State);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => manager.CreateAsync(new PrinterListenerInput(
+            "Still locked", "127.0.0.1", FreePort(), PrinterProfileService.EpsonTmT88VId,
+            true, 1500, 4 * 1024 * 1024, new PrinterListenerBufferConfiguration())));
+        await manager.StopAsync(CancellationToken.None);
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
     public async Task TrialManagerRunsExactlyOneMemoryOnlyDefaultListener()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));

@@ -34,6 +34,7 @@ builder.Services.AddSingleton<PrinterStateService>();
 builder.Services.AddSingleton<PrinterListenerConfigurationService>();
 builder.Services.AddSingleton<PrinterListenerManager>();
 builder.Services.AddSingleton<StoredGraphicService>();
+builder.Services.AddSingleton<ConnectionDiagnosticsService>();
 builder.Services.AddSingleton(supportLogs);
 builder.Services.AddHttpClient("UsageTelemetry");
 builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTelemetryService(
@@ -57,6 +58,12 @@ builder.Services.AddHttpClient<MaintenanceRefreshService>(client =>
     client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
     client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
     client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddHttpClient<SupportRequestService>(client =>
+{
+    client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddHostedService(services => services.GetRequiredService<PrinterListenerManager>());
 builder.Services.AddHostedService<PeriodicUpdateChecker>();
@@ -560,6 +567,85 @@ app.MapGet("/api/support/activation-diagnostics", (LicenseService license) =>
         .AppendLine("This report does not contain the activation key, customer registration data, or receipt contents.")
         .ToString();
     return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Activation-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+});
+
+app.MapPost("/api/support/connection-diagnostics", async (
+    ConnectionDiagnosticsService diagnostics,
+    CancellationToken cancellationToken) =>
+{
+    var report = await diagnostics.RunAsync(cancellationToken);
+    return Results.Ok(new { Report = report, PackagePreview = diagnostics.PreviewPackage(report) });
+});
+
+app.MapGet("/api/support/connection-diagnostics/package/{packageId}", async (
+    string packageId,
+    ConnectionDiagnosticsService diagnostics,
+    CancellationToken cancellationToken) =>
+{
+    if (!diagnostics.TryGetReport(packageId, out var report)) return Results.NotFound();
+    var package = await diagnostics.CreatePackageAsync(report, cancellationToken);
+    return Results.File(package, "application/zip", $"POS-Printer-Emulator-Support-{report.PackageId}.zip");
+});
+
+app.MapPost("/api/support/connection-diagnostics/listeners/{id}/restart", async (
+    string id,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    CancellationToken cancellationToken) =>
+{
+    try { return Results.Ok((await listeners.RestartForDiagnosticsAsync(id, cancellationToken)).ToResponse(profiles)); }
+    catch (Exception exception) { return ListenerProblem(exception); }
+});
+
+app.MapPost("/api/support/requests/preview", (
+    SupportRequestInput request,
+    SupportRequestService support,
+    PrinterListenerManager listeners) =>
+{
+    try
+    {
+        var attachments = SupportRequestService.DecodeAttachments(request.Attachments);
+        var summary = string.Join("; ", listeners.GetStatus().Listeners.Select(listener =>
+            $"{listener.Configuration.Name}: {listener.Configuration.BindAddress}:{listener.Configuration.Port}, {listener.State}"));
+        return Results.Ok(support.Preview(request, summary, attachments));
+    }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/support/requests", async (
+    SupportRequestInput request,
+    SupportRequestService support,
+    PrinterListenerManager listeners,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var attachments = SupportRequestService.DecodeAttachments(request.Attachments);
+        var summary = string.Join("; ", listeners.GetStatus().Listeners.Select(listener =>
+            $"{listener.Configuration.Name}: {listener.Configuration.BindAddress}:{listener.Configuration.Port}, {listener.State}"));
+        var result = await support.SubmitAsync(request, license.GetStatus(), summary, attachments, cancellationToken);
+        return result.State == "SavedForRetry" ? Results.Json(result, statusCode: 202) : Results.Ok(result);
+    }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 403); }
+});
+
+app.MapGet("/api/support/requests/drafts", (SupportRequestService support) => Results.Ok(support.ListDrafts()));
+
+app.MapPost("/api/support/requests/drafts/{reference}/retry", async (
+    string reference, SupportRequestService support, CancellationToken cancellationToken) =>
+{
+    try { return Results.Ok(await support.RetryAsync(reference, cancellationToken)); }
+    catch (KeyNotFoundException exception) { return Results.Problem(exception.Message, statusCode: 404); }
+    catch (HttpRequestException) { return Results.Problem("The support service is still unavailable. The draft was preserved.", statusCode: 503); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapDelete("/api/support/requests/drafts/{reference}", (string reference, SupportRequestService support) =>
+{
+    try { return support.DeleteDraft(reference) ? Results.NoContent() : Results.NotFound(); }
+    catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
 app.MapPost("/api/license/activate", async (
