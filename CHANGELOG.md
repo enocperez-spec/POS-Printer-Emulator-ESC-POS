@@ -37,7 +37,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Preserved existing paid activation keys as Pro, added safe replacement-key upgrades without reinstalling, and retained listener definitions that exceed a temporarily lower allowance without running or deleting them.
 - Fixed protected-schema deployment so semicolons inside release and backlog descriptions are not mistaken for SQL statement boundaries.
 - Passed all 113 automated desktop tests, all PHP commerce contracts, PHP and JavaScript syntax checks, 15-page SEO validation, real Lite activation against the local service, rendered Trial/Lite/Pro/Enterprise Settings plus desktop/mobile pricing checks, and an installed v0.3.24 Enterprise-to-v0.3.25 upgrade that preserved registration and activation.
-- At publication, receipt comparison was scheduled for v0.3.27 and enhanced support diagnostics for v0.3.28. The roadmap was later reprioritized so customer support diagnostics moves into v0.3.27, receipt comparison follows in v0.3.28, and guided update installation remains v0.3.29.
+- After the v0.3.30-v0.3.32 security and updater releases, the pending roadmap was moved forward: customer support diagnostics is v0.3.33, receipt comparison is v0.3.34, and guided update installation is v0.3.35.
 
 ## v0.3.24 — 2026-07-19
 

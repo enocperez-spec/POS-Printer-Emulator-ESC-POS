@@ -19,4 +19,4 @@ WHERE item_key = 'v0.3.26';
 UPDATE development_roadmap
 SET status = 'Next',
     completed_at = NULL
-WHERE item_key = 'v0.3.27';
+WHERE item_key = 'v0.3.33';

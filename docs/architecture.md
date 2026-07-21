@@ -74,9 +74,9 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 10. **v0.3.24 — Upgrade licensing and Printer Setup safeguards (released 2026-07-19).** Preserve paid licensing through updates, make license persistence compatible with hardened Windows data folders, give Trial users safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100 with matching Enterprise listeners.
 11. **v0.3.25 — Four-tier licensing and upgrade paths (released 2026-07-19).** Introduce Lite at $24.99, retain the common paid feature set, and enforce total listener allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15.
 12. **v0.3.26 — Annual Application Maintenance and Support (released 2026-07-20).** Keep paid licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, and grandfathered existing-customer coverage.
-13. **v0.3.27 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-14. **v0.3.28 — Enhanced support package and connection diagnostics.** Provide guided listener, port, firewall, and connectivity tests plus privacy-aware diagnostic bundles suitable for customer support.
-15. **v0.3.29 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+13. **v0.3.33 — Enhanced support package and connection diagnostics.** Provide guided service, listener, port, firewall, Windows queue, Epson driver, storage, and connectivity checks; reviewed repair actions; and privacy-aware support packages suitable for customers on every license tier.
+14. **v0.3.34 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+15. **v0.3.35 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
 16. Service-to-viewer authentication and installer repair mode.
 17. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
 18. Optional online activation revocation and license transfer workflow.

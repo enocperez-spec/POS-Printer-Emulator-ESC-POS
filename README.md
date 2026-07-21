@@ -27,7 +27,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.26 is the current public release, released July 20, 2026. The next planned release is v0.3.27 Receipt Comparison and Automated Validation.
+> **Release status:** v0.3.32 is the current public release, released July 21, 2026. The next planned release is v0.3.33 Enhanced Support Package and Connection Diagnostics.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -237,9 +237,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.24 — Upgrade licensing and Printer Setup safeguards:** Preserve paid licensing during updates, recover from hardened-folder persistence failures, provide Trial-safe activation diagnostics, and allocate unique Windows printer ports sequentially from 9100.
 - **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
 - **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
-- **Next in v0.3.27 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.28 — Enhanced support package and connection diagnostics:** Add guided network tests, listener and firewall checks, redacted diagnostic bundles, and clearer customer-facing connection results.
-- **v0.3.29 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Next in v0.3.33 — Enhanced support package and connection diagnostics:** Add guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; provide safe repair actions and privacy-reviewed support packages that remain available locally on every license tier.
+- **v0.3.34 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.35 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

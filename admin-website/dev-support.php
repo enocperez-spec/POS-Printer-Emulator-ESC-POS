@@ -216,6 +216,98 @@ function migrate_dev_support_release_numbers(): void
 
 migrate_dev_support_release_numbers();
 
+function migrate_pending_release_numbers(): void
+{
+    $pdo = database();
+    $mappings = [
+        'v0.3.27' => ['key' => 'v0.3.33', 'title' => 'Enhanced support package and connection diagnostics', 'priority' => 333],
+        'v0.3.28' => ['key' => 'v0.3.34', 'title' => 'Receipt comparison and automated validation', 'priority' => 334],
+        'v0.3.29' => ['key' => 'v0.3.35', 'title' => 'Guided update installation and restart', 'priority' => 335],
+    ];
+
+    $pdo->beginTransaction();
+    try {
+        $migrationClaim = $pdo->prepare(
+            'INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)'
+        );
+        $migrationClaim->execute(['pending-release-renumber-v0.3.33']);
+        if ($migrationClaim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        $keys = array_merge(array_keys($mappings), array_column($mappings, 'key'));
+        $placeholders = implode(', ', array_fill(0, count($keys), '?'));
+        $select = $pdo->prepare(
+            "SELECT id, item_key, title, status FROM development_roadmap
+             WHERE item_key IN ($placeholders) FOR UPDATE"
+        );
+        $select->execute($keys);
+        $rows = [];
+        foreach ($select->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $rows[(string)$row['item_key']] = $row;
+        }
+
+        $moveToTemporaryKey = $pdo->prepare(
+            'UPDATE development_roadmap SET item_key = ?, version_label = NULL WHERE id = ?'
+        );
+        foreach ($mappings as $oldKey => $mapping) {
+            $newKey = $mapping['key'];
+            if (isset($rows[$newKey]) && isset($rows[$oldKey])) {
+                throw new RuntimeException("Both $oldKey and $newKey exist in the pending release tracker.");
+            }
+            if (!isset($rows[$oldKey])) {
+                continue;
+            }
+            if ($rows[$oldKey]['title'] !== $mapping['title'] || $rows[$oldKey]['status'] === 'Released') {
+                throw new RuntimeException("The pending release $oldKey cannot be renumbered safely.");
+            }
+            $moveToTemporaryKey->execute(['pending-renumber-' . $rows[$oldKey]['id'], $rows[$oldKey]['id']]);
+        }
+
+        $moveToFinalKey = $pdo->prepare(
+            'UPDATE development_roadmap SET item_key = ?, version_label = ?, priority_rank = ? WHERE id = ?'
+        );
+        foreach ($mappings as $oldKey => $mapping) {
+            if (!isset($rows[$oldKey])) {
+                continue;
+            }
+            $moveToFinalKey->execute([
+                $mapping['key'],
+                $mapping['key'],
+                $mapping['priority'],
+                $rows[$oldKey]['id'],
+            ]);
+        }
+
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release
+                     WHEN 'v0.3.27' THEN 'v0.3.33'
+                     WHEN 'v0.3.28' THEN 'v0.3.34'
+                     WHEN 'v0.3.29' THEN 'v0.3.35'
+                     ELSE target_release
+                 END,
+                 fixed_version = CASE fixed_version
+                     WHEN 'v0.3.27' THEN 'v0.3.33'
+                     WHEN 'v0.3.28' THEN 'v0.3.34'
+                     WHEN 'v0.3.29' THEN 'v0.3.35'
+                     ELSE fixed_version
+                 END
+             WHERE target_release IN ('v0.3.27', 'v0.3.28', 'v0.3.29')
+                OR fixed_version IN ('v0.3.27', 'v0.3.28', 'v0.3.29')"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
+migrate_pending_release_numbers();
+
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "INSERT INTO development_roadmap
@@ -276,17 +368,17 @@ $releaseSync = database()->prepare(
          'One included year for new paid licenses; existing-license grandfathering through July 19, 2027; optional one-time Lite $9.99, Pro $19.99, and Enterprise $59.99 renewals; signed entitlement refresh; server-verified PayPal renewal orders; Admin pricing, status, history, extension, and revocation controls; telemetry without keys or receipt data.',
          'Maintenance must be implemented before future releases are delivered under the coverage policy.',
          'Permanent paid features keep working after coverage ends, early and lapsed renewals calculate correctly and idempotently, only covered customers receive signed update entitlements, and commerce, licensing, migration, and telemetry tests pass.', '2026-07-20 00:00:00.000000'),
-        ('v0.3.27', 'v0.3.27', 'Release', 'Enhanced support package and connection diagnostics', 'Next', 327,
+        ('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Next', 333,
          'Guide nontechnical customers through installation, printer, listener, and connection problems and produce privacy-reviewed support evidence.',
          'Guided checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, Epson drivers, and local or POS connectivity; plain-language results; reviewed repair actions; copyable summaries; and previewed redacted ZIP support packages available locally to every license tier.',
          'Customer diagnostics and package export reduce support time immediately and must remain available without active maintenance, while assisted support contact continues to follow the maintenance entitlement.',
          'Common service, listener, port, firewall, queue, driver, storage, and connection failures are explained and safely repairable where supported, and a reviewed support package excludes receipt contents and licensing secrets by default.', NULL),
-        ('v0.3.28', 'v0.3.28', 'Release', 'Receipt comparison and automated validation', 'Planned', 328,
+        ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Planned', 334,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.29', 'v0.3.29', 'Release', 'Guided update installation and restart', 'Planned', 329,
+        ('v0.3.35', 'v0.3.35', 'Release', 'Guided update installation and restart', 'Planned', 335,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -370,9 +462,9 @@ database()->prepare(
      SET github_url = CASE item_key
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
-         WHEN 'v0.3.27' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
-         WHEN 'v0.3.28' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.29' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
+         WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -380,7 +472,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.27', 'v0.3.28', 'v0.3.29', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

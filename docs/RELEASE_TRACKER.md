@@ -14,9 +14,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Current public release: v0.3.32 — released 2026-07-21**
 
-**Current development: v0.3.27 — Enhanced support package and connection diagnostics**
+**Current development: v0.3.33 — Enhanced support package and connection diagnostics**
 
-**Next release after v0.3.27: v0.3.28 — Receipt comparison and automated validation**
+**Next release after v0.3.33: v0.3.34 — Receipt comparison and automated validation**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -72,7 +72,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; v0.3.27 gives customers and support staff a safe way to diagnose the completed listener, profile, printer, licensing, and storage system; v0.3.28 then uses deterministic captures and profiles for receipt comparison; and the guided updater closes the remaining in-application update lifecycle.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; after the completed v0.3.30-v0.3.32 security and updater work, v0.3.33 gives customers and support staff a safe way to diagnose the completed listener, profile, printer, licensing, and storage system; v0.3.34 then uses deterministic captures and profiles for receipt comparison; and v0.3.35 closes the remaining in-application update lifecycle.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -315,7 +315,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Completion verification:** All 138 desktop tests, all PHP commerce/database/site contracts, 39-file PHP lint, TypeScript and JavaScript validation, 16-page SEO validation, release-manifest synchronization, bundled SQLite verification, and repository diff checks pass. Browser QA rendered the policy page and renewal checkout at desktop/mobile sizes, switched all three renewal tiers at $9.99/$19.99/$59.99, and showed no console errors. Isolated live-app QA confirmed that an expired Lite license retains its paid features, update checks return HTTP 403, diagnostics return HTTP 200 without an activation key, and a renewed Lite license immediately restores update access. The all-in-one v0.3.26 installer and SHA-256 checksum passed packaging checks. An installed v0.3.25 Enterprise system upgraded to v0.3.26 with installer exit code 0 while preserving its paid tier, customer registration, license ID, and listener allowance; maintenance loaded as Active with the grandfathered expiration present.
 
-### v0.3.27 — Enhanced support package and connection diagnostics
+### v0.3.33 — Enhanced support package and connection diagnostics
 
 **Status:** Next
 
@@ -329,8 +329,8 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Check the Windows service, local viewer, database and storage access, configured listeners, bind addresses, port conflicts, listener health, recent connection activity, and print-job processing errors.
 - Verify the Windows Print Spooler, installed printer queues, Standard TCP/IP port mappings, assigned Epson driver, Epson APD and Status API versions, and availability of the bundled repair package.
 - Verify the POS Printer Emulator private/domain firewall rule and explain when the selected Windows network profile or bind address prevents another POS computer from connecting.
-- Run a time-bounded local end-to-end listener probe without consuming a Trial print job or changing customer receipt history.
-- Provide an optional **Wait for POS connection** check that watches a selected listener for an incoming connection and gives the customer the exact IP address and port to enter at the POS terminal.
+- Run a time-bounded local listener health probe without consuming a Trial print job or changing customer receipt history.
+- Provide the exact configured listener IP address and port for the customer to enter in their POS software, without attempting to test or infer the behavior of an unknown POS implementation.
 - Show every check as **Passed**, **Attention needed**, **Failed**, or **Skipped**, with a plain-language explanation and expandable technical details.
 - Offer only reviewed corrective actions: restart the service or listener, retry a failed listener, recreate the application firewall rule, open the Printer Setup Wizard for queue or driver repair, and copy the correct POS connection details. Administrator approval is requested only when a selected repair requires it.
 - Create a standard ZIP support package containing a text summary, machine-readable manifest, redacted application logs, application and Windows versions, listener/profile configuration summaries, diagnostic results, recent error metadata, printer/driver/firewall summaries, and a stable package identifier.
@@ -342,7 +342,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can run the diagnostic workflow without administrator tools, identify a deliberately broken service, listener, port, firewall, queue, or Epson-driver configuration with a useful corrective action, safely repair supported problems, and export a reviewed package that contains no receipt contents or secret licensing data unless the customer explicitly adds permitted evidence. Trial and expired-maintenance installations retain local diagnostics and package export, while assisted-support contact follows the maintenance entitlement.
 
-### v0.3.28 — Receipt comparison and automated validation
+### v0.3.34 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -363,7 +363,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.29 — Guided update installation and restart
+### v0.3.35 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -429,7 +429,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.29.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.35.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 

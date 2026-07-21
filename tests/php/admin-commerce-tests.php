@@ -106,10 +106,16 @@ if ($publicVersion === '') {
     }
 }
 $expectContains("('BUG-013', 'Support diagnostics failed when Stored Logos directory was absent'",$devSupport,'Admin Dev Support is missing released BUG-013.');
-$expectContains("('v0.3.27', 'v0.3.27', 'Release', 'Enhanced support package and connection diagnostics', 'Next'", $devSupport, 'Enhanced support diagnostics was not promoted to v0.3.27.');
-$expectContains("('v0.3.28', 'v0.3.28', 'Release', 'Receipt comparison and automated validation', 'Planned'", $devSupport, 'Receipt comparison was not moved to v0.3.28.');
-$expectContains("WHEN 'v0.3.27' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'", $devSupport, 'Admin Dev Support is missing the v0.3.27 diagnostics issue link.');
-$expectContains("WHEN 'v0.3.28' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.28 comparison issue link.');
+$expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Next'", $devSupport, 'Enhanced support diagnostics was not renumbered to v0.3.33.');
+$expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Planned'", $devSupport, 'Receipt comparison was not renumbered to v0.3.34.');
+$expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Guided update installation and restart', 'Planned'", $devSupport, 'Guided update installation was not renumbered to v0.3.35.');
+$expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Next'", $schema, 'Fresh database schema is missing pending v0.3.33.');
+$expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Planned'", $schema, 'Fresh database schema is missing pending v0.3.34.');
+$expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Guided update installation and restart', 'Planned'", $schema, 'Fresh database schema is missing pending v0.3.35.');
+$expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');
+$expectContains("WHEN 'v0.3.27' THEN 'v0.3.33'", $devSupport, 'Bug targets are not migrated from v0.3.27 to v0.3.33.');
+$expectContains("WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'", $devSupport, 'Admin Dev Support is missing the v0.3.33 diagnostics issue link.');
+$expectContains("WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.34 comparison issue link.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
 $expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');
