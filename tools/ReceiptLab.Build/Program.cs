@@ -412,6 +412,12 @@ internal static class ReceiptLabBuild
             "(\"releaseNotes\"\\s*:\\s*\"https://github\\.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v)[0-9]+\\.[0-9]+\\.[0-9]+(\")",
             match => $"{match.Groups[1].Value}{displayVersion}{match.Groups[2].Value}");
 
+        updated = Regex.Replace(
+            updated,
+            "((?:Current release|Release status):</strong>\\s*)v[0-9]+\\.[0-9]+\\.[0-9]+",
+            match => $"{match.Groups[1].Value}v{displayVersion}",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
         if (installer is null)
         {
             return updated;
