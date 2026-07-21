@@ -221,8 +221,8 @@ function migrate_pending_release_numbers(): void
     $pdo = database();
     $mappings = [
         'v0.3.27' => ['key' => 'v0.3.33', 'title' => 'Enhanced support package and connection diagnostics', 'priority' => 333],
-        'v0.3.28' => ['key' => 'v0.3.34', 'title' => 'Receipt comparison and automated validation', 'priority' => 334],
-        'v0.3.29' => ['key' => 'v0.3.35', 'title' => 'Guided update installation and restart', 'priority' => 335],
+        'v0.3.28' => ['key' => 'v0.3.35', 'title' => 'Receipt comparison and automated validation', 'priority' => 335],
+        'v0.3.29' => ['key' => 'v0.3.36', 'title' => 'Guided update installation and restart', 'priority' => 336],
     ];
 
     $pdo->beginTransaction();
@@ -284,14 +284,14 @@ function migrate_pending_release_numbers(): void
             "UPDATE development_bugs
              SET target_release = CASE target_release
                      WHEN 'v0.3.27' THEN 'v0.3.33'
-                     WHEN 'v0.3.28' THEN 'v0.3.34'
-                     WHEN 'v0.3.29' THEN 'v0.3.35'
+                     WHEN 'v0.3.28' THEN 'v0.3.35'
+                     WHEN 'v0.3.29' THEN 'v0.3.36'
                      ELSE target_release
                  END,
                  fixed_version = CASE fixed_version
                      WHEN 'v0.3.27' THEN 'v0.3.33'
-                     WHEN 'v0.3.28' THEN 'v0.3.34'
-                     WHEN 'v0.3.29' THEN 'v0.3.35'
+                     WHEN 'v0.3.28' THEN 'v0.3.35'
+                     WHEN 'v0.3.29' THEN 'v0.3.36'
                      ELSE fixed_version
                  END
              WHERE target_release IN ('v0.3.27', 'v0.3.28', 'v0.3.29')
@@ -373,11 +373,11 @@ $releaseSync = database()->prepare(
          'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.',
          'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.',
          'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.', UTC_TIMESTAMP(6)),
-        ('v0.3.34', 'v0.3.34', 'Release', 'Encrypted configuration backup and restore', 'Released', 334,
-         'Protect and move emulator configuration without transferring license or machine identity.',
-         'Password-encrypted PPE backup packages; listeners, profiles, stored logos, printer states, preferences, and optional paid history; explicit exclusions; verified preview; license-limit preservation; Windows-protected safety snapshots; rollback-safe restore.',
-         'Customers need a recovery path before comparison suites and the guided updater add more reusable configuration.',
-         'Encrypted create, inspect, and restore pass with wrong-password and tamper rejection, automatic safety snapshots, rollback protection, all 151 tests, and rendered desktop/mobile verification.', UTC_TIMESTAMP(6)),
+        ('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released', 334,
+         'Protect portable emulator configuration while presenting consistent product-use, licensing, compatibility, privacy, support, and liability terms.',
+         'Password-encrypted PPE backups with verified preview and rollback-safe restore; installer EULA acceptance; canonical website EULA; EPCOM Ltd. and Georgia jurisdiction; Windows 11 Pro and third-party POS support boundaries; and maintenance-response terms.',
+         'Customers need both a safe configuration recovery path and clear legal and support terms before comparison suites and guided updates expand the workflow.',
+         'Encrypted create, inspect, and restore pass wrong-password and tamper rejection, automatic safety snapshots, rollback protection, all 151 tests, rendered UI validation, matching website and installer terms, required acceptance, and published installer checksum.', UTC_TIMESTAMP(6)),
         ('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next', 335,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',

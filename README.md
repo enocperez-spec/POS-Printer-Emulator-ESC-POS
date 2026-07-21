@@ -33,7 +33,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 ## Install on Windows
 
-POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
+POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
 1. Download `POSPrinterEmulatorSetup-0.3.34-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
@@ -250,10 +250,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
 - **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
 - **Released in v0.3.33 — Enhanced support package and connection diagnostics:** Adds guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; safe repair actions; privacy-reviewed support packages; and an in-app Support Request form that securely creates redacted GitHub issues through the backend. The release does not attempt to test unknown POS software implementations or store GitHub credentials in the desktop application.
-- **Released in v0.3.34 — Encrypted configuration backup and restore:** Create password-protected `.ppebackup` packages, review their contents before restore, exclude license and registration secrets, optionally include paid receipt history, and recover automatically if restoration fails.
+- **Released in v0.3.34 — Encrypted backup, EULA, and support policy:** Create password-protected `.ppebackup` packages with preview and rollback-safe restore; require installer acceptance of the public EPCOM Ltd. EULA; and align Windows, third-party POS, maintenance-response, licensing, privacy, and support boundaries.
 - **Next in v0.3.35 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
 - **v0.3.36 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
-- **Release prerequisite — Windows 11 Pro support-policy alignment:** Remove conflicting Windows 10/11 support claims from the website, application, installer metadata, documentation, structured data, and release checks; identify 64-bit Windows 11 Pro as the only supported environment; and publish the maintenance-response and third-party POS support limitations consistently.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

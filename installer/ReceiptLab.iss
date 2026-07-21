@@ -1,6 +1,6 @@
 #define MyAppName "POS Printer Emulator"
 #define MyAppVersion "0.3.34"
-#define MyAppPublisher "POS Printer Emulator"
+#define MyAppPublisher "EPCOM Ltd."
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
 #define ServiceName "ReceiptLab"
@@ -31,6 +31,7 @@ RestartApplications=no
 RestartIfNeededByRun=no
 SetupMutex=POSPrinterEmulatorSetupMutex
 SetupIconFile=..\assets\branding\pos-printer-emulator.ico
+LicenseFile=EULA.txt
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked

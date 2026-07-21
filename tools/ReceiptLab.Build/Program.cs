@@ -541,6 +541,32 @@ internal static class ReceiptLabBuild
             failures.Add("indexnow-key.txt must contain an 8-128 character hexadecimal key");
         }
 
+        var supportPolicyFiles = Directory.EnumerateFiles(websiteDirectory, "*.html", SearchOption.TopDirectoryOnly)
+            .Concat([
+                Path.Combine(Root, "README.md"),
+                Path.Combine(Root, "src", "ReceiptEmulator.Viewer", "src", "App.tsx")
+            ]);
+        var obsoleteWindowsClaims = new[]
+        {
+            "Windows 10 64-bit",
+            "Windows 10 and Windows 11",
+            "Windows 10 or Windows 11",
+            "Windows 10/11",
+            "Windows 10 / 11",
+            "Windows 10 or 11"
+        };
+        foreach (var policyFile in supportPolicyFiles)
+        {
+            var policyText = File.ReadAllText(policyFile);
+            foreach (var obsoleteClaim in obsoleteWindowsClaims)
+            {
+                if (policyText.Contains(obsoleteClaim, StringComparison.OrdinalIgnoreCase))
+                {
+                    failures.Add($"{Path.GetFileName(policyFile)} contains obsolete support claim: {obsoleteClaim}");
+                }
+            }
+        }
+
         if (failures.Count > 0)
         {
             throw new InvalidOperationException("SEO validation failed:" + Environment.NewLine + "- " + string.Join(Environment.NewLine + "- ", failures));

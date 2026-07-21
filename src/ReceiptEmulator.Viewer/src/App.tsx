@@ -382,7 +382,7 @@ function App() {
       <footer className="status-bar">
         <span>POS Printer Emulator v{status.version} · {status.license.mode} License</span>
         <span>Local only. Receipt data stays on this device.</span>
-        <span>Windows 10/11 · x64</span>
+        <span>Windows 11 Pro · x64</span>
       </footer>
       {settingsSection && (
         <SettingsDialog

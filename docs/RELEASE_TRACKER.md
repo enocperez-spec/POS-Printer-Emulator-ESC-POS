@@ -18,7 +18,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Next release after v0.3.35: v0.3.36 — Guided update installation and restart**
 
-**Most recently completed: v0.3.34 — Encrypted configuration backup and restore**
+**Most recently completed: v0.3.34 — Encrypted backup, EULA, and support policy**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -72,11 +72,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.31 | Released | Secure development lifecycle (Phase 2) |
 | v0.3.32 | Released | Updater installer-asset validation |
 | v0.3.33 | Released | Enhanced support package, connection diagnostics, and in-app support requests |
-| v0.3.34 | Released | Encrypted configuration backup and restore |
+| v0.3.34 | Released | Encrypted backup, EULA, and support policy |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete the security and updater work; v0.3.33 provides safe customer diagnostics and support requests; v0.3.34 protects portable customer configuration with encrypted backup and rollback-safe restore; v0.3.35 uses deterministic captures and profiles for receipt comparison; and v0.3.36 closes the remaining in-application update lifecycle with a pre-update safety snapshot.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete the security and updater work; v0.3.33 provides safe customer diagnostics and support requests; v0.3.34 protects portable customer configuration and establishes the EULA and support boundaries; v0.3.35 uses deterministic captures and profiles for receipt comparison; and v0.3.36 closes the remaining in-application update lifecycle with a pre-update safety snapshot.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -357,11 +357,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Completion verification:** All 147 desktop tests, the production viewer build, desktop packaging build, PHP commerce/database/site contracts, PHP syntax checks, rendered Support UI checks, diagnostic-package preview, and ZIP download verification passed. The Trial tier retained local diagnostics and package export while assisted submission remained disabled without active maintenance. The self-contained v0.3.33 Windows installer and SHA-256 checksum were generated successfully.
 
-### v0.3.34 — Encrypted configuration backup and restore
+### v0.3.34 — Encrypted backup, EULA, and support policy
 
 **Status:** Released — 2026-07-21
 
-**Purpose:** Give customers a simple, portable way to protect and move their emulator configuration while keeping licensing secrets, personal registration data, and Windows-managed printer components out of the backup.
+**Purpose:** Give customers a safe, portable configuration recovery path while presenting the same product-use, licensing, compatibility, privacy, support, and liability terms before installation and purchase.
 
 **Released scope:**
 
@@ -376,12 +376,21 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Preserve listener definitions above the current license allowance while running only the number permitted by the active tier.
 - Create a machine-protected safety snapshot before restore, keep the five newest safety snapshots, and roll back the running configuration if restoration fails.
 - Restore the saved light/dark theme and collapsed-panel preferences immediately after a successful restore.
+- Add an End User License Agreement covering Trial, Lite, Pro, and Enterprise editions.
+- Require affirmative acceptance in the Windows installer before installation can continue.
+- Publish the same agreement at the canonical `/eula` website route and link it from the homepage and sitemap.
+- Identify EPCOM Ltd. as the Licensor and installer publisher and apply Georgia governing law and jurisdiction, subject to mandatory rights.
+- Preserve Apache License 2.0 and other open-source rights for their covered components.
+- Limit standard support to POS Printer Emulator and exclude third-party POS products, vendor-specific integration, and legacy systems.
+- Require a separately approved quotation, order, or statement of work before any offered custom POS integration or development begins.
+- Define fully updated 64-bit Windows 11 Pro as the only supported operating-system environment.
+- State that active-maintenance requests may take up to six calendar months for an initial substantive response unless a separately signed SLA states otherwise, and that a response is not a promised diagnosis, correction, workaround, or resolution.
 
 **Security and privacy:** Backup passwords and decrypted payloads are never written to application logs. Automatic safety snapshots are protected with Windows machine data protection in the restricted application-data directory. A 128 MB package limit and strict schema and count validation constrain untrusted imports.
 
-**Completion verification:** All 151 automated desktop tests pass, including encrypted round-trip, incorrect-password, and tamper-detection coverage. A live local API exercise successfully created, inspected, and restored an encrypted package and returned a safety-snapshot reference. The release build and rendered desktop/mobile create-review-restore flow passed with no browser console errors.
+**Completion verification:** All 151 automated desktop tests pass, including encrypted round-trip, incorrect-password, and tamper-detection coverage. A live local API exercise successfully created, inspected, and restored an encrypted package and returned a safety-snapshot reference. The release build and rendered desktop/mobile create-review-restore flow passed with no browser console errors. Website and installer terms match, installation requires acceptance, Windows and support-policy content is consistent, and automated release and SEO checks pass.
 
-**Complete when:** A customer can create a password-protected backup, review it before restoring, recover the supported configuration on the same or another installation without transferring a license, and return to the original configuration automatically if restore fails.
+**Complete when:** A customer can create a password-protected backup, review it before restoring, recover supported configuration without transferring a license, and return automatically to the original configuration if restore fails; the website and installer present matching terms, installation requires acceptance, customer-facing support and Windows requirements are consistent, and the versioned installer plus checksum are published.
 
 ### v0.3.35 — Receipt comparison and automated validation
 
@@ -539,7 +548,7 @@ These items remain unnumbered until the order is approved. The priority below is
 - Apply trusted timestamps so signatures remain valid after certificate expiration.
 - Verify signatures and hashes as part of the build and release process.
 - Publish installer checksums with GitHub releases and validate downloaded updates before launch.
-- Test clean install, upgrade, repair, silent install, and uninstall on supported Windows 10/11 environments.
+- Test clean install, upgrade, repair, silent install, and uninstall on a fully updated supported 64-bit Windows 11 Pro environment.
 - Document certificate custody, renewal, and emergency revocation procedures without storing private signing material in the repository.
 
 ### Priority 5 — Online license deactivation, revocation, and transfer

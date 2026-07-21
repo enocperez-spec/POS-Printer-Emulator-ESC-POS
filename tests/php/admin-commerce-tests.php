@@ -107,11 +107,11 @@ if ($publicVersion === '') {
 }
 $expectContains("('BUG-013', 'Support diagnostics failed when Stored Logos directory was absent'",$devSupport,'Admin Dev Support is missing released BUG-013.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $devSupport, 'Enhanced support diagnostics was not marked released for v0.3.33.');
-$expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted configuration backup and restore', 'Released'", $devSupport, 'Encrypted configuration backup was not marked released for v0.3.34.');
+$expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released'", $devSupport, 'Encrypted backup and EULA release was not marked released for v0.3.34.');
 $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next'", $devSupport, 'Receipt comparison was not marked next for v0.3.35.');
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned'", $devSupport, 'Guided update installation was not moved to v0.3.36.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $schema, 'Fresh database schema is missing released v0.3.33.');
-$expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted configuration backup and restore', 'Released'", $schema, 'Fresh database schema is missing released v0.3.34.');
+$expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released'", $schema, 'Fresh database schema is missing released v0.3.34.');
 $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next'", $schema, 'Fresh database schema is missing next v0.3.35.');
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned'", $schema, 'Fresh database schema is missing pending v0.3.36.');
 $expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');

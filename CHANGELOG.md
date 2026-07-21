@@ -15,6 +15,14 @@ For the current release status, scheduled versions, future backlog, and release-
 - Creates a Windows-protected safety snapshot before restore, keeps the five newest snapshots, and automatically rolls back the running configuration if restoration fails.
 - Preserves listener definitions beyond the current tier allowance while activating only the number permitted by the installed Trial, Lite, Pro, or Enterprise license.
 - Passed all 151 automated desktop tests, a clean warning-free release build, encrypted create/inspect/restore API verification, and desktop/mobile rendered UI validation with no browser console errors.
+- Adds an End User License Agreement covering Trial, Lite, Pro, and Enterprise editions and requires affirmative acceptance before Windows installation can continue.
+- Publishes the same agreement at `/eula`, links it from the homepage, and adds it to the canonical sitemap and automated SEO validation.
+- Identifies EPCOM Ltd. as the Licensor and installer publisher and applies Georgia law and Georgia state and federal court jurisdiction, subject to mandatory rights.
+- Preserves the rights granted by Apache License 2.0 and other open-source licenses for their covered components.
+- Defines POS Printer Emulator-only support, excludes third-party and legacy POS systems from standard support, and requires a separately approved paid scope for custom integration or development when offered.
+- Defines fully updated 64-bit Windows 11 Pro as the only supported operating-system environment and treats Windows 10 and other editions as unsupported.
+- States that an active-maintenance support request may take up to six calendar months for an initial substantive response unless a separately signed SLA provides otherwise; a response does not promise diagnosis, correction, workaround, or resolution.
+- Shifts Receipt Comparison to v0.3.35 and Guided Update Installation to v0.3.36.
 
 ## v0.3.33 — 2026-07-21
 
