@@ -1,0 +1,254 @@
+POS PRINTER EMULATOR
+END USER LICENSE AGREEMENT
+
+Effective date: July 21, 2026
+Agreement version: 1.0
+
+IMPORTANT: PLEASE READ THIS END USER LICENSE AGREEMENT ("AGREEMENT") CAREFULLY.
+BY SELECTING "I ACCEPT THE AGREEMENT," INSTALLING, ACTIVATING, ACCESSING, OR
+USING POS PRINTER EMULATOR, YOU AGREE TO BE BOUND BY THIS AGREEMENT. IF YOU
+DO NOT AGREE, DO NOT INSTALL OR USE THE SOFTWARE.
+
+1. PARTIES AND PRODUCT
+
+This Agreement is between you (an individual or the organization on whose
+behalf you act) and EPCOM Ltd. ("Licensor"). "Software" means the POS Printer
+Emulator desktop application, background services, installer, documentation,
+updates, and related components supplied by Licensor.
+
+If you accept this Agreement for an organization, you represent that you have
+authority to bind that organization. "You" and "your" then refer to that
+organization.
+
+2. LICENSE GRANT AND EDITIONS
+
+Subject to this Agreement and any applicable order confirmation, Licensor
+grants you a limited, non-exclusive, non-transferable license to install and
+use the Software on Windows devices you control for lawful POS development,
+receipt testing, administration, training, support, and troubleshooting.
+
+The Trial edition is an evaluation license and may include daily job limits, a
+visible watermark, no historical job access, and unavailable premium features.
+Paid Lite, Pro, and Enterprise licenses are perpetual for the version and
+features purchased, subject to the device, listener, user, or other limits
+shown in the application, pricing page, or order confirmation. A license does
+not include more installations, listeners, users, or features than the
+applicable edition permits.
+
+3. REGISTRATION AND ACTIVATION
+
+New installations operate in Trial mode unless activated. You agree to provide
+accurate customer or company name and email information. Activation keys,
+maintenance tokens, and installation credentials are confidential. You may
+not publish, share, resell, sublicense, or use them for more installations or
+capacity than purchased. A valid key may upgrade an existing installation
+without a reinstall. Licensor may verify license validity and enforce the
+applicable edition limits, but will not knowingly collect receipt content as
+part of activation or ordinary usage reporting.
+
+4. PERMITTED COPIES AND TRANSFERS
+
+You may make a reasonable number of archival copies of the installer and your
+license records. You may transfer a paid license only with Licensor's prior
+written approval and only if the transferor stops using all copies and the
+recipient accepts this Agreement. Transfers prohibited by law are not
+restricted by this section.
+
+5. RESTRICTIONS
+
+Except where applicable law or an open-source license expressly permits it,
+you may not:
+
+  a. bypass or defeat activation, Trial limits, edition limits, or security;
+  b. rent, lease, sublicense, sell, distribute, or provide the Software as a
+     hosted or managed service to third parties;
+  c. reverse engineer, decompile, or disassemble proprietary components;
+  d. remove or alter copyright, trademark, attribution, or license notices;
+  e. use the Software to violate law, privacy rights, payment-card rules, or
+     another party's intellectual-property rights; or
+  f. use the Software to operate or impersonate an unauthorized network
+     service or to intercept print traffic you are not authorized to receive.
+
+Nothing in this Agreement limits rights that cannot lawfully be restricted.
+
+6. UPDATES, UPGRADES, AND MAINTENANCE
+
+A paid license is not a subscription unless your order expressly says
+otherwise. The purchased version and its licensed features may continue to be
+used after included maintenance ends. Access to later versions, update
+downloads, upgrades, and assisted support may require active maintenance.
+Licensor may change or discontinue future features, services, or editions, but
+will not intentionally remove perpetual rights already purchased for an
+installed version except as required by law or because of your material breach.
+
+7. RECEIPT DATA, REGISTRATION DATA, AND PRIVACY
+
+Receipt text, raw ESC/POS data, barcodes, QR-code contents, rendered receipts,
+and eligible job history are designed to remain on the Windows device running
+the Software. Licensing services may receive an installation identifier,
+authentication token, customer or company name, email address, application
+version, license tier and identifier, maintenance status, launch counts,
+emulated job counts, and last-seen time. The current privacy notice at
+https://www.posprinteremulator.com/privacy explains this processing and is
+incorporated into this Agreement by reference.
+
+You own or retain your rights in data you submit to the Software. You are
+responsible for having permission to process it and for avoiding real payment
+card data, authentication secrets, personal information, or other sensitive
+production data in test receipts unless you have appropriate safeguards and a
+lawful basis.
+
+8. NETWORK AND PRODUCTION RESPONSIBILITY
+
+The Software may listen for RAW TCP/IP print traffic, including on port 9100.
+You are responsible for firewall rules, trusted-network configuration, access
+control, backups, and compliance with your security policies. The Software is
+a testing and diagnostic tool, not a payment processor or security product.
+ESC/POS behavior and vendor extensions vary. You must validate production
+output on the actual target printer and hardware before deployment.
+
+Licensor's only supported operating-system environment is a 64-bit computer
+running Windows 11 Pro that is currently supported by Microsoft and has all
+applicable security and servicing updates installed. Windows 10, other Windows
+editions, modified operating systems, virtualized environments, and unsupported
+or end-of-life Windows releases are outside the supported environment. The
+Software may install or operate in an unsupported environment, but any such use
+is at your own risk and is not eligible for technical support, compatibility
+assistance, or a warranty of operation.
+
+9. OWNERSHIP AND OPEN-SOURCE SOFTWARE
+
+The Software is licensed, not sold. Licensor and its suppliers retain all
+rights not expressly granted by this Agreement, including rights in names,
+logos, proprietary services, activation systems, documentation, and software.
+
+Some or all source code and third-party components may be provided under the
+Apache License 2.0 or other open-source licenses. For any component accompanied
+by an open-source license or notice, that license governs the component and
+this Agreement does not reduce the rights it grants. Required notices and
+license texts are included with the Software or its source distribution.
+
+10. THIRD-PARTY PRODUCTS
+
+The Software may interoperate with Microsoft Windows, WebView2, printer
+drivers, POS systems, and other third-party products. Those products are
+governed by their providers' terms. References to Epson, ESC/POS, Microsoft,
+or other third parties describe compatibility only and do not imply
+affiliation, sponsorship, or endorsement.
+
+Licensor supports the POS Printer Emulator Software only. Licensor does not
+sell, maintain, warrant, or provide technical support for any third-party POS
+system, printer driver, operating system, network, or hardware. The Software is
+designed to work with common POS printing workflows and ESC/POS data, but
+Licensor does not represent or warrant that it is compatible with every POS
+product, version, configuration, proprietary protocol, or vendor extension.
+Older, discontinued, unsupported, or otherwise obsolete third-party systems
+("Legacy Systems") may be incompatible and may not be eligible for integration
+assistance.
+
+11. SUPPORT
+
+Support and maintenance are provided only as stated in your order confirmation
+or the then-current maintenance policy. You must provide reasonable diagnostic
+information, excluding receipt content and secrets unless specifically agreed,
+for Licensor to investigate a support request.
+
+If a third-party POS system does not generate supported print data or does not
+communicate correctly with the Software, resolving the issue may require
+changes by the POS vendor or customer, configuration services, custom
+integration work, or additional Software development. Such work is outside
+standard Software support, is not guaranteed to be available or successful,
+and may require additional fees. Licensor will perform billable integration or
+development work only under a separate written statement of work, quotation,
+or order that you approve before the work begins. Licensor has no obligation to
+modify the Software for a particular POS system or Legacy System.
+
+Unless EPCOM Ltd. expressly agrees to a different response time in a separate
+written service-level agreement signed by EPCOM Ltd., a support request covered
+by active maintenance may take up to six (6) calendar months after Licensor
+receives a sufficiently complete request to receive an initial substantive
+response. Payment for a license, maintenance, or support does not create a
+shorter response time. A "response" may be limited to acknowledging the request,
+requesting additional information, providing status or guidance, or stating
+that the matter is unsupported. A response is not a promise to diagnose,
+correct, repair, modify, provide a workaround for, or resolve the reported
+issue. No diagnosis, correction, workaround, restoration, or resolution time is
+guaranteed.
+
+12. DISCLAIMER OF WARRANTIES
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE, TRIAL, DOCUMENTATION, AND
+SERVICES ARE PROVIDED "AS IS" AND "AS AVAILABLE," WITH ALL FAULTS. LICENSOR
+DISCLAIMS ALL EXPRESS, IMPLIED, AND STATUTORY WARRANTIES, INCLUDING
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT,
+ACCURACY, QUIET ENJOYMENT, AND WARRANTIES ARISING FROM COURSE OF DEALING OR
+USAGE OF TRADE. LICENSOR DOES NOT WARRANT THAT THE SOFTWARE WILL BE
+UNINTERRUPTED, ERROR-FREE, SECURE, COMPATIBLE WITH EVERY POS SYSTEM OR ESC/POS
+COMMAND, OR AN EXACT SUBSTITUTE FOR PHYSICAL PRINTER VALIDATION.
+
+SOME JURISDICTIONS DO NOT ALLOW CERTAIN DISCLAIMERS. IN THOSE JURISDICTIONS,
+THE DISCLAIMERS APPLY ONLY TO THE EXTENT LEGALLY PERMITTED, AND YOU RETAIN ALL
+MANDATORY CONSUMER AND STATUTORY RIGHTS.
+
+13. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR AND ITS SUPPLIERS WILL NOT BE
+LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL
+DAMAGES, OR FOR LOST PROFITS, REVENUE, BUSINESS, GOODWILL, DATA, OR PRODUCTION,
+ARISING FROM OR RELATED TO THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE TOTAL AGGREGATE LIABILITY OF
+LICENSOR AND ITS SUPPLIERS ARISING FROM OR RELATED TO THE SOFTWARE WILL NOT
+EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID FOR THE APPLICABLE SOFTWARE
+LICENSE OR (B) US $100. THESE LIMITS DO NOT APPLY TO LIABILITY THAT CANNOT BE
+LIMITED OR EXCLUDED BY LAW.
+
+14. TERM AND TERMINATION
+
+This Agreement begins when you first accept, install, or use the Software. You
+may terminate it by uninstalling and destroying all copies in your control.
+Licensor may terminate your license for a material breach if you do not cure
+the breach within 30 days after written notice, or immediately if the breach
+cannot reasonably be cured. On termination, stop using and remove the Software.
+Sections that by their nature should survive will survive, including ownership,
+disclaimers, limitations of liability, and general terms.
+
+15. EXPORT AND LEGAL COMPLIANCE
+
+You must comply with applicable export-control, sanctions, anti-corruption,
+privacy, and other laws. You may not use or transfer the Software to a person,
+entity, or location when prohibited by applicable law.
+
+16. GENERAL TERMS
+
+This Agreement, the applicable order confirmation, the privacy notice, and any
+open-source notices are the complete agreement about the Software and replace
+prior discussions on that subject. If there is a conflict, an order confirmation
+controls only for its specific commercial terms, and an open-source license
+controls for its covered component.
+
+This Agreement is governed by the laws of the State of Georgia, United States,
+without regard to conflict-of-law rules. The state and federal courts located
+in Georgia have exclusive jurisdiction, unless mandatory law gives you another
+forum. The United Nations Convention on Contracts for the International Sale
+of Goods does not apply.
+
+If a provision is unenforceable, it will be enforced to the maximum lawful
+extent and the remaining provisions will remain effective. Failure to enforce
+a provision is not a waiver. You may not assign this Agreement except as
+permitted in Section 4; Licensor may assign it as part of a merger, acquisition,
+reorganization, or transfer of the Software business. Headings are for
+convenience only.
+
+Licensor may publish revised terms for future releases. A revised Agreement
+applies only after you affirmatively accept it or install a release that clearly
+presents it for acceptance. No revision reduces mandatory rights.
+
+17. CONTACT
+
+Questions about this Agreement may be sent to:
+
+EPCOM Ltd.
+POS Printer Emulator
+support@posprinteremulator.com
+https://www.posprinteremulator.com

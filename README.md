@@ -27,13 +27,13 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.33 is the current public release, released July 21, 2026. The next planned release is v0.3.34 Receipt Comparison and Automated Validation.
+> **Release status:** v0.3.34 is the current public release, released July 21, 2026. The next planned release is v0.3.35 Receipt Comparison and Automated Validation.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
 ## Install on Windows
 
-POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
+POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
 1. Download `POSPrinterEmulatorSetup-0.3.26-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
@@ -242,8 +242,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
 - **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
 - **Released in v0.3.33 — Enhanced support package and connection diagnostics:** Adds guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; safe repair actions; privacy-reviewed support packages; and an in-app Support Request form that securely creates redacted GitHub issues through the backend. The release does not attempt to test unknown POS software implementations or store GitHub credentials in the desktop application.
-- **Next in v0.3.34 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.35 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.34 — End User License Agreement and support policy:** Adds mandatory installer acceptance, publishes the website EULA, identifies EPCOM Ltd. as the Georgia Licensor, defines supported Windows and third-party POS boundaries, and documents maintenance-response terms.
+- **Next in v0.3.35 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.36 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

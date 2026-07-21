@@ -51,7 +51,7 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.33',
+  version: '0.3.34',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -368,7 +368,7 @@ function App() {
       <footer className="status-bar">
         <span>POS Printer Emulator v{status.version} · {status.license.mode} License</span>
         <span>Local only. Receipt data stays on this device.</span>
-        <span>Windows 10/11 · x64</span>
+        <span>Windows 11 Pro · x64</span>
       </footer>
       {settingsSection && (
         <SettingsDialog

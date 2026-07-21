@@ -6,6 +6,17 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.34 — 2026-07-21
+
+- Adds an End User License Agreement covering Trial, Lite, Pro, and Enterprise editions and requires affirmative acceptance before Windows installation can continue.
+- Publishes the same agreement at `/eula`, links it from the homepage, and adds it to the canonical sitemap and automated SEO validation.
+- Identifies EPCOM Ltd. as the Licensor and installer publisher and applies Georgia law and Georgia state and federal court jurisdiction, subject to mandatory rights.
+- Preserves the rights granted by Apache License 2.0 and other open-source licenses for their covered components.
+- Defines POS Printer Emulator-only support, excludes third-party and legacy POS systems from standard support, and requires a separately approved paid scope for custom integration or development when offered.
+- Defines fully updated 64-bit Windows 11 Pro as the only supported operating-system environment and treats Windows 10 and other editions as unsupported.
+- States that an active-maintenance support request may take up to six calendar months for an initial substantive response unless a separately signed SLA provides otherwise; a response does not promise diagnosis, correction, workaround, or resolution.
+- Shifts Receipt Comparison to v0.3.35 and Guided Update Installation to v0.3.36.
+
 ## v0.3.33 — 2026-07-21
 
 - Adds guided Connection Diagnostics for the local service and viewer, storage, printer listeners, configured ports, local health probes, recent job errors, Windows services, printer queues, Epson driver components, and the private/domain firewall rule. The diagnostics display emulator connection details but do not attempt to test unknown POS software.

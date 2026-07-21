@@ -221,8 +221,8 @@ function migrate_pending_release_numbers(): void
     $pdo = database();
     $mappings = [
         'v0.3.27' => ['key' => 'v0.3.33', 'title' => 'Enhanced support package and connection diagnostics', 'priority' => 333],
-        'v0.3.28' => ['key' => 'v0.3.34', 'title' => 'Receipt comparison and automated validation', 'priority' => 334],
-        'v0.3.29' => ['key' => 'v0.3.35', 'title' => 'Guided update installation and restart', 'priority' => 335],
+        'v0.3.28' => ['key' => 'v0.3.35', 'title' => 'Receipt comparison and automated validation', 'priority' => 335],
+        'v0.3.29' => ['key' => 'v0.3.36', 'title' => 'Guided update installation and restart', 'priority' => 336],
     ];
 
     $pdo->beginTransaction();
@@ -284,14 +284,14 @@ function migrate_pending_release_numbers(): void
             "UPDATE development_bugs
              SET target_release = CASE target_release
                      WHEN 'v0.3.27' THEN 'v0.3.33'
-                     WHEN 'v0.3.28' THEN 'v0.3.34'
-                     WHEN 'v0.3.29' THEN 'v0.3.35'
+                     WHEN 'v0.3.28' THEN 'v0.3.35'
+                     WHEN 'v0.3.29' THEN 'v0.3.36'
                      ELSE target_release
                  END,
                  fixed_version = CASE fixed_version
                      WHEN 'v0.3.27' THEN 'v0.3.33'
-                     WHEN 'v0.3.28' THEN 'v0.3.34'
-                     WHEN 'v0.3.29' THEN 'v0.3.35'
+                     WHEN 'v0.3.28' THEN 'v0.3.35'
+                     WHEN 'v0.3.29' THEN 'v0.3.36'
                      ELSE fixed_version
                  END
              WHERE target_release IN ('v0.3.27', 'v0.3.28', 'v0.3.29')
@@ -373,12 +373,17 @@ $releaseSync = database()->prepare(
          'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.',
          'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.',
          'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.', UTC_TIMESTAMP(6)),
-        ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Next', 334,
+        ('v0.3.34', 'v0.3.34', 'Release', 'End User License Agreement and support policy', 'Released', 334,
+         'Present the product-use, licensing, compatibility, privacy, support, and liability terms before installation and on the public website.',
+         'Installer acceptance; canonical website EULA; EPCOM Ltd. and Georgia jurisdiction; open-source rights; Windows 11 Pro support boundary; third-party and legacy POS exclusions; separately approved custom work; and maintenance response terms.',
+         'Customers must receive consistent legal and support terms before installing or purchasing the software.',
+         'Website and installer terms match, acceptance is required, policy content is consistent, and the versioned installer plus checksum are published.', UTC_TIMESTAMP(6)),
+        ('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next', 335,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.35', 'v0.3.35', 'Release', 'Guided update installation and restart', 'Planned', 335,
+        ('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned', 336,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -463,8 +468,9 @@ database()->prepare(
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
          WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
-         WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'
+         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -472,7 +478,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

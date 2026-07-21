@@ -12,11 +12,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.33 — released 2026-07-21**
+**Current public release: v0.3.34 — released 2026-07-21**
 
-**Current development: v0.3.34 — Receipt comparison and automated validation**
+**Current development: v0.3.35 — Receipt comparison and automated validation**
 
-**Next release after v0.3.34: v0.3.35 — Guided update installation and restart**
+**Next release after v0.3.35: v0.3.36 — Guided update installation and restart**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -69,10 +69,12 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.30 | Released | Security remediation (Phase 1) |
 | v0.3.31 | Released | Secure development lifecycle (Phase 2) |
 | v0.3.32 | Released | Updater installer-asset validation |
+| v0.3.33 | Released | Enhanced support package and connection diagnostics |
+| v0.3.34 | Released | End User License Agreement and support policy |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; after the completed v0.3.30-v0.3.32 security and updater work, v0.3.33 gives customers and support staff a safe way to diagnose the completed listener, profile, printer, licensing, and storage system; v0.3.34 then uses deterministic captures and profiles for receipt comparison; and v0.3.35 closes the remaining in-application update lifecycle.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; after the completed v0.3.30-v0.3.32 security and updater work, v0.3.33 gives customers and support staff a safe way to diagnose the completed listener, profile, printer, licensing, and storage system; v0.3.34 establishes the customer EULA and support boundaries; v0.3.35 then uses deterministic captures and profiles for receipt comparison; and v0.3.36 closes the remaining in-application update lifecycle.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -353,7 +355,27 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Completion verification:** All 147 desktop tests, the production viewer build, desktop packaging build, PHP commerce/database/site contracts, PHP syntax checks, rendered Support UI checks, diagnostic-package preview, and ZIP download verification passed. The Trial tier retained local diagnostics and package export while assisted submission remained disabled without active maintenance. The self-contained v0.3.33 Windows installer and SHA-256 checksum were generated successfully.
 
-### v0.3.34 — Receipt comparison and automated validation
+### v0.3.34 — End User License Agreement and support policy
+
+**Status:** Released — 2026-07-21
+
+**Purpose:** Present enforceable product-use, licensing, compatibility, privacy, support, and liability terms before installation while publishing the same agreement for pre-purchase review.
+
+**Released scope:**
+
+- Add an End User License Agreement covering Trial, Lite, Pro, and Enterprise editions.
+- Require affirmative acceptance in the Windows installer before installation can continue.
+- Publish the same agreement at the canonical `/eula` website route and link it from the homepage and sitemap.
+- Identify EPCOM Ltd. as the Licensor and installer publisher and apply Georgia governing law and jurisdiction, subject to mandatory rights.
+- Preserve Apache License 2.0 and other open-source rights for their covered components.
+- Limit standard support to POS Printer Emulator and exclude third-party POS products, vendor-specific integration, and legacy systems.
+- Require a separately approved quotation, order, or statement of work before any offered custom POS integration or development begins.
+- Define fully updated 64-bit Windows 11 Pro as the only supported operating-system environment.
+- State that active-maintenance requests may take up to six calendar months for an initial substantive response unless a separately signed SLA states otherwise, and that a response is not a promised diagnosis, correction, workaround, or resolution.
+
+**Complete when:** The website and installer present matching terms, installation cannot continue without acceptance, customer-facing support and Windows requirements are consistent, automated SEO and release checks pass, and the versioned Windows installer plus checksum are published.
+
+### v0.3.35 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -374,7 +396,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.35 — Guided update installation and restart
+### v0.3.36 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -492,7 +514,7 @@ These items remain unnumbered until the order is approved. The priority below is
 - Apply trusted timestamps so signatures remain valid after certificate expiration.
 - Verify signatures and hashes as part of the build and release process.
 - Publish installer checksums with GitHub releases and validate downloaded updates before launch.
-- Test clean install, upgrade, repair, silent install, and uninstall on supported Windows 10/11 environments.
+- Test clean install, upgrade, repair, silent install, and uninstall on a fully updated supported 64-bit Windows 11 Pro environment.
 - Document certificate custody, renewal, and emergency revocation procedures without storing private signing material in the repository.
 
 ### Priority 5 — Online license deactivation, revocation, and transfer
