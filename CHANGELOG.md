@@ -4,6 +4,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## Upcoming security releases
+
+- **v0.3.30 — Security remediation (Phase 1):** Rotate exposed website credentials, harden website and desktop boundaries, protect secrets and logs, verify signed updates/installers, and clear all critical/high security blockers.
+- **v0.3.31 — Secure development lifecycle (Phase 2, in progress):** Make threat modeling, automated security checks, security regression tests, tracker evidence, and release sign-off part of every future feature release.
+
 ## v0.3.26 — 2026-07-20
 
 - Keeps every Lite, Pro, and Enterprise license permanent while adding an independent annual Application Maintenance and Support entitlement.
@@ -25,7 +30,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Preserved existing paid activation keys as Pro, added safe replacement-key upgrades without reinstalling, and retained listener definitions that exceed a temporarily lower allowance without running or deleting them.
 - Fixed protected-schema deployment so semicolons inside release and backlog descriptions are not mistaken for SQL statement boundaries.
 - Passed all 113 automated desktop tests, all PHP commerce contracts, PHP and JavaScript syntax checks, 15-page SEO validation, real Lite activation against the local service, rendered Trial/Lite/Pro/Enterprise Settings plus desktop/mobile pricing checks, and an installed v0.3.24 Enterprise-to-v0.3.25 upgrade that preserved registration and activation.
-- Receipt comparison moves to v0.3.27, enhanced support diagnostics to v0.3.28, and guided update installation to v0.3.29.
+- At publication, receipt comparison was scheduled for v0.3.27 and enhanced support diagnostics for v0.3.28. The roadmap was later reprioritized so customer support diagnostics moves into v0.3.27, receipt comparison follows in v0.3.28, and guided update installation remains v0.3.29.
 
 ## v0.3.24 — 2026-07-19
 
