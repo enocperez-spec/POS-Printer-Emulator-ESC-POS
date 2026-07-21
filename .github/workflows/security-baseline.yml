@@ -29,8 +29,9 @@ jobs:
       - name: Audit .NET dependencies
         shell: bash
         run: |
+          export EnableWindowsTargeting=true
           while IFS= read -r project; do
-            dotnet list "$project" package --vulnerable --include-transitive -p:EnableWindowsTargeting=true
+            dotnet list "$project" package --vulnerable --include-transitive
           done < <(find src tools tests -name '*.csproj' -print)
       - name: Audit npm dependencies when manifests exist
         shell: bash
