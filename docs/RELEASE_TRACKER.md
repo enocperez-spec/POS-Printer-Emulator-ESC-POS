@@ -14,9 +14,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Current public release: v0.3.26 — released 2026-07-20**
 
-**Current development: v0.3.27 — Receipt comparison and automated validation**
+**Current development: v0.3.30 — Security remediation (Phase 1)**
 
-**Next release after v0.3.27: v0.3.28 — Enhanced support package and connection diagnostics**
+**Next release after v0.3.27: v0.3.28 — Receipt comparison and automated validation**
 
 ## Completed releases
 
@@ -54,7 +54,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Scheduled releases
 
-The scheduled order is dependency-driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; comparison then uses deterministic captures and profiles; enhanced diagnostics can report across the complete system; and the guided updater closes the remaining in-application update lifecycle.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; v0.3.27 gives customers and support staff a safe way to diagnose the completed listener, profile, printer, licensing, and storage system; v0.3.28 then uses deterministic captures and profiles for receipt comparison; and the guided updater closes the remaining in-application update lifecycle.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -297,9 +297,38 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 
 **Completion verification:** All 138 desktop tests, all PHP commerce/database/site contracts, 39-file PHP lint, TypeScript and JavaScript validation, 16-page SEO validation, release-manifest synchronization, bundled SQLite verification, and repository diff checks pass. Browser QA rendered the policy page and renewal checkout at desktop/mobile sizes, switched all three renewal tiers at $9.99/$19.99/$59.99, and showed no console errors. Isolated live-app QA confirmed that an expired Lite license retains its paid features, update checks return HTTP 403, diagnostics return HTTP 200 without an activation key, and a renewed Lite license immediately restores update access. The all-in-one v0.3.26 installer and SHA-256 checksum passed packaging checks. An installed v0.3.25 Enterprise system upgraded to v0.3.26 with installer exit code 0 while preserving its paid tier, customer registration, license ID, and listener allowance; maintenance loaded as Active with the grandfathered expiration present.
 
-### v0.3.27 — Receipt comparison and automated validation
+### v0.3.27 — Enhanced support package and connection diagnostics
 
 **Status:** Next
+
+**GitHub:** [Issue #20 — Enhanced support package and connection diagnostics](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20)
+
+**Purpose:** Help nontechnical customers identify common installation, Windows-printer, listener, and network problems without opening Windows administration tools, then create a privacy-reviewed package that support staff can use immediately.
+
+**Planned scope:**
+
+- Replace the single diagnostic-log download with a guided **Connection Diagnostics** workflow under Settings → Support.
+- Check the Windows service, local viewer, database and storage access, configured listeners, bind addresses, port conflicts, listener health, recent connection activity, and print-job processing errors.
+- Verify the Windows Print Spooler, installed printer queues, Standard TCP/IP port mappings, assigned Epson driver, Epson APD and Status API versions, and availability of the bundled repair package.
+- Verify the POS Printer Emulator private/domain firewall rule and explain when the selected Windows network profile or bind address prevents another POS computer from connecting.
+- Run a time-bounded local end-to-end listener probe without consuming a Trial print job or changing customer receipt history.
+- Provide an optional **Wait for POS connection** check that watches a selected listener for an incoming connection and gives the customer the exact IP address and port to enter at the POS terminal.
+- Show every check as **Passed**, **Attention needed**, **Failed**, or **Skipped**, with a plain-language explanation and expandable technical details.
+- Offer only reviewed corrective actions: restart the service or listener, retry a failed listener, recreate the application firewall rule, open the Printer Setup Wizard for queue or driver repair, and copy the correct POS connection details. Administrator approval is requested only when a selected repair requires it.
+- Create a standard ZIP support package containing a text summary, machine-readable manifest, redacted application logs, application and Windows versions, listener/profile configuration summaries, diagnostic results, recent error metadata, printer/driver/firewall summaries, and a stable package identifier.
+- Preview every file and data category before export. Exclude receipt text, raw receipt bytes, imported captures, activation keys, maintenance keys, payment information, email addresses, Windows user names, and full local file paths by default.
+- Require explicit, separate consent before including registration details or selected receipt/capture evidence. Never include activation or maintenance keys.
+- Add **Copy Support Summary**, **Save Support Package**, and—only when maintenance is active—**Contact Technical Support** actions. Package creation and local diagnostics remain available to Trial users and customers whose maintenance has expired.
+- Keep the workflow offline-first. Do not upload a package automatically or transmit diagnostic data without a separate future feature and explicit customer consent.
+- Add deterministic redaction, authorization, corrupt-data, cancellation, timeout, all-license-tier, expired-maintenance, and installed-Windows diagnostic tests.
+
+**Complete when:** A customer can run the diagnostic workflow without administrator tools, identify a deliberately broken service, listener, port, firewall, queue, or Epson-driver configuration with a useful corrective action, safely repair supported problems, and export a reviewed package that contains no receipt contents or secret licensing data unless the customer explicitly adds permitted evidence. Trial and expired-maintenance installations retain local diagnostics and package export, while assisted-support contact follows the maintenance entitlement.
+
+### v0.3.28 — Receipt comparison and automated validation
+
+**Status:** Planned
+
+**GitHub:** [Issue #21 — Receipt comparison and automated validation](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21)
 
 **Purpose:** Turn the emulator into a repeatable compatibility-testing tool for POS changes, printer migrations, and regression testing.
 
@@ -315,25 +344,6 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 - Add deterministic golden-output tests for the supported renderer behavior.
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
-
-### v0.3.28 — Enhanced support package and connection diagnostics
-
-**Status:** Planned
-
-**Purpose:** Reduce support time by guiding nontechnical customers through connection checks and producing a privacy-aware package when assistance is required.
-
-**Planned scope:**
-
-- Add guided checks for service status, listener state, bind address, port availability, Windows firewall rules, printer queues, Epson driver state, and viewer health.
-- Test local and remote connectivity with plain-language results and corrective suggestions.
-- Report each configured listener and profile without including receipt contents by default.
-- Build a redacted support package containing logs, versions, configuration summaries, health results, and recent error metadata.
-- Preview exactly what will be included before saving a support package.
-- Require explicit consent before including raw receipt captures, receipt text, registration fields, or activation information.
-- Add one-click copy for a support summary and a stable package identifier.
-- Include repair links or actions for problems the application can safely correct.
-
-**Complete when:** A customer can diagnose common service, port, firewall, and driver problems without opening Windows administration tools and can produce a reviewed, redacted package for support.
 
 ### v0.3.29 — Guided update installation and restart
 
@@ -360,6 +370,44 @@ The scheduled order is dependency-driven: v0.3.25 establishes the four-tier comm
 **Why this priority:** The external updater and controlled shutdown eliminate the remaining class of self-update file-lock failures while preventing unexpected listener downtime or loss of customer state.
 
 **Complete when:** From Settings, a customer can download an update, choose Install and Restart, see the listener stop cleanly, complete the installation with no locked-file error, relaunch automatically on the new version, and retain registration, licensing, settings, stored data, and the previously selected receipt; cancel and failure paths leave the current installation usable.
+
+### v0.3.30 — Security remediation (Phase 1)
+
+**Status:** In progress — security gate before new roadmap work
+
+**Purpose:** Resolve the actionable security findings from the completed deep review and harden the public Admin Portal, purchase site, and Windows application before adding more externally reachable functionality.
+
+**Planned scope:**
+
+- Rotate every exposed purchase and maintenance bearer token, remove tokens from source, history, backups, and logs, and load replacements from server-side secrets outside the web root.
+- Separate purchase-site and maintenance credentials, reject the old credentials, and verify PayPal, activation, renewal, and Admin Portal workflows after rotation.
+- Enforce HTTPS/TLS, secure cookies, CSRF protection, authorization checks, input validation, and login/API rate limits across the public website and Admin Portal.
+- Encrypt activation keys and customer registration data at rest on Windows; redact credentials, keys, email addresses, and other personal data from logs.
+- Enforce Trial/Lite/Pro/Enterprise feature and listener limits at every desktop API boundary, not only in the UI, and review local-service elevation and file permissions for least privilege.
+- Verify update and installer downloads using trusted HTTPS, checksums, and publisher signatures; add dependency, secret-scanning, and package-integrity checks to the release build.
+- Add regression tests for authentication, authorization, token rotation, rate limiting, secret redaction, license boundaries, update integrity, and installer permissions.
+
+**Complete when:** The medium finding is remediated and verified, no critical/high findings remain, old exposed credentials are rejected, secrets are absent from tracked files and logs, website and desktop security tests pass, and signed update/install verification succeeds on a clean Windows installation.
+
+### v0.3.31 — Secure development lifecycle (Phase 2)
+
+**Status:** In progress — follows v0.3.30
+
+**Purpose:** Make security a repeatable release requirement so future features for the website, Admin Portal, and desktop application do not reintroduce the issues addressed in Phase 1.
+
+**Planned scope:**
+
+- Add a security checklist and threat-model note to every feature, bug fix, and release entry.
+- Require trust-boundary, data-flow, privilege, authentication, authorization, input-validation, and sensitive-data decisions before implementation.
+- Run automated dependency, secret, static-analysis, package-signing, and HTTPS/security-header checks in CI for every merge and release candidate.
+- Add API tests for CSRF, injection, rate limiting, object-level authorization, malformed uploads, and safe error responses.
+- Add desktop tests for privilege escalation, local API access, encrypted storage, license bypass resistance, update authenticity, installer rollback, and log redaction.
+- Keep validated security findings in GitHub Issues and the Admin Portal Dev Support tracker with severity, owner, remediation, and verification evidence.
+- Require explicit security sign-off before publication; block releases with unresolved critical or high findings and document accepted lower-risk exceptions.
+- Schedule a lightweight review each release and a deep security scan after major architecture, licensing, payment, storage, or networking changes.
+- Use the repository [security release checklist](SECURITY_RELEASE_CHECKLIST.md), sign-off template, and automated `.github/workflows/security-baseline.yml` gates for every merge and release candidate.
+
+**Complete when:** The checklist, CI gates, test suites, tracker workflow, and release sign-off are documented and exercised on at least one complete release after v0.3.30, with evidence linked from the release record.
 
 ## Future backlog
 

@@ -1,0 +1,40 @@
+name: Security baseline
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan tracked files for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit .NET dependencies
+        shell: bash
+        run: |
+          while IFS= read -r project; do
+            dotnet list "$project" package --vulnerable --include-transitive
+          done < <(find src tools tests -name '*.csproj' -print)
+      - name: Audit npm dependencies when manifests exist
+        shell: bash
+        run: |
+          while IFS= read -r package; do
+            (cd "$(dirname "$package")" && npm audit --audit-level=high)
+          done < <(find . -name package.json -not -path './artifacts/*' -print)
