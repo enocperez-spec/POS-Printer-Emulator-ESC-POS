@@ -12,9 +12,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.26 — released 2026-07-20**
+**Current public release: v0.3.31 — released 2026-07-21**
 
-**Current development: v0.3.30 — Security remediation (Phase 1)**
+**Current development: v0.3.30 — Security remediation (Phase 1) follow-up verification**
 
 **Next release after v0.3.27: v0.3.28 — Receipt comparison and automated validation**
 
@@ -373,7 +373,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.30 — Security remediation (Phase 1)
 
-**Status:** In progress — security gate before new roadmap work
+**Status:** Released — 2026-07-21
 
 **Purpose:** Resolve the actionable security findings from the completed deep review and harden the public Admin Portal, purchase site, and Windows application before adding more externally reachable functionality.
 
@@ -391,7 +391,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.31 — Secure development lifecycle (Phase 2)
 
-**Status:** In progress — follows v0.3.30
+**Status:** Released — 2026-07-21
 
 **Purpose:** Make security a repeatable release requirement so future features for the website, Admin Portal, and desktop application do not reintroduce the issues addressed in Phase 1.
 
