@@ -75,11 +75,12 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 11. **v0.3.25 — Four-tier licensing and upgrade paths (released 2026-07-19).** Introduce Lite at $24.99, retain the common paid feature set, and enforce total listener allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15.
 12. **v0.3.26 — Annual Application Maintenance and Support (released 2026-07-20).** Keep paid licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, and grandfathered existing-customer coverage.
 13. **v0.3.33 — Enhanced support package and connection diagnostics.** Provide guided service, listener, port, firewall, Windows queue, Epson driver, storage, and connectivity checks; reviewed repair actions; and privacy-aware support packages suitable for customers on every license tier.
-14. **v0.3.34 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-15. **v0.3.35 — Guided update installation and restart.** Verify downloaded installers, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
-16. Service-to-viewer authentication and installer repair mode.
-17. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
-18. Optional online activation revocation and license transfer workflow.
-19. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-20. PNG export and deterministic PDF generation.
-21. Production code-signing and expanded unattended deployment validation.
+14. **v0.3.34 — Encrypted configuration backup and restore.** Protect portable listener, profile, stored-logo, printer-state, preference, and optional paid-history backups with authenticated password encryption, reviewed exclusions, safety snapshots, and rollback-safe restore.
+15. **v0.3.35 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+16. **v0.3.36 — Guided update installation and restart.** Verify downloaded installers, create a pre-update safety snapshot, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+17. Service-to-viewer authentication and installer repair mode.
+18. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
+19. Optional online activation revocation and license transfer workflow.
+20. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+21. PNG export and deterministic PDF generation.
+22. Production code-signing and expanded unattended deployment validation.

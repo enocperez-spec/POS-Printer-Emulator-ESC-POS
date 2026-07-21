@@ -6,6 +6,16 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.34 — 2026-07-21
+
+- Adds **Settings → Backup & Restore** to every license tier with portable password-encrypted `.ppebackup` packages.
+- Backs up printer listeners, custom printer profiles and selection, stored logos, simulated printer states, and interface preferences; paid licenses may optionally include local receipt history.
+- Excludes activation and maintenance keys, customer registration, credentials, application logs, Windows printer queues, and Epson driver files so a backup cannot transfer a software license or machine identity.
+- Verifies the package password, integrity, schema, contents, limits, and compatibility before enabling restore and shows all included and excluded categories to the customer.
+- Creates a Windows-protected safety snapshot before restore, keeps the five newest snapshots, and automatically rolls back the running configuration if restoration fails.
+- Preserves listener definitions beyond the current tier allowance while activating only the number permitted by the installed Trial, Lite, Pro, or Enterprise license.
+- Passed all 151 automated desktop tests, a clean warning-free release build, encrypted create/inspect/restore API verification, and desktop/mobile rendered UI validation with no browser console errors.
+
 ## v0.3.33 — 2026-07-21
 
 - Adds guided Connection Diagnostics for the local service and viewer, storage, printer listeners, configured ports, local health probes, recent job errors, Windows services, printer queues, Epson driver components, and the private/domain firewall rule. The diagnostics display emulator connection details but do not attempt to test unknown POS software.
@@ -46,7 +56,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Preserved existing paid activation keys as Pro, added safe replacement-key upgrades without reinstalling, and retained listener definitions that exceed a temporarily lower allowance without running or deleting them.
 - Fixed protected-schema deployment so semicolons inside release and backlog descriptions are not mistaken for SQL statement boundaries.
 - Passed all 113 automated desktop tests, all PHP commerce contracts, PHP and JavaScript syntax checks, 15-page SEO validation, real Lite activation against the local service, rendered Trial/Lite/Pro/Enterprise Settings plus desktop/mobile pricing checks, and an installed v0.3.24 Enterprise-to-v0.3.25 upgrade that preserved registration and activation.
-- After the v0.3.30-v0.3.32 security and updater releases, the pending roadmap was moved forward: customer support diagnostics is v0.3.33, receipt comparison is v0.3.34, and guided update installation is v0.3.35.
+- After the v0.3.30-v0.3.32 security and updater releases, customer support diagnostics shipped in v0.3.33; encrypted configuration backup and restore followed in v0.3.34; receipt comparison and guided update installation moved to v0.3.35 and v0.3.36.
 
 ## v0.3.24 — 2026-07-19
 

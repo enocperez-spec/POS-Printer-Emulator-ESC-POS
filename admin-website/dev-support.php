@@ -373,14 +373,19 @@ $releaseSync = database()->prepare(
          'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.',
          'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.',
          'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.', UTC_TIMESTAMP(6)),
-        ('v0.3.34', 'v0.3.34', 'Release', 'Receipt comparison and automated validation', 'Next', 334,
+        ('v0.3.34', 'v0.3.34', 'Release', 'Encrypted configuration backup and restore', 'Released', 334,
+         'Protect and move emulator configuration without transferring license or machine identity.',
+         'Password-encrypted PPE backup packages; listeners, profiles, stored logos, printer states, preferences, and optional paid history; explicit exclusions; verified preview; license-limit preservation; Windows-protected safety snapshots; rollback-safe restore.',
+         'Customers need a recovery path before comparison suites and the guided updater add more reusable configuration.',
+         'Encrypted create, inspect, and restore pass with wrong-password and tamper rejection, automatic safety snapshots, rollback protection, all 151 tests, and rendered desktop/mobile verification.', UTC_TIMESTAMP(6)),
+        ('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next', 335,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
-         'Diagnostics now takes priority because it directly helps customers resolve installation and connection problems; deterministic captures and profiles remain ready for the following comparison release.',
+         'The encrypted v0.3.34 backup foundation now protects the profiles, listeners, and captures used by comparison suites.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.35', 'v0.3.35', 'Release', 'Guided update installation and restart', 'Planned', 335,
+        ('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned', 336,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
-         'Background installer download; checksum and signature verification; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
+         'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
          'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
         ('v0.3.30', 'v0.3.30', 'Release', 'Security remediation (Phase 1)', 'Released', 330,
@@ -463,8 +468,9 @@ database()->prepare(
          WHEN 'v0.3.20' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/6'
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
          WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
-         WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'
+         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -472,7 +478,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

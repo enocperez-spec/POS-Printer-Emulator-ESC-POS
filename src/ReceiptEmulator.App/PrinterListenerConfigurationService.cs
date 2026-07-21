@@ -44,6 +44,57 @@ public sealed class PrinterListenerConfigurationService
 
     public bool CanManageMultipleListeners => MaximumListeners > 1;
 
+    public IReadOnlyList<PrinterListenerConfiguration> GetStoredConfigurations()
+    {
+        lock (_sync)
+        {
+            if (!CanManageMultipleListeners &&
+                !File.Exists(Path.Combine(_license.RootPath, ReceiptDatabase.FileName)))
+                return [CreateLegacyDefault()];
+            EnsureManagedListenersLoadedUnsafe();
+            return _listeners.ToArray();
+        }
+    }
+
+    public void ReplaceAll(IReadOnlyList<PrinterListenerConfiguration> listeners)
+    {
+        lock (_sync)
+        {
+            if (listeners.Count is < 1 or > PrinterListenerDefaults.MaximumListeners)
+                throw new InvalidDataException($"Backups must contain between 1 and {PrinterListenerDefaults.MaximumListeners} printer listeners.");
+            if (!listeners.Any(listener => listener.Id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("The required default printer listener is missing from the backup.");
+
+            EnsureManagedListenersLoadedUnsafe();
+            var previous = _listeners.ToArray();
+            try
+            {
+                _listeners.Clear();
+                foreach (var source in listeners
+                             .OrderBy(listener => listener.Id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                             .ThenBy(listener => listener.CreatedAt)
+                             .ThenBy(listener => listener.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    var id = source.Id?.Trim() ?? string.Empty;
+                    if (id.Length is < 1 or > 96 || id.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_'))
+                        throw new InvalidDataException("A printer listener identifier in the backup is invalid.");
+                    var validated = Validate(ToInput(source), id, source.CreatedAt, source.UpdatedAt);
+                    _listeners.Add(validated);
+                }
+                SortUnsafe();
+                EnsureDatabaseUnsafe().ReplaceListenerConfigurations(_listeners);
+                _managedListenersLoaded = true;
+            }
+            catch
+            {
+                _listeners.Clear();
+                _listeners.AddRange(previous);
+                SortUnsafe();
+                throw;
+            }
+        }
+    }
+
     public IReadOnlyList<PrinterListenerConfiguration> GetAll()
     {
         lock (_sync)

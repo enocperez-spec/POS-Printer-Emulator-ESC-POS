@@ -1,4 +1,4 @@
-import type { ActivationRequest, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -17,8 +17,8 @@ async function request(url: string, init?: RequestInit): Promise<void> {
   }
 }
 
-async function download(url: string): Promise<Blob> {
-  const response = await fetch(url)
+async function download(url: string, init?: RequestInit): Promise<Blob> {
+  const response = await fetch(url, init)
   if (!response.ok) {
     const problem = await response.json().catch(() => null)
     throw new Error(problem?.detail ?? `Download failed (${response.status})`)
@@ -164,4 +164,15 @@ export const api = {
     return json<StoredGraphic>(`/api/stored-graphics/${encodeURIComponent(keyCode)}`, { method: 'POST', body: form })
   },
   deleteStoredGraphic: (keyCode: string) => request(`/api/stored-graphics/${encodeURIComponent(keyCode)}`, { method: 'DELETE' }),
+  createConfigurationBackup: (input: ConfigurationBackupCreateRequest) => download('/api/backups/create', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
+  inspectConfigurationBackup: (file: File, password: string) => {
+    const form = new FormData(); form.set('file', file); form.set('password', password)
+    return json<ConfigurationBackupPreview>('/api/backups/inspect', { method: 'POST', body: form })
+  },
+  restoreConfigurationBackup: (file: File, password: string) => {
+    const form = new FormData(); form.set('file', file); form.set('password', password)
+    return json<ConfigurationRestoreResult>('/api/backups/restore', { method: 'POST', body: form })
+  },
 }

@@ -27,7 +27,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.33 is the current public release, released July 21, 2026. The next planned release is v0.3.34 Receipt Comparison and Automated Validation.
+> **Release status:** v0.3.34 is the current public release, released July 21, 2026. The next planned release is v0.3.35 Receipt Comparison and Automated Validation.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -35,7 +35,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports 64-bit Windows 10 and Windows 11.
 
-1. Download `POSPrinterEmulatorSetup-0.3.26-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.34-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -159,7 +159,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.26-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.34-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -188,7 +188,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.26 artifacts/installer/POSPrinterEmulatorSetup-0.3.26-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.26-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.26" --notes "Adds optional annual Application Maintenance and Support while keeping Lite, Pro, and Enterprise licenses permanent."
+gh release create v0.3.34 artifacts/installer/POSPrinterEmulatorSetup-0.3.34-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.34-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.34" --notes-file artifacts/release-notes-v0.3.34.md
 ```
 
 ## Issue customer activation keys
@@ -221,6 +221,14 @@ Development settings are stored in `src/ReceiptEmulator.App/appsettings.json`:
 
 The `Printer` section supplies the compatible default listener for every installation. In v0.3.25, Pro and Enterprise listener changes are validated against their total allowances and stored locally in SQLite through **Settings → Printer Listeners**.
 
+## Configuration backup and restore
+
+The v0.3.34 interface is available under **Settings → Backup & Restore**. Enter and confirm a password of at least 10 characters, optionally include local receipt history on a paid license, and save the generated `.ppebackup` file somewhere safe. The password cannot be recovered.
+
+To restore, select the `.ppebackup` file and enter its password. The application verifies the package and displays its contents, exclusions, counts, and compatibility warnings before enabling restore. A Windows-protected safety snapshot is created first, and the running configuration is rolled back automatically if restoration fails.
+
+Portable backups include listeners, custom profiles, the selected profile, stored logos, simulated printer states, interface preferences, and optional paid receipt history. Activation and maintenance keys, customer registration, credentials, logs, Windows printer queues, Epson drivers, and other machine-level components are never exported. Restoring a backup does not transfer the software license.
+
 ## Current MVP limitations
 
 Version 0.3.25 stores Lite, Pro, and Enterprise history plus paid listener configuration in one local SQLite database with a 500-job history limit, while Trial remains session-only. Existing JSON and earlier SQLite history migrate transactionally. Customer-facing database maintenance, receipt comparison, online revocation/transfer, hardened Thermal rendering, PNG export, and production code-signing remain planned work.
@@ -242,8 +250,10 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.25 — Four-tier licensing and listener allowances:** Add Lite at $24.99, make paid features available to Lite/Pro/Enterprise, and enforce total listener caps of 1/1/2/15 for Trial/Lite/Pro/Enterprise.
 - **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
 - **Released in v0.3.33 — Enhanced support package and connection diagnostics:** Adds guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; safe repair actions; privacy-reviewed support packages; and an in-app Support Request form that securely creates redacted GitHub issues through the backend. The release does not attempt to test unknown POS software implementations or store GitHub credentials in the desktop application.
-- **Next in v0.3.34 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.35 — Guided update installation and restart:** Download and verify updates in the background, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.34 — Encrypted configuration backup and restore:** Create password-protected `.ppebackup` packages, review their contents before restore, exclude license and registration secrets, optionally include paid receipt history, and recover automatically if restoration fails.
+- **Next in v0.3.35 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.36 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Release prerequisite — Windows 11 Pro support-policy alignment:** Remove conflicting Windows 10/11 support claims from the website, application, installer metadata, documentation, structured data, and release checks; identify 64-bit Windows 11 Pro as the only supported environment; and publish the maintenance-response and third-party POS support limitations consistently.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

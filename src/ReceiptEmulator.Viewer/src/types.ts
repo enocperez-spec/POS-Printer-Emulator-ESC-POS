@@ -214,6 +214,47 @@ export type ConnectionDiagnosticsResponse = {
   packagePreview: SupportPackagePreview
 }
 
+export type BackupPreferences = {
+  theme: 'light' | 'dark'
+  activityCollapsed: boolean
+  inspectorCollapsed: boolean
+}
+
+export type ConfigurationBackupCreateRequest = {
+  password: string
+  includeHistory: boolean
+  preferences: BackupPreferences
+}
+
+export type ConfigurationBackupPreview = {
+  applicationVersion: string
+  createdAt: string
+  includesHistory: boolean
+  printerProfileCount: number
+  printerListenerCount: number
+  storedLogoCount: number
+  receiptJobCount: number
+  maximumListeners: number
+  preservedInactiveListeners: number
+  includedData: string[]
+  excludedData: string[]
+  warnings: string[]
+  preferences: BackupPreferences
+}
+
+export type ConfigurationRestoreResult = {
+  success: boolean
+  restoredAt: string
+  restoredProfiles: number
+  restoredListeners: number
+  restoredLogos: number
+  restoredReceiptJobs: number
+  preservedInactiveListeners: number
+  safetySnapshotId: string
+  warnings: string[]
+  preferences: BackupPreferences
+}
+
 export type StoredGraphic = {
   keyCode: string
   name: string

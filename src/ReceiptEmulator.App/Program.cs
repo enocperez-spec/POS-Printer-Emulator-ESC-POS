@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Http.Features;
 using ReceiptEmulator;
 
 var setupExitCode = await WindowsSetupCommand.TryRunAsync(args);
@@ -35,7 +36,10 @@ builder.Services.AddSingleton<PrinterListenerConfigurationService>();
 builder.Services.AddSingleton<PrinterListenerManager>();
 builder.Services.AddSingleton<StoredGraphicService>();
 builder.Services.AddSingleton<ConnectionDiagnosticsService>();
+builder.Services.AddSingleton<ConfigurationBackupService>();
 builder.Services.AddSingleton(supportLogs);
+builder.Services.Configure<FormOptions>(options =>
+    options.MultipartBodyLengthLimit = BackupPackageCodec.MaximumPackageBytes + 1024 * 1024);
 builder.Services.AddHttpClient("UsageTelemetry");
 builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTelemetryService(
     services.GetRequiredService<IHttpClientFactory>().CreateClient("UsageTelemetry"),
@@ -487,6 +491,48 @@ app.MapDelete("/api/stored-graphics/{keyCode}", async (string keyCode, StoredGra
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
+app.MapPost("/api/backups/create", async (
+    ConfigurationBackupCreateRequest request,
+    ConfigurationBackupService backups,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var package = await backups.CreateAsync(request, cancellationToken);
+        return Results.File(
+            package,
+            "application/vnd.pos-printer-emulator.backup",
+            $"pos-printer-emulator-{DateTimeOffset.Now:yyyyMMdd-HHmmss}{ConfigurationBackupService.FileExtension}");
+    }
+    catch (Exception exception) { return BackupProblem(exception); }
+});
+
+app.MapPost("/api/backups/inspect", async (
+    HttpRequest request,
+    ConfigurationBackupService backups,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var (package, password) = await ReadBackupUploadAsync(request, cancellationToken);
+        return Results.Ok(backups.Inspect(package, password));
+    }
+    catch (Exception exception) { return BackupProblem(exception); }
+});
+
+app.MapPost("/api/backups/restore", async (
+    HttpRequest request,
+    ConfigurationBackupService backups,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var (package, password) = await ReadBackupUploadAsync(request, cancellationToken);
+        return Results.Ok(await backups.RestoreAsync(package, password, cancellationToken));
+    }
+    catch (Exception exception) { return BackupProblem(exception); }
+});
+
 app.MapGet("/api/support/diagnostics", (LicenseService license, PrinterListenerManager listeners,
     ReceiptStore store, SupportLogProvider logs, StoredGraphicService graphics, PrinterProfileService profiles) =>
 {
@@ -870,6 +916,34 @@ static IResult ListenerProblem(Exception exception) => exception switch
     InvalidOperationException => Results.Problem(exception.Message, statusCode: 409),
     _ => Results.Problem("The printer listener operation could not be completed. Review Support diagnostics and try again.", statusCode: 500)
 };
+
+static IResult BackupProblem(Exception exception) => exception switch
+{
+    ArgumentException => Results.Problem(exception.Message, statusCode: 400),
+    InvalidDataException => Results.Problem(exception.Message, statusCode: 400),
+    UnauthorizedAccessException => Results.Problem(exception.Message, statusCode: 403),
+    InvalidOperationException => Results.Problem(exception.Message, statusCode: 409),
+    OperationCanceledException => Results.Problem("The backup operation was cancelled.", statusCode: 408),
+    _ => Results.Problem("The backup operation could not be completed. No licensing credentials were changed.", statusCode: 500)
+};
+
+static async Task<(byte[] Package, string Password)> ReadBackupUploadAsync(
+    HttpRequest request,
+    CancellationToken cancellationToken)
+{
+    if (!request.HasFormContentType)
+        throw new ArgumentException("Select a POS Printer Emulator backup file and enter its password.");
+    var form = await request.ReadFormAsync(cancellationToken);
+    var file = form.Files.GetFile("file") ?? throw new ArgumentException("Select a .ppebackup file.");
+    if (!Path.GetExtension(file.FileName).Equals(ConfigurationBackupService.FileExtension, StringComparison.OrdinalIgnoreCase))
+        throw new ArgumentException("Select a .ppebackup file created by POS Printer Emulator.");
+    if (file.Length <= 0 || file.Length > BackupPackageCodec.MaximumPackageBytes)
+        throw new ArgumentException("Backup files must be between 1 byte and 128 MB.");
+    var password = form["password"].ToString();
+    await using var output = new MemoryStream((int)file.Length);
+    await file.CopyToAsync(output, cancellationToken);
+    return (output.ToArray(), password);
+}
 
 static object JobResponse(ReceiptJob job) => new
 {

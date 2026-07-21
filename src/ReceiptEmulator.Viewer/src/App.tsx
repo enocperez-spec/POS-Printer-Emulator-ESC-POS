@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleStop,
+  DatabaseBackup,
   Download,
   ExternalLink,
   FileText,
@@ -44,14 +45,15 @@ import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
 import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
-import type { ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import { BackupRestoreSettings } from './BackupRestoreSettings'
+import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.33',
+  version: '0.3.34',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -64,7 +66,7 @@ type ClearRequest =
   | { kind: 'one'; id: string; label: string }
   | { kind: 'all'; count: number; listenerId?: string; listenerName?: string }
 
-type SettingsSection = 'license' | 'printer' | 'listeners' | 'profiles' | 'logos' | 'state' | 'updates' | 'support'
+type SettingsSection = 'license' | 'printer' | 'listeners' | 'profiles' | 'logos' | 'state' | 'backup' | 'updates' | 'support'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -177,6 +179,18 @@ function App() {
   const refreshStoredGraphics = useCallback(async () => {
     setStoredGraphics(await api.storedGraphics())
   }, [])
+
+  const applyRestoredPreferences = useCallback(async (preferences: BackupPreferences) => {
+    setTheme(preferences.theme)
+    setActivityCollapsed(preferences.activityCollapsed)
+    setInspectorCollapsed(preferences.inspectorCollapsed)
+    await refresh()
+    if (status.license.features.storedLogos) await refreshStoredGraphics()
+    if (status.license.features.multipleListeners) {
+      const restoredListeners = await api.printerListeners()
+      setListeners(restoredListeners.listeners)
+    }
+  }, [refresh, refreshStoredGraphics, status.license.features.multipleListeners, status.license.features.storedLogos])
 
   useEffect(() => {
     void refresh()
@@ -380,6 +394,8 @@ function App() {
           listeners={listeners}
           onStoredGraphicsChanged={refreshStoredGraphics}
           onListenersChanged={setListeners}
+          preferences={{ theme, activityCollapsed, inspectorCollapsed }}
+          onPreferencesRestored={applyRestoredPreferences}
           onClose={() => setSettingsSection(undefined)}
           onActivated={license => {
             setStatus(current => ({ ...current, license }))
@@ -659,7 +675,7 @@ function ReceiptPaper({ lines, watermark, storedGraphics, paperWidthMm }: { line
   )
 }
 
-function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, listeners, onStoredGraphicsChanged, onListenersChanged, onClose, onActivated }: {
+function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, listeners, onStoredGraphicsChanged, onListenersChanged, preferences, onPreferencesRestored, onClose, onActivated }: {
   status: ServiceStatus
   initialSection: SettingsSection
   updateStatus?: UpdateStatus
@@ -668,6 +684,8 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   listeners: PrinterListener[]
   onStoredGraphicsChanged: () => Promise<void>
   onListenersChanged: (listeners: PrinterListener[]) => void
+  preferences: BackupPreferences
+  onPreferencesRestored: (preferences: BackupPreferences) => Promise<void>
   onClose: () => void
   onActivated: (license: ServiceStatus['license']) => void
 }) {
@@ -682,7 +700,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   useEffect(() => {
     if (!canAccess(section)) setSection('license')
   }, [features.printerProfiles, features.printerState, features.storedLogos, features.updates, section])
-  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', updates: 'Check for Updates', support: 'Support' }
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', backup: 'Backup & Restore', updates: 'Check for Updates', support: 'Support' }
   const lockedTitle = 'Requires a Lite, Pro, or Enterprise License'
   const updatesLockedTitle = status.license.isPaid
     ? 'Renew Application Maintenance and Support to check for updates'
@@ -703,6 +721,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
             <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+            <button className={section === 'backup' ? 'active' : ''} onClick={() => setSection('backup')}><DatabaseBackup size={18} /><span>Backup &amp; Restore</span><ChevronRight size={15} /></button>
             <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? updatesLockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />{status.license.isPaid ? 'Renew' : 'Lite'}</span>}</button>
             <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
           </nav>
@@ -713,6 +732,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
             {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}
+            {section === 'backup' && <BackupRestoreSettings license={status.license} preferences={preferences} onRestored={onPreferencesRestored} />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
             {section === 'support' && <SupportSettings status={status} onOpenPrinterWizard={() => setSection('printer')} />}
           </div>
