@@ -37,5 +37,10 @@ jobs:
         shell: bash
         run: |
           while IFS= read -r package; do
-            (cd "$(dirname "$package")" && npm audit --audit-level=high)
+            directory="$(dirname "$package")"
+            if [[ -f "$directory/package-lock.json" || -f "$directory/npm-shrinkwrap.json" ]]; then
+              (cd "$directory" && npm audit --audit-level=high)
+            else
+              echo "Skipping $directory: no npm lockfile is committed"
+            fi
           done < <(find . -name package.json -not -path './artifacts/*' -print)
