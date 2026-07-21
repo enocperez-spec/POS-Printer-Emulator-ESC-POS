@@ -238,6 +238,53 @@ internal sealed class ReceiptDatabase
         return command.ExecuteNonQuery() > 0;
     }
 
+    public void ReplaceListenerConfigurations(IReadOnlyList<PrinterListenerConfiguration> listeners)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM printer_listeners;";
+            delete.ExecuteNonQuery();
+        }
+
+        foreach (var listener in listeners)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO printer_listeners (
+                    id, name, protocol, enabled, bind_address, port, profile_id,
+                    idle_job_timeout_ms, maximum_job_bytes, buffer_enabled,
+                    buffer_capacity, buffer_processing_delay_ms,
+                    buffer_overflow_behavior, created_at, updated_at)
+                VALUES (
+                    $id, $name, $protocol, $enabled, $bindAddress, $port, $profileId,
+                    $idleJobTimeoutMs, $maximumJobBytes, $bufferEnabled,
+                    $bufferCapacity, $bufferProcessingDelayMs,
+                    $bufferOverflowBehavior, $createdAt, $updatedAt);
+                """;
+            command.Parameters.AddWithValue("$id", listener.Id);
+            command.Parameters.AddWithValue("$name", listener.Name);
+            command.Parameters.AddWithValue("$protocol", listener.Protocol);
+            command.Parameters.AddWithValue("$enabled", listener.Enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$bindAddress", listener.BindAddress);
+            command.Parameters.AddWithValue("$port", listener.Port);
+            command.Parameters.AddWithValue("$profileId", listener.ProfileId);
+            command.Parameters.AddWithValue("$idleJobTimeoutMs", listener.IdleJobTimeoutMilliseconds);
+            command.Parameters.AddWithValue("$maximumJobBytes", listener.MaximumJobBytes);
+            command.Parameters.AddWithValue("$bufferEnabled", listener.Buffer.Enabled ? 1 : 0);
+            command.Parameters.AddWithValue("$bufferCapacity", listener.Buffer.Capacity);
+            command.Parameters.AddWithValue("$bufferProcessingDelayMs", listener.Buffer.ProcessingDelayMilliseconds);
+            command.Parameters.AddWithValue("$bufferOverflowBehavior", listener.Buffer.OverflowBehavior);
+            command.Parameters.AddWithValue("$createdAt", listener.CreatedAt.ToString("O"));
+            command.Parameters.AddWithValue("$updatedAt", listener.UpdatedAt.ToString("O"));
+            command.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
     public bool IntegrityCheck()
     {
         using var connection = OpenConnection();

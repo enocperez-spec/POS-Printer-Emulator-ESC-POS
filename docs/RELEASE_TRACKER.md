@@ -18,6 +18,8 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Next release after v0.3.35: v0.3.36 — Guided update installation and restart**
 
+**Most recently completed: v0.3.34 — Encrypted backup, EULA, and support policy**
+
 ### v0.3.32 — Updater installer-asset validation
 
 **Status:** Released — 2026-07-21
@@ -69,12 +71,12 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.30 | Released | Security remediation (Phase 1) |
 | v0.3.31 | Released | Secure development lifecycle (Phase 2) |
 | v0.3.32 | Released | Updater installer-asset validation |
-| v0.3.33 | Released | Enhanced support package and connection diagnostics |
-| v0.3.34 | Released | End User License Agreement and support policy |
+| v0.3.33 | Released | Enhanced support package, connection diagnostics, and in-app support requests |
+| v0.3.34 | Released | Encrypted backup, EULA, and support policy |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning the permanent licenses into subscriptions; after the completed v0.3.30-v0.3.32 security and updater work, v0.3.33 gives customers and support staff a safe way to diagnose the completed listener, profile, printer, licensing, and storage system; v0.3.34 establishes the customer EULA and support boundaries; v0.3.35 then uses deterministic captures and profiles for receipt comparison; and v0.3.36 closes the remaining in-application update lifecycle.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete the security and updater work; v0.3.33 provides safe customer diagnostics and support requests; v0.3.34 protects portable customer configuration and establishes the EULA and support boundaries; v0.3.35 uses deterministic captures and profiles for receipt comparison; and v0.3.36 closes the remaining in-application update lifecycle with a pre-update safety snapshot.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -355,14 +357,25 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Completion verification:** All 147 desktop tests, the production viewer build, desktop packaging build, PHP commerce/database/site contracts, PHP syntax checks, rendered Support UI checks, diagnostic-package preview, and ZIP download verification passed. The Trial tier retained local diagnostics and package export while assisted submission remained disabled without active maintenance. The self-contained v0.3.33 Windows installer and SHA-256 checksum were generated successfully.
 
-### v0.3.34 — End User License Agreement and support policy
+### v0.3.34 — Encrypted backup, EULA, and support policy
 
 **Status:** Released — 2026-07-21
 
-**Purpose:** Present enforceable product-use, licensing, compatibility, privacy, support, and liability terms before installation while publishing the same agreement for pre-purchase review.
+**Purpose:** Give customers a safe, portable configuration recovery path while presenting the same product-use, licensing, compatibility, privacy, support, and liability terms before installation and purchase.
 
 **Released scope:**
 
+- Add **Settings → Backup & Restore** for Trial, Lite, Pro, and Enterprise installations.
+- Create a portable `.ppebackup` package protected by a customer-supplied password using authenticated AES-256-GCM encryption and PBKDF2-SHA256 key derivation.
+- Include printer listeners, custom printer profiles, the selected profile, stored logos, simulated printer states, and interface preferences.
+- Allow paid licenses to include receipt history optionally; Trial backups remain configuration-only.
+- Exclude activation keys, maintenance keys, registration details, credentials, logs, Windows printer queues, and Epson driver files.
+- Inspect and validate a backup before making changes, then show its creation time, source version, included categories, item counts, exclusions, and compatibility warnings.
+- Reject malformed, oversized, tampered, or incorrectly password-protected packages without changing the installation.
+- Validate duplicate listener identities, names, and ports plus tier limits, profile limits, logo limits, and history limits before restore.
+- Preserve listener definitions above the current license allowance while running only the number permitted by the active tier.
+- Create a machine-protected safety snapshot before restore, keep the five newest safety snapshots, and roll back the running configuration if restoration fails.
+- Restore the saved light/dark theme and collapsed-panel preferences immediately after a successful restore.
 - Add an End User License Agreement covering Trial, Lite, Pro, and Enterprise editions.
 - Require affirmative acceptance in the Windows installer before installation can continue.
 - Publish the same agreement at the canonical `/eula` website route and link it from the homepage and sitemap.
@@ -373,7 +386,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Define fully updated 64-bit Windows 11 Pro as the only supported operating-system environment.
 - State that active-maintenance requests may take up to six calendar months for an initial substantive response unless a separately signed SLA states otherwise, and that a response is not a promised diagnosis, correction, workaround, or resolution.
 
-**Complete when:** The website and installer present matching terms, installation cannot continue without acceptance, customer-facing support and Windows requirements are consistent, automated SEO and release checks pass, and the versioned Windows installer plus checksum are published.
+**Security and privacy:** Backup passwords and decrypted payloads are never written to application logs. Automatic safety snapshots are protected with Windows machine data protection in the restricted application-data directory. A 128 MB package limit and strict schema and count validation constrain untrusted imports.
+
+**Completion verification:** All 151 automated desktop tests pass, including encrypted round-trip, incorrect-password, and tamper-detection coverage. A live local API exercise successfully created, inspected, and restored an encrypted package and returned a safety-snapshot reference. The release build and rendered desktop/mobile create-review-restore flow passed with no browser console errors. Website and installer terms match, installation requires acceptance, Windows and support-policy content is consistent, and automated release and SEO checks pass.
+
+**Complete when:** A customer can create a password-protected backup, review it before restoring, recover supported configuration without transferring a license, and return automatically to the original configuration if restore fails; the website and installer present matching terms, installation requires acceptance, customer-facing support and Windows requirements are consistent, and the versioned installer plus checksum are published.
 
 ### v0.3.35 — Receipt comparison and automated validation
 
@@ -408,6 +425,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 - Download an available installer in the background while the application remains usable.
 - Verify the completed download against the release checksum and trusted publisher signature before offering installation.
+- Create an automatic pre-update configuration safety snapshot using the v0.3.34 backup foundation.
 - Replace the current update action with a clear **Install and Restart** confirmation that explains the listener will be briefly unavailable.
 - Provide **Install and Restart**, **Install Later**, and **Cancel** choices without closing the application unexpectedly.
 - Detect an active incoming print job, finish or preserve it safely, and stop accepting new jobs before shutdown.
@@ -462,7 +480,23 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.35.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.36.
+
+### Release prerequisite — Windows 11 Pro support-policy alignment
+
+**Why required:** The EULA identifies 64-bit Windows 11 Pro as the only supported operating-system environment, but existing public pages, application labels, documentation, structured data, test plans, and installer compatibility settings still contain Windows 10/11 claims. Those contradictions must be removed before the next public release or website publication.
+
+**Proposed scope:**
+
+- Replace customer-facing Windows 10/11 compatibility claims with a precise 64-bit Windows 11 Pro support statement across the homepage, download page, FAQ, SEO pages, application footer, README, documentation, structured data, and support materials.
+- Decide and document whether the installer will block unsupported Windows versions or allow installation with an explicit unsupported-environment warning; do not imply that successful installation creates support eligibility.
+- Align installer version checks, application diagnostics, support-package metadata, automated tests, and release validation with the approved Windows 11 Pro policy.
+- Publish the maintenance-support disclosure consistently: an initial substantive response may take up to six calendar months unless a separately signed SLA states otherwise, and a response does not promise diagnosis, correction, workaround, or resolution.
+- Publish the third-party POS limitation consistently: EPCOM Ltd. supports POS Printer Emulator only; POS-specific integration or development is outside standard support, may be unavailable, and requires a separately approved paid scope when offered.
+- Add an automated content check that fails a release if obsolete Windows 10 support claims or conflicting response-time promises reappear in public product and support content.
+- Test clean installation, upgrade, diagnostics, support-request creation, and uninstall on a fully updated 64-bit Windows 11 Pro machine.
+
+**Complete when:** The EULA, website, application, installer, documentation, structured data, support policy, and automated release checks state one consistent support policy; no active customer-facing Windows 10 support claim remains; and Windows 11 Pro release validation is recorded.
 
 ### Priority 1 — Service-to-viewer authentication and installer repair
 

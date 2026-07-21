@@ -52,6 +52,42 @@ public sealed class StoredGraphicService
         return graphics.OrderBy(graphic => graphic.KeyCode, StringComparer.Ordinal).ToArray();
     }
 
+    public Task<IReadOnlyList<StoredGraphicBackup>> ExportAllAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = new List<StoredGraphicBackup>();
+        foreach (var graphic in List())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (TryRead(graphic.KeyCode, out var content, out _))
+                result.Add(new(graphic.KeyCode, graphic.Name, graphic.FileName, content));
+        }
+        return Task.FromResult<IReadOnlyList<StoredGraphicBackup>>(result);
+    }
+
+    public async Task ReplaceAllAsync(
+        IReadOnlyList<StoredGraphicBackup> graphics,
+        CancellationToken cancellationToken = default)
+    {
+        if (graphics.Select(graphic => NormalizeKey(graphic.KeyCode)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != graphics.Count)
+            throw new InvalidDataException("The backup contains duplicate stored-logo keys.");
+        foreach (var graphic in graphics)
+        {
+            if (graphic.Content.Length > MaximumFileBytes)
+                throw new InvalidDataException($"Stored logo {graphic.KeyCode} is larger than 2 MB.");
+            _ = DetectImageType(graphic.Content);
+        }
+
+        var desired = graphics.Select(graphic => NormalizeKey(graphic.KeyCode)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in List().Where(existing => !desired.Contains(existing.KeyCode)))
+            await DeleteAsync(existing.KeyCode, cancellationToken);
+        foreach (var graphic in graphics)
+        {
+            await using var content = new MemoryStream(graphic.Content, writable: false);
+            await ImportAsync(graphic.KeyCode, graphic.Name, graphic.FileName, content, cancellationToken);
+        }
+    }
+
     public async Task<StoredGraphicInfo> ImportAsync(
         string keyCode,
         string? name,

@@ -117,6 +117,32 @@ public sealed class PrinterProfileService
         }
     }
 
+    public void Replace(PrinterProfileStatus backup)
+    {
+        lock (_sync)
+        {
+            var customProfiles = backup.Profiles
+                .Where(profile => !profile.BuiltIn)
+                .Select(ValidateStored)
+                .ToList();
+            if (customProfiles.Select(profile => profile.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != customProfiles.Count)
+                throw new InvalidDataException("The backup contains duplicate custom printer profile identifiers.");
+            if (customProfiles.Select(profile => profile.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != customProfiles.Count)
+                throw new InvalidDataException("The backup contains duplicate custom printer profile names.");
+            if (customProfiles.Any(profile => BuiltIns.Any(builtIn => builtIn.Id.Equals(profile.Id, StringComparison.OrdinalIgnoreCase))))
+                throw new InvalidDataException("A custom printer profile conflicts with a protected built-in profile.");
+
+            var selectedProfileId = backup.SelectedProfileId?.Trim() ?? EpsonTmT88VId;
+            if (!BuiltIns.Concat(customProfiles).Any(profile => profile.Id.Equals(selectedProfileId, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("The selected printer profile in the backup is not available.");
+
+            Save(_profilesPath, customProfiles);
+            Save(_selectionPath, new SelectionState(selectedProfileId));
+            _customProfiles = customProfiles;
+            _selectedProfileId = selectedProfileId;
+        }
+    }
+
     public bool TryGet(string profileId, out PrinterProfile? profile)
     {
         lock (_sync)

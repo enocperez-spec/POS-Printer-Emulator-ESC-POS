@@ -132,6 +132,31 @@ public sealed class ReceiptStore
         }
     }
 
+    public IReadOnlyList<ReceiptJob> ExportHistory()
+    {
+        lock (_sync)
+        {
+            return _jobs.Take(HistoryCapacity).ToArray();
+        }
+    }
+
+    public void ReplaceHistory(IReadOnlyList<ReceiptJob> jobs)
+    {
+        if (!HasPersistentHistory)
+            throw new UnauthorizedAccessException("Receipt history restore requires a paid license.");
+        if (jobs.Count > HistoryCapacity)
+            throw new InvalidDataException($"Receipt history backups can contain no more than {HistoryCapacity} jobs.");
+        if (jobs.Select(job => job.Id).Distinct().Count() != jobs.Count)
+            throw new InvalidDataException("The backup contains duplicate receipt job identifiers.");
+
+        lock (_sync)
+        {
+            Clear();
+            foreach (var job in jobs.OrderBy(job => job.ReceivedAt))
+                Add(job);
+        }
+    }
+
     public bool Delete(Guid id)
     {
         lock (_sync)

@@ -353,6 +353,40 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         }
     }
 
+    public async Task RestoreConfigurationsAsync(
+        IReadOnlyList<PrinterListenerConfiguration> configurations,
+        CancellationToken cancellationToken = default)
+    {
+        await _lifecycle.WaitAsync(cancellationToken);
+        var previous = _configurations.GetStoredConfigurations();
+        try
+        {
+            await StopAndDisposeRuntimesUnsafeAsync(cancellationToken);
+            _configurations.ReplaceAll(configurations);
+            await RebuildRuntimesUnsafeAsync(cancellationToken);
+        }
+        catch (Exception restoreException)
+        {
+            try
+            {
+                await StopAndDisposeRuntimesUnsafeAsync(CancellationToken.None);
+                _configurations.ReplaceAll(previous);
+                await RebuildRuntimesUnsafeAsync(CancellationToken.None);
+            }
+            catch (Exception rollbackException)
+            {
+                throw new InvalidOperationException(
+                    "Printer listener restoration and automatic listener rollback both failed.",
+                    new AggregateException(restoreException, rollbackException));
+            }
+            throw;
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
     public PrinterStateStatus GetPrinterState(string id) => FindRuntime(id).PrinterState.GetStatus();
 
     public PrinterStateStatus UpdatePrinterState(string id, PrinterStateUpdateRequest request) =>
@@ -443,6 +477,41 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         if (!_runtimes.TryGetValue(id, out var runtime))
             throw new KeyNotFoundException("The printer listener was not found or has not initialized yet.");
         return runtime;
+    }
+
+    private async Task StopAndDisposeRuntimesUnsafeAsync(CancellationToken cancellationToken)
+    {
+        foreach (var runtime in _runtimes.Values.ToArray())
+        {
+            await StopQuietlyAsync(runtime, cancellationToken);
+            await runtime.DisposeAsync();
+        }
+        _runtimes.Clear();
+        _configurationErrors.Clear();
+        _legacyState.Listening = false;
+    }
+
+    private async Task RebuildRuntimesUnsafeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            foreach (var configuration in _configurations.GetEffectiveConfigurations())
+            {
+                var runtime = CreateRuntime(configuration);
+                _runtimes[configuration.Id] = runtime;
+                if (configuration.Enabled)
+                {
+                    ProbePort(configuration, current: null);
+                    await runtime.StartAsync(cancellationToken);
+                }
+            }
+            RefreshLegacyState();
+        }
+        catch
+        {
+            await StopAndDisposeRuntimesUnsafeAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     private void ProbePort(PrinterListenerConfiguration configuration, PrinterListenerRuntime? current)
