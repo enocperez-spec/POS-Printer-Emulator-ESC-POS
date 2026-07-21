@@ -12,11 +12,26 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.31 — released 2026-07-21**
+**Current public release: v0.3.32 — released 2026-07-21**
 
 **Current development: v0.3.30 — Security remediation (Phase 1) follow-up verification**
 
 **Next release after v0.3.27: v0.3.28 — Receipt comparison and automated validation**
+
+### v0.3.32 — Updater installer-asset validation
+
+**Status:** Released — 2026-07-21
+
+**Purpose:** Prevent documentation-only GitHub releases from being presented as desktop installers and provide a real installer asset for the updater to download.
+
+**Released scope:**
+
+- Require a trusted Windows `.exe` release asset before enabling **Download and install**.
+- Show a clear message when a newer release has no Windows installer instead of attempting to open the release webpage as an installer.
+- Add regression tests for both installer and no-installer GitHub release responses.
+- Build and publish `POSPrinterEmulatorSetup-0.3.32-win-x64.exe` with a SHA-256 checksum.
+
+**Complete when:** An installed v0.3.26 or v0.3.31 customer sees a valid installer download for v0.3.32, while a documentation-only release cannot trigger an installer launch.
 
 ## Completed releases
 

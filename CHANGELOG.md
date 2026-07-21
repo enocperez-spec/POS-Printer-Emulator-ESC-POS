@@ -6,6 +6,13 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.32 — Updater installer-asset validation
+
+- Fixed the desktop updater rejecting a release because it received a GitHub release webpage instead of a Windows installer asset.
+- Releases without a Windows `.exe` installer are now reported clearly and are not offered as installable desktop updates.
+- Added regression coverage for installer and no-installer release responses.
+- Published the signed/self-contained Windows installer as `POSPrinterEmulatorSetup-0.3.32-win-x64.exe`.
+
 - **v0.3.30 — Security remediation (Phase 1):** Rotate exposed website credentials, harden website and desktop boundaries, protect secrets and logs, verify signed updates/installers, and clear all critical/high security blockers.
 - **v0.3.31 — Secure development lifecycle (Phase 2, released 2026-07-21):** Make threat modeling, automated security checks, security regression tests, tracker evidence, and release sign-off part of every future feature release.
 

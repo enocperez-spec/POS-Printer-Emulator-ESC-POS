@@ -55,10 +55,20 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
                 var release = await response.Content.ReadFromJsonAsync<GitHubRelease>(cancellationToken: cancellationToken)
                     ?? throw new InvalidOperationException("The update service returned an empty response.");
                 var latest = release.TagName.Trim().TrimStart('v', 'V');
-                var updateAvailable = CompareVersions(latest, ProductInfo.Version) > 0;
                 var asset = release.Assets.FirstOrDefault(item =>
                     item.Name.EndsWith("-win-x64.exe", StringComparison.OrdinalIgnoreCase))
                     ?? release.Assets.FirstOrDefault(item => item.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+                var newerRelease = CompareVersions(latest, ProductInfo.Version) > 0;
+                // A release without a Windows installer (for example a documentation
+                // or security-process release) must not be offered as an installable
+                // desktop update. Never fall back to the release HTML page as an
+                // installer URL.
+                var updateAvailable = newerRelease && asset is not null;
+                var message = updateAvailable
+                    ? $"POS Printer Emulator {latest} is available."
+                    : newerRelease
+                        ? $"POS Printer Emulator {latest} is published, but no Windows installer is available yet."
+                        : "You already have the latest version installed.";
 
                 return _cached = new UpdateStatus(
                     ProductInfo.Version,
@@ -66,11 +76,9 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
                     updateAvailable,
                     true,
                     release.HtmlUrl,
-                    asset?.BrowserDownloadUrl ?? release.HtmlUrl,
+                    asset?.BrowserDownloadUrl,
                     checkedAt,
-                    updateAvailable
-                        ? $"POS Printer Emulator {latest} is available."
-                        : "You already have the latest version installed.");
+                    message);
             }
             catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or InvalidOperationException)
             {

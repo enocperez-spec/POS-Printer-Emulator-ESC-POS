@@ -12,12 +12,12 @@ public sealed class UpdateServiceTests
     {
         using var client = CreateClient("""
             {
-              "tag_name": "v0.3.27",
-              "html_url": "https://github.com/example/releases/tag/v0.3.27",
+              "tag_name": "v0.3.33",
+              "html_url": "https://github.com/example/releases/tag/v0.3.33",
               "assets": [
                 {
-                  "name": "POSPrinterEmulatorSetup-0.3.27-win-x64.exe",
-                  "browser_download_url": "https://github.com/example/releases/download/v0.3.27/setup.exe"
+                  "name": "POSPrinterEmulatorSetup-0.3.33-win-x64.exe",
+                  "browser_download_url": "https://github.com/example/releases/download/v0.3.33/setup.exe"
                 }
               ]
             }
@@ -28,7 +28,7 @@ public sealed class UpdateServiceTests
 
         Assert.True(status.CheckSucceeded);
         Assert.True(status.UpdateAvailable);
-        Assert.Equal("0.3.27", status.LatestVersion);
+        Assert.Equal("0.3.33", status.LatestVersion);
         Assert.EndsWith("setup.exe", status.DownloadUrl);
     }
 
@@ -49,6 +49,26 @@ public sealed class UpdateServiceTests
         Assert.True(status.CheckSucceeded);
         Assert.False(status.UpdateAvailable);
         Assert.Contains("latest version", status.Message);
+    }
+
+    [Fact]
+    public async Task DoesNotOfferAReleaseWithoutAWindowsInstaller()
+    {
+        using var client = CreateClient("""
+            {
+              "tag_name": "v0.3.33",
+              "html_url": "https://github.com/example/releases/tag/v0.3.33",
+              "assets": []
+            }
+            """);
+        var service = new UpdateService(client, NullLogger<UpdateService>.Instance);
+
+        var status = await service.CheckAsync(true);
+
+        Assert.True(status.CheckSucceeded);
+        Assert.False(status.UpdateAvailable);
+        Assert.Null(status.DownloadUrl);
+        Assert.Contains("no Windows installer", status.Message);
     }
 
     [Fact]
