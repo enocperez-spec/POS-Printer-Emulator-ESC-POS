@@ -7,6 +7,7 @@ This directory contains the static production website for `posprinteremulator.co
 - `index.html`: public product, feature, licensing, download, and FAQ page.
 - `application-maintenance-support.html`: canonical permanent-license and optional annual maintenance policy, renewal pricing, and renewal links.
 - `documentation.html`: product documentation and links to task-specific setup guides.
+- `how-to-use-pos-printer-emulator-main-page.html`: complete illustrated main-page reference with practical examples, troubleshooting, screenshots, and five captioned instructional videos.
 - `how-to-manage-pos-printer-emulator-license.html`: illustrated License activation and maintenance guide.
 - `how-to-use-pos-printer-setup-wizard.html`: illustrated Windows printer setup guide.
 - `how-to-configure-printer-listeners.html`: illustrated Printer Listeners guide.

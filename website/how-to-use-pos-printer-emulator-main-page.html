@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>POS Printer Emulator Main Page Guide</title>
+    <meta
+      name="description"
+      content="Learn every area of the POS Printer Emulator main page: listener status, Activity, receipt preview, ESC/POS commands, raw data, job details, exports, replay, and troubleshooting."
+    />
+    <link rel="canonical" href="https://www.posprinteremulator.com/how-to-use-pos-printer-emulator-main-page" />
+    <link rel="icon" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css?v=20260719-tiers" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260722-main-page" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": "How to use the POS Printer Emulator main page",
+        "description": "A complete guide to monitoring listeners, finding receipt jobs, reviewing the rendered receipt, and inspecting ESC/POS data.",
+        "step": [
+          {"@type":"HowToStep","name":"Confirm listener status","text":"Check the green listener status and listener summary in the header."},
+          {"@type":"HowToStep","name":"Select a receipt job","text":"Use Activity search and printer filters, then select a job."},
+          {"@type":"HowToStep","name":"Review the receipt","text":"Use zoom, Actual size, export, replay, and Print or PDF controls."},
+          {"@type":"HowToStep","name":"Inspect the data","text":"Review Commands, Raw data, and Job details for troubleshooting and validation."}
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator" /></a>
+        <button class="menu-toggle" aria-expanded="false" aria-controls="site-nav" data-menu-toggle><span></span><span></span><span></span></button>
+        <nav class="site-nav" id="site-nav" data-nav>
+          <a href="/">Home</a><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a class="button button-small" href="pos-printer-emulator-download">Download</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero">
+        <div class="shell">
+          <div class="breadcrumbs"><a href="/">Home</a><span>/</span><a href="documentation">Documentation</a><span>/</span><span>Main page</span></div>
+          <h1>Complete Main Page Guide</h1>
+          <p>Learn the screen you will use every day—from confirming that printers are listening to finding, previewing, exporting, replaying, and troubleshooting receipt jobs.</p>
+        </div>
+      </section>
+
+      <section class="page-body">
+        <div class="shell article-layout">
+          <article class="article-content main-page-guide">
+            <div class="callout">
+              <p><strong>Start here:</strong> a green listener status means the emulator is ready. Send a receipt from the POS or select <strong>Test receipt</strong>, then choose the new job in Activity.</p>
+            </div>
+
+            <h2 id="at-a-glance">The main page at a glance</h2>
+            <p>The main page is divided into three working areas. <strong>Activity</strong> finds the job, <strong>Receipt preview</strong> shows the result, and <strong>Inspector</strong> explains what the POS sent. The header monitors the emulator; the footer confirms version and license information.</p>
+            <figure class="guide-screenshot guide-screenshot-wide">
+              <img src="assets/main-page-guide/00-main-page-empty.png" alt="POS Printer Emulator main page with two running listeners and no receipt jobs" />
+              <figcaption>The empty state is normal before the first job. The app is ready when at least one listener is running.</figcaption>
+            </figure>
+            <div class="interface-map">
+              <section><span>1</span><div><strong>Header and listener health</strong><p>Confirms service readiness, opens a test receipt, changes theme, and opens Settings.</p></div></section>
+              <section><span>2</span><div><strong>Activity</strong><p>Lists, searches, filters, imports, selects, and removes receipt jobs.</p></div></section>
+              <section><span>3</span><div><strong>Receipt preview</strong><p>Renders the receipt and provides zoom, export, replay, print, and PDF actions.</p></div></section>
+              <section><span>4</span><div><strong>Inspector</strong><p>Decodes ESC/POS commands, shows original bytes, and records job context.</p></div></section>
+              <section><span>5</span><div><strong>Status footer</strong><p>Shows the app version, license tier, local-data notice, Windows edition, and architecture.</p></div></section>
+            </div>
+            <div class="video-guide">
+              <div><span class="video-label">Captioned lesson · about 13 seconds</span><h3>Main page overview</h3><p>See the ready state, listener health, and the three areas used to review a receipt.</p></div>
+              <video controls preload="metadata" poster="assets/main-page-guide/00-main-page-empty.png"><source src="assets/main-page-guide/videos/01-main-page-overview.mp4" type="video/mp4" />Your browser does not support MP4 video.</video>
+            </div>
+
+            <h2 id="header">Header and listener health</h2>
+            <p>The header answers the first troubleshooting question: <em>Is the emulator ready to receive a receipt?</em> It remains visible while you work.</p>
+            <div class="table-scroll"><table class="compact-table control-table">
+              <thead><tr><th>Item</th><th>What it tells you</th><th>How to use it</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Listener status</strong></td><td>A green dot and “Running (listening)” for one listener, or “2 of 2 listeners running” for multiple listeners.</td><td>Confirm at least one listener is running before sending a receipt. A stopped or faulted count means that printer needs attention.</td></tr>
+                <tr><td><strong>Listener fact</strong></td><td>One listener shows its bind address and TCP port. Multiple listeners show total printers and faulted printers.</td><td>Use the port when configuring the POS. Open Settings → Printer Listeners for individual endpoints.</td></tr>
+                <tr><td><strong>Test receipt</strong></td><td>Creates the built-in sample receipt without requiring a POS.</td><td>Use it after installation, after changing a profile or logo, or when separating an emulator problem from a POS problem.</td></tr>
+                <tr><td><strong>Dark mode / Light mode</strong></td><td>The currently available theme change.</td><td>Select it to switch themes. The choice is saved on this computer.</td></tr>
+                <tr><td><strong>Settings</strong></td><td>Opens licensing, printer setup, listeners, profiles, logos, state, backups, updates, and support.</td><td>Use Settings for configuration; return to the main page for everyday receipt work.</td></tr>
+              </tbody>
+            </table></div>
+            <div class="tip-grid">
+              <div class="tip-card"><strong>Expected result</strong><p>Selecting Test receipt should add a completed job to Activity and display a formatted receipt almost immediately.</p></div>
+              <div class="tip-card warning-card"><strong>Important address note</strong><p><code>0.0.0.0:9100</code> means the listener accepts connections on available network interfaces. A POS on another computer must use this PC’s real IPv4 address—not <code>0.0.0.0</code>.</p></div>
+            </div>
+            <p><strong>Trial limitation:</strong> a test receipt counts as one of the five daily emulated jobs. The button is unavailable after the daily limit is reached.</p>
+
+            <h2 id="activity">Activity: find and manage jobs</h2>
+            <p>Activity is the receipt inbox. New jobs appear here after the POS closes the connection or the listener’s idle-job timeout completes. Select a row to load its receipt and inspector data.</p>
+            <figure class="guide-screenshot guide-screenshot-wide"><img src="assets/main-page-guide/01-overview-and-activity.png" alt="Activity panel with three completed receipt jobs and one selected job" loading="lazy" /><figcaption>The blue row is selected. Its receipt and command data appear in the center and right panels.</figcaption></figure>
+            <h3>Information on every job</h3>
+            <ul>
+              <li><strong>Time and source address:</strong> when the job arrived and the network source that sent it.</li>
+              <li><strong>Preview title:</strong> useful text extracted from the receipt, such as a store or transaction heading.</li>
+              <li><strong>Payload size:</strong> the amount of original receipt data received.</li>
+              <li><strong>Printer listener:</strong> the listener name and port that accepted the job.</li>
+              <li><strong>Origin:</strong> Live, Imported, Replayed, or Sample, depending on how the job entered the app.</li>
+              <li><strong>Result and warnings:</strong> Completed confirms processing finished; a warning count identifies commands the renderer did not fully support.</li>
+            </ul>
+            <h3>Activity controls</h3>
+            <div class="table-scroll"><table class="compact-table control-table">
+              <thead><tr><th>Control</th><th>Action</th><th>Best time to use it</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Import</strong> ↑</td><td>Imports a saved <code>.bin</code> payload or <code>.ppecapture</code> package.</td><td>Reproduce a customer receipt or inspect a capture without asking the POS to send it again. Available with Lite, Pro, or Enterprise.</td></tr>
+                <tr><td><strong>Clear all</strong> 🗑</td><td>Opens a confirmation before permanently removing all visible-scope jobs.</td><td>Clean a test session. When one printer is selected, only that printer’s jobs are removed.</td></tr>
+                <tr><td><strong>Collapse Activity</strong></td><td>Reduces Activity to a narrow edge button.</td><td>Give a long or wide receipt more room. Select the edge button to restore the panel.</td></tr>
+                <tr><td><strong>Search jobs</strong></td><td>Matches source, receipt preview text, status, origin, listener, port, or imported filename.</td><td>Find one transaction in a long history—for example, search a store heading, IP address, or listener name.</td></tr>
+                <tr><td><strong>All printers filter</strong></td><td>Shows all jobs or only jobs accepted by one listener.</td><td>Separate front-counter and drive-thru activity in multi-listener installations.</td></tr>
+                <tr><td><strong>Job trash icon</strong></td><td>Confirms and permanently removes only that job.</td><td>Remove an unwanted test or a receipt that should no longer remain in local history.</td></tr>
+              </tbody>
+            </table></div>
+            <div class="video-guide">
+              <div><span class="video-label">Captioned lesson · about 13 seconds</span><h3>Activity and job management</h3><p>Review job information, use search and filters, and understand deletion confirmation.</p></div>
+              <video controls preload="metadata" poster="assets/main-page-guide/01-overview-and-activity.png"><source src="assets/main-page-guide/videos/02-activity-and-job-management.mp4" type="video/mp4" />Your browser does not support MP4 video.</video>
+            </div>
+            <div class="tip-grid">
+              <div class="tip-card"><strong>Example</strong><p>Choose “Drive-Thru Printer · port 9101” in the filter. Activity now shows only receipts accepted by that listener, and Clear all affects only that filtered printer after confirmation.</p></div>
+              <div class="tip-card warning-card"><strong>Deletion warning</strong><p>Clearing a job also removes it from saved paid-license history. A deleted job can be recovered only if you previously exported a Raw or Capture file.</p></div>
+            </div>
+            <p><strong>Trial limitation:</strong> Trial shows current-session jobs only. Lite, Pro, and Enterprise save local job history. All receipt data remains on this device unless you intentionally export or submit an approved support request.</p>
+
+            <h2 id="preview">Receipt preview and toolbar</h2>
+            <p>The center panel turns ESC/POS data into a visual receipt. It uses the printer profile assigned to the listener, including paper width and supported formatting.</p>
+            <figure class="guide-screenshot guide-screenshot-wide"><img src="assets/main-page-guide/02-receipt-preview-controls.png" alt="Receipt preview at 120 percent with export, replay, and print controls" loading="lazy" /><figcaption>Zoom changes only the on-screen view. It does not alter the original receipt bytes or exported capture.</figcaption></figure>
+            <div class="table-scroll"><table class="compact-table control-table">
+              <thead><tr><th>Control</th><th>Purpose and expected result</th><th>Notes</th></tr></thead>
+              <tbody>
+                <tr><td><strong>− / percentage / +</strong></td><td>Changes the on-screen preview from 50% through 160% in 10% steps.</td><td>Use zoom for readability. It does not change paper width, print size, or receipt data.</td></tr>
+                <tr><td><strong>Actual size</strong></td><td>Returns the preview to 100%.</td><td>Use after zooming when comparing two receipts consistently.</td></tr>
+                <tr><td><strong>Text</strong></td><td>Downloads extracted readable text as a <code>.txt</code> file.</td><td>Good for quick review; graphics and byte-level formatting are not preserved.</td></tr>
+                <tr><td><strong>Raw</strong></td><td>Downloads the original ESC/POS payload as a <code>.bin</code> file.</td><td>Best for exact reproduction and technical investigation. Treat it as sensitive receipt data.</td></tr>
+                <tr><td><strong>Capture</strong></td><td>Downloads a portable <code>.ppecapture</code> package with receipt and profile context.</td><td>Preferred when moving a reproducible test case to another POS Printer Emulator installation.</td></tr>
+                <tr><td><strong>Replay</strong></td><td>Processes the selected receipt again and adds a new Replayed job.</td><td>Use after changing a profile or stored logo. Replay does not ask the POS to resend.</td></tr>
+                <tr><td><strong>Print / PDF</strong></td><td>Opens the Windows print dialog for paper printing or a PDF printer.</td><td>Choose Microsoft Print to PDF when available. The final output depends on the selected Windows print driver and settings.</td></tr>
+              </tbody>
+            </table></div>
+            <div class="video-guide">
+              <div><span class="video-label">Captioned lesson · about 13 seconds</span><h3>Receipt preview tools</h3><p>Zoom the receipt, understand exports and replay, then expand the canvas for long receipts.</p></div>
+              <video controls preload="metadata" poster="assets/main-page-guide/02-receipt-preview-controls.png"><source src="assets/main-page-guide/videos/03-receipt-preview-tools.mp4" type="video/mp4" />Your browser does not support MP4 video.</video>
+            </div>
+            <h3>What the preview can display</h3>
+            <p>Supported text alignment, emphasis, character size, barcodes, QR codes, raster graphics, and imported stored logos are rendered on simulated thermal paper. Trial receipts show a visible TRIAL watermark.</p>
+            <div class="callout"><p><strong>Stored printer image warning:</strong> an Epson NV graphic command may contain only a key such as <code>00</code>, not the original image pixels. Import and map the logo in Settings → Stored Logos. Until then, the preview correctly shows a placeholder.</p></div>
+            <p><strong>Accuracy limitation:</strong> the preview explains what the emulator supports; a physical printer, driver, code page, or vendor-specific command can behave differently. Check the Commands warning count whenever exact reproduction matters.</p>
+
+            <h2 id="inspector">Inspector: Commands, Raw data, and Job details</h2>
+            <p>The right panel is the technical explanation for the selected receipt. Start with Commands for readable diagnosis, use Raw data for byte-level comparison, and use Job details for the surrounding context.</p>
+
+            <h3>Commands</h3>
+            <figure class="guide-screenshot guide-screenshot-wide"><img src="assets/main-page-guide/03-commands-inspector.png" alt="Commands tab showing decoded ESC POS offsets bytes names and details" loading="lazy" /><figcaption>Unsupported rows are highlighted and counted. A warning does not automatically mean the whole job failed.</figcaption></figure>
+            <ul>
+              <li><strong>Offset:</strong> byte position where the command begins, shown in hexadecimal.</li>
+              <li><strong>Bytes (hex):</strong> exact command bytes.</li>
+              <li><strong>Command:</strong> readable name such as Initialize printer, Select alignment, or Print raster image.</li>
+              <li><strong>Details:</strong> interpreted values such as center alignment, image dimensions, or text.</li>
+              <li><strong>Footer:</strong> original payload size and total parsed-command count.</li>
+            </ul>
+            <p><strong>Use it when:</strong> text is misaligned, a logo is missing, a barcode differs, or the warning count is greater than zero. Locate the highlighted command and compare its offset and bytes with the POS or printer documentation.</p>
+
+            <h3>Raw data</h3>
+            <figure class="guide-screenshot guide-screenshot-wide"><img src="assets/main-page-guide/04-raw-data-inspector.png" alt="Raw data tab showing the original receipt payload in hexadecimal lines" loading="lazy" /><figcaption>The in-app Raw data tab is a viewer. The Raw toolbar button downloads the same original payload as a file.</figcaption></figure>
+            <p>Raw data displays the original payload as hexadecimal bytes with line offsets. It is useful for comparing two jobs or confirming that a control byte actually arrived. It is not intended to be edited inside the application.</p>
+            <p><strong>Troubleshooting tip:</strong> if Raw data is present but the receipt is blank, check Commands for unsupported controls, image-only data, an unexpected code page, or a reset command. If the payload size is unexpectedly tiny, inspect how the POS closes or flushes its TCP connection.</p>
+
+            <h3>Job details</h3>
+            <figure class="guide-screenshot guide-screenshot-wide"><img src="assets/main-page-guide/05-job-details-inspector.png" alt="Job details tab showing receipt source listener origin profile result and warning information" loading="lazy" /><figcaption>Job details links a receipt to the exact listener and profile that processed it.</figcaption></figure>
+            <p>Job details can include Receipt ID, received time, source address, printer listener, listener endpoint and ID, job origin, renderer version, printer profile, paper width and printable dots, captured profile, original receipt context, imported filename, parent job, payload size, processing result, and unsupported-command count.</p>
+            <p><strong>Use it when:</strong> confirming which printer accepted a job, comparing a replay with its parent, documenting an imported capture, or including precise context in a support request. Receipt IDs and listener IDs are useful reference values; do not treat them as activation or authentication keys.</p>
+            <div class="video-guide">
+              <div><span class="video-label">Captioned lesson · about 13 seconds</span><h3>Job inspector</h3><p>Move from readable ESC/POS commands to exact bytes and then to receipt context.</p></div>
+              <video controls preload="metadata" poster="assets/main-page-guide/03-commands-inspector.png"><source src="assets/main-page-guide/videos/04-job-inspector.mp4" type="video/mp4" />Your browser does not support MP4 video.</video>
+            </div>
+
+            <h2 id="layout">Layout, theme, and status footer</h2>
+            <p>Activity and Inspector can each be collapsed independently. This is useful for long receipts, narrow screens, or presentations. The collapsed edge remains visible so the panel can be restored in one click.</p>
+            <figure class="guide-screenshot guide-screenshot-wide"><img src="assets/main-page-guide/06-wide-preview-collapsed-panels.png" alt="Wide receipt preview with Activity and Inspector panels collapsed" loading="lazy" /><figcaption>Panel and theme preferences are saved locally and can also be included in a configuration backup.</figcaption></figure>
+            <div class="video-guide">
+              <div><span class="video-label">Captioned lesson · about 13 seconds</span><h3>Layout, theme, and footer</h3><p>Collapse panels, switch theme, and use the footer when confirming environment details.</p></div>
+              <video controls preload="metadata" poster="assets/main-page-guide/07-light-mode.png"><source src="assets/main-page-guide/videos/05-layout-theme-and-status.mp4" type="video/mp4" />Your browser does not support MP4 video.</video>
+            </div>
+            <h3>Status footer</h3>
+            <ul>
+              <li><strong>Left:</strong> installed POS Printer Emulator version and Trial, Lite, Pro, or Enterprise license tier.</li>
+              <li><strong>Center:</strong> reminder that receipt data is stored locally on the device.</li>
+              <li><strong>Right:</strong> Windows edition and x64 architecture, useful when choosing installers or reporting a problem.</li>
+            </ul>
+
+            <h2 id="workflow">Everyday example: validate a receipt</h2>
+            <ol class="numbered-steps">
+              <li>Confirm the header is green and the intended printer listener is running.</li>
+              <li>Send the receipt from the POS. For an emulator-only check, select <strong>Test receipt</strong>.</li>
+              <li>Find the new job by its time, source, or printer and select it in Activity.</li>
+              <li>Review the center preview for text, price alignment, totals, logo, barcode, and paper width.</li>
+              <li>Open Commands and investigate any unsupported count or unexpected formatting.</li>
+              <li>Use Job details to confirm the listener and printer profile.</li>
+              <li>Export a Capture for repeatable testing, or Replay after changing a profile or stored logo.</li>
+              <li>When finished, delete only the test jobs you no longer need.</li>
+            </ol>
+
+            <h2 id="troubleshooting">Common questions and troubleshooting</h2>
+            <div class="troubleshooting-list">
+              <details><summary>No job appears in Activity</summary><p>Confirm a listener is running, verify the POS uses the correct emulator-PC IP address and listener port, and check Windows Firewall. For a remote POS, do not enter <code>0.0.0.0</code> as the destination. Open Settings → Support to run Connection Diagnostics.</p></details>
+              <details><summary>A job appears after a short delay</summary><p>The listener may be waiting for the POS to close the TCP connection or for the configured idle-job timeout. Persistent delays should be checked in Settings → Printer Listeners and Connection Diagnostics.</p></details>
+              <details><summary>The receipt preview is blank or incomplete</summary><p>Select Commands and check unsupported rows. Inspect Raw data to confirm bytes arrived. Image-only payloads can appear blank if the image command is unsupported or if a stored NV logo was referenced without embedded pixels.</p></details>
+              <details><summary>The receipt has warnings but says Completed</summary><p>Completed means the payload was processed. Warnings mean one or more commands could not be fully emulated. The rest of the receipt can still render successfully.</p></details>
+              <details><summary>Text, Raw, Capture, Replay, or Print/PDF is unavailable</summary><p>These are paid-license features. Activate Lite, Pro, or Enterprise in Settings → License. In Trial, the receipt preview also includes a watermark.</p></details>
+              <details><summary>Print / PDF does not create a PDF</summary><p>The button opens the Windows print dialog. Choose Microsoft Print to PDF or another installed PDF printer, then select a destination filename. The emulator does not silently choose a printer.</p></details>
+              <details><summary>Search shows no result</summary><p>Clear the search text and return the printer filter to All printers. Search uses job metadata and extracted preview text; it is not a full hexadecimal-byte search.</p></details>
+              <details><summary>A cleared job is needed again</summary><p>Deletion is permanent. Import a previously saved Raw or Capture export. If no export exists, resend the receipt from the POS.</p></details>
+            </div>
+          </article>
+
+          <aside class="sidebar-card guide-toc">
+            <h2>Main page sections</h2>
+            <p>Version 0.3.36</p>
+            <a class="button button-primary" href="pos-printer-emulator-download">Download for Windows</a>
+            <ul class="sidebar-links">
+              <li><a href="#at-a-glance">At a glance</a></li>
+              <li><a href="#header">Header and listener health</a></li>
+              <li><a href="#activity">Activity and job management</a></li>
+              <li><a href="#preview">Receipt preview and toolbar</a></li>
+              <li><a href="#inspector">Commands, Raw data, Job details</a></li>
+              <li><a href="#layout">Layout, theme, and footer</a></li>
+              <li><a href="#workflow">Everyday workflow</a></li>
+              <li><a href="#troubleshooting">Troubleshooting</a></li>
+              <li><a href="documentation">All documentation</a></li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <section class="related"><div class="shell"><h2>Continue learning</h2><div class="related-grid"><a href="how-to-configure-printer-listeners"><strong>Printer Listeners</strong><span>Add and monitor printer endpoints.</span></a><a href="how-to-create-printer-profiles"><strong>Printer Profiles</strong><span>Match the target printer’s capabilities.</span></a><a href="how-to-submit-a-support-request"><strong>Support</strong><span>Run diagnostics and submit a privacy-reviewed request.</span></a></div></div></section>
+    <footer class="site-footer"><div class="shell footer-top"><a class="brand footer-brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator" /></a><nav><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a href="privacy">Privacy</a><a href="eula">EULA</a></nav></div><div class="shell footer-bottom"><span>© 2026 POS Printer Emulator.</span><span>Local tools for better receipt testing.</span></div></footer>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>
