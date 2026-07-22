@@ -18,6 +18,8 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Next release after v0.3.39: v0.3.40 — Guided update installation and restart**
 
+**Future customer-experience sequence: v0.3.41 through v0.3.48**
+
 **Most recently completed: v0.3.38 — Trial Onboarding Clarity Correction**
 
 ### v0.3.32 — Updater installer-asset validation
@@ -80,7 +82,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 uses deterministic captures and profiles for receipt comparison; and v0.3.40 closes the in-application update lifecycle with a pre-update safety snapshot.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 uses deterministic captures and profiles for receipt comparison; v0.3.40 closes the in-application update lifecycle; and v0.3.41-v0.3.48 improve everyday usability, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -514,6 +516,206 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Why this priority:** The external updater and controlled shutdown eliminate the remaining class of self-update file-lock failures while preventing unexpected listener downtime or loss of customer state.
 
 **Complete when:** From Settings, a customer can download an update, choose Install and Restart, see the listener stop cleanly, complete the installation with no locked-file error, relaunch automatically on the new version, and retain registration, licensing, settings, stored data, and the previously selected receipt; cancel and failure paths leave the current installation usable.
+
+### v0.3.41 — Simple Mode and Expert Mode
+
+**Status:** Planned
+
+**GitHub:** [Issue #30 — Simple Mode and Expert Mode](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30)
+
+**Purpose:** Give new customers a task-focused experience without removing the complete three-panel workspace used by experienced customers.
+
+**Planned scope:**
+
+- Add a persistent Simple Mode with clear task cards for printer setup, connection details, Test Receipt, latest receipt, capture import, diagnostics, and support.
+- Keep the current Activity, Receipt Preview, and Inspector layout as Expert Mode.
+- Add an always-available mode switch and remember the choice per Windows user.
+- Show one plain-language health statement and the next recommended action instead of exposing implementation details first.
+- Preserve the selected receipt, filters, panels, theme, and listener context when switching modes.
+- Keep every license boundary enforced by the service API; Simple Mode must not unlock or conceal paid-only behavior incorrectly.
+
+**License availability:** All license tiers.
+
+**Security and privacy:** Do not expose receipt contents, activation material, or private endpoints beyond information already authorized for the current tier.
+
+**Why this order:** It addresses the customer confusion already observed during onboarding while leaving the expert workflow intact.
+
+**Complete when:** A new customer can set up, connect, test, review the latest receipt, and diagnose a problem from Simple Mode, then switch to Expert Mode and find the same state and data.
+
+### v0.3.42 — Accessibility and keyboard usability
+
+**Status:** Planned
+
+**GitHub:** [Issue #31 — Accessibility and keyboard usability](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31)
+
+**Purpose:** Make every primary workflow usable with a keyboard, Windows assistive technology, display scaling, and high-contrast preferences.
+
+**Planned scope:**
+
+- Define a complete focus order, visible focus treatment, semantic landmarks, accessible names, and screen-reader status announcements.
+- Add documented shortcuts for Test Receipt, Settings, search, job navigation, panel controls, help, and the mode switch.
+- Support Windows text scaling, 200 percent display scaling, high contrast, reduced motion, and application zoom without clipped controls.
+- Meet WCAG 2.2 AA contrast, focus, target-size, error, and help expectations for the WebView interface.
+- Add automated accessibility checks plus keyboard-only, Narrator, scaling, and high-contrast acceptance tests.
+- Caption every instructional video and provide equivalent text instructions.
+
+**License availability:** All license tiers.
+
+**Security and privacy:** Accessible names and announcements must never reveal hidden activation keys, masked receipt values, credentials, or other tier-restricted information.
+
+**Why this order:** Accessibility improves usability for every customer and is less expensive to establish before more screens and controls are added.
+
+**Complete when:** Primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
+
+### v0.3.43 — Automatic configuration restore points
+
+**Status:** Planned
+
+**GitHub:** [Issue #32 — Automatic configuration restore points](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32)
+
+**Purpose:** Protect customers from accidental configuration loss without requiring them to remember to create a manual backup.
+
+**Planned scope:**
+
+- Create encrypted restore points before listener, profile, stored-logo, configuration import, restore, repair, and update changes.
+- Add optional scheduled local restore points with retention limits by count, age, and total storage.
+- Show the creation time, reason, application version, included sections, and integrity state before restoration.
+- Restore transactionally, create a safety point first, and roll back automatically when validation or restart fails.
+- Provide clear storage usage and cleanup controls without deleting the only known-good restore point.
+- Reuse the established encrypted backup format while keeping automatic files in the protected application-data directory.
+
+**License availability:** Lite, Pro, and Enterprise. Trial receives automatic safety points for included setup changes without scheduled retention controls.
+
+**Security and privacy:** Encrypt restore points, restrict Windows ACLs, redact secrets from metadata, never upload automatically, and exclude activation keys or receipt payloads unless a separately reviewed protected format explicitly supports them.
+
+**Why this order:** It reduces the recovery risk before projects and additional privacy or encoding configuration make customer state more complex.
+
+**Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
+
+### v0.3.44 — Projects and testing sessions
+
+**Status:** Planned
+
+**GitHub:** [Issue #33 — Projects and testing sessions](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33)
+
+**Purpose:** Organize receipts and configuration by customer, store, POS migration, register, or support engagement.
+
+**Planned scope:**
+
+- Create named projects containing sessions, notes, tags, listener references, profiles, captures, validation baselines, and reports.
+- Add a default project so existing installations migrate without requiring customer action.
+- Provide project selection, recent projects, archive, duplicate, safe move or copy, export, and import workflows.
+- Preserve project filters and the last-open session across restarts without changing active listener routing unexpectedly.
+- Validate imported project schemas, integrity checksums, item limits, and safe paths before committing any data.
+- Integrate projects with receipt comparison while keeping shared built-in profiles and stored logos understandable.
+
+**License availability:** Pro and Enterprise.
+
+**Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
+
+**Why this order:** The comparison foundation in v0.3.39 makes project-level test organization useful, while v0.3.43 supplies a recovery layer first.
+
+**Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
+
+### v0.3.45 — Privacy-safe receipt masking
+
+**Status:** Planned
+
+**GitHub:** [Issue #34 — Privacy-safe receipt masking](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34)
+
+**Purpose:** Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive customer information.
+
+**Planned scope:**
+
+- Add a reversible display-only Privacy View with built-in and customer-defined masking rules.
+- Detect and mask likely names, email addresses, phone numbers, payment fragments, loyalty identifiers, transaction identifiers, IP addresses, and selected text patterns.
+- Apply masking to screenshots, privacy-safe exports, comparison reports, and support attachments only when explicitly selected.
+- Preserve the original authorized raw receipt locally and clearly distinguish masked output from original data.
+- Preview every masked export, identify unmatched high-risk patterns, and let the customer cancel before saving or submitting.
+- Add adversarial tests for split fields, alternate separators, encoded text, images, QR codes, barcodes, and rule bypasses.
+
+**License availability:** Pro and Enterprise. Trial retains its existing irreversible post-allowance redaction behavior.
+
+**Security and privacy:** Never claim perfect automatic detection, default to safer masking, prevent raw values from entering a masked artifact, and keep masking rules local unless the customer deliberately exports them.
+
+**Why this order:** Project and comparison exports increase the likelihood that receipt artifacts will be shared, so privacy controls should follow before broader workflow expansion.
+
+**Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
+
+### v0.3.46 — System tray health and notifications
+
+**Status:** Planned
+
+**GitHub:** [Issue #35 — System tray health and notifications](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35)
+
+**Purpose:** Keep customers informed about important listener events without requiring the main application window to remain open.
+
+**Planned scope:**
+
+- Add a system-tray icon with healthy, warning, stopped, and faulted states.
+- Provide quick actions for Open, Test Receipt, listener status, Diagnostics, and Exit while preserving the independently running Windows service.
+- Add configurable local notifications for listener faults, port conflicts, rejected jobs, Trial limits, maintenance status, and available updates.
+- Deduplicate repeated alerts, rate-limit noisy failures, expire stale notifications, and clear resolved conditions.
+- Honor Windows Focus Assist and provide separate preferences for critical, warning, and informational events.
+- Explain clearly whether closing the window hides the interface or stops any component.
+
+**License availability:** All license tiers, with actions limited to each tier's existing permissions.
+
+**Security and privacy:** Lock-screen notifications must not display receipt contents, registration data, activation keys, email addresses, credentials, or full private-network details.
+
+**Why this order:** After core workflows and privacy controls are established, background awareness reduces missed faults and unnecessary support requests.
+
+**Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
+
+### v0.3.47 — Character and code-page assistant
+
+**Status:** Planned
+
+**GitHub:** [Issue #36 — Character and code-page assistant](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36)
+
+**Purpose:** Help customers correct garbled symbols, accents, currency marks, and multilingual receipt text without manually researching Epson code-page tables.
+
+**Planned scope:**
+
+- Detect probable character-encoding mismatches and identify the affected byte ranges and ESC/POS code-page commands.
+- Show side-by-side previews using compatible Epson and generic profile code pages.
+- Explain when a POS changes encoding mid-job and distinguish an unsupported glyph from a wrong code page.
+- Recommend the most likely profile or code-page correction and require an explicit preview before saving it.
+- Add international golden fixtures covering common Western, Central European, Cyrillic, Greek, Turkish, Hebrew, Arabic, and symbol cases supported by the selected profile.
+- Preserve original capture bytes and record assistant decisions as separate profile configuration.
+
+**License availability:** Pro and Enterprise.
+
+**Security and privacy:** Treat decoded receipt text as local customer data and exclude it from telemetry and diagnostics unless the customer explicitly consents to a reviewed, masked attachment.
+
+**Why this order:** The profile, comparison, privacy, and project foundations make encoding recommendations testable and safe to review before application.
+
+**Complete when:** Known mojibake fixtures produce the correct diagnosis and preview, saved recommendations render deterministically, and original capture bytes remain unchanged.
+
+### v0.3.48 — Offline Enterprise update packages
+
+**Status:** Planned
+
+**GitHub:** [Issue #37 — Offline Enterprise update packages](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37)
+
+**Purpose:** Support secure application updates on restricted or air-gapped POS networks.
+
+**Planned scope:**
+
+- Publish a portable update package containing the installer, versioned manifest, architecture, checksums, trusted publisher signature, and release metadata.
+- Import from approved removable media and verify every artifact before offering installation.
+- Reject tampered, unsigned, downgraded, wrong-product, wrong-architecture, expired, and unsupported packages without changing the installed application.
+- Reuse the v0.3.40 Install and Restart safety snapshot, active-job drain, controlled shutdown, rollback, relaunch, and confirmation flow.
+- Provide a documented offline maintenance-entitlement refresh workflow without changing permanent-license ownership or creating a subscription requirement.
+- Record privacy-safe audit evidence for package verification and installation results.
+
+**License availability:** Enterprise.
+
+**Security and privacy:** Require trusted signatures and hashes, prevent path traversal and package substitution, use least privilege, and never execute content until the complete package is verified.
+
+**Why this order:** It depends on the guided updater, production signing, rollback, and entitlement foundations and therefore belongs after the earlier customer-experience work.
+
+**Complete when:** An offline Enterprise computer installs a valid package and rejects tampered, unsigned, downgraded, incompatible, or unentitled packages without damaging the current installation.
 
 ### v0.3.30 — Security remediation (Phase 1)
 

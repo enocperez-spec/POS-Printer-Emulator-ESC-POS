@@ -258,6 +258,14 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.38 — Trial Onboarding Clarity Correction:** Makes the welcome flow reopenable, presents setup as two explicit steps, and shows the included Trial listener with read-only local and LAN connection details.
 - **v0.3.39 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
 - **v0.3.40 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
+- **v0.3.41 — Simple Mode and Expert Mode:** Add a task-focused customer experience while preserving the current complete inspection workspace.
+- **v0.3.42 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, and accessibility regression checks.
+- **v0.3.43 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
+- **v0.3.44 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
+- **v0.3.45 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
+- **v0.3.46 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
+- **v0.3.47 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
+- **v0.3.48 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

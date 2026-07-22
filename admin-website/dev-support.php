@@ -476,6 +476,46 @@ $releaseSync = database()->prepare(
          'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
          'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+        ('v0.3.41', 'v0.3.41', 'Release', 'Simple Mode and Expert Mode', 'Planned', 341,
+         'Give new customers a task-focused experience while preserving the complete expert workspace.',
+         'Simple task cards; plain-language health and next action; retained Expert Mode; remembered mode choice; state-preserving switching; and unchanged server-side license enforcement.',
+         'Persistent task guidance addresses customer confusion without removing advanced receipt inspection.',
+         'Customers complete setup, connection, testing, review, and diagnostics in Simple Mode and switch to Expert Mode without losing state.', NULL),
+        ('v0.3.42', 'v0.3.42', 'Release', 'Accessibility and keyboard usability', 'Planned', 342,
+         'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.',
+         'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
+         'Accessibility should be established before additional screens and controls increase remediation cost.',
+         'Primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', NULL),
+        ('v0.3.43', 'v0.3.43', 'Release', 'Automatic configuration restore points', 'Planned', 343,
+         'Protect customers from accidental configuration loss without requiring manual backups.',
+         'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
+         'Recovery protection should precede projects and additional customer configuration complexity.',
+         'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
+        ('v0.3.44', 'v0.3.44', 'Release', 'Projects and testing sessions', 'Planned', 344,
+         'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
+         'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
+         'Comparison and restore-point foundations make isolated project workflows safe and useful.',
+         'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
+        ('v0.3.45', 'v0.3.45', 'Release', 'Privacy-safe receipt masking', 'Planned', 345,
+         'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
+         'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
+         'Project and comparison exports increase sharing, so privacy controls should follow their foundation.',
+         'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
+        ('v0.3.46', 'v0.3.46', 'Release', 'System tray health and notifications', 'Planned', 346,
+         'Keep customers informed about important listener events without leaving the main window open.',
+         'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
+         'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.',
+         'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
+        ('v0.3.47', 'v0.3.47', 'Release', 'Character and code-page assistant', 'Planned', 347,
+         'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
+         'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.',
+         'Profiles, comparison, privacy, and project foundations make encoding recommendations testable and safe.',
+         'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', NULL),
+        ('v0.3.48', 'v0.3.48', 'Release', 'Offline Enterprise update packages', 'Planned', 348,
+         'Support secure updates on restricted or air-gapped POS networks.',
+         'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.',
+         'This depends on guided updates, production signing, rollback, and entitlement foundations.',
+         'A valid offline package installs successfully while tampered, unsigned, downgraded, incompatible, or unentitled packages leave the current installation unchanged.', NULL),
         ('v0.3.30', 'v0.3.30', 'Release', 'Security remediation (Phase 1)', 'Released', 330,
          'Resolve the actionable security findings from the completed deep review before adding more externally reachable functionality.',
          'Credential rotation and separation; HTTPS, cookie, CSRF, authorization, input-validation, and rate-limit hardening; encrypted and redacted sensitive desktop data; license-boundary enforcement; signed update and installer verification; dependency, secret, and package-integrity checks; security regression coverage.',
@@ -563,6 +603,14 @@ database()->prepare(
          WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'
          WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
          WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30'
+         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
+         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
+         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
+         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
+         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -570,7 +618,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
