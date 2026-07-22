@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+
 namespace ReceiptEmulator;
 
 public sealed record PrinterListenerApiCounters(
@@ -46,9 +50,7 @@ public static class PrinterListenerApiMapper
         var profileName = profiles.TryGet(configuration.ProfileId, out var profile) && profile is not null
             ? profile.Name
             : "Unavailable profile";
-        var connectionAddress = configuration.BindAddress == PrinterListenerDefaults.DefaultBindAddress
-            ? Environment.MachineName
-            : configuration.BindAddress;
+        var connectionAddress = ResolveConnectionAddress(configuration.BindAddress);
         var status = runtime.State == PrinterListenerRuntimeStates.Listening
             ? "Running"
             : runtime.State;
@@ -82,6 +84,47 @@ public static class PrinterListenerApiMapper
                 runtime.Counters.FailedJobs,
                 runtime.Counters.QueuedJobs,
                 runtime.Counters.ActiveJobs));
+    }
+
+    public static string ResolveConnectionAddress(string bindAddress, IEnumerable<IPAddress>? hostAddresses = null)
+    {
+        if (!IPAddress.TryParse(bindAddress, out var parsedAddress) || !parsedAddress.Equals(IPAddress.Any))
+            return bindAddress;
+
+        try
+        {
+            return (hostAddresses ?? PreferredHostAddresses())
+                .FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))?.ToString()
+                ?? IPAddress.Loopback.ToString();
+        }
+        catch
+        {
+            return IPAddress.Loopback.ToString();
+        }
+    }
+
+    private static IEnumerable<IPAddress> PreferredHostAddresses()
+    {
+        var activeAdapters = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up &&
+                              adapter.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel)
+            .Select(adapter =>
+            {
+                var properties = adapter.GetIPProperties();
+                var hasGateway = properties.GatewayAddresses.Any(gateway =>
+                    gateway.Address.AddressFamily == AddressFamily.InterNetwork && !gateway.Address.Equals(IPAddress.Any));
+                return new
+                {
+                    adapter.Speed,
+                    HasGateway = hasGateway,
+                    Addresses = properties.UnicastAddresses.Select(address => address.Address)
+                };
+            })
+            .OrderByDescending(adapter => adapter.HasGateway)
+            .ThenByDescending(adapter => adapter.Speed)
+            .SelectMany(adapter => adapter.Addresses);
+
+        return activeAdapters.Concat(Dns.GetHostAddresses(Dns.GetHostName())).Distinct();
     }
 
     public static PrinterListenerSummary ToSummary(this PrinterListenerCollectionStatus status) => new(

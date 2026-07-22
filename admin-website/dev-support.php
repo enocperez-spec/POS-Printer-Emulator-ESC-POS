@@ -347,6 +347,35 @@ function migrate_trial_onboarding_schedule(): void
 
 migrate_trial_onboarding_schedule();
 
+function migrate_trial_onboarding_clarity_schedule(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+        $claim->execute(['trial-onboarding-clarity-v0.3.38']);
+        if ($claim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.40', version_label='v0.3.40', priority_rank=340 WHERE item_key='v0.3.39' AND title='Guided update installation and restart'");
+        $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.39', version_label='v0.3.39', priority_rank=339 WHERE item_key='v0.3.38' AND title='Receipt comparison and automated validation'");
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release WHEN 'v0.3.39' THEN 'v0.3.40' WHEN 'v0.3.38' THEN 'v0.3.39' ELSE target_release END,
+                 fixed_version = CASE fixed_version WHEN 'v0.3.39' THEN 'v0.3.40' WHEN 'v0.3.38' THEN 'v0.3.39' ELSE fixed_version END
+             WHERE target_release IN ('v0.3.38', 'v0.3.39') OR fixed_version IN ('v0.3.38', 'v0.3.39')"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
+    }
+}
+
+migrate_trial_onboarding_clarity_schedule();
+
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "INSERT INTO development_roadmap
@@ -432,12 +461,17 @@ $releaseSync = database()->prepare(
          'First-launch welcome; Trial Configuration Wizard; one automatic listener; confirmed sequential port recovery; unlimited ephemeral Test Receipts; complete-job allowance counter; irreversible ten-line redaction after the fifth external job; upgrade guidance; and local diagnostics.',
          'Removing first-run friction improves evaluation while ingestion-time redaction protects receipt data after the Trial allowance is used.',
          'Fresh Trial setup, unlimited Test Receipts, port-conflict recovery, five complete external jobs, accepted redacted later jobs, and non-recoverability across APIs, history, exports, and diagnostics are verified.', UTC_TIMESTAMP(6)),
-        ('v0.3.38', 'v0.3.38', 'Release', 'Receipt comparison and automated validation', 'Next', 338,
+        ('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released', 338,
+         'Make Trial setup impossible to lose and show customers exactly where their POS must send print jobs.',
+         'Versioned and reopenable two-step welcome guide; wizard-first instruction; visible read-only included listener; local and LAN IPv4 endpoints; copyable RAW TCP details; and retained server-side mutation denial.',
+         'The v0.3.37 guide could remain dismissed and hid the included listener behind an upgrade panel, leaving customers unsure how to connect.',
+         'Fresh and upgraded Trial installations see and can reopen the guide, view one locked listener, copy exact connection details, and receive HTTP 403 for listener mutations.', UTC_TIMESTAMP(6)),
+        ('v0.3.39', 'v0.3.39', 'Release', 'Receipt comparison and automated validation', 'Next', 339,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Planned', 339,
+        ('v0.3.40', 'v0.3.40', 'Release', 'Guided update installation and restart', 'Planned', 340,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -526,8 +560,9 @@ database()->prepare(
          WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'
          WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'
          WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.37'
-         WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'
+         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -535,7 +570,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -621,7 +656,15 @@ $bugSync = database()->prepare(
          'The desktop save filter did not recognize .ppebackup, so Windows appended .zip and the API accepted only the final extension.',
          'Create a configuration backup in v0.3.34, then select the generated .ppebackup.zip file for restore.',
          'The save dialog now uses .ppebackup directly; both native and legacy names pass validation; all 158 tests and the complete rendered restore workflow pass.',
-         UTC_TIMESTAMP(6))
+         UTC_TIMESTAMP(6)),
+        ('BUG-015', 'Trial welcome and included listener were difficult to find',
+         'Medium', 'Released', 'v0.3.37', 'v0.3.38', 'v0.3.38',
+         'Trial customers could dismiss the welcome guide permanently and then saw only an upgrade panel instead of the included listener connection details.',
+         'Trial setup should remain reopenable and show one read-only listener with exact local and LAN connection targets.',
+         'A persistent v1 completion flag hid the guide, while the single-license Printer Listeners page returned early to an upgrade-only panel.',
+         'Dismiss the v0.3.37 welcome guide, reopen the application, then open Settings and select Printer Listeners.',
+         'The v2 guide is reopenable from the header; the listener is readable without edit controls; the server rejects Trial changes with HTTP 403; the production viewer builds and all 166 desktop tests pass.',
+         NULL)
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
         target_release = COALESCE(target_release, VALUES(target_release)),

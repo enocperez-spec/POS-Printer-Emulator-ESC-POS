@@ -6,6 +6,15 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.38 — 2026-07-22
+
+- Corrects the v0.3.37 first-launch experience with a versioned welcome guide that existing Trial customers see once after updating and can reopen at any time from **Trial setup** in the top bar.
+- Replaces the general onboarding checklist with a clear two-step flow: **1. Run the Printer Setup Wizard** and **2. Configure the POS to use the included listener**.
+- Shows the included Trial listener under **Settings → Printer Listeners** with its name, running state, local address, LAN IPv4 address, port, protocol, profile, and copyable connection instructions.
+- Keeps the Trial listener read-only: create, edit, start, stop, restart, and delete controls are absent, and the server continues to reject listener changes for Trial licenses.
+- Replaces the network computer name with an actual LAN IPv4 address so a remote POS can use the displayed connection target directly.
+- Moves Receipt Comparison and Automated Validation to v0.3.39 and Guided Update Installation and Restart to v0.3.40.
+
 ## v0.3.37 — 2026-07-22
 
 - Adds a first-launch Trial welcome screen with **Set Up Trial Printer**, **Print a Test Receipt**, live listener status, and **Troubleshoot Connection** actions.

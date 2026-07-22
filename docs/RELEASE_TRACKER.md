@@ -12,13 +12,13 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.37 — released 2026-07-22**
+**Current public release: v0.3.38 — released 2026-07-22**
 
-**Current development: v0.3.38 — Receipt comparison and automated validation**
+**Current development: v0.3.39 — Receipt comparison and automated validation**
 
-**Next release after v0.3.38: v0.3.39 — Guided update installation and restart**
+**Next release after v0.3.39: v0.3.40 — Guided update installation and restart**
 
-**Most recently completed: v0.3.37 — Trial Setup and Onboarding Improvements**
+**Most recently completed: v0.3.38 — Trial Onboarding Clarity Correction**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -75,10 +75,12 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.34 | Released | Encrypted backup, EULA, and support policy |
 | v0.3.35 | Released | Backup restore usability and compatibility |
 | v0.3.36 | Released | Privacy-preserving geographic analytics dashboard |
+| v0.3.37 | Released | Trial setup and onboarding improvements |
+| v0.3.38 | Released | Trial onboarding clarity correction |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 removes Trial onboarding friction; v0.3.38 uses deterministic captures and profiles for receipt comparison; and v0.3.39 closes the in-application update lifecycle with a pre-update safety snapshot.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 uses deterministic captures and profiles for receipt comparison; and v0.3.40 closes the in-application update lifecycle with a pre-update safety snapshot.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -444,7 +446,28 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A fresh Trial installation reaches a visible Test Receipt in one click, configures its single Windows printer through the shared wizard, recovers from a port-9100 conflict with confirmation, processes five complete external jobs, accepts a sixth without a POS-side failure, and proves that content after line ten is unavailable from every API, view, export, history, or diagnostic path.
 
-### v0.3.38 — Receipt comparison and automated validation
+### v0.3.38 — Trial Onboarding Clarity Correction
+
+**Status:** Released — 2026-07-22
+
+**Purpose:** Correct the v0.3.37 onboarding gap so every Trial customer can find the setup instructions again and see exactly where their POS must send print jobs.
+
+**Released scope:**
+
+- Give the welcome experience a new versioned completion state so existing v0.3.37 Trial installations see the corrected guide once after updating.
+- Add a permanent **Trial setup** action in the application header so the guide is never lost after dismissal.
+- Present two explicit steps: run the Printer Setup Wizard, then configure the POS to send RAW TCP/ESC-POS data to the included listener.
+- Show the included Trial listener under **Settings → Printer Listeners** with its name, status, profile, local endpoint, LAN IPv4 endpoint, port, and copyable instructions.
+- Remove all create, edit, start, stop, restart, and delete controls for Trial while retaining server-side HTTP 403 enforcement for listener changes.
+- Explain that a same-computer POS uses `127.0.0.1:<port>` and a remote POS uses the emulator computer's displayed LAN IPv4 address and the same port.
+
+**Security and privacy:** Listener details remain local. The UI exposes only private-network connection information already needed to configure the customer's POS, and Trial listener mutation remains denied by the server rather than relying on hidden controls alone.
+
+**Completion verification:** The production C# packager rebuilt the viewer, service, desktop shell, license tools, self-contained Windows runtime, and installer with zero build errors. All 166 desktop tests and Admin/database commerce tests passed. Live Trial API verification returned one included listener with a LAN IPv4 address and rejected a listener mutation with HTTP 403. The installer checksum was generated successfully; rendered Codex browser automation remained unavailable because its browser kernel could not create the required local assets.
+
+**Complete when:** A fresh or upgraded Trial installation sees the corrected guide, can reopen it, can run the wizard from Step 1, sees one read-only listener in Step 2, can copy exact connection details, and cannot alter listener configuration through either the interface or API.
+
+### v0.3.39 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -465,7 +488,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.39 — Guided update installation and restart
+### v0.3.40 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -532,7 +555,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after the scheduled v0.3.37-v0.3.39 releases.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after the scheduled v0.3.37-v0.3.40 releases.
 
 ### Release prerequisite — Windows 11 Pro support-policy alignment
 
