@@ -106,20 +106,24 @@ if ($publicVersion === '') {
     }
 }
 $expectContains("('BUG-013', 'Support diagnostics failed when Stored Logos directory was absent'",$devSupport,'Admin Dev Support is missing released BUG-013.');
+$expectContains("('BUG-014', 'Windows added a ZIP suffix to configuration backups'",$devSupport,'Admin Dev Support is missing released BUG-014.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $devSupport, 'Enhanced support diagnostics was not marked released for v0.3.33.');
 $expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released'", $devSupport, 'Encrypted backup and EULA release was not marked released for v0.3.34.');
-$expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next'", $devSupport, 'Receipt comparison was not marked next for v0.3.35.');
-$expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned'", $devSupport, 'Guided update installation was not moved to v0.3.36.');
+$expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and compatibility', 'Released'", $devSupport, 'Backup restore usability was not marked released for v0.3.35.');
+$expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Receipt comparison and automated validation', 'Next'", $devSupport, 'Receipt comparison was not moved to v0.3.36.');
+$expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Guided update installation and restart', 'Planned'", $devSupport, 'Guided update installation was not moved to v0.3.37.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $schema, 'Fresh database schema is missing released v0.3.33.');
 $expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released'", $schema, 'Fresh database schema is missing released v0.3.34.');
-$expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next'", $schema, 'Fresh database schema is missing next v0.3.35.');
-$expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned'", $schema, 'Fresh database schema is missing pending v0.3.36.');
+$expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and compatibility', 'Released'", $schema, 'Fresh database schema is missing released v0.3.35.');
+$expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Receipt comparison and automated validation', 'Next'", $schema, 'Fresh database schema is missing next v0.3.36.');
+$expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Guided update installation and restart', 'Planned'", $schema, 'Fresh database schema is missing pending v0.3.37.');
 $expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');
 $expectContains("WHEN 'v0.3.27' THEN 'v0.3.33'", $devSupport, 'Bug targets are not migrated from v0.3.27 to v0.3.33.');
 $expectContains("WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'", $devSupport, 'Admin Dev Support is missing the v0.3.33 diagnostics issue link.');
 $expectContains("WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'", $devSupport, 'Admin Dev Support is missing the v0.3.34 release link.');
-$expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.35 comparison issue link.');
-$expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'", $devSupport, 'Admin Dev Support is missing the v0.3.36 guided update issue link.');
+$expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'", $devSupport, 'Admin Dev Support is missing the v0.3.35 release link.');
+$expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.36 comparison issue link.');
+$expectContains("WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'", $devSupport, 'Admin Dev Support is missing the v0.3.37 guided update issue link.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
 $expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');

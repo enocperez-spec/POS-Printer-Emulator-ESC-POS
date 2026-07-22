@@ -27,7 +27,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.34 is the current public release, released July 21, 2026. The next planned release is v0.3.35 Receipt Comparison and Automated Validation.
+> **Release status:** v0.3.35 is the current public release, released July 22, 2026. The next planned release is v0.3.36 Receipt Comparison and Automated Validation.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -35,7 +35,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.34-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.35-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -159,7 +159,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.34-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.35-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -188,7 +188,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.34 artifacts/installer/POSPrinterEmulatorSetup-0.3.34-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.34-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.34" --notes-file artifacts/release-notes-v0.3.34.md
+gh release create v0.3.35 artifacts/installer/POSPrinterEmulatorSetup-0.3.35-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.35-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.35" --notes-file artifacts/release-notes-v0.3.35.md
 ```
 
 ## Issue customer activation keys
@@ -223,7 +223,7 @@ The `Printer` section supplies the compatible default listener for every install
 
 ## Configuration backup and restore
 
-The v0.3.34 interface is available under **Settings → Backup & Restore**. Enter and confirm a password of at least 10 characters, optionally include local receipt history on a paid license, and save the generated `.ppebackup` file somewhere safe. The password cannot be recovered.
+The backup interface introduced in v0.3.34 and refined in v0.3.35 is available under **Settings → Backup & Restore**. Enter and confirm a password of at least 10 characters, optionally include local receipt history on a paid license, and save the generated `.ppebackup` file somewhere safe. The password cannot be recovered.
 
 To restore, select the `.ppebackup` file and enter its password. The application verifies the package and displays its contents, exclusions, counts, and compatibility warnings before enabling restore. A Windows-protected safety snapshot is created first, and the running configuration is rolled back automatically if restoration fails.
 
@@ -251,8 +251,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.26 — Annual Application Maintenance and Support:** Keeps licenses permanent while adding the included first year, optional one-time annual renewals, maintenance-aware updates and assisted support, grandfathered coverage through 2027-07-19, and always-available local diagnostics.
 - **Released in v0.3.33 — Enhanced support package and connection diagnostics:** Adds guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; safe repair actions; privacy-reviewed support packages; and an in-app Support Request form that securely creates redacted GitHub issues through the backend. The release does not attempt to test unknown POS software implementations or store GitHub credentials in the desktop application.
 - **Released in v0.3.34 — Encrypted backup, EULA, and support policy:** Create password-protected `.ppebackup` packages with preview and rollback-safe restore; require installer acceptance of the public EPCOM Ltd. EULA; and align Windows, third-party POS, maintenance-response, licensing, privacy, and support boundaries.
-- **Next in v0.3.35 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.36 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, confirm an Install and Restart action, close the application safely, run an external updater, and relaunch after installation.
+- **Released in v0.3.35 — Backup restore usability and compatibility:** Keep the native `.ppebackup` extension, accept legacy `.ppebackup.zip` files, add in-app restore guidance, and publish an illustrated customer guide.
+- **Next in v0.3.36 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.37 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

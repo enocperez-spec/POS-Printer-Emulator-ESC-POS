@@ -6,6 +6,15 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.35 — 2026-07-22
+
+- Fixes the Windows desktop save dialog so configuration backups keep the native `.ppebackup` extension instead of being renamed to `.ppebackup.zip`.
+- Accepts legacy `.ppebackup.zip` files created by version 0.3.34 so customers do not need to extract or rebuild an existing backup.
+- Adds an accessible question-mark tooltip beside **Restore from backup** with the complete restore sequence and legacy-file guidance.
+- Publishes a responsive, illustrated backup and restore guide on the product website with four verified in-app screenshots.
+- Passed all 158 automated desktop tests, a clean warning-free release build, desktop/mobile restore-flow QA, 18-page SEO validation, and live website asset verification.
+- Moves Receipt Comparison to v0.3.36 and Guided Update Installation to v0.3.37.
+
 ## v0.3.34 — 2026-07-21
 
 - Adds **Settings → Backup & Restore** to every license tier with portable password-encrypted `.ppebackup` packages.
@@ -22,7 +31,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Defines POS Printer Emulator-only support, excludes third-party and legacy POS systems from standard support, and requires a separately approved paid scope for custom integration or development when offered.
 - Defines fully updated 64-bit Windows 11 Pro as the only supported operating-system environment and treats Windows 10 and other editions as unsupported.
 - States that an active-maintenance support request may take up to six calendar months for an initial substantive response unless a separately signed SLA provides otherwise; a response does not promise diagnosis, correction, workaround, or resolution.
-- Shifts Receipt Comparison to v0.3.35 and Guided Update Installation to v0.3.36.
+- Establishes the encrypted backup foundation refined by the v0.3.35 restore-usability maintenance release.
 
 ## v0.3.33 — 2026-07-21
 
@@ -64,7 +73,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Preserved existing paid activation keys as Pro, added safe replacement-key upgrades without reinstalling, and retained listener definitions that exceed a temporarily lower allowance without running or deleting them.
 - Fixed protected-schema deployment so semicolons inside release and backlog descriptions are not mistaken for SQL statement boundaries.
 - Passed all 113 automated desktop tests, all PHP commerce contracts, PHP and JavaScript syntax checks, 15-page SEO validation, real Lite activation against the local service, rendered Trial/Lite/Pro/Enterprise Settings plus desktop/mobile pricing checks, and an installed v0.3.24 Enterprise-to-v0.3.25 upgrade that preserved registration and activation.
-- After the v0.3.30-v0.3.32 security and updater releases, customer support diagnostics shipped in v0.3.33; encrypted configuration backup and restore followed in v0.3.34; receipt comparison and guided update installation moved to v0.3.35 and v0.3.36.
+- After the v0.3.30-v0.3.32 security and updater releases, customer support diagnostics shipped in v0.3.33; encrypted configuration backup and restore followed in v0.3.34; v0.3.35 refined backup restore usability; receipt comparison and guided update installation moved to v0.3.36 and v0.3.37.
 
 ## v0.3.24 — 2026-07-19
 

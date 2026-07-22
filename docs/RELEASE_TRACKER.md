@@ -12,13 +12,13 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.34 — released 2026-07-21**
+**Current public release: v0.3.35 — released 2026-07-22**
 
-**Current development: v0.3.35 — Receipt comparison and automated validation**
+**Current development: v0.3.36 — Receipt comparison and automated validation**
 
-**Next release after v0.3.35: v0.3.36 — Guided update installation and restart**
+**Next release after v0.3.36: v0.3.37 — Guided update installation and restart**
 
-**Most recently completed: v0.3.34 — Encrypted backup, EULA, and support policy**
+**Most recently completed: v0.3.35 — Backup restore usability and compatibility**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -73,10 +73,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.32 | Released | Updater installer-asset validation |
 | v0.3.33 | Released | Enhanced support package, connection diagnostics, and in-app support requests |
 | v0.3.34 | Released | Encrypted backup, EULA, and support policy |
+| v0.3.35 | Released | Backup restore usability and compatibility |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete the security and updater work; v0.3.33 provides safe customer diagnostics and support requests; v0.3.34 protects portable customer configuration and establishes the EULA and support boundaries; v0.3.35 uses deterministic captures and profiles for receipt comparison; and v0.3.36 closes the remaining in-application update lifecycle with a pre-update safety snapshot.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete the security and updater work; v0.3.33 provides safe customer diagnostics and support requests; v0.3.34 protects portable customer configuration and establishes the EULA and support boundaries; v0.3.35 corrects backup file compatibility and adds guided restore help; v0.3.36 uses deterministic captures and profiles for receipt comparison; and v0.3.37 closes the remaining in-application update lifecycle with a pre-update safety snapshot.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -392,7 +393,27 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can create a password-protected backup, review it before restoring, recover supported configuration without transferring a license, and return automatically to the original configuration if restore fails; the website and installer present matching terms, installation requires acceptance, customer-facing support and Windows requirements are consistent, and the versioned installer plus checksum are published.
 
-### v0.3.35 — Receipt comparison and automated validation
+### v0.3.35 — Backup restore usability and compatibility
+
+**Status:** Released — 2026-07-22
+
+**Purpose:** Remove the confusing Windows ZIP behavior from encrypted backups and make restoration understandable without leaving the application.
+
+**Released scope:**
+
+- Use a dedicated Windows save filter and default extension so new backups retain the `.ppebackup` suffix.
+- Accept both `.ppebackup` and legacy `.ppebackup.zip` names created by version 0.3.34 without asking customers to extract the encrypted package.
+- Add an accessible question-mark tooltip beside **Restore from backup** with the complete choose, password, review, confirm, and restore sequence.
+- Add a responsive illustrated website guide with screenshots for choosing a file, reviewing contents, and confirming a successful restore.
+- Preserve all authenticated encryption, package-size limits, validation, safety-snapshot, rollback, tier-limit, and secret-exclusion protections from v0.3.34.
+
+**Security and privacy:** Legacy filename compatibility does not bypass package authentication or schema validation. The application still decrypts only after password entry, never logs backup passwords or decrypted payloads, and never imports activation or maintenance credentials.
+
+**Completion verification:** All 158 automated desktop tests pass, including valid and invalid backup filename cases. The complete create, choose, inspect, confirm, and restore workflow passed in desktop and narrow-window rendered QA with no browser console errors. The release build completed with zero warnings and errors, 18 canonical website pages passed SEO validation, and the live guide plus all four screenshot assets returned HTTP 200.
+
+**Complete when:** Newly created backups keep the `.ppebackup` extension, existing `.ppebackup.zip` files restore without extraction, in-app guidance is available by pointer and keyboard, the illustrated guide is public, and the versioned installer plus checksum are published.
+
+### v0.3.36 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -413,7 +434,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.36 — Guided update installation and restart
+### v0.3.37 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -480,7 +501,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.36.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.37.
 
 ### Release prerequisite — Windows 11 Pro support-policy alignment
 

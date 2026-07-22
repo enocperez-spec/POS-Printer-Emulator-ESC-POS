@@ -221,8 +221,8 @@ function migrate_pending_release_numbers(): void
     $pdo = database();
     $mappings = [
         'v0.3.27' => ['key' => 'v0.3.33', 'title' => 'Enhanced support package and connection diagnostics', 'priority' => 333],
-        'v0.3.28' => ['key' => 'v0.3.35', 'title' => 'Receipt comparison and automated validation', 'priority' => 335],
-        'v0.3.29' => ['key' => 'v0.3.36', 'title' => 'Guided update installation and restart', 'priority' => 336],
+        'v0.3.28' => ['key' => 'v0.3.36', 'title' => 'Receipt comparison and automated validation', 'priority' => 336],
+        'v0.3.29' => ['key' => 'v0.3.37', 'title' => 'Guided update installation and restart', 'priority' => 337],
     ];
 
     $pdo->beginTransaction();
@@ -284,14 +284,14 @@ function migrate_pending_release_numbers(): void
             "UPDATE development_bugs
              SET target_release = CASE target_release
                      WHEN 'v0.3.27' THEN 'v0.3.33'
-                     WHEN 'v0.3.28' THEN 'v0.3.35'
-                     WHEN 'v0.3.29' THEN 'v0.3.36'
+                     WHEN 'v0.3.28' THEN 'v0.3.36'
+                     WHEN 'v0.3.29' THEN 'v0.3.37'
                      ELSE target_release
                  END,
                  fixed_version = CASE fixed_version
                      WHEN 'v0.3.27' THEN 'v0.3.33'
-                     WHEN 'v0.3.28' THEN 'v0.3.35'
-                     WHEN 'v0.3.29' THEN 'v0.3.36'
+                     WHEN 'v0.3.28' THEN 'v0.3.36'
+                     WHEN 'v0.3.29' THEN 'v0.3.37'
                      ELSE fixed_version
                  END
              WHERE target_release IN ('v0.3.27', 'v0.3.28', 'v0.3.29')
@@ -378,12 +378,17 @@ $releaseSync = database()->prepare(
          'Password-encrypted PPE backups with verified preview and rollback-safe restore; installer EULA acceptance; canonical website EULA; EPCOM Ltd. and Georgia jurisdiction; Windows 11 Pro and third-party POS support boundaries; and maintenance-response terms.',
          'Customers need both a safe configuration recovery path and clear legal and support terms before comparison suites and guided updates expand the workflow.',
          'Encrypted create, inspect, and restore pass wrong-password and tamper rejection, automatic safety snapshots, rollback protection, all 151 tests, rendered UI validation, matching website and installer terms, required acceptance, and published installer checksum.', UTC_TIMESTAMP(6)),
-        ('v0.3.35', 'v0.3.35', 'Release', 'Receipt comparison and automated validation', 'Next', 335,
+        ('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and compatibility', 'Released', 335,
+         'Remove confusing Windows ZIP behavior from encrypted backups and make restoration understandable without leaving the application.',
+         'Native .ppebackup save handling; compatibility with v0.3.34 .ppebackup.zip file names; accessible in-app restore guidance; and a responsive illustrated website guide.',
+         'Customers must be able to recover the v0.3.34 backup they already created without extracting an encrypted package or guessing the restore sequence.',
+         'New backups keep .ppebackup, legacy names restore successfully, all 158 tests and rendered restore-flow checks pass, and the guide plus screenshots are public.', UTC_TIMESTAMP(6)),
+        ('v0.3.36', 'v0.3.36', 'Release', 'Receipt comparison and automated validation', 'Next', 336,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
-         'The encrypted v0.3.34 backup foundation now protects the profiles, listeners, and captures used by comparison suites.',
+         'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.36', 'v0.3.36', 'Release', 'Guided update installation and restart', 'Planned', 336,
+        ('v0.3.37', 'v0.3.37', 'Release', 'Guided update installation and restart', 'Planned', 337,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -469,8 +474,9 @@ database()->prepare(
          WHEN 'v0.3.21' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/5'
          WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
          WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'
-         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'
+         WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -478,7 +484,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -556,7 +562,15 @@ $bugSync = database()->prepare(
          'Diagnostic export enumerated a missing optional directory and returned HTTP 500.',
          'Remove or omit the Stored Logos directory, then download diagnostics from Settings Support or Activation Diagnostics.',
          'Missing logo storage is treated as empty, imports recreate it safely, six Stored Graphic tests pass, and live expired-maintenance verification returns the diagnostic file with HTTP 200 while update checks remain HTTP 403.',
-         '2026-07-20 00:00:00.000000')
+         '2026-07-20 00:00:00.000000'),
+        ('BUG-014', 'Windows added a ZIP suffix to configuration backups',
+         'Medium', 'Released', 'v0.3.34', 'v0.3.35', 'v0.3.35',
+         'Customers could not extract the encrypted backup in Windows, and the restore picker rejected the resulting .ppebackup.zip name.',
+         'Backups should retain the native .ppebackup name, and existing v0.3.34 backup names should restore without extraction.',
+         'The desktop save filter did not recognize .ppebackup, so Windows appended .zip and the API accepted only the final extension.',
+         'Create a configuration backup in v0.3.34, then select the generated .ppebackup.zip file for restore.',
+         'The save dialog now uses .ppebackup directly; both native and legacy names pass validation; all 158 tests and the complete rendered restore workflow pass.',
+         UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),
         target_release = COALESCE(target_release, VALUES(target_release)),
