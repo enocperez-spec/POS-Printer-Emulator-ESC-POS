@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS installations (
     license_id CHAR(36) NULL,
     maintenance_status ENUM('NotApplicable', 'Active', 'Expired', 'Revoked') NOT NULL DEFAULT 'NotApplicable',
     maintenance_expires_at DATETIME(6) NULL,
+    country_code CHAR(2) NOT NULL DEFAULT 'ZZ',
+    region_code VARCHAR(8) NOT NULL DEFAULT '',
+    geo_updated_at DATETIME(6) NULL,
     first_seen_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_seen_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_launch_at DATETIME(6) NULL,
@@ -24,7 +27,8 @@ CREATE TABLE IF NOT EXISTS installations (
     KEY ix_installations_license_mode (license_mode),
     KEY ix_installations_last_seen (last_seen_at),
     KEY ix_installations_email (email_address),
-    KEY ix_installations_license_id (license_id)
+    KEY ix_installations_license_id (license_id),
+    KEY ix_installations_geography (country_code, region_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS daily_usage (
@@ -37,6 +41,18 @@ CREATE TABLE IF NOT EXISTS daily_usage (
     CONSTRAINT fk_daily_usage_installation
         FOREIGN KEY (installation_id) REFERENCES installations (id)
         ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS download_events_daily (
+    event_date DATE NOT NULL,
+    country_code CHAR(2) NOT NULL DEFAULT 'ZZ',
+    region_code VARCHAR(8) NOT NULL DEFAULT '',
+    app_version VARCHAR(32) NOT NULL,
+    source VARCHAR(32) NOT NULL DEFAULT 'other',
+    download_starts BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (event_date, country_code, region_code, app_version, source),
+    KEY ix_download_events_geography (country_code, region_code, event_date),
+    KEY ix_download_events_version (app_version, event_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS issued_licenses (
@@ -244,8 +260,9 @@ VALUES
     ('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released', 333, 'Guide nontechnical customers through emulator, printer, listener, and Windows configuration problems and produce privacy-reviewed support evidence.', 'Guided emulator-side checks for the service, viewer, storage, listeners, ports, firewall, Windows queues, and Epson drivers; reviewed repair actions; previewed redacted ZIP packages; and an in-app Support Request workflow that sends consented, redacted reports through a secure backend to correctly labeled GitHub issues without embedding GitHub credentials.', 'Customer diagnostics, safe package export, and structured support requests reduce support time while avoiding unreliable testing of unknown POS implementations.', 'Supported emulator and Windows failures are explained and safely repairable; support packages and GitHub issues exclude receipt contents, IP addresses, contact details, and secrets; offline drafts survive restart and retry.', '2026-07-21 00:00:00.000000'),
     ('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released', 334, 'Protect portable emulator configuration while presenting consistent product-use, licensing, compatibility, privacy, support, and liability terms.', 'Password-encrypted PPE backups with verified preview and rollback-safe restore; installer EULA acceptance; canonical website EULA; EPCOM Ltd. and Georgia jurisdiction; Windows 11 Pro and third-party POS support boundaries; and maintenance-response terms.', 'Customers need both a safe configuration recovery path and clear legal and support terms before comparison suites and guided updates expand the workflow.', 'Encrypted backup validation and rollback protection pass all 151 tests; website and installer terms match; acceptance is required; release and SEO checks pass; and the installer checksum is published.', '2026-07-21 00:00:00.000000'),
     ('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and compatibility', 'Released', 335, 'Remove confusing Windows ZIP behavior from encrypted backups and make restoration understandable without leaving the application.', 'Native .ppebackup save handling; compatibility with v0.3.34 .ppebackup.zip file names; accessible in-app restore guidance; and a responsive illustrated website guide.', 'Customers must be able to recover the v0.3.34 backup they already created without extracting an encrypted package or guessing the restore sequence.', 'New backups keep .ppebackup, legacy names restore successfully, all 158 tests and rendered restore-flow checks pass, and the guide plus screenshots are public.', '2026-07-22 00:00:00.000000'),
-    ('v0.3.36', 'v0.3.36', 'Release', 'Receipt comparison and automated validation', 'Next', 336, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-    ('v0.3.37', 'v0.3.37', 'Release', 'Guided update installation and restart', 'Planned', 337, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+    ('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released', 336, 'Show where website downloads and product activity occur without retaining raw IP addresses.', 'Coarse country and U.S. state derivation; transient IP processing; daily download-start aggregates; world and United States maps; exact regional tables; date, metric, license, and version filters; accessibility; privacy and EULA disclosures; and automated contract checks.', 'Geographic adoption data helps EPCOM prioritize documentation, compatibility, and support while data minimization protects customers.', 'The private Admin dashboard reports approximate regional download starts, installations, launches, and print jobs; raw IP addresses are not stored in the analytics schema; filters and keyboard controls work; and legal disclosures match implementation.', '2026-07-22 00:00:00.000000'),
+    ('v0.3.37', 'v0.3.37', 'Release', 'Receipt comparison and automated validation', 'Next', 337, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.', 'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.', 'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
+    ('v0.3.38', 'v0.3.38', 'Release', 'Guided update installation and restart', 'Planned', 338, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
@@ -349,7 +366,22 @@ WHERE item_key = 'v0.3.35';
 INSERT INTO development_roadmap
     (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
 VALUES
-    ('v0.3.36', 'v0.3.36', 'Release', 'Receipt comparison and automated validation', 'Next', 336,
+    ('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released', 336,
+     'Show where website downloads and product activity occur without retaining raw IP addresses.',
+     'Coarse country and U.S. state derivation; transient IP processing; daily download-start aggregates; world and United States maps; exact regional tables; date, metric, license, and version filters; accessibility; privacy and EULA disclosures; and automated contract checks.',
+     'Geographic adoption data helps EPCOM prioritize documentation, compatibility, and support while data minimization protects customers.',
+     'The private Admin dashboard reports approximate regional download starts, installations, launches, and print jobs; raw IP addresses are not stored in the analytics schema; filters and keyboard controls work; and legal disclosures match implementation.')
+ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),title=VALUES(title),status=VALUES(status),priority_rank=VALUES(priority_rank),purpose=VALUES(purpose),planned_scope=VALUES(planned_scope),priority_reason=VALUES(priority_reason),completion_criteria=VALUES(completion_criteria),completed_at=NULL;
+
+UPDATE development_roadmap
+SET completed_at = COALESCE(completed_at, '2026-07-22 00:00:00.000000'),
+    github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'
+WHERE item_key = 'v0.3.36';
+
+INSERT INTO development_roadmap
+    (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
+VALUES
+    ('v0.3.37', 'v0.3.37', 'Release', 'Receipt comparison and automated validation', 'Next', 337,
      'Provide repeatable compatibility and regression testing.',
      'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
      'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.',
@@ -358,12 +390,12 @@ ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),title=VALUES(title),
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-WHERE item_key = 'v0.3.36';
+WHERE item_key = 'v0.3.37';
 
 INSERT INTO development_roadmap
     (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
 VALUES
-    ('v0.3.37', 'v0.3.37', 'Release', 'Guided update installation and restart', 'Planned', 337,
+    ('v0.3.38', 'v0.3.38', 'Release', 'Guided update installation and restart', 'Planned', 338,
      'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
      'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
      'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -372,7 +404,7 @@ ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),title=VALUES(title),
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
-WHERE item_key = 'v0.3.37';
+WHERE item_key = 'v0.3.38';
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'

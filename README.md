@@ -27,7 +27,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.35 is the current public release, released July 22, 2026. The next planned release is v0.3.36 Receipt Comparison and Automated Validation.
+> **Release status:** v0.3.36 is the current public release, released July 22, 2026. The next planned release is v0.3.37 Receipt Comparison and Automated Validation.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -35,7 +35,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.35-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.36-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -99,7 +99,7 @@ Optional one-year renewals are **Lite $9.99**, **Pro $19.99**, and **Enterprise 
 
 ## License and usage dashboard
 
-Version 0.3.26 reports installation registration, Trial, Lite, Pro, or Enterprise status, maintenance status and coverage date, application version, launch counts, emulated print-job counts, and last-seen time to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
+Version 0.3.36 reports installation registration, Trial, Lite, Pro, or Enterprise status, maintenance status and coverage date, application version, launch counts, emulated print-job counts, last-seen time, and approximate country or U.S. state to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. The public IP address may be processed transiently to derive those coarse codes but is not stored in the product-analytics database. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
@@ -159,7 +159,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.35-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.36-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -188,7 +188,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.35 artifacts/installer/POSPrinterEmulatorSetup-0.3.35-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.35-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.35" --notes-file artifacts/release-notes-v0.3.35.md
+gh release create v0.3.36 artifacts/installer/POSPrinterEmulatorSetup-0.3.36-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.36-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.36" --notes-file artifacts/release-notes-v0.3.36.md
 ```
 
 ## Issue customer activation keys
@@ -252,8 +252,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.33 — Enhanced support package and connection diagnostics:** Adds guided service, listener, port, firewall, Windows queue, Epson driver, and storage checks; safe repair actions; privacy-reviewed support packages; and an in-app Support Request form that securely creates redacted GitHub issues through the backend. The release does not attempt to test unknown POS software implementations or store GitHub credentials in the desktop application.
 - **Released in v0.3.34 — Encrypted backup, EULA, and support policy:** Create password-protected `.ppebackup` packages with preview and rollback-safe restore; require installer acceptance of the public EPCOM Ltd. EULA; and align Windows, third-party POS, maintenance-response, licensing, privacy, and support boundaries.
 - **Released in v0.3.35 — Backup restore usability and compatibility:** Keep the native `.ppebackup` extension, accept legacy `.ppebackup.zip` files, add in-app restore guidance, and publish an illustrated customer guide.
-- **Next in v0.3.36 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.37 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
+- **Released in v0.3.36 — Privacy-preserving geographic analytics:** Map approximate country and U.S. state totals for downloads and product usage without retaining raw IP addresses.
+- **Next in v0.3.37 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.38 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

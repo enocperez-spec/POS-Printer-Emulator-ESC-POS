@@ -6,6 +6,14 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.36 — 2026-07-22
+
+- Adds privacy-preserving country and U.S. state analytics for installations, download starts, application launches, and emulated print jobs.
+- Adds accessible world and United States maps with exact regional tables and date, metric, license, and version filters in the private Admin Portal.
+- Routes public installer actions through a fixed same-site download endpoint that records aggregate starts without storing raw IP addresses.
+- Adds coarse-geography database migrations, periodic location refresh, privacy/EULA disclosures, local permissive map assets, and automated analytics contract tests.
+- Moves Receipt Comparison and Automated Validation to v0.3.37 and Guided Update Installation and Restart to v0.3.38.
+
 ## v0.3.35 — 2026-07-22
 
 - Fixes the Windows desktop save dialog so configuration backups keep the native `.ppebackup` extension instead of being renamed to `.ppebackup.zip`.

@@ -1,0 +1,13 @@
+Bundled administrative-boundary map assets
+
+World geometry is generated from world-atlas 2.0.2, derived from Natural Earth data.
+world-atlas is licensed under the ISC License. Natural Earth data is in the public domain.
+https://github.com/topojson/world-atlas
+https://www.naturalearthdata.com/about/terms-of-use/
+
+United States geometry is generated from us-atlas 3.0.1, derived from U.S. Census Bureau cartographic boundary files.
+us-atlas is licensed under the ISC License. U.S. Census Bureau data is a work of the United States government.
+https://github.com/topojson/us-atlas
+https://www.census.gov/programs-surveys/geography/technical-documentation/naming-convention/cartographic-boundary-file.html
+
+Geometry was projected and converted to SVG path data for this dashboard. No map tiles or customer information are sent to a map provider.

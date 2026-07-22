@@ -12,13 +12,13 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.35 — released 2026-07-22**
+**Current public release: v0.3.36 — released 2026-07-22**
 
-**Current development: v0.3.36 — Receipt comparison and automated validation**
+**Current development: v0.3.37 — Receipt comparison and automated validation**
 
-**Next release after v0.3.36: v0.3.37 — Guided update installation and restart**
+**Next release after v0.3.37: v0.3.38 — Guided update installation and restart**
 
-**Most recently completed: v0.3.35 — Backup restore usability and compatibility**
+**Most recently completed: v0.3.36 — Privacy-preserving geographic analytics dashboard**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -74,10 +74,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.33 | Released | Enhanced support package, connection diagnostics, and in-app support requests |
 | v0.3.34 | Released | Encrypted backup, EULA, and support policy |
 | v0.3.35 | Released | Backup restore usability and compatibility |
+| v0.3.36 | Released | Privacy-preserving geographic analytics dashboard |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds the maintenance entitlement required to fund updates and assisted support without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete the security and updater work; v0.3.33 provides safe customer diagnostics and support requests; v0.3.34 protects portable customer configuration and establishes the EULA and support boundaries; v0.3.35 corrects backup file compatibility and adds guided restore help; v0.3.36 uses deterministic captures and profiles for receipt comparison; and v0.3.37 closes the remaining in-application update lifecycle with a pre-update safety snapshot.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 uses deterministic captures and profiles for receipt comparison; and v0.3.38 closes the in-application update lifecycle with a pre-update safety snapshot.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -413,7 +414,17 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Newly created backups keep the `.ppebackup` extension, existing `.ppebackup.zip` files restore without extraction, in-app guidance is available by pointer and keyboard, the illustrated guide is public, and the versioned installer plus checksum are published.
 
-### v0.3.36 — Receipt comparison and automated validation
+### v0.3.36 — Privacy-preserving geographic analytics dashboard
+
+**Status:** Released — 2026-07-22
+
+**Purpose:** Show approximate regional adoption while minimizing location data.
+
+**Released scope:** Coarse country and U.S. state derivation for downloads and application telemetry; aggregate download starts; private world and U.S. maps; exact regional tables; date, metric, license, and version filters; local map assets; keyboard access; and matching privacy/EULA disclosures. Public IP addresses are processed transiently for lookup and are not stored in the product-analytics database.
+
+**Complete when:** The dashboard reports download starts, installations, launches, and print jobs by approximate region, raw IP addresses are absent from analytics storage, all filters and accessible table/map controls work, and automated contract checks pass.
+
+### v0.3.37 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -434,7 +445,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.37 — Guided update installation and restart
+### v0.3.38 — Guided update installation and restart
 
 **Status:** Planned
 

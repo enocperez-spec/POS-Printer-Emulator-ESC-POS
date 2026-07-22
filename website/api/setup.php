@@ -130,6 +130,22 @@ try {
     if(!isset($installationColumns['maintenance_expires_at'])){
         $pdo->exec('ALTER TABLE installations ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER maintenance_status');
     }
+    if(!isset($installationColumns['country_code'])){
+        $pdo->exec("ALTER TABLE installations ADD COLUMN country_code CHAR(2) NOT NULL DEFAULT 'ZZ' AFTER maintenance_expires_at");
+    }
+    if(!isset($installationColumns['region_code'])){
+        $pdo->exec("ALTER TABLE installations ADD COLUMN region_code VARCHAR(8) NOT NULL DEFAULT '' AFTER country_code");
+    }
+    if(!isset($installationColumns['geo_updated_at'])){
+        $pdo->exec('ALTER TABLE installations ADD COLUMN geo_updated_at DATETIME(6) NULL AFTER region_code');
+    }
+    $installationIndexes=[];
+    foreach($pdo->query('SHOW INDEX FROM installations')->fetchAll() as $index){
+        $installationIndexes[(string)$index['Key_name']]=true;
+    }
+    if(!isset($installationIndexes['ix_installations_geography'])){
+        $pdo->exec('CREATE INDEX ix_installations_geography ON installations (country_code, region_code)');
+    }
     $licenseColumns=[];
     foreach($pdo->query('SHOW COLUMNS FROM issued_licenses')->fetchAll() as $column){
         $licenseColumns[(string)$column['Field']]=true;

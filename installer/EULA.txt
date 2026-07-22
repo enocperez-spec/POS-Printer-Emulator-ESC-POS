@@ -1,8 +1,8 @@
 POS PRINTER EMULATOR
 END USER LICENSE AGREEMENT
 
-Effective date: July 21, 2026
-Agreement version: 1.0
+Effective date: July 22, 2026
+Agreement version: 1.1
 
 IMPORTANT: PLEASE READ THIS END USER LICENSE AGREEMENT ("AGREEMENT") CAREFULLY.
 BY SELECTING "I ACCEPT THE AGREEMENT," INSTALLING, ACTIVATING, ACCESSING, OR
@@ -91,6 +91,17 @@ version, license tier and identifier, maintenance status, launch counts,
 emulated job counts, and last-seen time. The current privacy notice at
 https://www.posprinteremulator.com/privacy explains this processing and is
 incorporated into this Agreement by reference.
+
+For download and product-usage analytics, the public IP address associated
+with a website or Software request may be processed transiently to estimate a
+country and, for United States requests, a state. Licensor stores the resulting
+coarse geographic codes and lookup time with aggregate download or usage data,
+not the public IP address in its product-analytics database. An IP-geolocation
+service provider may process the public IP address solely to perform that
+lookup when the hosting service does not supply coarse location information.
+IP-derived location is approximate and may be inaccurate because of VPNs,
+mobile carriers, shared networks, or routing. It is not a customer address and
+will not be used for advertising or sold as location data.
 
 You own or retain your rights in data you submit to the Software. You are
 responsible for having permission to process it and for avoiding real payment

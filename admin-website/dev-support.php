@@ -383,12 +383,17 @@ $releaseSync = database()->prepare(
          'Native .ppebackup save handling; compatibility with v0.3.34 .ppebackup.zip file names; accessible in-app restore guidance; and a responsive illustrated website guide.',
          'Customers must be able to recover the v0.3.34 backup they already created without extracting an encrypted package or guessing the restore sequence.',
          'New backups keep .ppebackup, legacy names restore successfully, all 158 tests and rendered restore-flow checks pass, and the guide plus screenshots are public.', UTC_TIMESTAMP(6)),
-        ('v0.3.36', 'v0.3.36', 'Release', 'Receipt comparison and automated validation', 'Next', 336,
+        ('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released', 336,
+         'Show where website downloads and product activity occur without retaining raw IP addresses.',
+         'Coarse country and U.S. state derivation; transient IP processing; daily download-start aggregates; world and United States maps; exact regional tables; date, metric, license, and version filters; accessibility; privacy and EULA disclosures; and automated contract checks.',
+         'Geographic adoption data helps EPCOM prioritize documentation, compatibility, and support while data minimization protects customers.',
+         'The private Admin dashboard reports approximate regional download starts, installations, launches, and print jobs; raw IP addresses are not stored in the analytics schema; filters and keyboard controls work; and legal disclosures match implementation.', UTC_TIMESTAMP(6)),
+        ('v0.3.37', 'v0.3.37', 'Release', 'Receipt comparison and automated validation', 'Next', 337,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.37', 'v0.3.37', 'Release', 'Guided update installation and restart', 'Planned', 337,
+        ('v0.3.38', 'v0.3.38', 'Release', 'Guided update installation and restart', 'Planned', 338,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -475,8 +480,9 @@ database()->prepare(
          WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'
          WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'
          WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'
-         WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'
+         WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -484,7 +490,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

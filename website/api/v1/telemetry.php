@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/_bootstrap.php';
+require dirname(__DIR__) . '/_geography.php';
 
 function normalize_license_registration(string $value): string
 {
@@ -105,6 +106,7 @@ try {
         $appVersion = required_string($body, 'appVersion', 32);
         $submittedLicenseId = empty($body['licenseId']) ? null : required_string($body, 'licenseId', 36);
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        $geography = request_geography();
         $pdo->beginTransaction();
         try {
             $managedLicense = resolve_managed_license(
@@ -119,9 +121,9 @@ try {
             $statement = $pdo->prepare(
                 'INSERT INTO installations
                     (installation_uuid, token_hash, customer_name, email_address, app_version, license_mode, license_id,
-                     maintenance_status, maintenance_expires_at)
+                     maintenance_status, maintenance_expires_at, country_code, region_code, geo_updated_at)
                  VALUES (:uuid, UNHEX(SHA2(:token, 256)), :customer, :email, :version, :mode, :license_id,
-                         :maintenance_status, :maintenance_expires_at)');
+                         :maintenance_status, :maintenance_expires_at, :country_code, :region_code, UTC_TIMESTAMP(6))');
             $statement->execute([
                 'uuid' => strtolower($installationUuid),
                 'token' => $token,
@@ -132,6 +134,8 @@ try {
                 'license_id' => $managedLicense['license_id'],
                 'maintenance_status'=>$maintenance['status'],
                 'maintenance_expires_at'=>$maintenance['expires_at'],
+                'country_code' => $geography['country_code'],
+                'region_code' => $geography['region_code'],
             ]);
             $pdo->commit();
         } catch (PDOException $exception) {
@@ -163,13 +167,14 @@ try {
     }
 
     $find = $pdo->prepare(
-        'SELECT id FROM installations
+        'SELECT id, country_code, region_code, geo_updated_at FROM installations
          WHERE installation_uuid = :uuid AND token_hash = UNHEX(SHA2(:token, 256))');
     $find->execute(['uuid' => strtolower($installationUuid), 'token' => $installationToken]);
-    $installationId = $find->fetchColumn();
-    if ($installationId === false) {
+    $installation = $find->fetch();
+    if (!is_array($installation)) {
         json_response(['error' => 'Authentication failed.'], 401);
     }
+    $installationId = (int)$installation['id'];
 
     $event = required_string($body, 'event', 24);
     if (!in_array($event, ['launch', 'print_job', 'activation', 'heartbeat'], true)) {
@@ -183,6 +188,17 @@ try {
     $launches = $event === 'launch' ? $count : 0;
     $jobs = $event === 'print_job' ? $count : 0;
     $activations = $event === 'activation' ? 1 : 0;
+    $geography = [
+        'country_code' => normalize_country_code($installation['country_code'] ?? ''),
+        'region_code' => normalize_region_code($installation['region_code'] ?? '', normalize_country_code($installation['country_code'] ?? '')),
+    ];
+    $refreshGeography = should_refresh_geography($geography['country_code'], $installation['geo_updated_at'] ?? null);
+    if ($refreshGeography) {
+        $resolvedGeography = request_geography();
+        if ($resolvedGeography['country_code'] !== UNKNOWN_COUNTRY_CODE || $geography['country_code'] === UNKNOWN_COUNTRY_CODE) {
+            $geography = $resolvedGeography;
+        }
+    }
 
     $pdo->beginTransaction();
     $managedLicense = resolve_managed_license(
@@ -205,6 +221,9 @@ try {
             license_id = :license_id,
             maintenance_status = :maintenance_status,
             maintenance_expires_at = :maintenance_expires_at,
+            country_code = :country_code,
+            region_code = :region_code,
+            geo_updated_at = IF(:refresh_geography = 1, UTC_TIMESTAMP(6), geo_updated_at),
             last_seen_at = UTC_TIMESTAMP(6),
             last_launch_at = IF(:has_launches = 1, UTC_TIMESTAMP(6), last_launch_at),
             last_print_job_at = IF(:has_jobs = 1, UTC_TIMESTAMP(6), last_print_job_at),
@@ -220,6 +239,9 @@ try {
         'license_id' => $licenseId,
         'maintenance_status'=>$maintenance['status'],
         'maintenance_expires_at'=>$maintenance['expires_at'],
+        'country_code' => $geography['country_code'],
+        'region_code' => $geography['region_code'],
+        'refresh_geography' => $refreshGeography ? 1 : 0,
         'has_launches' => $launches > 0 ? 1 : 0,
         'has_jobs' => $jobs > 0 ? 1 : 0,
         'launch_increment' => $launches,

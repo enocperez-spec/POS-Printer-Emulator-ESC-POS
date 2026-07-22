@@ -5,6 +5,7 @@ $tests = [
     __DIR__ . '/buy-commerce-tests.php',
     __DIR__ . '/admin-commerce-tests.php',
     __DIR__ . '/main-website-contract-tests.php',
+    __DIR__ . '/geography-tests.php',
 ];
 $failed = false;
 foreach ($tests as $test) {
