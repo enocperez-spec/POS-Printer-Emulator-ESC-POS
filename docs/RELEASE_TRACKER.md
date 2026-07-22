@@ -487,8 +487,9 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Run a validation suite locally and produce clear pass, warning, or fail results.
 - Export human-readable HTML/PDF results and machine-readable JSON results.
 - Add deterministic golden-output tests for the supported renderer behavior.
+- Brand the installer welcome, completion, and header areas with the official product artwork while retaining the product icon on Setup, shortcuts, and uninstall entries.
 
-**Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
+**Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
 
 ### v0.3.40 — Guided update installation and restart
 

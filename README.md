@@ -164,6 +164,10 @@ Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
+### Installer product branding
+
+The installer reads its product artwork from `assets\branding`. Replace `pos-printer-emulator-icon.png` to update the large welcome/completion image and the small wizard header image, and replace `pos-printer-emulator.ico` to update the Setup executable, application shortcuts, and uninstall entry. Keep the filenames unchanged. The packaging command verifies that both files and all required installer directives are present before compiling.
+
 The public version is recorded separately in `website/release.json`. After the candidate has passed release testing and the release is approved, promote `ProductInfo.Version` to the website labels and download links explicitly:
 
 ```console

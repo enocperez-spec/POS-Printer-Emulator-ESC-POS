@@ -169,6 +169,7 @@ internal static class ReceiptLabBuild
         await EnsureWebView2BootstrapperAsync();
         var compiler = FindInnoSetupCompiler();
         var installerDefinition = Path.Combine(Root, "installer", "ReceiptLab.iss");
+        ValidateInstallerBranding(installerDefinition);
         Console.WriteLine("Compiling the POS Printer Emulator Windows installer...");
         await RunProcessAsync(compiler, [installerDefinition], Root);
 
@@ -190,6 +191,34 @@ internal static class ReceiptLabBuild
 
         Console.WriteLine($"Installer created at {installerPath}");
         Console.WriteLine($"SHA-256 checksum created at {checksumPath}");
+    }
+
+    private static void ValidateInstallerBranding(string installerDefinition)
+    {
+        var definition = File.ReadAllText(installerDefinition);
+        var requiredDirectives = new[]
+        {
+            @"SetupIconFile=..\assets\branding\pos-printer-emulator.ico",
+            @"WizardImageFile=..\assets\branding\pos-printer-emulator-icon.png",
+            @"WizardSmallImageFile=..\assets\branding\pos-printer-emulator-icon.png"
+        };
+
+        foreach (var directive in requiredDirectives)
+        {
+            if (!definition.Contains(directive, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"The installer is missing required product branding: {directive}");
+            }
+        }
+
+        var brandingDirectory = Path.Combine(Root, "assets", "branding");
+        foreach (var fileName in new[] { "pos-printer-emulator.ico", "pos-printer-emulator-icon.png" })
+        {
+            if (!File.Exists(Path.Combine(brandingDirectory, fileName)))
+            {
+                throw new FileNotFoundException($"The installer branding asset is missing: {fileName}");
+            }
+        }
     }
 
     private static async Task VerifyPublishedApplicationsAsync()
