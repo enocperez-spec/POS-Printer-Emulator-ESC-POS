@@ -33,12 +33,18 @@ function is_probable_download_bot(): bool
 
 function record_download_start(string $version, string $source): void
 {
-    if ($_SERVER['REQUEST_METHOD'] !== 'GET' || is_probable_download_bot()) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        return;
+    }
+
+    $pdo = database();
+    ensure_geography_storage($pdo);
+    if (is_probable_download_bot()) {
         return;
     }
 
     $geography = request_geography();
-    $statement = database()->prepare(
+    $statement = $pdo->prepare(
         'INSERT INTO download_events_daily
             (event_date, country_code, region_code, app_version, source, download_starts)
          VALUES (UTC_DATE(), :country_code, :region_code, :app_version, :source, 1)

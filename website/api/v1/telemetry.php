@@ -100,6 +100,7 @@ try {
     }
 
     $pdo = database();
+    ensure_geography_storage($pdo);
     if ($action === 'register') {
         $customerName = required_string($body, 'customerName', 160, true);
         $emailAddress = strtolower(required_string($body, 'emailAddress', 254, true));

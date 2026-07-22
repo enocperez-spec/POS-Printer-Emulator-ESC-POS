@@ -53,6 +53,11 @@ foreach (['download_events_daily', 'is_probable_download_bot', "header('Location
         $failures[] = "Download tracking contract is missing {$needle}.";
     }
 }
+if (!str_contains($geography, 'function ensure_geography_storage') ||
+    !str_contains($telemetry, 'ensure_geography_storage($pdo);') ||
+    !str_contains($download, 'ensure_geography_storage($pdo);')) {
+    $failures[] = 'Public telemetry and downloads must apply the fixed idempotent geography migration before recording data.';
+}
 if (!str_contains($privacy, 'processed transiently') || !str_contains($privacy, 'does not store the public IP address')) {
     $failures[] = 'The privacy notice must clearly disclose transient IP geolocation and non-retention.';
 }
