@@ -14,12 +14,14 @@ internal static class ReceiptLabBuild
     private static readonly string Root = FindProjectRoot();
     private static readonly string AppProject = Path.Combine(Root, "src", "ReceiptEmulator.App", "ReceiptEmulator.App.csproj");
     private static readonly string DesktopProject = Path.Combine(Root, "src", "POSPrinterEmulator.Desktop", "POSPrinterEmulator.Desktop.csproj");
+    private static readonly string UpdaterProject = Path.Combine(Root, "src", "POSPrinterEmulator.Updater", "POSPrinterEmulator.Updater.csproj");
     private static readonly string LicenseToolProject = Path.Combine(Root, "tools", "POSPrinterEmulator.LicenseTool", "POSPrinterEmulator.LicenseTool.csproj");
     private static readonly string LicenseManagerProject = Path.Combine(Root, "tools", "POSPrinterEmulator.LicenseManager", "POSPrinterEmulator.LicenseManager.csproj");
     private static readonly string TestProject = Path.Combine(Root, "tests", "ReceiptEmulator.Tests", "ReceiptEmulator.Tests.csproj");
     private static readonly string ViewerDirectory = Path.Combine(Root, "src", "ReceiptEmulator.Viewer");
     private static readonly string WebRoot = Path.Combine(Root, "src", "ReceiptEmulator.App", "wwwroot");
     private static readonly string PublishDirectory = Path.Combine(Root, "artifacts", "win-x64");
+    private static readonly string UpdaterPublishDirectory = Path.Combine(Root, "artifacts", "updater", "win-x64");
     private static readonly string PrerequisitesDirectory = Path.Combine(Root, "artifacts", "prerequisites");
     private static readonly string WebView2Bootstrapper = Path.Combine(PrerequisitesDirectory, "MicrosoftEdgeWebview2Setup.exe");
 
@@ -84,6 +86,7 @@ internal static class ReceiptLabBuild
         Console.WriteLine("Building the POS Printer Emulator service and desktop application...");
         await RunProcessAsync("dotnet", ["build", AppProject, "-c", BuildConfiguration], Root);
         await RunProcessAsync("dotnet", ["build", DesktopProject, "-c", BuildConfiguration], Root);
+        await RunProcessAsync("dotnet", ["build", UpdaterProject, "-c", BuildConfiguration], Root);
         await RunProcessAsync("dotnet", ["build", LicenseToolProject, "-c", BuildConfiguration], Root);
         await RunProcessAsync("dotnet", ["build", LicenseManagerProject, "-c", BuildConfiguration], Root);
         await TestAsync();
@@ -121,6 +124,7 @@ internal static class ReceiptLabBuild
     {
         await BuildAsync();
         DeleteDirectoryInsideWorkspace(PublishDirectory);
+        DeleteDirectoryInsideWorkspace(UpdaterPublishDirectory);
 
         Console.WriteLine("Publishing the self-contained Windows application...");
         await RunProcessAsync(
@@ -150,6 +154,25 @@ internal static class ReceiptLabBuild
                 "-o", PublishDirectory
             ],
             Root);
+
+        await RunProcessAsync(
+            "dotnet",
+            [
+                "publish",
+                UpdaterProject,
+                "-c", BuildConfiguration,
+                "-r", "win-x64",
+                "--self-contained", "true",
+                "-p:PublishSingleFile=true",
+                "-p:IncludeNativeLibrariesForSelfExtract=true",
+                "-p:DebugType=None",
+                "-o", UpdaterPublishDirectory
+            ],
+            Root);
+        File.Copy(
+            Path.Combine(UpdaterPublishDirectory, "POSPrinterEmulator.Updater.exe"),
+            Path.Combine(PublishDirectory, "POSPrinterEmulator.Updater.exe"),
+            overwrite: true);
 
         await VerifyPublishedApplicationsAsync();
         Console.WriteLine($"Self-contained Windows publish created at {PublishDirectory}");
@@ -231,7 +254,8 @@ internal static class ReceiptLabBuild
 
         var serviceExecutable = Path.Combine(PublishDirectory, "ReceiptEmulator.exe");
         var desktopExecutable = Path.Combine(PublishDirectory, "POSPrinterEmulator.Desktop.exe");
-        foreach (var executable in new[] { serviceExecutable, desktopExecutable })
+        var updaterExecutable = Path.Combine(PublishDirectory, "POSPrinterEmulator.Updater.exe");
+        foreach (var executable in new[] { serviceExecutable, desktopExecutable, updaterExecutable })
         {
             if (!File.Exists(executable))
             {

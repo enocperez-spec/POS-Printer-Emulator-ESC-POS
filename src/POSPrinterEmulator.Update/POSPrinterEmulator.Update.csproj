@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>POSPrinterEmulator.Update</RootNamespace>
+    <AssemblyName>POSPrinterEmulator.Update</AssemblyName>
+    <Version>0.3.39</Version>
+  </PropertyGroup>
+</Project>

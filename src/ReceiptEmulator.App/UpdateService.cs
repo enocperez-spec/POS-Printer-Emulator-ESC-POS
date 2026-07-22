@@ -11,6 +11,7 @@ public sealed record UpdateStatus(
     bool CheckSucceeded,
     string? ReleaseUrl,
     string? DownloadUrl,
+    string? ChecksumUrl,
     DateTimeOffset CheckedAt,
     string Message);
 
@@ -47,6 +48,7 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
                         true,
                         "https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases",
                         null,
+                        null,
                         checkedAt,
                         "You already have the latest version installed. No newer public release is available.");
                 }
@@ -58,16 +60,20 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
                 var asset = release.Assets.FirstOrDefault(item =>
                     item.Name.EndsWith("-win-x64.exe", StringComparison.OrdinalIgnoreCase))
                     ?? release.Assets.FirstOrDefault(item => item.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+                var checksumAsset = asset is null ? null : release.Assets.FirstOrDefault(item =>
+                    item.Name.Equals(asset.Name + ".sha256", StringComparison.OrdinalIgnoreCase));
                 var newerRelease = CompareVersions(latest, ProductInfo.Version) > 0;
                 // A release without a Windows installer (for example a documentation
                 // or security-process release) must not be offered as an installable
                 // desktop update. Never fall back to the release HTML page as an
                 // installer URL.
-                var updateAvailable = newerRelease && asset is not null;
+                var updateAvailable = newerRelease && asset is not null && checksumAsset is not null;
                 var message = updateAvailable
                     ? $"POS Printer Emulator {latest} is available."
                     : newerRelease
-                        ? $"POS Printer Emulator {latest} is published, but no Windows installer is available yet."
+                        ? asset is null
+                            ? $"POS Printer Emulator {latest} is published, but no Windows installer is available yet."
+                            : $"POS Printer Emulator {latest} is published, but its security checksum is not available yet."
                         : "You already have the latest version installed.";
 
                 return _cached = new UpdateStatus(
@@ -77,6 +83,7 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
                     true,
                     release.HtmlUrl,
                     asset?.BrowserDownloadUrl,
+                    checksumAsset?.BrowserDownloadUrl,
                     checkedAt,
                     message);
             }
@@ -114,7 +121,7 @@ public sealed class UpdateService(HttpClient client, ILogger<UpdateService> logg
     }
 
     private static UpdateStatus Unavailable(DateTimeOffset checkedAt, string message) =>
-        new(ProductInfo.Version, null, false, false, null, null, checkedAt, message);
+        new(ProductInfo.Version, null, false, false, null, null, null, checkedAt, message);
 
     private sealed record GitHubRelease(
         [property: JsonPropertyName("tag_name")] string TagName,

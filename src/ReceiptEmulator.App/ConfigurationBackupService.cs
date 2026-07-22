@@ -218,6 +218,19 @@ public sealed class ConfigurationBackupService
         }
     }
 
+    public async Task<string> CreateSafetySnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            return await SaveSafetySnapshotAsync(cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public ConfigurationBackupPreview Inspect(ReadOnlySpan<byte> package, string password)
     {
         var payload = BackupPackageCodec.Read(package, password);

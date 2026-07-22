@@ -12,6 +12,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 - Receipt preview with persistent Light and Dark viewing modes.
 - Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
 - The v0.3.38 Trial onboarding correction provides a reopenable two-step setup guide, shows the included listener as read-only with exact local and LAN connection targets, and retains unlimited ephemeral built-in Test Receipts plus privacy-safe ten-line previews after the complete-job allowance is exhausted.
+- The v0.3.39 release candidate downloads and verifies updates in the background, creates an encrypted safety snapshot, drains active receipt work, closes file-locking processes, installs through a separate updater, restores the prior workspace view, and relaunches automatically.
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
@@ -28,7 +29,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.38 is the current public release, released July 22, 2026. v0.3.39 Guided Update Installation and Restart is next in development.
+> **Release status:** v0.3.38 is the current public release, released July 22, 2026. v0.3.39 Guided Update Installation and Restart is the release candidate being prepared for publication.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -270,6 +271,7 @@ The permanent status list for every completed, scheduled, and future release is 
 - **v0.3.46 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
 - **v0.3.47 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
 - **v0.3.48 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.49 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

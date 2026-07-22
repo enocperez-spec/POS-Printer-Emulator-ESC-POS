@@ -126,7 +126,7 @@ $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released'", $devSupport, 'Geographic analytics was not marked released for v0.3.36.');
 $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released'", $devSupport, 'Released v0.3.37 Trial onboarding is missing from Admin Dev Support.');
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $devSupport, 'Released Trial onboarding clarity correction is missing from v0.3.38.');
-$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Next'", $devSupport, 'Guided update installation was not moved to v0.3.39.');
+$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Ready for publishing'", $devSupport, 'Guided update installation was not marked ready for publishing.');
 $futureReleases = [
     'v0.3.40' => ['Simple Mode and Expert Mode', 30],
     'v0.3.41' => ['Accessibility and keyboard usability', 31],
@@ -137,6 +137,7 @@ $futureReleases = [
     'v0.3.46' => ['Character and code-page assistant', 36],
     'v0.3.47' => ['Offline Enterprise update packages', 37],
     'v0.3.48' => ['Receipt comparison and automated validation', 21],
+    'v0.3.49' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
     $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', 'Planned'";
@@ -151,7 +152,7 @@ $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released'", $schema, 'Fresh database schema is missing released v0.3.36.');
 $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released'", $schema, 'Fresh database schema is missing released v0.3.37 Trial onboarding.');
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $schema, 'Fresh database schema is missing released v0.3.38 Trial onboarding clarity.');
-$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Next'", $schema, 'Fresh database schema is missing next v0.3.39.');
+$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Ready for publishing'", $schema, 'Fresh database schema is missing the ready v0.3.39 release candidate.');
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $schema, 'Fresh database schema is missing BUG-015.');
 $expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');
 $expectContains("'receipt-comparison-to-end-v0.3.48'", $devSupport, 'Admin Dev Support is missing the receipt-comparison rescheduling migration.');

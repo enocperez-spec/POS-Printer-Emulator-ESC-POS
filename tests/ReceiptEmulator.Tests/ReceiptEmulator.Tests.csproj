@@ -15,5 +15,6 @@
     </PackageReference>
     <ProjectReference Include="..\..\src\ReceiptEmulator.App\ReceiptEmulator.App.csproj" />
     <ProjectReference Include="..\..\src\POSPrinterEmulator.Licensing\POSPrinterEmulator.Licensing.csproj" />
+    <ProjectReference Include="..\..\src\POSPrinterEmulator.Update\POSPrinterEmulator.Update.csproj" />
   </ItemGroup>
 </Project>

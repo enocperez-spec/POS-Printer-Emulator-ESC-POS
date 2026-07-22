@@ -12,12 +12,16 @@ public sealed class UpdateServiceTests
     {
         using var client = CreateClient("""
             {
-              "tag_name": "v0.3.39",
-              "html_url": "https://github.com/example/releases/tag/v0.3.39",
+              "tag_name": "v0.3.40",
+              "html_url": "https://github.com/example/releases/tag/v0.3.40",
               "assets": [
                 {
-                  "name": "POSPrinterEmulatorSetup-0.3.39-win-x64.exe",
-                  "browser_download_url": "https://github.com/example/releases/download/v0.3.39/setup.exe"
+                  "name": "POSPrinterEmulatorSetup-0.3.40-win-x64.exe",
+                  "browser_download_url": "https://github.com/example/releases/download/v0.3.40/setup.exe"
+                },
+                {
+                  "name": "POSPrinterEmulatorSetup-0.3.40-win-x64.exe.sha256",
+                  "browser_download_url": "https://github.com/example/releases/download/v0.3.40/setup.exe.sha256"
                 }
               ]
             }
@@ -28,8 +32,30 @@ public sealed class UpdateServiceTests
 
         Assert.True(status.CheckSucceeded);
         Assert.True(status.UpdateAvailable);
-        Assert.Equal("0.3.39", status.LatestVersion);
+        Assert.Equal("0.3.40", status.LatestVersion);
         Assert.EndsWith("setup.exe", status.DownloadUrl);
+        Assert.EndsWith("setup.exe.sha256", status.ChecksumUrl);
+    }
+
+    [Fact]
+    public async Task DoesNotOfferAnInstallerWithoutItsSecurityChecksum()
+    {
+        using var client = CreateClient("""
+            {
+              "tag_name": "v0.3.40",
+              "html_url": "https://github.com/example/releases/tag/v0.3.40",
+              "assets": [{
+                "name": "POSPrinterEmulatorSetup-0.3.40-win-x64.exe",
+                "browser_download_url": "https://github.com/example/releases/download/v0.3.40/setup.exe"
+              }]
+            }
+            """);
+        var service = new UpdateService(client, NullLogger<UpdateService>.Instance);
+
+        var status = await service.CheckAsync(true);
+
+        Assert.False(status.UpdateAvailable);
+        Assert.Contains("security checksum", status.Message);
     }
 
     [Fact]
@@ -56,8 +82,8 @@ public sealed class UpdateServiceTests
     {
         using var client = CreateClient("""
             {
-              "tag_name": "v0.3.39",
-              "html_url": "https://github.com/example/releases/tag/v0.3.39",
+              "tag_name": "v0.3.40",
+              "html_url": "https://github.com/example/releases/tag/v0.3.40",
               "assets": []
             }
             """);

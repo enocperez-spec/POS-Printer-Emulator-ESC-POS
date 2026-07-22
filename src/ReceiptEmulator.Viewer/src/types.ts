@@ -127,6 +127,7 @@ export type UpdateStatus = {
   checkSucceeded: boolean
   releaseUrl?: string
   downloadUrl?: string
+  checksumUrl?: string
   checkedAt: string
   message: string
 }

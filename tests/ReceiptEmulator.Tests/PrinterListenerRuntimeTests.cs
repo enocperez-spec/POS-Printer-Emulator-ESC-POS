@@ -243,6 +243,27 @@ public sealed class PrinterListenerRuntimeTests
     }
 
     [Fact]
+    public async Task UpdatePreparationStopsIdleListenersAndCanResumeThemAfterCancellation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var (manager, _) = EnterpriseManager(root, FreePort(), new RecordingSink());
+        await using (manager)
+        {
+            await manager.StartAsync(CancellationToken.None);
+            Assert.True(manager.GetStatus().Listeners.Single().Listening);
+
+            await manager.PrepareForUpdateAsync(TimeSpan.FromSeconds(2));
+            Assert.False(manager.GetStatus().Listeners.Single().Listening);
+
+            await manager.ResumeAfterUpdatePreparationAsync();
+            Assert.True(manager.GetStatus().Listeners.Single().Listening);
+        }
+
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
     public async Task EnterpriseManagerPersistsListenersAcrossRestartAndRejectsExternalPortConflicts()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));

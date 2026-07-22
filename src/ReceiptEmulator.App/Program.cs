@@ -102,6 +102,32 @@ app.MapGet("/api/updates/status", (UpdateService updates, LicenseService license
         ? Results.Problem("Check for Updates requires active Application Maintenance and Support coverage.", statusCode: 403)
         : updates.GetCached() is { } status ? Results.Ok(status) : Results.NoContent());
 
+app.MapPost("/api/updates/prepare", async (
+    ConfigurationBackupService backups,
+    PrinterListenerManager listeners,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (!license.HasMaintenanceAccess)
+        return Results.Problem("Installing updates requires active Application Maintenance and Support coverage.", statusCode: 403);
+    try
+    {
+        var snapshotId = await backups.CreateSafetySnapshotAsync(cancellationToken);
+        await listeners.PrepareForUpdateAsync(TimeSpan.FromSeconds(20), cancellationToken);
+        return Results.Ok(new { prepared = true, safetySnapshotId = snapshotId });
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 409);
+    }
+});
+
+app.MapPost("/api/updates/resume", async (PrinterListenerManager listeners, CancellationToken cancellationToken) =>
+{
+    await listeners.ResumeAfterUpdatePreparationAsync(cancellationToken);
+    return Results.Ok(new { resumed = true });
+});
+
 app.MapGet("/api/printer-setup/status", () => Results.Ok(PrinterSetupManager.GetStatus()));
 
 app.MapGet("/api/printer-setup/available-port", (

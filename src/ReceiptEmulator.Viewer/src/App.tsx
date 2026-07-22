@@ -56,7 +56,7 @@ const trialOnboardingStorageKey = 'pos-printer-emulator-trial-onboarding-v2'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.38',
+  version: '0.3.39',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -105,13 +105,16 @@ function App() {
     localStorage.getItem(trialOnboardingStorageKey) === 'complete',
   )
   const [jobs, setJobs] = useState<JobSummary[]>([])
-  const [selectedId, setSelectedId] = useState<string>()
+  const [selectedId, setSelectedId] = useState<string | undefined>(() => localStorage.getItem('pos-printer-emulator-selected-job') ?? undefined)
   const [job, setJob] = useState<ReceiptJob>()
-  const [query, setQuery] = useState('')
-  const [listenerFilter, setListenerFilter] = useState('all')
+  const [query, setQuery] = useState(() => localStorage.getItem('pos-printer-emulator-job-search') ?? '')
+  const [listenerFilter, setListenerFilter] = useState(() => localStorage.getItem('pos-printer-emulator-listener-filter') ?? 'all')
   const [listeners, setListeners] = useState<PrinterListener[]>([])
-  const [tab, setTab] = useState<'commands' | 'raw' | 'details'>('commands')
-  const [zoom, setZoom] = useState(100)
+  const [tab, setTab] = useState<'commands' | 'raw' | 'details'>(() => {
+    const saved = localStorage.getItem('pos-printer-emulator-inspector-tab')
+    return saved === 'raw' || saved === 'details' ? saved : 'commands'
+  })
+  const [zoom, setZoom] = useState(() => Math.min(160, Math.max(50, Number(localStorage.getItem('pos-printer-emulator-zoom')) || 100)))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [settingsSection, setSettingsSection] = useState<SettingsSection>()
@@ -140,6 +143,15 @@ function App() {
   useEffect(() => {
     localStorage.setItem('pos-printer-emulator-inspector-collapsed', String(inspectorCollapsed))
   }, [inspectorCollapsed])
+
+  useEffect(() => {
+    if (selectedId) localStorage.setItem('pos-printer-emulator-selected-job', selectedId)
+    else localStorage.removeItem('pos-printer-emulator-selected-job')
+    localStorage.setItem('pos-printer-emulator-job-search', query)
+    localStorage.setItem('pos-printer-emulator-listener-filter', listenerFilter)
+    localStorage.setItem('pos-printer-emulator-inspector-tab', tab)
+    localStorage.setItem('pos-printer-emulator-zoom', String(zoom))
+  }, [selectedId, query, listenerFilter, tab, zoom])
 
   const refresh = useCallback(async () => {
     try {
@@ -939,6 +951,18 @@ function UpdatesSettings({ status, updateStatus, onCheckUpdates }: {
 }) {
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState(updateStatus)
+  const [installState, setInstallState] = useState<{ state: string; message: string; percent?: number }>()
+
+  useEffect(() => {
+    const webview = (window as Window & { chrome?: { webview?: { addEventListener: (name: string, handler: (event: { data: unknown }) => void) => void; removeEventListener: (name: string, handler: (event: { data: unknown }) => void) => void } } }).chrome?.webview
+    if (!webview) return
+    const handler = (event: { data: unknown }) => {
+      const message = event.data as { type?: string; state?: string; message?: string; percent?: number }
+      if (message?.type === 'update-state' && message.state && message.message) setInstallState({ state: message.state, message: message.message, percent: message.percent })
+    }
+    webview.addEventListener('message', handler)
+    return () => webview.removeEventListener('message', handler)
+  }, [])
 
   async function checkNow() {
     setChecking(true)
@@ -967,12 +991,13 @@ function UpdatesSettings({ status, updateStatus, onCheckUpdates }: {
       </dl>
       <div className="settings-actions">
         <button className="secondary-action" onClick={checkNow} disabled={checking}><RefreshCw size={16} className={checking ? 'spin' : ''} /> {checking ? 'Checking…' : 'Check now'}</button>
-        {available && result?.downloadUrl && (
-          <button className="primary-action" onClick={() => launchUpdate(result.downloadUrl!)}><Download size={16} /> Download and install</button>
+        {available && result?.downloadUrl && result?.checksumUrl && (
+          <button className="primary-action" disabled={installState?.state === 'downloading' || installState?.state === 'preparing'} onClick={() => launchUpdate(result.downloadUrl!, result.checksumUrl!, result.latestVersion!)}><Download size={16} /> {installState?.state === 'downloading' ? `Downloading ${installState.percent ?? 0}%…` : installState?.state === 'preparing' ? 'Preparing…' : 'Download and install'}</button>
         )}
         {available && result?.releaseUrl && <a href={result.releaseUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Release details</a>}
       </div>
-      <p className="settings-note">Automatic checks use the official POS Printer Emulator GitHub Releases feed. Installation always asks for Windows confirmation.</p>
+      {installState && <div className={`diagnostic-message update-${installState.state}`} role="status">{installState.message}</div>}
+      <p className="settings-note">Automatic checks use the official POS Printer Emulator GitHub Releases feed. The installer and its security checksum are downloaded first. The application closes only after you confirm, then restarts automatically when setup finishes.</p>
     </div>
   )
 }
@@ -1172,10 +1197,10 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-function launchUpdate(url: string) {
+function launchUpdate(url: string, checksumUrl: string, version: string) {
   const desktop = (window as Window & { chrome?: { webview?: { postMessage: (message: unknown) => void } } }).chrome?.webview
   if (desktop) {
-    desktop.postMessage({ type: 'install-update', url })
+    desktop.postMessage({ type: 'install-update', url, checksumUrl, version })
   } else {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
