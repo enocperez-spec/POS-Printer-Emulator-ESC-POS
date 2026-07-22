@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.39 — released 2026-07-22**
+**Current public release: v0.3.40 — released 2026-07-22**
 
-**Current development: v0.3.40 — Simple Mode and Expert Mode**
+**Current development: v0.3.41 — Accessibility and keyboard usability**
 
-**Next release after v0.3.40: v0.3.41 — Accessibility and keyboard usability**
+**Next release after v0.3.41: v0.3.42 — Automatic configuration restore points**
 
-**Future scheduled sequence: v0.3.40 through v0.3.49**
+**Future scheduled sequence: v0.3.41 through v0.3.49**
 
-**Most recently completed: v0.3.39 — Guided update installation and restart**
+**Most recently completed: v0.3.40 — Simple Mode and Expert Mode**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -80,6 +80,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.37 | Released | Trial setup and onboarding improvements |
 | v0.3.38 | Released | Trial onboarding clarity correction |
 | v0.3.39 | Released | Guided update installation and restart |
+| v0.3.40 | Released | Simple Mode and Expert Mode |
 
 ## Scheduled releases
 
@@ -500,13 +501,13 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.40 — Simple Mode and Expert Mode
 
-**Status:** Planned
+**Status:** Released — 2026-07-22
 
-**GitHub:** [Issue #30 — Simple Mode and Expert Mode](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30)
+**GitHub:** [v0.3.40 release](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40)
 
 **Purpose:** Give new customers a task-focused experience without removing the complete three-panel workspace used by experienced customers.
 
-**Planned scope:**
+**Completed scope:**
 
 - Add a persistent Simple Mode with clear task cards for printer setup, connection details, Test Receipt, latest receipt, capture import, diagnostics, and support.
 - Keep the current Activity, Receipt Preview, and Inspector layout as Expert Mode.
@@ -522,6 +523,8 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Why this order:** It addresses the customer confusion already observed during onboarding while leaving the expert workflow intact.
 
 **Complete when:** A new customer can set up, connect, test, review the latest receipt, and diagnose a problem from Simple Mode, then switch to Expert Mode and find the same state and data.
+
+**Completion verification:** The production viewer compiles with TypeScript strict checks and Vite, all 171 desktop tests pass, Admin/database and website contract tests pass, and browser QA confirms the remembered mode switch, live listener details, copy confirmation, immediate Test Receipt rendering, setup-wizard routing, diagnostics routing, responsive behavior without horizontal overflow, and a clean console. The concept comparison and intentional differences are recorded in [`design/v0.3.40-fidelity-ledger.md`](design/v0.3.40-fidelity-ledger.md). The 120,603,760-byte installer contains v0.3.40.0 service, desktop, and updater executables, and its independently recalculated SHA-256 value matches the generated checksum (`6a2ac6093e65fb47113ad1ae9fcacad2b8e13673f68c850d31b939d90f3cafce`). Authenticode signing remains unavailable, so the checksum must be verified before distribution.
 
 ### v0.3.41 — Accessibility and keyboard usability
 

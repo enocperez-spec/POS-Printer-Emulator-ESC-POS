@@ -6,6 +6,17 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.40 — 2026-07-22
+
+- Adds a persistent **Simple Mode** with plain-language health, the next recommended action, and a numbered setup, connection, and verification workflow.
+- Displays the active listener name, address, port, and protocol with copy controls so customers can configure a POS without opening advanced settings.
+- Shows the most recent receipt through the production receipt renderer and provides direct Test Receipt, capture import, diagnostics, support, and Printer Setup Wizard actions.
+- Preserves the existing Activity, Receipt Preview, and Inspector workspace as **Expert Mode**, with an always-available switch that remembers each Windows user's choice.
+- Preserves the selected receipt and the existing search, listener filter, panel, zoom, inspector, and theme state while changing modes.
+- Retains all server-enforced Trial, Lite, Pro, and Enterprise feature boundaries; Simple Mode does not grant access to restricted operations.
+- Adds responsive layouts, visible keyboard focus, semantic regions, and accessible pressed-state announcements for the mode control.
+- Moves active development to v0.3.41 — Accessibility and keyboard usability.
+
 ## v0.3.39 — 2026-07-22
 
 - Adds a guided in-application update flow with visible download progress and an explicit install-and-restart confirmation.

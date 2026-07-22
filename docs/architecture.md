@@ -80,19 +80,20 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 16. **v0.3.36 — Privacy-preserving geographic analytics.** Aggregate approximate country and U.S. state activity without retaining raw IP addresses, then render accessible private maps and exact tables.
 17. **v0.3.37 — Trial setup and onboarding improvements.** Guide first launch, preserve one automatic Trial listener, provide unlimited ephemeral Test Receipts, and accept over-limit POS jobs with irreversible ten-line redaction.
 18. **v0.3.38 — Trial onboarding clarity correction (released 2026-07-22).** Make the two-step welcome guide reopenable and expose the included Trial listener as a read-only local/LAN connection target while retaining server-enforced listener immutability.
-19. **v0.3.39 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-20. **v0.3.40 — Guided update installation and restart.** Verify downloaded installers, create a pre-update safety snapshot, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
-21. **v0.3.41 — Simple Mode and Expert Mode.** Provide task-focused setup and daily-use actions while preserving the complete receipt-inspection workspace and state.
-22. **v0.3.42 — Accessibility and keyboard usability.** Establish keyboard, screen-reader, high-contrast, scaling, reduced-motion, caption, and automated accessibility requirements across primary workflows.
-23. **v0.3.43 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
-24. **v0.3.44 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
-25. **v0.3.45 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
-26. **v0.3.46 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
-27. **v0.3.47 — Character and code-page assistant.** Analyze encoding commands and bytes, compare supported code-page interpretations, and persist explicit profile choices separately from captures.
-28. **v0.3.48 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
-29. Service-to-viewer authentication and installer repair mode.
-30. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
-31. Optional online activation revocation and license transfer workflow.
-32. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-33. PNG export and deterministic PDF generation.
-34. Production code-signing and expanded unattended deployment validation.
+19. **v0.3.39 — Guided update installation and restart (released 2026-07-22).** Verify downloaded installers, create a pre-update safety snapshot, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+20. **v0.3.40 — Simple Mode and Expert Mode.** Provide task-focused setup, connection, testing, latest-receipt, and support actions while preserving the complete receipt-inspection workspace and state.
+21. **v0.3.41 — Accessibility and keyboard usability.** Establish keyboard, screen-reader, high-contrast, scaling, reduced-motion, caption, and automated accessibility requirements across primary workflows.
+22. **v0.3.42 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
+23. **v0.3.43 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
+24. **v0.3.44 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
+25. **v0.3.45 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
+26. **v0.3.46 — Character and code-page assistant.** Analyze encoding commands and bytes, compare supported code-page interpretations, and persist explicit profile choices separately from captures.
+27. **v0.3.47 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
+28. **v0.3.48 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+29. **v0.3.49 — Update Notifications for All License Types.** Notify every license and maintenance state about public releases while preserving the correct manual-download, guided-update, and renewal boundaries.
+30. Service-to-viewer authentication and installer repair mode.
+31. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
+32. Optional online activation revocation and license transfer workflow.
+33. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+34. PNG export and deterministic PDF generation.
+35. Production code-signing and expanded unattended deployment validation.
