@@ -128,6 +128,22 @@ $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding I
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $devSupport, 'Released Trial onboarding clarity correction is missing from v0.3.38.');
 $expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Receipt comparison and automated validation', 'Next'", $devSupport, 'Receipt comparison was not moved to v0.3.39.');
 $expectContains("('v0.3.40', 'v0.3.40', 'Release', 'Guided update installation and restart', 'Planned'", $devSupport, 'Guided update installation was not moved to v0.3.40.');
+$futureReleases = [
+    'v0.3.41' => ['Simple Mode and Expert Mode', 30],
+    'v0.3.42' => ['Accessibility and keyboard usability', 31],
+    'v0.3.43' => ['Automatic configuration restore points', 32],
+    'v0.3.44' => ['Projects and testing sessions', 33],
+    'v0.3.45' => ['Privacy-safe receipt masking', 34],
+    'v0.3.46' => ['System tray health and notifications', 35],
+    'v0.3.47' => ['Character and code-page assistant', 36],
+    'v0.3.48' => ['Offline Enterprise update packages', 37],
+];
+foreach ($futureReleases as $version => [$title, $issue]) {
+    $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', 'Planned'";
+    $expectContains($expectedRow, $devSupport, "Admin Dev Support is missing planned {$version} {$title}.");
+    $expectContains($expectedRow, $schema, "Fresh database schema is missing planned {$version} {$title}.");
+    $expectContains("WHEN '{$version}' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/{$issue}'", $devSupport, "Admin Dev Support is missing the {$version} GitHub issue link.");
+}
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $devSupport, 'Admin Dev Support is missing BUG-015.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $schema, 'Fresh database schema is missing released v0.3.33.');
 $expectContains("('v0.3.34', 'v0.3.34', 'Release', 'Encrypted backup, EULA, and support policy', 'Released'", $schema, 'Fresh database schema is missing released v0.3.34.');
