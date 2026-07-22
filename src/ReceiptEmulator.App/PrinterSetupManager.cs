@@ -100,7 +100,8 @@ public static class PrinterSetupManager
         string printerName,
         string ipAddress,
         int startingPort = PrinterListenerDefaults.DefaultPort,
-        IEnumerable<PrinterListenerConfiguration>? configuredListeners = null)
+        IEnumerable<PrinterListenerConfiguration>? configuredListeners = null,
+        IEnumerable<int>? unavailableListenerPorts = null)
     {
         Validate(new PrinterInstallRequest(printerName, ipAddress, startingPort, ipAddress == "127.0.0.1"));
         HashSet<int> assignedPorts = OperatingSystem.IsWindows()
@@ -108,6 +109,7 @@ public static class PrinterSetupManager
             : [];
         var listeners = configuredListeners?.ToArray() ?? [];
 
+        assignedPorts.UnionWith(unavailableListenerPorts ?? []);
         var port = FindFirstAvailablePort(startingPort, assignedPorts, ipAddress, listeners);
         if (port == startingPort)
         {
@@ -116,8 +118,10 @@ public static class PrinterSetupManager
                 : new(port, false, $"Port {port} is the default connection port.");
         }
 
-        var reason = assignedPorts.Contains(startingPort)
-            ? $"Port {startingPort} is already assigned to another Windows printer."
+        var reason = unavailableListenerPorts?.Contains(startingPort) == true
+            ? $"The emulator could not start its listener on port {startingPort} because that TCP port is unavailable."
+            : assignedPorts.Contains(startingPort)
+                ? $"Port {startingPort} is already assigned to another Windows printer."
             : $"Port {startingPort} is assigned to an emulator listener that cannot be reused for {ipAddress} with the Epson TM-T88V driver.";
         return new(port, true, $"{reason} Port {port} was selected automatically.");
     }
@@ -297,6 +301,18 @@ public static class PrinterSetupManager
         {
             throw new InvalidOperationException(
                 $"The emulator's default printer listener on port {request.Port} is unavailable. Return to the printer setup summary so another port can be selected.");
+        }
+
+        if (collection.MaximumListeners <= 1)
+        {
+            using var configureResponse = await client.PostAsJsonAsync(
+                "http://127.0.0.1:5187/api/printer-setup/default-listener",
+                new SingleListenerSetupRequest(request.Port),
+                JsonOptions,
+                cancellationToken);
+            configureResponse.EnsureSuccessStatusCode();
+            Log($"Moved the single printer listener to port {request.Port} for Windows printer setup.");
+            return null;
         }
 
         var input = BuildSetupListenerInput(request.PrinterName, request.Port);

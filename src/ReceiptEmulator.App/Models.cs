@@ -65,6 +65,8 @@ public sealed class ReceiptJob
 public static class JobOrigins
 {
     public const string Live = "Live";
+    public const string TestReceipt = "Test Receipt";
+    public const string TrialLimited = "Trial Limit";
     public const string Imported = "Imported";
     public const string Replayed = "Replayed";
 }
@@ -132,6 +134,8 @@ public sealed record LicenseStatus(
 }
 
 public sealed record ActivationRequest(string CustomerName, string EmailAddress, string ActivationKey);
+
+public sealed record SingleListenerSetupRequest(int Port);
 
 public sealed record MaintenanceEntitlementRequest(string EntitlementToken);
 

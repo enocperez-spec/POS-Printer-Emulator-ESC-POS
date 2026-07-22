@@ -308,6 +308,45 @@ function migrate_pending_release_numbers(): void
 
 migrate_pending_release_numbers();
 
+function migrate_trial_onboarding_schedule(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+        $claim->execute(['trial-onboarding-schedule-v0.3.37']);
+        if ($claim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        // Move existing planned issue targets before the release rows are synchronized below.
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release
+                     WHEN 'v0.3.38' THEN 'v0.3.39'
+                     WHEN 'v0.3.37' THEN 'v0.3.38'
+                     ELSE target_release
+                 END,
+                 fixed_version = CASE fixed_version
+                     WHEN 'v0.3.38' THEN 'v0.3.39'
+                     WHEN 'v0.3.37' THEN 'v0.3.38'
+                     ELSE fixed_version
+                 END
+             WHERE target_release IN ('v0.3.37', 'v0.3.38')
+                OR fixed_version IN ('v0.3.37', 'v0.3.38')"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
+migrate_trial_onboarding_schedule();
+
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "INSERT INTO development_roadmap
@@ -388,12 +427,17 @@ $releaseSync = database()->prepare(
          'Coarse country and U.S. state derivation; transient IP processing; daily download-start aggregates; world and United States maps; exact regional tables; date, metric, license, and version filters; accessibility; privacy and EULA disclosures; and automated contract checks.',
          'Geographic adoption data helps EPCOM prioritize documentation, compatibility, and support while data minimization protects customers.',
          'The private Admin dashboard reports approximate regional download starts, installations, launches, and print jobs; raw IP addresses are not stored in the analytics schema; filters and keyboard controls work; and legal disclosures match implementation.', UTC_TIMESTAMP(6)),
-        ('v0.3.37', 'v0.3.37', 'Release', 'Receipt comparison and automated validation', 'Next', 337,
+        ('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released', 337,
+         'Let nontechnical Trial customers begin testing immediately without understanding listeners, ports, or Windows printer configuration.',
+         'First-launch welcome; Trial Configuration Wizard; one automatic listener; confirmed sequential port recovery; unlimited ephemeral Test Receipts; complete-job allowance counter; irreversible ten-line redaction after the fifth external job; upgrade guidance; and local diagnostics.',
+         'Removing first-run friction improves evaluation while ingestion-time redaction protects receipt data after the Trial allowance is used.',
+         'Fresh Trial setup, unlimited Test Receipts, port-conflict recovery, five complete external jobs, accepted redacted later jobs, and non-recoverability across APIs, history, exports, and diagnostics are verified.', UTC_TIMESTAMP(6)),
+        ('v0.3.38', 'v0.3.38', 'Release', 'Receipt comparison and automated validation', 'Next', 338,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and HTML, PDF, and JSON results.',
          'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.',
          'Known-good captures pass, intentional changes fail precisely, and ignored dynamic fields avoid false failures.', NULL),
-        ('v0.3.38', 'v0.3.38', 'Release', 'Guided update installation and restart', 'Planned', 338,
+        ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Planned', 339,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
@@ -481,8 +525,9 @@ database()->prepare(
          WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'
          WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'
          WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'
-         WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.37'
+         WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -490,7 +535,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

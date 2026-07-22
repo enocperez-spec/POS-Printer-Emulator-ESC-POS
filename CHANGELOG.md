@@ -6,6 +6,16 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.37 — 2026-07-22
+
+- Adds a first-launch Trial welcome screen with **Set Up Trial Printer**, **Print a Test Receipt**, live listener status, and **Troubleshoot Connection** actions.
+- Renames and simplifies the existing wizard to **Trial Configuration Wizard** for Trial customers while retaining one shared implementation for every license tier.
+- Makes built-in Test Receipts unlimited, labels them clearly, excludes them from the five-job Trial allowance and usage reporting, and keeps them out of persistent paid history.
+- Keeps accepting external POS connections after the five complete daily Trial jobs are used, shows only the first ten rendered lines, and permanently discards the hidden raw bytes, commands, and remaining receipt content.
+- Adds an explicit Trial-limit receipt notice, Activity status, upgrade guidance, and a header counter showing complete Trial POS jobs remaining for the computer's local day.
+- Preserves the single Trial listener, detects a faulted or assigned port 9100, selects the next available port, requires confirmation, and safely persists the replacement single-listener port without unlocking multi-listener management.
+- Moves Receipt Comparison and Automated Validation to v0.3.38 and Guided Update Installation and Restart to v0.3.39.
+
 ## v0.3.36 — 2026-07-22
 
 - Adds privacy-preserving country and U.S. state analytics for installations, download starts, application launches, and emulated print jobs.

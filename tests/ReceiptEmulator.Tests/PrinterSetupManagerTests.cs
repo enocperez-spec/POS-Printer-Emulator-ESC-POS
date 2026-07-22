@@ -32,6 +32,34 @@ public sealed class PrinterSetupManagerTests
     }
 
     [Fact]
+    public void PortSelectionSkipsFaultedListenerPort()
+    {
+        var configuration = new PrinterListenerConfiguration(
+            PrinterListenerDefaults.DefaultId,
+            PrinterListenerDefaults.DefaultName,
+            PrinterListenerDefaults.DefaultBindAddress,
+            9100,
+            PrinterProfileService.EpsonTmT88VId,
+            true,
+            1500,
+            4 * 1024 * 1024,
+            new PrinterListenerBufferConfiguration(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
+        var selection = PrinterSetupManager.GetAvailablePort(
+            "POS Printer Emulator",
+            "127.0.0.1",
+            9100,
+            [configuration],
+            [9100]);
+
+        Assert.Equal(9101, selection.Port);
+        Assert.True(selection.AutomaticallyAdjusted);
+        Assert.Contains("TCP port is unavailable", selection.Message);
+    }
+
+    [Fact]
     public void PortSelectionStopsAtFirstGap()
     {
         Assert.Equal(9101, PrinterSetupManager.FindFirstAvailablePort(9100, [9100, 9102, 9103]));

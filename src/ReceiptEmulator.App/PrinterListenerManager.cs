@@ -394,6 +394,50 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
 
     public PrinterStateStatus ResetPrinterState(string id) => FindRuntime(id).PrinterState.Reset();
 
+    public async Task<PrinterListenerRuntimeStatus> ConfigureSingleListenerForSetupAsync(
+        int port,
+        CancellationToken cancellationToken = default)
+    {
+        if (_maximumListeners() > 1)
+            throw new InvalidOperationException("Use Printer Listeners to configure a multi-listener license.");
+
+        await _lifecycle.WaitAsync(cancellationToken);
+        try
+        {
+            var currentConfiguration = _configurations.Find(PrinterListenerDefaults.DefaultId)
+                ?? throw new KeyNotFoundException("The default printer listener was not found.");
+            var replacementConfiguration = _configurations.PrepareSingleListenerSetup(port);
+            _runtimes.TryGetValue(currentConfiguration.Id, out var current);
+            ProbePort(replacementConfiguration, current);
+            if (current is not null) await current.StopAsync(cancellationToken);
+
+            var replacement = CreateRuntime(replacementConfiguration);
+            try
+            {
+                await replacement.StartAsync(cancellationToken);
+                _configurations.CommitSingleListenerSetup(replacementConfiguration);
+            }
+            catch
+            {
+                await StopQuietlyAsync(replacement, cancellationToken);
+                await replacement.DisposeAsync();
+                if (current is not null && currentConfiguration.Enabled)
+                    await StartQuietlyAsync(current, cancellationToken);
+                throw;
+            }
+
+            _runtimes[replacementConfiguration.Id] = replacement;
+            _configurationErrors.TryRemove(replacementConfiguration.Id, out _);
+            if (current is not null) await current.DisposeAsync();
+            RefreshLegacyState();
+            return replacement.GetStatus();
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;

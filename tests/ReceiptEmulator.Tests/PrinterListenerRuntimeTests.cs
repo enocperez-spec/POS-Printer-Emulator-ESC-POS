@@ -151,6 +151,46 @@ public sealed class PrinterListenerRuntimeTests
     }
 
     [Fact]
+    public async Task TrialSetupCanMoveAndPersistItsSingleDefaultListener()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var firstPort = FreePort();
+        var alternativePort = FreePort();
+        var license = new LicenseService(new TestEnvironment(), new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Data:Root"] = root })
+            .Build());
+        var options = new PrinterOptions { BindAddress = "127.0.0.1", Port = firstPort };
+        var profiles = new PrinterProfileService(license);
+        var configurations = new PrinterListenerConfigurationService(
+            license, options, profiles, NullLogger<PrinterListenerConfigurationService>.Instance);
+        await using (var manager = new PrinterListenerManager(
+                         configurations,
+                         profiles,
+                         new RecordingSink(),
+                         () => 1,
+                         new ServiceRuntimeState(),
+                         NullLoggerFactory.Instance,
+                         NullLogger<PrinterListenerManager>.Instance))
+        {
+            await manager.StartAsync(CancellationToken.None);
+
+            var configured = await manager.ConfigureSingleListenerForSetupAsync(alternativePort);
+
+            Assert.True(configured.Listening);
+            Assert.Equal(alternativePort, configured.Configuration.Port);
+            Assert.Single(manager.GetStatus().Listeners);
+        }
+
+        var reloaded = new PrinterListenerConfigurationService(
+            license, options, profiles, NullLogger<PrinterListenerConfigurationService>.Instance);
+        Assert.Equal(alternativePort, reloaded.EnsureDefault().Port);
+        Assert.True(File.Exists(Path.Combine(root, "single-listener.json")));
+
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
     public async Task StatusFallsBackToActiveRuntimeWhenManagedStorageCannotBeOpened()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));

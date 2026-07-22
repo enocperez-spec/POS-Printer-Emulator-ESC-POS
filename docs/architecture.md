@@ -78,8 +78,9 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 14. **v0.3.34 — Encrypted backup, EULA, and support policy.** Protect portable listener, profile, stored-logo, printer-state, preference, and optional paid-history backups with authenticated password encryption, reviewed exclusions, safety snapshots, and rollback-safe restore; require installer EULA acceptance and align the public Windows and support boundaries.
 15. **v0.3.35 — Backup restore usability and compatibility.** Preserve the native backup extension, accept legacy `.ppebackup.zip` files, provide accessible in-app restore guidance, and publish an illustrated customer guide.
 16. **v0.3.36 — Privacy-preserving geographic analytics.** Aggregate approximate country and U.S. state activity without retaining raw IP addresses, then render accessible private maps and exact tables.
-17. **v0.3.37 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-18. **v0.3.38 — Guided update installation and restart.** Verify downloaded installers, create a pre-update safety snapshot, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
+17. **v0.3.37 — Trial setup and onboarding improvements.** Guide first launch, preserve one automatic Trial listener, provide unlimited ephemeral Test Receipts, and accept over-limit POS jobs with irreversible ten-line redaction.
+18. **v0.3.38 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+19. **v0.3.39 — Guided update installation and restart.** Verify downloaded installers, create a pre-update safety snapshot, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
 17. Service-to-viewer authentication and installer repair mode.
 18. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
 19. Optional online activation revocation and license transfer workflow.

@@ -30,7 +30,7 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 | Bug ID | Severity | Summary | Affected version(s) | Target | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 
-There are no open bugs currently assigned to the v0.3.36 release.
+There are no open bugs currently assigned to the v0.3.37 release.
 
 ## Resolved bugs
 

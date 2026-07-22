@@ -113,16 +113,22 @@ app.MapGet("/api/printer-setup/available-port", (
 {
     try
     {
-        var currentListeners = listeners.GetStatus().Listeners.Select(listener => listener.Configuration).ToArray();
+        var listenerStatus = listeners.GetStatus().Listeners;
+        var currentListeners = listenerStatus.Select(listener => listener.Configuration).ToArray();
         var selection = PrinterSetupManager.GetAvailablePort(
             printerName,
             ipAddress,
             startingPort ?? PrinterListenerDefaults.DefaultPort,
-            currentListeners);
+            currentListeners,
+            listenerStatus.Where(listener => listener.State == PrinterListenerRuntimeStates.Faulted)
+                .Select(listener => listener.Configuration.Port));
         var reusesListener = currentListeners.Any(listener =>
             listener.Port == selection.Port &&
             PrinterSetupManager.IsListenerCompatibleForPrinterSetup(listener, ipAddress));
-        if (!reusesListener && currentListeners.Length >= license.MaximumListeners)
+        var canMoveSingleDefault = license.MaximumListeners == 1 &&
+                                   currentListeners.Length == 1 &&
+                                   currentListeners[0].Id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase);
+        if (!reusesListener && currentListeners.Length >= license.MaximumListeners && !canMoveSingleDefault)
         {
             return Results.Problem(
                 $"{selection.Message} " +
@@ -137,10 +143,29 @@ app.MapGet("/api/printer-setup/available-port", (
     }
 });
 
+app.MapPost("/api/printer-setup/default-listener", async (
+    SingleListenerSetupRequest request,
+    PrinterListenerManager listeners,
+    PrinterProfileService profiles,
+    LicenseService license,
+    CancellationToken cancellationToken) =>
+{
+    if (license.MaximumListeners != 1)
+        return Results.Problem("Use Printer Listeners to configure this license.", statusCode: 400);
+    if (request.Port is < PrinterListenerDefaults.DefaultPort or > 65535)
+        return Results.Problem("The Trial printer port must be 9100 or higher.", statusCode: 400);
+    try
+    {
+        return Results.Ok((await listeners.ConfigureSingleListenerForSetupAsync(request.Port, cancellationToken)).ToResponse(profiles));
+    }
+    catch (Exception exception)
+    {
+        return ListenerProblem(exception);
+    }
+});
+
 app.MapGet("/api/listeners", (PrinterListenerManager listeners, PrinterProfileService profiles, LicenseService license) =>
 {
-    if (!license.CanManageMultipleListeners)
-        return Results.Problem("Multiple printer listeners require a Pro or Enterprise License.", statusCode: 403);
     var response = listeners.GetStatus().Listeners.Select(listener => listener.ToResponse(profiles)).ToArray();
     return Results.Ok(new PrinterListenerCollectionResponse(response, license.MaximumListeners));
 });
@@ -814,8 +839,8 @@ app.MapPost("/api/sample", (ReceiptProcessor processor, PrinterListenerManager l
     var configuration = listeners.Get(PrinterListenerDefaults.DefaultId).Configuration;
     var profile = profiles.Get(configuration.ProfileId);
     var context = new PrinterListenerJobContext(configuration.Id, configuration.Name, configuration.Port);
-    var job = processor.Process(SampleReceipt.Create(), "127.0.0.1", profile, context, out var rejection);
-    return job is null ? Results.Problem(rejection, statusCode: 429) : Results.Ok(JobResponse(job));
+    var job = processor.ProcessTestReceipt(SampleReceipt.Create(), profile, context, out var rejection);
+    return job is null ? Results.Problem(rejection, statusCode: 400) : Results.Ok(JobResponse(job));
 });
 
 app.MapPost("/api/captures/import", async (
