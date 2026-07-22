@@ -12,7 +12,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 - Receipt preview with persistent Light and Dark viewing modes.
 - Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
 - The v0.3.38 Trial onboarding correction provides a reopenable two-step setup guide, shows the included listener as read-only with exact local and LAN connection targets, and retains unlimited ephemeral built-in Test Receipts plus privacy-safe ten-line previews after the complete-job allowance is exhausted.
-- The v0.3.39 release candidate downloads and verifies updates in the background, creates an encrypted safety snapshot, drains active receipt work, closes file-locking processes, installs through a separate updater, restores the prior workspace view, and relaunches automatically.
+- The v0.3.39 release downloads and verifies updates in the background, creates an encrypted safety snapshot, drains active receipt work, closes file-locking processes, installs through a separate updater, restores the prior workspace view, and relaunches automatically.
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
@@ -29,7 +29,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.38 is the current public release, released July 22, 2026. v0.3.39 Guided Update Installation and Restart is the release candidate being prepared for publication.
+> **Release status:** v0.3.39 is the current public release, released July 22, 2026. v0.3.40 Simple Mode and Expert Mode is the next scheduled release.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -37,7 +37,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.36-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.39-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -161,7 +161,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.36-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.39-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -194,7 +194,7 @@ After authenticating GitHub CLI and pushing the repository, publish the installe
 
 ```console
 gh auth login
-gh release create v0.3.36 artifacts/installer/POSPrinterEmulatorSetup-0.3.36-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.36-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.36" --notes-file artifacts/release-notes-v0.3.36.md
+gh release create v0.3.39 artifacts/installer/POSPrinterEmulatorSetup-0.3.39-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.39-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.39" --notes-file artifacts/release-notes-v0.3.39.md
 ```
 
 ## Issue customer activation keys

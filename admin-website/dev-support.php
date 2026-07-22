@@ -523,11 +523,11 @@ $releaseSync = database()->prepare(
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, privacy-safe HTML, PDF, and JSON results; brand the installer welcome, completion, header, Setup executable, shortcuts, and uninstall entry with official product artwork.',
          'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.',
          'Known-good captures pass, intentional changes fail precisely, ignored dynamic fields avoid false failures, privacy-safe exports protect configured sensitive values, and the compiled installer displays official branding at normal and high-DPI scaling.', NULL),
-        ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Ready for publishing', 339,
+        ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Released', 339,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; SHA-256 verification; pre-update safety snapshot; install confirmation and safe deferral; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; and recovery-safe failure handling.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
-         'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
+         'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', UTC_TIMESTAMP(6)),
         ('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Planned', 340,
          'Give new customers a task-focused experience while preserving the complete expert workspace.',
          'Simple task cards; plain-language health and next action; retained Expert Mode; remembered mode choice; state-preserving switching; and unchanged server-side license enforcement.',
@@ -653,7 +653,7 @@ database()->prepare(
          WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'
          WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.37'
          WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'
-         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'
          WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30'
          WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
          WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'

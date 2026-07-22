@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.38 — released 2026-07-22**
+**Current public release: v0.3.39 — released 2026-07-22**
 
-**Current development: v0.3.39 — Guided update installation and restart (release candidate)**
+**Current development: v0.3.40 — Simple Mode and Expert Mode**
 
-**Next release after v0.3.39: v0.3.40 — Simple Mode and Expert Mode**
+**Next release after v0.3.40: v0.3.41 — Accessibility and keyboard usability**
 
 **Future scheduled sequence: v0.3.40 through v0.3.49**
 
-**Most recently completed: v0.3.38 — Trial Onboarding Clarity Correction**
+**Most recently completed: v0.3.39 — Guided update installation and restart**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -79,7 +79,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.36 | Released | Privacy-preserving geographic analytics dashboard |
 | v0.3.37 | Released | Trial setup and onboarding improvements |
 | v0.3.38 | Released | Trial onboarding clarity correction |
-| v0.3.39 | Ready for publishing | Guided update installation and restart |
+| v0.3.39 | Released | Guided update installation and restart |
 
 ## Scheduled releases
 
@@ -472,9 +472,9 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.39 — Guided update installation and restart
 
-**Status:** Release candidate — ready for publishing
+**Status:** Released — 2026-07-22
 
-**GitHub:** [Issue #3 — Guided update installation and restart](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3)
+**GitHub:** [v0.3.39 release](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39)
 
 **Purpose:** Make application updates reliable and understandable by closing the running application cleanly before the installer replaces its files, then returning the customer to the updated application.
 

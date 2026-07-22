@@ -126,7 +126,7 @@ $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released'", $devSupport, 'Geographic analytics was not marked released for v0.3.36.');
 $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released'", $devSupport, 'Released v0.3.37 Trial onboarding is missing from Admin Dev Support.');
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $devSupport, 'Released Trial onboarding clarity correction is missing from v0.3.38.');
-$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Ready for publishing'", $devSupport, 'Guided update installation was not marked ready for publishing.');
+$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Released'", $devSupport, 'Guided update installation was not marked released.');
 $futureReleases = [
     'v0.3.40' => ['Simple Mode and Expert Mode', 30],
     'v0.3.41' => ['Accessibility and keyboard usability', 31],
@@ -152,7 +152,7 @@ $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released'", $schema, 'Fresh database schema is missing released v0.3.36.');
 $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released'", $schema, 'Fresh database schema is missing released v0.3.37 Trial onboarding.');
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $schema, 'Fresh database schema is missing released v0.3.38 Trial onboarding clarity.');
-$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Ready for publishing'", $schema, 'Fresh database schema is missing the ready v0.3.39 release candidate.');
+$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Released'", $schema, 'Fresh database schema is missing released v0.3.39.');
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $schema, 'Fresh database schema is missing BUG-015.');
 $expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');
 $expectContains("'receipt-comparison-to-end-v0.3.48'", $devSupport, 'Admin Dev Support is missing the receipt-comparison rescheduling migration.');
@@ -161,7 +161,7 @@ $expectContains("WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'", $devSupport, 'Admin Dev Support is missing the v0.3.34 release link.');
 $expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'", $devSupport, 'Admin Dev Support is missing the v0.3.35 release link.');
 $expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'", $devSupport, 'Admin Dev Support is missing the v0.3.36 release link.');
-$expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'", $devSupport, 'Admin Dev Support is missing the v0.3.39 guided update issue link.');
+$expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'", $devSupport, 'Admin Dev Support is missing the v0.3.39 release link.');
 $expectContains("WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'", $devSupport, 'Admin Dev Support is missing the v0.3.38 release link.');
 $expectContains("WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.48 comparison issue link.');
 
