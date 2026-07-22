@@ -7,6 +7,14 @@ This directory contains the static production website for `posprinteremulator.co
 - `index.html`: public product, feature, licensing, download, and FAQ page.
 - `application-maintenance-support.html`: canonical permanent-license and optional annual maintenance policy, renewal pricing, and renewal links.
 - `documentation.html`: product documentation and links to task-specific setup guides.
+- `how-to-manage-pos-printer-emulator-license.html`: illustrated License activation and maintenance guide.
+- `how-to-use-pos-printer-setup-wizard.html`: illustrated Windows printer setup guide.
+- `how-to-configure-printer-listeners.html`: illustrated Printer Listeners guide.
+- `how-to-create-printer-profiles.html`: illustrated Printer Profiles guide.
+- `how-to-import-stored-logos.html`: illustrated Stored Logos guide.
+- `how-to-simulate-printer-state.html`: illustrated Printer State guide.
+- `how-to-check-for-pos-printer-emulator-updates.html`: illustrated Check for Updates guide.
+- `how-to-submit-a-support-request.html`: illustrated diagnostics and Support Request guide.
 - `how-to-back-up-and-restore-pos-printer-emulator.html`: illustrated backup and restore instructions, including legacy file-name guidance.
 - `privacy.html`: privacy information.
 - `eula.html`: public End User License Agreement shown during installation.
