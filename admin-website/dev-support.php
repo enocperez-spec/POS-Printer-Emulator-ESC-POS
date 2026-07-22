@@ -528,11 +528,11 @@ $releaseSync = database()->prepare(
          'Background installer download; SHA-256 verification; pre-update safety snapshot; install confirmation and safe deferral; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; and recovery-safe failure handling.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
          'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', UTC_TIMESTAMP(6)),
-        ('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Planned', 340,
+        ('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Released', 340,
          'Give new customers a task-focused experience while preserving the complete expert workspace.',
          'Simple task cards; plain-language health and next action; retained Expert Mode; remembered mode choice; state-preserving switching; and unchanged server-side license enforcement.',
          'Persistent task guidance addresses customer confusion without removing advanced receipt inspection.',
-         'Customers complete setup, connection, testing, review, and diagnostics in Simple Mode and switch to Expert Mode without losing state.', NULL),
+         'Customers complete setup, connection, testing, review, and diagnostics in Simple Mode and switch to Expert Mode without losing state.', UTC_TIMESTAMP(6)),
         ('v0.3.41', 'v0.3.41', 'Release', 'Accessibility and keyboard usability', 'Planned', 341,
          'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.',
          'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
@@ -654,7 +654,7 @@ database()->prepare(
          WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.37'
          WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'
          WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'
-         WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30'
+         WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'
          WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
          WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'

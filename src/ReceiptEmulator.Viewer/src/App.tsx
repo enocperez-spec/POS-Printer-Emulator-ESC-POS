@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleHelp,
   CircleStop,
+  Copy,
   DatabaseBackup,
   Download,
   ExternalLink,
@@ -52,11 +53,12 @@ import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnostic
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 const trialOnboardingStorageKey = 'pos-printer-emulator-trial-onboarding-v2'
+const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.39',
+  version: '0.3.40',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -70,6 +72,7 @@ type ClearRequest =
   | { kind: 'all'; count: number; listenerId?: string; listenerName?: string }
 
 type SettingsSection = 'license' | 'printer' | 'listeners' | 'profiles' | 'logos' | 'state' | 'backup' | 'updates' | 'support'
+type ViewMode = 'simple' | 'expert'
 
 function formatBytes(value: number) {
   return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
@@ -100,6 +103,7 @@ function App() {
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
   )
   const [status, setStatus] = useState<ServiceStatus>(emptyStatus)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => localStorage.getItem(viewModeStorageKey) === 'expert' ? 'expert' : 'simple')
   const [statusReady, setStatusReady] = useState(false)
   const [trialOnboardingComplete, setTrialOnboardingComplete] = useState(() =>
     localStorage.getItem(trialOnboardingStorageKey) === 'complete',
@@ -135,6 +139,10 @@ function App() {
     localStorage.setItem('pos-printer-emulator-theme', theme)
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0d1522' : '#f7f9fc')
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem(viewModeStorageKey, viewMode)
+  }, [viewMode])
 
   useEffect(() => {
     localStorage.setItem('pos-printer-emulator-activity-collapsed', String(activityCollapsed))
@@ -250,6 +258,14 @@ function App() {
     if (!needle) return jobs
     return jobs.filter(item => `${item.sourceIp} ${item.preview} ${item.status} ${item.origin} ${item.listenerName ?? ''} ${item.listenerPort ?? ''} ${item.importedFileName ?? ''}`.toLowerCase().includes(needle))
   }, [jobs, query])
+
+  const simpleListener = useMemo(() => {
+    if (listenerFilter !== 'all') {
+      const filtered = listeners.find(listener => listener.id === listenerFilter)
+      if (filtered) return filtered
+    }
+    return listeners.find(listener => listener.isDefault) ?? listeners.find(listener => listener.listening) ?? listeners[0]
+  }, [listenerFilter, listeners])
 
   async function renderSample() {
     setBusy(true)
@@ -375,7 +391,8 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header status={status} onSample={renderSample} busy={busy} theme={theme}
+      <Header status={status} onSample={renderSample} busy={busy} theme={theme} viewMode={viewMode}
+        onViewMode={setViewMode}
         onTheme={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
         onTrialSetup={reviewTrialOnboarding}
         onSettings={setSettingsSection} />
@@ -394,26 +411,43 @@ function App() {
         </div>
       )}
       <input ref={captureFileRef} className="capture-file-input" type="file" accept=".bin,.ppecapture,application/octet-stream,application/vnd.pos-printer-emulator.capture+zip" onChange={importCapture} />
-      <main className={`workspace ${activityCollapsed ? 'activity-is-collapsed' : ''} ${inspectorCollapsed ? 'inspector-is-collapsed' : ''}`}>
-        {activityCollapsed ? (
-          <CollapsedSide side="left" label="Activity" onExpand={() => setActivityCollapsed(false)} />
-        ) : (
-          <ActivityRail jobs={filteredJobs} totalJobs={jobs.length} selectedId={selectedId} query={query} onQuery={setQuery}
+      {viewMode === 'simple' ? (
+        <SimpleWorkspace
+          status={status}
+          listener={simpleListener}
+          job={job}
+          storedGraphics={storedGraphics}
+          busy={busy}
+          importing={captureBusy}
+          importEnabled={status.license.features.premiumFeatures}
+          onSample={renderSample}
+          onImport={() => captureFileRef.current?.click()}
+          onOpenSettings={setSettingsSection}
+          onOpenExpert={() => setViewMode('expert')}
+          onError={setError}
+        />
+      ) : (
+        <main className={`workspace ${activityCollapsed ? 'activity-is-collapsed' : ''} ${inspectorCollapsed ? 'inspector-is-collapsed' : ''}`}>
+          {activityCollapsed ? (
+            <CollapsedSide side="left" label="Activity" onExpand={() => setActivityCollapsed(false)} />
+          ) : (
+            <ActivityRail jobs={filteredJobs} totalJobs={jobs.length} selectedId={selectedId} query={query} onQuery={setQuery}
+              listenerEndpoint={status.listener}
+              listeners={listeners} listenerFilter={listenerFilter} onListenerFilter={setListenerFilter}
+              onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
+              onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history}
+              onImport={() => captureFileRef.current?.click()} importEnabled={status.license.features.premiumFeatures} importing={captureBusy} />
+          )}
+          <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics}
             listenerEndpoint={status.listener}
-            listeners={listeners} listenerFilter={listenerFilter} onListenerFilter={setListenerFilter}
-            onSelect={setSelectedId} onDelete={clearJob} onClearAll={clearAllJobs}
-            onCollapse={() => setActivityCollapsed(true)} historyEnabled={status.license.features.history}
-            onImport={() => captureFileRef.current?.click()} importEnabled={status.license.features.premiumFeatures} importing={captureBusy} />
-        )}
-        <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics}
-          listenerEndpoint={status.listener}
-          onReplay={replayJob} replaying={captureBusy} onDownload={downloadJob} exporting={exporting} />
-        {inspectorCollapsed ? (
-          <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
-        ) : (
-          <Inspector job={job} tab={tab} onTab={setTab} onCollapse={() => setInspectorCollapsed(true)} />
-        )}
-      </main>
+            onReplay={replayJob} replaying={captureBusy} onDownload={downloadJob} exporting={exporting} />
+          {inspectorCollapsed ? (
+            <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
+          ) : (
+            <Inspector job={job} tab={tab} onTab={setTab} onCollapse={() => setInspectorCollapsed(true)} />
+          )}
+        </main>
+      )}
       <footer className="status-bar">
         <span>POS Printer Emulator v{status.version} · {status.license.mode} License</span>
         <span>Local only. Receipt data stays on this device.</span>
@@ -458,6 +492,163 @@ function App() {
   )
 }
 
+function SimpleWorkspace({ status, listener, job, storedGraphics, busy, importing, importEnabled, onSample, onImport, onOpenSettings, onOpenExpert, onError }: {
+  status: ServiceStatus
+  listener?: PrinterListener
+  job?: ReceiptJob
+  storedGraphics: StoredGraphic[]
+  busy: boolean
+  importing: boolean
+  importEnabled: boolean
+  onSample: () => void
+  onImport: () => void
+  onOpenSettings: (section: SettingsSection) => void
+  onOpenExpert: () => void
+  onError: (message?: string) => void
+}) {
+  const [copied, setCopied] = useState<string>()
+  const storedGraphicMap = useMemo(() => new Map(storedGraphics.map(graphic => [graphic.keyCode, graphic])), [storedGraphics])
+  const fallbackPort = Number(status.listener.match(/:(\d+)$/)?.[1]) || 9100
+  const rawAddress = listener?.connectionAddress?.trim() || listener?.bindAddress?.trim() || status.listener.replace(/:\d+$/, '')
+  const address = !rawAddress || rawAddress === '0.0.0.0' || rawAddress === '::' ? '127.0.0.1' : rawAddress
+  const port = listener?.port ?? fallbackPort
+  const listenerName = listener?.name || 'POS Printer Emulator'
+  const listenerHealthy = listener ? listener.listening && listener.status !== 'Faulted' : status.listening
+  const summaryHealthy = status.listenerSummary
+    ? status.listenerSummary.running > 0 && status.listenerSummary.faulted === 0
+    : listenerHealthy
+  const healthTitle = summaryHealthy ? 'Everything is ready' : 'Printer listener needs attention'
+  const healthDescription = summaryHealthy
+    ? 'Your printer listener is online and waiting for a receipt.'
+    : 'The listener is not currently accepting receipts.'
+  const nextAction = summaryHealthy
+    ? 'Connect your POS in Step 2 or send a Test Receipt in Step 3.'
+    : 'Run diagnostics or open Settings to review the listener.'
+
+  async function copyConnectionValue(label: string, value: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const input = document.createElement('textarea')
+        input.value = value
+        input.style.position = 'fixed'
+        input.style.opacity = '0'
+        document.body.appendChild(input)
+        input.select()
+        const copySucceeded = document.execCommand('copy')
+        input.remove()
+        if (!copySucceeded) throw new Error('Copy was not supported.')
+      }
+      setCopied(label)
+      window.setTimeout(() => setCopied(current => current === label ? undefined : current), 1_800)
+    } catch {
+      onError(`Could not copy the ${label.toLowerCase()}. Select the value and copy it manually.`)
+    }
+  }
+
+  return (
+    <main className="simple-workspace">
+      <section className="simple-primary" aria-labelledby="simple-health-title">
+        <div className={`simple-health ${summaryHealthy ? 'is-ready' : 'needs-attention'}`} role="status">
+          <div className="simple-health-icon" aria-hidden="true">{summaryHealthy ? <CheckCircle2 size={39} /> : <AlertTriangle size={36} />}</div>
+          <div>
+            <h1 id="simple-health-title">{healthTitle}</h1>
+            <p>{healthDescription}</p>
+            <strong>Next: <span>{nextAction}</span></strong>
+          </div>
+        </div>
+
+        <div className="simple-steps" aria-label="Printer setup steps">
+          <article className="simple-step">
+            <span className="simple-step-number" aria-hidden="true">1</span>
+            <div>
+              <h2>Set up your Windows printer</h2>
+              <p>Create a standard TCP/IP printer that points to this listener.</p>
+              <button className="simple-primary-action" type="button" onClick={() => onOpenSettings('printer')}><Printer size={17} /> Open setup wizard</button>
+            </div>
+          </article>
+
+          <article className="simple-step">
+            <span className="simple-step-number" aria-hidden="true">2</span>
+            <div>
+              <h2>Connect your POS</h2>
+              <p>Configure your POS to send receipts to this listener.</p>
+              <div className="simple-connection-grid">
+                <ConnectionValue label="Listener name" value={listenerName} copied={copied === 'Listener name'} onCopy={() => void copyConnectionValue('Listener name', listenerName)} />
+                <ConnectionValue label="Address" value={address} copied={copied === 'Address'} onCopy={() => void copyConnectionValue('Address', address)} />
+                <ConnectionValue label="Port" value={String(port)} copied={copied === 'Port'} onCopy={() => void copyConnectionValue('Port', String(port))} />
+                <ConnectionValue label="Protocol" value="RAW TCP" copied={copied === 'Protocol'} onCopy={() => void copyConnectionValue('Protocol', 'RAW TCP')} />
+              </div>
+              <small>Use these details in your POS printer or network settings.</small>
+            </div>
+          </article>
+
+          <article className="simple-step">
+            <span className="simple-step-number" aria-hidden="true">3</span>
+            <div>
+              <h2>Verify your first receipt</h2>
+              <p>Send a test receipt to confirm everything is working.</p>
+              <button className="simple-primary-action" type="button" disabled={busy} onClick={onSample}><FlaskConical size={17} /> {busy ? 'Sending test receipt…' : 'Send test receipt'}</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="simple-latest" aria-labelledby="simple-latest-title">
+        <header><h2 id="simple-latest-title">Latest receipt</h2>{job && <span>{formatTime(job.receivedAt)}</span>}</header>
+        <div className={`simple-receipt-stage ${job ? 'has-receipt' : ''}`}>
+          {job ? (
+            <div className="simple-receipt-scale" style={{ width: `${Math.round(364 * job.profilePaperWidthMm / 80)}px` }}>
+              <ReceiptPaper lines={job.lines} watermark={status.license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
+            </div>
+          ) : (
+            <div className="simple-receipt-empty">
+              <FileText size={48} />
+              <strong>No receipt received yet</strong>
+              <span>Receipts from your POS will appear here.</span>
+            </div>
+          )}
+        </div>
+        <p className="simple-listener-wait"><span className={`state-dot ${listenerHealthy ? '' : 'is-down'}`} /> {listenerHealthy ? `Waiting for a receipt on ${address}:${port} (RAW TCP)` : `Listener ${listenerName} is not currently running`}</p>
+      </section>
+
+      <section className="simple-actions" aria-labelledby="simple-actions-title">
+        <div>
+          <h2 id="simple-actions-title">Quick actions</h2>
+          <div className="simple-action-list">
+            <button type="button" onClick={onImport} disabled={!importEnabled || importing} title={importEnabled ? 'Open a saved receipt capture' : 'Capture import requires a Lite, Pro, or Enterprise License'}>
+              {importEnabled ? <Upload size={28} /> : <LockKeyhole size={25} />}
+              <span><strong>Import capture</strong><small>{importEnabled ? 'Open a saved ESC/POS capture file and view the receipt.' : 'Available with a Lite, Pro, or Enterprise License.'}</small></span>
+              <ChevronRight size={18} />
+            </button>
+            <button type="button" onClick={() => onOpenSettings('support')}>
+              <Gauge size={28} /><span><strong>Run diagnostics</strong><small>Check listener health and Windows configuration.</small></span><ChevronRight size={18} />
+            </button>
+            <button type="button" onClick={() => onOpenSettings('support')}>
+              <LifeBuoy size={28} /><span><strong>Submit support request</strong><small>Get help with privacy-reviewed logs and system information.</small></span><ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+        <aside className="simple-expert-handoff">
+          <h2>Need more control?</h2>
+          <p>Open Expert Mode for detailed receipt commands, raw data, and job controls.</p>
+          <button type="button" onClick={onOpenExpert}>Open Expert Mode <ChevronRight size={17} /></button>
+        </aside>
+      </section>
+    </main>
+  )
+}
+
+function ConnectionValue({ label, value, copied, onCopy }: { label: string; value: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <div className="simple-connection-value">
+      <span>{label}</span>
+      <div><code>{value}</code><button type="button" onClick={onCopy} aria-label={`Copy ${label.toLowerCase()}`} title={`Copy ${label.toLowerCase()}`}><Copy size={15} />{copied && <b role="status">Copied</b>}</button></div>
+    </div>
+  )
+}
+
 function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
   request: ClearRequest
   busy: boolean
@@ -487,11 +678,13 @@ function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
   )
 }
 
-function Header({ status, onSample, busy, theme, onTheme, onTrialSetup, onSettings }: {
+function Header({ status, onSample, busy, theme, viewMode, onViewMode, onTheme, onTrialSetup, onSettings }: {
   status: ServiceStatus
   onSample: () => void
   busy: boolean
   theme: 'light' | 'dark'
+  viewMode: ViewMode
+  onViewMode: (mode: ViewMode) => void
   onTheme: () => void
   onTrialSetup: () => void
   onSettings: (section: SettingsSection) => void
@@ -516,6 +709,14 @@ function Header({ status, onSample, busy, theme, onTheme, onTrialSetup, onSettin
       </div>
       <div className="header-fact"><span>{multipleListenersEnabled && listenerSummary ? 'Listeners' : 'Listener'}</span> {listenerFact}</div>
       {!status.license.isPaid && <div className="trial-allowance"><strong>{status.license.remaining} of {status.license.dailyLimit}</strong> complete Trial POS jobs left today</div>}
+      <div className="view-mode-switch" role="group" aria-label="Application view">
+        <button className={viewMode === 'simple' ? 'active' : ''} type="button" aria-pressed={viewMode === 'simple'} onClick={() => onViewMode('simple')}>
+          <span className="mode-full-label">Simple mode</span><span className="mode-short-label">Simple</span>
+        </button>
+        <button className={viewMode === 'expert' ? 'active' : ''} type="button" aria-pressed={viewMode === 'expert'} onClick={() => onViewMode('expert')}>
+          <span className="mode-full-label">Expert mode</span><span className="mode-short-label">Expert</span>
+        </button>
+      </div>
       <div className="header-actions">
         {status.license.mode === 'Trial' && <button className="trial-setup-button" onClick={onTrialSetup} title="Reopen the two-step Trial setup guide"><CircleHelp size={16} /> Trial setup</button>}
         <button className="sample-button" onClick={onSample} disabled={busy} title="Built-in Test Receipts are unlimited and do not use Trial POS jobs">
