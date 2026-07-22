@@ -376,6 +376,53 @@ function migrate_trial_onboarding_clarity_schedule(): void
 
 migrate_trial_onboarding_clarity_schedule();
 
+function migrate_receipt_comparison_to_end_schedule(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+        $claim->execute(['receipt-comparison-to-end-v0.3.48']);
+        if ($claim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        $pdo->exec("UPDATE development_roadmap SET item_key='schedule-temp-receipt-comparison', version_label='v0.3.48', status='Planned', priority_rank=348 WHERE item_key='v0.3.39' AND title='Receipt comparison and automated validation'");
+        foreach ([40 => 39, 41 => 40, 42 => 41, 43 => 42, 44 => 43, 45 => 44, 46 => 45, 47 => 46, 48 => 47] as $old => $new) {
+            $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.{$new}', version_label='v0.3.{$new}', priority_rank=3{$new} WHERE item_key='v0.3.{$old}'");
+        }
+        $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.48' WHERE item_key='schedule-temp-receipt-comparison'");
+        $pdo->exec("UPDATE development_roadmap SET status='Next' WHERE item_key='v0.3.39'");
+
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release
+                     WHEN 'v0.3.39' THEN 'v0.3.48' WHEN 'v0.3.40' THEN 'v0.3.39'
+                     WHEN 'v0.3.41' THEN 'v0.3.40' WHEN 'v0.3.42' THEN 'v0.3.41'
+                     WHEN 'v0.3.43' THEN 'v0.3.42' WHEN 'v0.3.44' THEN 'v0.3.43'
+                     WHEN 'v0.3.45' THEN 'v0.3.44' WHEN 'v0.3.46' THEN 'v0.3.45'
+                     WHEN 'v0.3.47' THEN 'v0.3.46' WHEN 'v0.3.48' THEN 'v0.3.47'
+                     ELSE target_release END,
+                 fixed_version = CASE fixed_version
+                     WHEN 'v0.3.39' THEN 'v0.3.48' WHEN 'v0.3.40' THEN 'v0.3.39'
+                     WHEN 'v0.3.41' THEN 'v0.3.40' WHEN 'v0.3.42' THEN 'v0.3.41'
+                     WHEN 'v0.3.43' THEN 'v0.3.42' WHEN 'v0.3.44' THEN 'v0.3.43'
+                     WHEN 'v0.3.45' THEN 'v0.3.44' WHEN 'v0.3.46' THEN 'v0.3.45'
+                     WHEN 'v0.3.47' THEN 'v0.3.46' WHEN 'v0.3.48' THEN 'v0.3.47'
+                     ELSE fixed_version END
+             WHERE target_release BETWEEN 'v0.3.39' AND 'v0.3.48'
+                OR fixed_version BETWEEN 'v0.3.39' AND 'v0.3.48'"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
+    }
+}
+
+migrate_receipt_comparison_to_end_schedule();
+
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "INSERT INTO development_roadmap
@@ -466,52 +513,52 @@ $releaseSync = database()->prepare(
          'Versioned and reopenable two-step welcome guide; wizard-first instruction; visible read-only included listener; local and LAN IPv4 endpoints; copyable RAW TCP details; and retained server-side mutation denial.',
          'The v0.3.37 guide could remain dismissed and hid the included listener behind an upgrade panel, leaving customers unsure how to connect.',
          'Fresh and upgraded Trial installations see and can reopen the guide, view one locked listener, copy exact connection details, and receive HTTP 403 for listener mutations.', UTC_TIMESTAMP(6)),
-        ('v0.3.39', 'v0.3.39', 'Release', 'Receipt comparison and automated validation', 'Next', 339,
+        ('v0.3.48', 'v0.3.48', 'Release', 'Receipt comparison and automated validation', 'Planned', 348,
          'Provide repeatable compatibility and regression testing.',
-         'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, HTML, PDF, and JSON results; brand the installer welcome, completion, header, Setup executable, shortcuts, and uninstall entry with official product artwork.',
-         'The encrypted backup foundation and v0.3.35 compatibility fixes protect the profiles, listeners, and captures used by comparison suites.',
-         'Known-good captures pass, intentional changes fail precisely, ignored dynamic fields avoid false failures, and the compiled installer displays official branding at normal and high-DPI scaling.', NULL),
-        ('v0.3.40', 'v0.3.40', 'Release', 'Guided update installation and restart', 'Planned', 340,
+         'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, privacy-safe HTML, PDF, and JSON results; brand the installer welcome, completion, header, Setup executable, shortcuts, and uninstall entry with official product artwork.',
+         'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.',
+         'Known-good captures pass, intentional changes fail precisely, ignored dynamic fields avoid false failures, privacy-safe exports protect configured sensitive values, and the compiled installer displays official branding at normal and high-DPI scaling.', NULL),
+        ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Next', 339,
          'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
          'Background installer download; checksum and signature verification; pre-update safety snapshot; Install and Restart, Install Later, and Cancel choices; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; logs; rollback-safe failure recovery; optional automatic downloads.',
          'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.',
          'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', NULL),
-        ('v0.3.41', 'v0.3.41', 'Release', 'Simple Mode and Expert Mode', 'Planned', 341,
+        ('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Planned', 340,
          'Give new customers a task-focused experience while preserving the complete expert workspace.',
          'Simple task cards; plain-language health and next action; retained Expert Mode; remembered mode choice; state-preserving switching; and unchanged server-side license enforcement.',
          'Persistent task guidance addresses customer confusion without removing advanced receipt inspection.',
          'Customers complete setup, connection, testing, review, and diagnostics in Simple Mode and switch to Expert Mode without losing state.', NULL),
-        ('v0.3.42', 'v0.3.42', 'Release', 'Accessibility and keyboard usability', 'Planned', 342,
+        ('v0.3.41', 'v0.3.41', 'Release', 'Accessibility and keyboard usability', 'Planned', 341,
          'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.',
          'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
          'Accessibility should be established before additional screens and controls increase remediation cost.',
          'Primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', NULL),
-        ('v0.3.43', 'v0.3.43', 'Release', 'Automatic configuration restore points', 'Planned', 343,
+        ('v0.3.42', 'v0.3.42', 'Release', 'Automatic configuration restore points', 'Planned', 342,
          'Protect customers from accidental configuration loss without requiring manual backups.',
          'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
          'Recovery protection should precede projects and additional customer configuration complexity.',
          'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
-        ('v0.3.44', 'v0.3.44', 'Release', 'Projects and testing sessions', 'Planned', 344,
+        ('v0.3.43', 'v0.3.43', 'Release', 'Projects and testing sessions', 'Planned', 343,
          'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
          'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
-         'Comparison and restore-point foundations make isolated project workflows safe and useful.',
+         'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.',
          'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
-        ('v0.3.45', 'v0.3.45', 'Release', 'Privacy-safe receipt masking', 'Planned', 345,
+        ('v0.3.44', 'v0.3.44', 'Release', 'Privacy-safe receipt masking', 'Planned', 344,
          'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
-         'Project and comparison exports increase sharing, so privacy controls should follow their foundation.',
+         'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.',
          'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
-        ('v0.3.46', 'v0.3.46', 'Release', 'System tray health and notifications', 'Planned', 346,
+        ('v0.3.45', 'v0.3.45', 'Release', 'System tray health and notifications', 'Planned', 345,
          'Keep customers informed about important listener events without leaving the main window open.',
          'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
          'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.',
          'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
-        ('v0.3.47', 'v0.3.47', 'Release', 'Character and code-page assistant', 'Planned', 347,
+        ('v0.3.46', 'v0.3.46', 'Release', 'Character and code-page assistant', 'Planned', 346,
          'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
          'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.',
-         'Profiles, comparison, privacy, and project foundations make encoding recommendations testable and safe.',
+         'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.',
          'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', NULL),
-        ('v0.3.48', 'v0.3.48', 'Release', 'Offline Enterprise update packages', 'Planned', 348,
+        ('v0.3.47', 'v0.3.47', 'Release', 'Offline Enterprise update packages', 'Planned', 347,
          'Support secure updates on restricted or air-gapped POS networks.',
          'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.',
          'This depends on guided updates, production signing, rollback, and entitlement foundations.',
@@ -601,16 +648,16 @@ database()->prepare(
          WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'
          WHEN 'v0.3.37' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.37'
          WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'
-         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
-         WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30'
-         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
-         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
-         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
-         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
-         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
-         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
-         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
+         WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'
+         WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/30'
+         WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
+         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
+         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
+         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
+         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
+         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'

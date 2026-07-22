@@ -126,17 +126,17 @@ $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released'", $devSupport, 'Geographic analytics was not marked released for v0.3.36.');
 $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released'", $devSupport, 'Released v0.3.37 Trial onboarding is missing from Admin Dev Support.');
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $devSupport, 'Released Trial onboarding clarity correction is missing from v0.3.38.');
-$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Receipt comparison and automated validation', 'Next'", $devSupport, 'Receipt comparison was not moved to v0.3.39.');
-$expectContains("('v0.3.40', 'v0.3.40', 'Release', 'Guided update installation and restart', 'Planned'", $devSupport, 'Guided update installation was not moved to v0.3.40.');
+$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Next'", $devSupport, 'Guided update installation was not moved to v0.3.39.');
 $futureReleases = [
-    'v0.3.41' => ['Simple Mode and Expert Mode', 30],
-    'v0.3.42' => ['Accessibility and keyboard usability', 31],
-    'v0.3.43' => ['Automatic configuration restore points', 32],
-    'v0.3.44' => ['Projects and testing sessions', 33],
-    'v0.3.45' => ['Privacy-safe receipt masking', 34],
-    'v0.3.46' => ['System tray health and notifications', 35],
-    'v0.3.47' => ['Character and code-page assistant', 36],
-    'v0.3.48' => ['Offline Enterprise update packages', 37],
+    'v0.3.40' => ['Simple Mode and Expert Mode', 30],
+    'v0.3.41' => ['Accessibility and keyboard usability', 31],
+    'v0.3.42' => ['Automatic configuration restore points', 32],
+    'v0.3.43' => ['Projects and testing sessions', 33],
+    'v0.3.44' => ['Privacy-safe receipt masking', 34],
+    'v0.3.45' => ['System tray health and notifications', 35],
+    'v0.3.46' => ['Character and code-page assistant', 36],
+    'v0.3.47' => ['Offline Enterprise update packages', 37],
+    'v0.3.48' => ['Receipt comparison and automated validation', 21],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
     $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', 'Planned'";
@@ -151,18 +151,18 @@ $expectContains("('v0.3.35', 'v0.3.35', 'Release', 'Backup restore usability and
 $expectContains("('v0.3.36', 'v0.3.36', 'Release', 'Privacy-preserving geographic analytics dashboard', 'Released'", $schema, 'Fresh database schema is missing released v0.3.36.');
 $expectContains("('v0.3.37', 'v0.3.37', 'Release', 'Trial Setup and Onboarding Improvements', 'Released'", $schema, 'Fresh database schema is missing released v0.3.37 Trial onboarding.');
 $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released'", $schema, 'Fresh database schema is missing released v0.3.38 Trial onboarding clarity.');
-$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Receipt comparison and automated validation', 'Next'", $schema, 'Fresh database schema is missing next v0.3.39.');
-$expectContains("('v0.3.40', 'v0.3.40', 'Release', 'Guided update installation and restart', 'Planned'", $schema, 'Fresh database schema is missing pending v0.3.40.');
+$expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Next'", $schema, 'Fresh database schema is missing next v0.3.39.');
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $schema, 'Fresh database schema is missing BUG-015.');
 $expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');
+$expectContains("'receipt-comparison-to-end-v0.3.48'", $devSupport, 'Admin Dev Support is missing the receipt-comparison rescheduling migration.');
 $expectContains("WHEN 'v0.3.27' THEN 'v0.3.33'", $devSupport, 'Bug targets are not migrated from v0.3.27 to v0.3.33.');
 $expectContains("WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'", $devSupport, 'Admin Dev Support is missing the v0.3.33 diagnostics issue link.');
 $expectContains("WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'", $devSupport, 'Admin Dev Support is missing the v0.3.34 release link.');
 $expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.35'", $devSupport, 'Admin Dev Support is missing the v0.3.35 release link.');
 $expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'", $devSupport, 'Admin Dev Support is missing the v0.3.36 release link.');
-$expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.39 comparison issue link.');
+$expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'", $devSupport, 'Admin Dev Support is missing the v0.3.39 guided update issue link.');
 $expectContains("WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'", $devSupport, 'Admin Dev Support is missing the v0.3.38 release link.');
-$expectContains("WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3'", $devSupport, 'Admin Dev Support is missing the v0.3.40 guided update issue link.');
+$expectContains("WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.48 comparison issue link.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
 $expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');
