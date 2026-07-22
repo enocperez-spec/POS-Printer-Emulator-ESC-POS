@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 
 namespace ReceiptEmulator;
 
@@ -12,10 +13,13 @@ public sealed class PrinterListenerConfigurationService
     private readonly PrinterOptions _options;
     private readonly PrinterProfileService _profiles;
     private readonly ILogger<PrinterListenerConfigurationService>? _logger;
+    private readonly string _singleListenerPath;
     private readonly DateTimeOffset _legacyCreatedAt = DateTimeOffset.UtcNow;
     private readonly List<PrinterListenerConfiguration> _listeners = [];
     private ReceiptDatabase? _database;
     private bool _managedListenersLoaded;
+    private bool _singleListenerOverrideLoaded;
+    private SingleListenerOverride? _singleListenerOverride;
 
     public PrinterListenerConfigurationService(
         LicenseService license,
@@ -38,6 +42,7 @@ public sealed class PrinterListenerConfigurationService
         _profiles = profiles;
         _maximumListeners = maximumListeners;
         _logger = logger;
+        _singleListenerPath = Path.Combine(license.RootPath, "single-listener.json");
     }
 
     public int MaximumListeners => Math.Clamp(_maximumListeners(), 1, PrinterListenerDefaults.MaximumListeners);
@@ -137,6 +142,62 @@ public sealed class PrinterListenerConfigurationService
 
             EnsureManagedListenersLoadedUnsafe();
             return FindEffectiveUnsafe(PrinterListenerDefaults.DefaultId)!;
+        }
+    }
+
+    internal PrinterListenerConfiguration PrepareSingleListenerSetup(int port)
+    {
+        lock (_sync)
+        {
+            if (CanManageMultipleListeners)
+                throw new InvalidOperationException("Single-listener setup is only available for Trial or Lite licenses.");
+            var current = CreateLegacyDefault();
+            return Validate(
+                ToInput(current) with
+                {
+                    BindAddress = PrinterListenerDefaults.DefaultBindAddress,
+                    Port = port,
+                    ProfileId = PrinterProfileService.EpsonTmT88VId,
+                    Enabled = true
+                },
+                current.Id,
+                current.CreatedAt,
+                DateTimeOffset.UtcNow);
+        }
+    }
+
+    internal void CommitSingleListenerSetup(PrinterListenerConfiguration listener)
+    {
+        lock (_sync)
+        {
+            if (CanManageMultipleListeners ||
+                !listener.Id.Equals(PrinterListenerDefaults.DefaultId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Only the default single printer listener can be configured here.");
+
+            var validated = Validate(ToInput(listener), listener.Id, listener.CreatedAt, listener.UpdatedAt);
+            var temporaryPath = _singleListenerPath + ".tmp";
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_singleListenerPath)!);
+                File.WriteAllText(temporaryPath, JsonSerializer.Serialize(new SingleListenerOverride(
+                    validated.BindAddress,
+                    validated.Port,
+                    validated.ProfileId,
+                    validated.UpdatedAt)));
+                File.Move(temporaryPath, _singleListenerPath, overwrite: true);
+                _singleListenerOverride = new SingleListenerOverride(
+                    validated.BindAddress,
+                    validated.Port,
+                    validated.ProfileId,
+                    validated.UpdatedAt);
+                _singleListenerOverrideLoaded = true;
+            }
+            catch (Exception exception)
+            {
+                try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); } catch { }
+                _logger?.LogError(exception, "The single printer listener configuration could not be saved");
+                throw new InvalidOperationException("The Trial printer listener settings could not be saved.", exception);
+            }
         }
     }
 
@@ -358,18 +419,54 @@ public sealed class PrinterListenerConfigurationService
     private PrinterListenerConfiguration CreateLegacyDefault()
     {
         var profile = _profiles.GetSelected();
+        var bindAddress = _options.BindAddress;
+        var port = _options.Port;
+        var updatedAt = _legacyCreatedAt;
+        var saved = LoadSingleListenerOverrideUnsafe();
+        if (saved is not null)
+        {
+            if (IPAddress.TryParse(saved.BindAddress, out var savedAddress) &&
+                savedAddress.AddressFamily == AddressFamily.InterNetwork &&
+                saved.Port is >= 1 and <= 65535 &&
+                _profiles.TryGet(saved.ProfileId, out _))
+            {
+                bindAddress = saved.BindAddress;
+                port = saved.Port;
+                profile = _profiles.Get(saved.ProfileId);
+                updatedAt = saved.UpdatedAt;
+            }
+        }
         return new PrinterListenerConfiguration(
             PrinterListenerDefaults.DefaultId,
             PrinterListenerDefaults.DefaultName,
-            _options.BindAddress,
-            _options.Port,
+            bindAddress,
+            port,
             profile.Id,
             true,
             _options.IdleJobTimeoutMilliseconds,
             _options.MaximumJobBytes,
             new PrinterListenerBufferConfiguration(),
             _legacyCreatedAt,
-            _legacyCreatedAt);
+            updatedAt);
+    }
+
+    private SingleListenerOverride? LoadSingleListenerOverrideUnsafe()
+    {
+        if (_singleListenerOverrideLoaded)
+            return _singleListenerOverride;
+        _singleListenerOverrideLoaded = true;
+        if (!File.Exists(_singleListenerPath))
+            return null;
+        try
+        {
+            _singleListenerOverride = JsonSerializer.Deserialize<SingleListenerOverride>(
+                File.ReadAllText(_singleListenerPath));
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning(exception, "Ignored damaged single printer listener settings and restored defaults");
+        }
+        return _singleListenerOverride;
     }
 
     private PrinterListenerConfiguration Validate(
@@ -517,4 +614,10 @@ public sealed class PrinterListenerConfigurationService
             return created != 0 ? created : StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
         });
     }
+
+    private sealed record SingleListenerOverride(
+        string BindAddress,
+        int Port,
+        string ProfileId,
+        DateTimeOffset UpdatedAt);
 }

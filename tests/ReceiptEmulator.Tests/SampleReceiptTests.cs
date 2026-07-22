@@ -12,6 +12,7 @@ public sealed class SampleReceiptTests
 
         Assert.Contains("1234 Glenridge Rd. NW\nAtlanta, GA 30342", receipt);
         Assert.Contains("CHECK #1198", receipt);
+        Assert.Contains("TEST RECEIPT", receipt);
         Assert.Contains("Server: E. Perez", receipt);
         Assert.DoesNotContain("123 Market Street", receipt);
         Assert.DoesNotContain("ORDER #1198", receipt);

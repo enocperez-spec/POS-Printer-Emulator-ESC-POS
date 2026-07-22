@@ -46,6 +46,7 @@ import { PrinterStateSettings } from './PrinterStateSettings'
 import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
 import { BackupRestoreSettings } from './BackupRestoreSettings'
+import { TrialOnboarding } from './TrialOnboarding'
 import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
@@ -53,7 +54,7 @@ const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings')
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.34',
+  version: '0.3.37',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -97,6 +98,10 @@ function App() {
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
   )
   const [status, setStatus] = useState<ServiceStatus>(emptyStatus)
+  const [statusReady, setStatusReady] = useState(false)
+  const [trialOnboardingComplete, setTrialOnboardingComplete] = useState(() =>
+    localStorage.getItem('pos-printer-emulator-trial-onboarding-v1') === 'complete',
+  )
   const [jobs, setJobs] = useState<JobSummary[]>([])
   const [selectedId, setSelectedId] = useState<string>()
   const [job, setJob] = useState<ReceiptJob>()
@@ -138,6 +143,7 @@ function App() {
     try {
       const [nextStatus, nextJobs] = await Promise.all([api.status(), api.jobs(listenerFilter === 'all' ? undefined : listenerFilter)])
       setStatus(nextStatus)
+      setStatusReady(true)
       setJobs(nextJobs)
       setSelectedId(current => current && nextJobs.some(item => item.id === current) ? current : nextJobs[0]?.id)
     } catch (cause) {
@@ -243,11 +249,23 @@ function App() {
       setSelectedId(created.id)
       setJob(created)
       void refresh()
+      return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not render the sample receipt.')
+      return false
     } finally {
       setBusy(false)
     }
+  }
+
+  function completeTrialOnboarding() {
+    localStorage.setItem('pos-printer-emulator-trial-onboarding-v1', 'complete')
+    setTrialOnboardingComplete(true)
+  }
+
+  function openOnboardingSection(section: SettingsSection) {
+    completeTrialOnboarding()
+    setSettingsSection(section)
   }
 
   async function importCapture(event: ChangeEvent<HTMLInputElement>) {
@@ -403,6 +421,17 @@ function App() {
           }}
         />
       )}
+      {statusReady && status.license.mode === 'Trial' && !trialOnboardingComplete && !settingsSection && (
+        <TrialOnboarding
+          status={status}
+          onSetup={() => openOnboardingSection('printer')}
+          onTroubleshoot={() => openOnboardingSection('support')}
+          onDismiss={completeTrialOnboarding}
+          onTestReceipt={async () => {
+            if (await renderSample()) completeTrialOnboarding()
+          }}
+        />
+      )}
       {clearRequest && (
         <ClearJobsDialog request={clearRequest} busy={clearing}
           onCancel={() => setClearRequest(undefined)} onConfirm={confirmClear} />
@@ -467,8 +496,9 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
         <span className="state-dot" /> {listenerStateLabel}
       </div>
       <div className="header-fact"><span>{multipleListenersEnabled && listenerSummary ? 'Listeners' : 'Listener'}</span> {listenerFact}</div>
+      {!status.license.isPaid && <div className="trial-allowance"><strong>{status.license.remaining} of {status.license.dailyLimit}</strong> complete Trial POS jobs left today</div>}
       <div className="header-actions">
-        <button className="sample-button" onClick={onSample} disabled={busy || (!status.license.isPaid && status.license.remaining === 0)}>
+        <button className="sample-button" onClick={onSample} disabled={busy} title="Built-in Test Receipts are unlimited and do not use Trial POS jobs">
           <FlaskConical size={16} /> {busy ? 'Rendering…' : 'Test receipt'}
         </button>
         <button
@@ -533,13 +563,13 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listenerEnd
         {jobs.map(item => (
           <div key={item.id} className={`job-row ${selectedId === item.id ? 'is-selected' : ''}`}>
             <button className="job-row-select" onClick={() => onSelect(item.id)} aria-label={`Open ${item.preview}`}>
-              <span className={`job-dot ${item.status.toLowerCase()}`} />
+              <span className={`job-dot ${item.status.toLowerCase().replaceAll(' ', '-')}`} />
               <span className="job-time">{formatTime(item.receivedAt)}</span>
               <span className="job-source">{item.sourceIp}</span>
               <strong className="job-preview">{item.preview}</strong>
               <span className="job-size">{formatBytes(item.payloadSize)}</span>
               {item.listenerName ? <span className="job-listener"><Network size={11} />{item.listenerName}{item.listenerPort ? ` · ${item.listenerPort}` : ''}</span> : null}
-              <span className="job-result"><b className={`job-origin ${item.origin.toLowerCase()}`}>{item.origin}</b>{item.status}</span>
+              <span className="job-result"><b className={`job-origin ${item.origin.toLowerCase().replaceAll(' ', '-')}`}>{item.origin}</b>{item.status}</span>
               {item.unsupportedCount > 0 && <span className="job-warning">{item.unsupportedCount} warning</span>}
             </button>
             <button className="job-delete" onClick={() => onDelete(item.id)} aria-label={`Clear ${item.preview}`} title="Clear this job"><Trash2 size={14} /></button>
@@ -607,9 +637,12 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
       </div>
       <div className="preview-canvas">
         {job ? (
-          <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})`, width: `${Math.round(364 * job.profilePaperWidthMm / 80)}px` }}>
-            <ReceiptPaper lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
-          </div>
+          <>
+            {job.origin === 'Trial Limit' && <div className="trial-limit-banner" role="status"><AlertTriangle size={17} /><div><strong>Trial Limit Reached</strong><span>The original bytes and receipt content after line 10 were permanently discarded. Upgrade for unlimited complete jobs.</span></div><a href="https://buy.posprinteremulator.com/" target="_blank" rel="noreferrer">View licenses</a></div>}
+            <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})`, width: `${Math.round(364 * job.profilePaperWidthMm / 80)}px` }}>
+              <ReceiptPaper lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
+            </div>
+          </>
         ) : (
           <div className="preview-empty">
             <div className="empty-receipt"><Printer size={34} /></div>
@@ -700,7 +733,8 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   useEffect(() => {
     if (!canAccess(section)) setSection('license')
   }, [features.printerProfiles, features.printerState, features.storedLogos, features.updates, section])
-  const labels: Record<SettingsSection, string> = { license: 'License', printer: 'Printer Setup Wizard', listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', backup: 'Backup & Restore', updates: 'Check for Updates', support: 'Support' }
+  const printerWizardLabel = status.license.mode === 'Trial' ? 'Trial Configuration Wizard' : 'Printer Setup Wizard'
+  const labels: Record<SettingsSection, string> = { license: 'License', printer: printerWizardLabel, listeners: 'Printer Listeners', profiles: 'Printer Profiles', logos: 'Stored Logos', state: 'Printer State', backup: 'Backup & Restore', updates: 'Check for Updates', support: 'Support' }
   const lockedTitle = 'Requires a Lite, Pro, or Enterprise License'
   const updatesLockedTitle = status.license.isPaid
     ? 'Renew Application Maintenance and Support to check for updates'
@@ -716,7 +750,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
         <div className="settings-layout">
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
-            <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>Printer Setup Wizard</span><ChevronRight size={15} /></button>
+            <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>{printerWizardLabel}</span><ChevronRight size={15} /></button>
             <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{multipleListenersEnabled ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
             <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
@@ -727,7 +761,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           </nav>
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
-            {section === 'printer' && <PrinterSetupWizard onCancel={onClose} />}
+            {section === 'printer' && <PrinterSetupWizard onCancel={onClose} trialMode={status.license.mode === 'Trial'} />}
             {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings canManage={multipleListenersEnabled} licenseMode={status.license.mode} maximumListeners={status.license.maximumListeners} onChanged={onListenersChanged} /></Suspense>}
             {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
@@ -824,7 +858,7 @@ function LicenseSettings({ status, onActivated }: {
           <h2>{status.license.isPaid ? `${status.license.mode} License activated` : 'Trial License'}</h2>
           <p>{status.license.isPaid
             ? `${status.license.mode} features are unlocked, including unlimited receipt jobs, saved history, and exports.`
-            : `${status.license.remaining} of ${status.license.dailyLimit} emulated print jobs remain today.`}</p>
+            : `${status.license.remaining} of ${status.license.dailyLimit} complete Trial POS print jobs remain today. Built-in Test Receipts are unlimited.`}</p>
         </div>
       </div>
 
@@ -1360,7 +1394,7 @@ function Inspector({ job, tab, onTab, onCollapse }: { job?: ReceiptJob; tab: 'co
           {job.listenerName && <div><dt>Printer listener</dt><dd>{job.listenerName}</dd></div>}
           {job.listenerPort && <div><dt>Listener endpoint</dt><dd>TCP port {job.listenerPort}</dd></div>}
           {job.listenerId && <div><dt>Listener ID</dt><dd>{job.listenerId}</dd></div>}
-          <div><dt>Job origin</dt><dd><span className={`detail-origin ${job.origin.toLowerCase()}`}>{job.origin}</span></dd></div>
+          <div><dt>Job origin</dt><dd><span className={`detail-origin ${job.origin.toLowerCase().replaceAll(' ', '-')}`}>{job.origin}</span></dd></div>
           <div><dt>Renderer version</dt><dd>{job.rendererVersion}</dd></div>
           <div><dt>Printer profile</dt><dd>{job.profileName}</dd></div>
           <div><dt>Profile paper</dt><dd>{job.profilePaperWidthMm} mm · {job.profilePrintableDots} dots</dd></div>

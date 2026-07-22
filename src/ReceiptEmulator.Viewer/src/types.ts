@@ -365,7 +365,7 @@ export type JobSummary = {
   status: string
   unsupportedCount: number
   preview: string
-  origin: 'Live' | 'Imported' | 'Replayed'
+  origin: 'Live' | 'Test Receipt' | 'Trial Limit' | 'Imported' | 'Replayed'
   rendererVersion: string
   parentJobId?: string
   importedFileName?: string

@@ -39,6 +39,23 @@ public sealed class ReceiptStoreTests
     }
 
     [Fact]
+    public void TestReceiptsRemainEphemeralWhenPaidHistoryIsEnabled()
+    {
+        var root = NewRoot();
+        var store = PersistentStore(root);
+        var sample = WithOrigin(CreateJob("TEST RECEIPT"), JobOrigins.TestReceipt);
+        var live = CreateJob("LIVE RECEIPT");
+
+        store.Add(sample);
+        store.Add(live);
+
+        Assert.Equal(2, store.GetSummaries().Count);
+        var reloaded = PersistentStore(root);
+        Assert.Null(reloaded.Get(sample.Id));
+        Assert.NotNull(reloaded.Get(live.Id));
+    }
+
+    [Fact]
     public void PaidHistoryRoundTripsThroughOneSqliteDatabase()
     {
         var root = NewRoot();
@@ -373,6 +390,17 @@ public sealed class ReceiptStoreTests
         ListenerId = id,
         ListenerName = name,
         ListenerPort = port
+    };
+
+    private static ReceiptJob WithOrigin(ReceiptJob job, string origin) => new()
+    {
+        Id = job.Id,
+        ReceivedAt = job.ReceivedAt,
+        SourceIp = job.SourceIp,
+        RawPayload = job.RawPayload,
+        Receipt = job.Receipt,
+        Status = job.Status,
+        Origin = origin
     };
 
     private static string WriteLegacyJob(string historyDirectory, ReceiptJob job)

@@ -11,6 +11,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 - Annual Application Maintenance and Support in v0.3.26 keeps paid licenses permanent, includes one year of updates and assisted support with new purchases, and offers later annual renewals as optional one-time purchases rather than subscriptions.
 - Receipt preview with persistent Light and Dark viewing modes.
 - Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
+- The v0.3.37 Trial onboarding flow provides one guided listener, unlimited ephemeral built-in Test Receipts, a clear daily allowance counter, and privacy-safe ten-line previews after the complete-job allowance is exhausted.
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
@@ -27,7 +28,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.36 is the current public release, released July 22, 2026. The next planned release is v0.3.37 Receipt Comparison and Automated Validation.
+> **Release status:** v0.3.37 is the current public release, released July 22, 2026. v0.3.38 Receipt Comparison and Automated Validation is in development.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -253,8 +254,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.34 — Encrypted backup, EULA, and support policy:** Create password-protected `.ppebackup` packages with preview and rollback-safe restore; require installer acceptance of the public EPCOM Ltd. EULA; and align Windows, third-party POS, maintenance-response, licensing, privacy, and support boundaries.
 - **Released in v0.3.35 — Backup restore usability and compatibility:** Keep the native `.ppebackup` extension, accept legacy `.ppebackup.zip` files, add in-app restore guidance, and publish an illustrated customer guide.
 - **Released in v0.3.36 — Privacy-preserving geographic analytics:** Map approximate country and U.S. state totals for downloads and product usage without retaining raw IP addresses.
-- **Next in v0.3.37 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.38 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
+- **Released in v0.3.37 — Trial Setup and Onboarding Improvements:** Added guided first-launch setup, unlimited ephemeral Test Receipts, clear Trial allowance status, privacy-safe over-limit previews, and safe single-listener port recovery.
+- **v0.3.38 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.39 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

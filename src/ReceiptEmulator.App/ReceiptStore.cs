@@ -59,7 +59,7 @@ public sealed class ReceiptStore
                 _jobs.RemoveLast();
             }
 
-            if (HasPersistentHistory)
+            if (HasPersistentHistory && !IsEphemeral(job))
             {
                 Persist(job);
             }
@@ -84,7 +84,10 @@ public sealed class ReceiptStore
                     _jobs.AddFirst(job);
                 }
 
-                Persist(job);
+                if (!IsEphemeral(job))
+                {
+                    Persist(job);
+                }
             }
 
             while (_jobs.Count > HistoryCapacity)
@@ -474,6 +477,9 @@ public sealed class ReceiptStore
     private static string FirstUsefulLine(ParsedReceipt receipt) => receipt.Lines
         .Select(line => string.Concat(line.Spans.Select(span => span.Text)).Trim())
         .FirstOrDefault(text => text.Length > 0) ?? "Receipt job";
+
+    private static bool IsEphemeral(ReceiptJob job) =>
+        job.Origin.Equals(JobOrigins.TestReceipt, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesListener(ReceiptJob job, string? listenerId) =>
         string.IsNullOrWhiteSpace(listenerId) ||

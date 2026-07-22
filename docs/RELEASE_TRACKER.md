@@ -12,13 +12,13 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.36 — released 2026-07-22**
+**Current public release: v0.3.37 — released 2026-07-22**
 
-**Current development: v0.3.37 — Receipt comparison and automated validation**
+**Current development: v0.3.38 — Receipt comparison and automated validation**
 
-**Next release after v0.3.37: v0.3.38 — Guided update installation and restart**
+**Next release after v0.3.38: v0.3.39 — Guided update installation and restart**
 
-**Most recently completed: v0.3.36 — Privacy-preserving geographic analytics dashboard**
+**Most recently completed: v0.3.37 — Trial Setup and Onboarding Improvements**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -78,7 +78,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 uses deterministic captures and profiles for receipt comparison; and v0.3.38 closes the in-application update lifecycle with a pre-update safety snapshot.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 removes Trial onboarding friction; v0.3.38 uses deterministic captures and profiles for receipt comparison; and v0.3.39 closes the in-application update lifecycle with a pre-update safety snapshot.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -424,7 +424,27 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** The dashboard reports download starts, installations, launches, and print jobs by approximate region, raw IP addresses are absent from analytics storage, all filters and accessible table/map controls work, and automated contract checks pass.
 
-### v0.3.37 — Receipt comparison and automated validation
+### v0.3.37 — Trial Setup and Onboarding Improvements
+
+**Status:** Released — 2026-07-22
+
+**Purpose:** Let a nontechnical Trial customer install, open, test, and connect the emulator without first understanding listeners, TCP/IP ports, or Windows printer configuration.
+
+**Released scope:**
+
+- Show a first-launch welcome screen with **Set Up Trial Printer**, **Print a Test Receipt**, listener status, and **Troubleshoot Connection**.
+- Dynamically simplify the existing Printer Setup Wizard and label it **Trial Configuration Wizard** for Trial customers.
+- Start one enabled default listener, reuse `127.0.0.1:9100` for same-computer setup, and safely move the single listener to the first free sequential port after a confirmed conflict.
+- Make built-in Test Receipts unlimited, clearly labeled, session-only, excluded from paid history, and excluded from product usage reporting.
+- Count only complete external POS jobs toward the five-job local-day Trial allowance.
+- Continue accepting later external connections while retaining only the first ten rendered lines and an upgrade notice; irreversibly discard hidden bytes, parsed commands, and remaining receipt content.
+- Keep local connection diagnostics available with reviewed restart, firewall, wizard, and repair actions.
+
+**Security and privacy:** Over-limit content is redacted at ingestion, not merely hidden in the interface. Activating a paid license later cannot recover the discarded receipt bytes or lines. Test Receipts are not persisted or counted in telemetry.
+
+**Complete when:** A fresh Trial installation reaches a visible Test Receipt in one click, configures its single Windows printer through the shared wizard, recovers from a port-9100 conflict with confirmation, processes five complete external jobs, accepts a sixth without a POS-side failure, and proves that content after line ten is unavailable from every API, view, export, history, or diagnostic path.
+
+### v0.3.38 — Receipt comparison and automated validation
 
 **Status:** Next
 
@@ -445,7 +465,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
 
-### v0.3.38 — Guided update installation and restart
+### v0.3.39 — Guided update installation and restart
 
 **Status:** Planned
 
@@ -512,7 +532,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ## Future backlog
 
-These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after v0.3.37.
+These items remain unnumbered until the order is approved. The priority below is the recommended implementation order after the scheduled v0.3.37-v0.3.39 releases.
 
 ### Release prerequisite — Windows 11 Pro support-policy alignment
 

@@ -55,6 +55,67 @@ public sealed class ReceiptProcessorTests
         Assert.Equal(LicenseService.TrialDailyLimit, license.GetStatus().Remaining);
     }
 
+    [Fact]
+    public void BuiltInTestReceiptsAreUnlimitedAndDoNotConsumeTrialAllowance()
+    {
+        var license = new LicenseService(new TestEnvironment());
+        var store = new ReceiptStore(license);
+        var telemetry = new RecordingTelemetry();
+        var processor = new ReceiptProcessor(new EscPosParser(), store, license, NullLogger<ReceiptProcessor>.Instance, telemetry);
+        var profile = new PrinterProfileService(license).GetSelected();
+        var listener = new PrinterListenerJobContext(PrinterListenerDefaults.DefaultId, PrinterListenerDefaults.DefaultName, 9100);
+
+        foreach (var _ in Enumerable.Range(0, 12))
+        {
+            var sample = processor.ProcessTestReceipt(SampleReceipt.Create(), profile, listener, out var rejection);
+            Assert.NotNull(sample);
+            Assert.Null(rejection);
+            Assert.Equal(JobOrigins.TestReceipt, sample.Origin);
+            Assert.Equal("Completed", sample.Status);
+        }
+
+        Assert.Equal(LicenseService.TrialDailyLimit, license.GetStatus().Remaining);
+        Assert.All(store.GetSummaries(), summary => Assert.Equal(JobOrigins.TestReceipt, summary.Origin));
+        Assert.Equal(0, telemetry.PrintJobs);
+    }
+
+    [Fact]
+    public void JobsAfterTrialLimitAreAcceptedWithOnlyTenLinesAndNoOriginalBytes()
+    {
+        var license = new LicenseService(new TestEnvironment());
+        var store = new ReceiptStore(license);
+        var telemetry = new RecordingTelemetry();
+        var processor = new ReceiptProcessor(new EscPosParser(), store, license, NullLogger<ReceiptProcessor>.Instance, telemetry);
+        var payload = System.Text.Encoding.ASCII.GetBytes(string.Join('\n', Enumerable.Range(1, 15).Select(index => $"SECRET LINE {index:D2}")) + "\n");
+
+        foreach (var count in Enumerable.Range(0, LicenseService.TrialDailyLimit))
+        {
+            Assert.NotNull(processor.Process(System.Text.Encoding.ASCII.GetBytes($"COUNTED {count}\n"), "127.0.0.1", out _));
+        }
+
+        var limited = processor.Process(payload, "127.0.0.1", out var rejection);
+
+        Assert.NotNull(limited);
+        Assert.Null(rejection);
+        Assert.Equal(JobOrigins.TrialLimited, limited.Origin);
+        Assert.Equal("Trial Limit Reached", limited.Status);
+        Assert.Contains("SECRET LINE 10", limited.Receipt.PlainText);
+        Assert.DoesNotContain("SECRET LINE 11", limited.Receipt.PlainText);
+        Assert.DoesNotContain("SECRET LINE 15", limited.Receipt.PlainText);
+        Assert.Contains("TRIAL LICENSE LIMIT REACHED", limited.Receipt.PlainText);
+        Assert.DoesNotContain("SECRET LINE 11", System.Text.Encoding.UTF8.GetString(limited.RawPayload));
+        Assert.Single(limited.Receipt.Commands);
+        Assert.Equal(0, license.GetStatus().Remaining);
+        Assert.Equal(LicenseService.TrialDailyLimit, telemetry.PrintJobs);
+    }
+
+    private sealed class RecordingTelemetry : IUsageTelemetry
+    {
+        public int PrintJobs { get; private set; }
+        public void RecordPrintJob() => PrintJobs++;
+        public void RecordActivation() { }
+    }
+
     private sealed class TestEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = "Testing";

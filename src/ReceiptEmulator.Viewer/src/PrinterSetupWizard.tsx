@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, LoaderCircle, Printer, RotateCw, Server, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, LoaderCircle, Network, Printer, RotateCw, Server, XCircle } from 'lucide-react'
 import { api } from './api'
 import type { PrinterInstallRequest, PrinterInstallResult, PrinterPortSelection, PrinterSetupStatus } from './types'
 
 type DesktopBridge = { postMessage: (message: unknown) => void; addEventListener: (type: 'message', listener: (event: MessageEvent) => void) => void; removeEventListener: (type: 'message', listener: (event: MessageEvent) => void) => void }
 const desktopBridge = () => (window as Window & { chrome?: { webview?: DesktopBridge } }).chrome?.webview
 
-export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
+export function PrinterSetupWizard({ onCancel, trialMode = false }: { onCancel: () => void; trialMode?: boolean }) {
   const [step, setStep] = useState(1)
   const [sameComputer, setSameComputer] = useState(true)
   const [ipAddress, setIpAddress] = useState('127.0.0.1')
@@ -20,6 +20,7 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
   const [result, setResult] = useState<PrinterInstallResult>()
   const [detailsVisible, setDetailsVisible] = useState(false)
   const [testMessage, setTestMessage] = useState<string>()
+  const [alternativePortConfirmed, setAlternativePortConfirmed] = useState(false)
 
   useEffect(() => {
     api.printerSetupStatus().then(setDriver).catch(cause => setDriverError(cause instanceof Error ? cause.message : 'Driver status could not be checked.'))
@@ -50,6 +51,7 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
     setIpAddress(value ? '127.0.0.1' : '')
     setPort(9100)
     setPortSelection(undefined)
+    setAlternativePortConfirmed(false)
     setPortError(undefined)
   }
 
@@ -60,6 +62,7 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
       const selection = await api.availablePrinterPort(printerName.trim(), ipAddress)
       setPort(selection.port)
       setPortSelection(selection)
+      setAlternativePortConfirmed(!selection.automaticallyAdjusted)
       return selection
     } catch (cause) {
       setPortError(cause instanceof Error ? cause.message : 'Windows printer-port availability could not be checked.')
@@ -103,7 +106,15 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
       setStep(4)
     }
   }
-  function printTest() { setTestMessage('Sending test receipt…'); desktopBridge()?.postMessage({ type: 'print-printer-test', printerName }) }
+  async function printTest() {
+    setTestMessage('Creating the unlimited built-in Test Receipt…')
+    try {
+      await api.sample()
+      setTestMessage('Test Receipt created in Activity. It did not use a Trial POS job.')
+    } catch (error) {
+      setTestMessage(error instanceof Error ? error.message : 'The Test Receipt could not be created.')
+    }
+  }
 
   return (
     <div className="printer-wizard">
@@ -112,11 +123,13 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
       </div>
       <div className="wizard-step-label">Step {step} of 6</div>
 
+      {step === 1 && trialMode && <div className="trial-wizard-intro"><strong>Trial Configuration Wizard</strong><span>Sets up one printer listener. You can create unlimited built-in Test Receipts and process five complete POS print jobs each local day.</span></div>}
+
       {step === 1 && <div className="wizard-page">
         <div className="wizard-heading"><Server size={28} /><div><h2>Where is your POS software?</h2><p>We’ll choose the correct connection automatically.</p></div></div>
         <fieldset className="choice-cards"><legend>Is the POS software installed on this computer?</legend>
           <label className={sameComputer ? 'selected' : ''}><input type="radio" checked={sameComputer} onChange={() => chooseLocation(true)} /><strong>Yes, this computer</strong><span>Recommended for a single-computer setup</span></label>
-          <label className={!sameComputer ? 'selected' : ''}><input type="radio" checked={!sameComputer} onChange={() => chooseLocation(false)} /><strong>No, another computer</strong><span>The POS sends receipts across your local network</span></label>
+          <label className={!sameComputer ? 'selected' : ''}><input type="radio" checked={!sameComputer} onChange={() => chooseLocation(false)} /><strong>No, another computer</strong><span>Use this computer’s private network address; 127.0.0.1 works only on the same PC</span></label>
         </fieldset>
         {!sameComputer && <label className="wizard-field">Emulator computer IP address<input value={ipAddress} onChange={event => setIpAddress(event.target.value)} placeholder="Example: 192.168.1.25" inputMode="decimal" /><small>On the computer running this emulator, open Windows Settings → Network & internet to find its IPv4 address.</small>{ipAddress && !ipValid && <em>Enter a valid IPv4 address.</em>}</label>}
         <div className="automatic-value"><span>Connection port</span><strong>Starts at 9100 · availability checked automatically</strong></div>
@@ -158,6 +171,8 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
           {portSelection.automaticallyAdjusted ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
           <div><strong>{portSelection.automaticallyAdjusted ? `Port ${port} selected automatically` : `Port ${port} is available`}</strong><p>{portSelection.message}</p></div>
         </div>}
+        {portSelection?.automaticallyAdjusted && <label className="port-confirmation"><input type="checkbox" checked={alternativePortConfirmed} onChange={event => setAlternativePortConfirmed(event.target.checked)} /><span>I understand port 9100 is assigned and confirm the automatically selected port {port}.</span></label>}
+        {!sameComputer && <div className="wizard-tip"><Network size={18} /><p>Enter <strong>{ipAddress}:{port}</strong> in the POS software on the other computer. Trial supports this one listener; Pro supports two and Enterprise supports up to 15.</p></div>}
       </div>}
 
       {step === 5 && <div className="wizard-page wizard-installing"><LoaderCircle className="spin" size={42} /><h2>Installing your printer…</h2><p>Approve the Windows security prompt if it appears. Keep this window open while the Epson driver, printer port, and Windows printer are configured.</p><div className="installation-list"><span>Checking Epson components</span><span>Creating the printer connection</span><span>Adding and verifying the Windows printer</span></div></div>}
@@ -180,7 +195,7 @@ export function PrinterSetupWizard({ onCancel }: { onCancel: () => void }) {
         <div>
           {step > 1 && step < 5 && step !== 6 && <button className="secondary-action" onClick={() => setStep(value => value - 1)}><ChevronLeft size={16} /> Back</button>}
           {step < 4 && <button className="primary-action" disabled={!canContinue || resolvingPort} onClick={continueWizard}>{resolvingPort ? 'Checking port…' : 'Continue'} {!resolvingPort && <ChevronRight size={16} />}</button>}
-          {step === 4 && <button className="primary-action" disabled={resolvingPort || !driver || (!driver.driverInstalled && !driver.driverPackageAvailable)} onClick={install}><Printer size={16} /> {resolvingPort ? 'Rechecking port…' : 'Install Printer'}</button>}
+          {step === 4 && <button className="primary-action" disabled={resolvingPort || !driver || (!driver.driverInstalled && !driver.driverPackageAvailable) || (portSelection?.automaticallyAdjusted === true && !alternativePortConfirmed)} onClick={install}><Printer size={16} /> {resolvingPort ? 'Rechecking port…' : 'Install Printer'}</button>}
           {step === 6 && result?.success && <button className="primary-action" onClick={printTest}><Printer size={16} /> Print Test Receipt</button>}
           {step === 6 && !result?.success && <button className="primary-action" onClick={retry}><RotateCw size={16} /> Retry Installation</button>}
         </div>

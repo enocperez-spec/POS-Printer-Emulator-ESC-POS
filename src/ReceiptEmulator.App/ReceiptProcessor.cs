@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace ReceiptEmulator;
 
 public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, LicenseService license, ILogger<ReceiptProcessor> logger, IUsageTelemetry? telemetry = null, PrinterProfileService? profiles = null)
@@ -14,6 +16,14 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
         out string? rejection)
         => ProcessCore(payload, sourceIp, JobOrigins.Live, true, true, null, sourceIp, null, null, null,
             profile, listener, out rejection);
+
+    internal ReceiptJob? ProcessTestReceipt(
+        byte[] payload,
+        PrinterProfile profile,
+        PrinterListenerJobContext listener,
+        out string? rejection)
+        => ProcessCore(payload, "Built-in test", JobOrigins.TestReceipt, false, false, null,
+            "Built-in test", null, null, null, profile, listener, out rejection);
 
     public ReceiptJob? Import(
         byte[] payload,
@@ -108,11 +118,16 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             return null;
         }
 
-        if (consumeTrial && !license.TryConsume(out _))
+        var trialLimitReached = consumeTrial && !license.TryConsume(out _);
+        if (trialLimitReached)
         {
-            rejection = "Daily trial limit reached. Activate POS Printer Emulator to process more jobs.";
-            logger.LogWarning("Rejected receipt from {SourceIp}: trial limit reached", sourceIp);
-            return null;
+            receipt = CreateTrialLimitedReceipt(receipt);
+            payload = Encoding.UTF8.GetBytes(receipt.PlainText);
+            origin = JobOrigins.TrialLimited;
+            recordTelemetry = false;
+            logger.LogInformation(
+                "Accepted a privacy-redacted Trial-limit receipt from {SourceIp}; original payload content was discarded",
+                sourceIp);
         }
 
         var receivedAt = DateTimeOffset.Now;
@@ -123,7 +138,7 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             SourceIp = sourceIp,
             RawPayload = payload,
             Receipt = receipt,
-            Status = "Completed",
+            Status = trialLimitReached ? "Trial Limit Reached" : "Completed",
             Origin = origin,
             RendererVersion = ProductInfo.Version,
             OriginalReceivedAt = originalReceivedAt ?? receivedAt,
@@ -148,6 +163,30 @@ public sealed class ReceiptProcessor(EscPosParser parser, ReceiptStore store, Li
             "Stored {Origin} receipt {ReceiptId} from {SourceIp} on listener {ListenerId} ({Length} bytes)",
             origin, job.Id, sourceIp, job.ListenerId, payload.Length);
         return job;
+    }
+
+    private static ParsedReceipt CreateTrialLimitedReceipt(ParsedReceipt source)
+    {
+        const int visibleLineLimit = 10;
+        var limited = new ParsedReceipt();
+        limited.Lines.AddRange(source.Lines.Take(visibleLineLimit));
+        limited.Lines.Add(new ReceiptLine("center", []));
+        limited.Lines.Add(new ReceiptLine("center",
+            [new ReceiptSpan("TRIAL LICENSE LIMIT REACHED", true, false, 1, 1)]));
+        limited.Lines.Add(new ReceiptLine("center",
+            [new ReceiptSpan("The Trial License is limited to five complete", false, false, 1, 1)]));
+        limited.Lines.Add(new ReceiptLine("center",
+            [new ReceiptSpan("emulated print jobs per day.", false, false, 1, 1)]));
+        limited.Lines.Add(new ReceiptLine("center",
+            [new ReceiptSpan("Upgrade to Lite, Pro, or Enterprise to view", false, false, 1, 1)]));
+        limited.Lines.Add(new ReceiptLine("center",
+            [new ReceiptSpan("complete receipts and unlock additional features.", false, false, 1, 1)]));
+        limited.Commands.Add(new ParsedCommand(
+            0,
+            string.Empty,
+            "Trial limit notice",
+            "Original raw bytes and remaining receipt content were discarded for privacy."));
+        return limited;
     }
 
     private static PrinterListenerJobContext? CreateListenerContext(

@@ -19,6 +19,9 @@ public static class SampleReceipt
         Command(0x1D, 0x21, 0x11);
         Text("POS PRINTER EMULATOR\n");
         Command(0x1D, 0x21, 0x00);
+        Command(0x1B, 0x45, 0x01);
+        Text("TEST RECEIPT\n");
+        Command(0x1B, 0x45, 0x00);
         Text("1234 Glenridge Rd. NW\nAtlanta, GA 30342\n");
         Text("------------------------------------------\n");
         Command(0x1B, 0x45, 0x01);
