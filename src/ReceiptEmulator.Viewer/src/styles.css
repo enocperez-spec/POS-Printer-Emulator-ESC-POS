@@ -971,6 +971,16 @@ html[data-theme="dark"] .enterprise-eyebrow { color: #b9a8ff; }
 .backup-card > header svg { color: var(--blue); }
 .backup-card h4 { margin: 0 0 4px; font-size: 13px; }
 .backup-card header p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.backup-title-with-help { display: flex; align-items: center; gap: 7px; }
+.backup-title-with-help h4 { margin: 0; }
+.backup-help { position: relative; display: inline-flex; align-items: center; justify-content: center; color: var(--blue); cursor: help; outline: 0; }
+.backup-help::before { position: absolute; inset: -5px; content: ""; border-radius: 50%; }
+.backup-help:focus-visible { border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
+.backup-help-tooltip { position: absolute; z-index: 30; bottom: calc(100% + 10px); left: 50%; width: 280px; display: grid; gap: 6px; padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--blue) 32%, var(--border)); border-radius: 9px; color: var(--text); background: var(--surface); box-shadow: 0 12px 32px rgb(8 27 51 / 24%); font-size: 10px; font-weight: 500; line-height: 1.45; opacity: 0; pointer-events: none; transform: translate(-50%, 5px); transition: opacity .15s ease, transform .15s ease; }
+.backup-help-tooltip::after { position: absolute; top: 100%; left: 50%; width: 10px; height: 10px; content: ""; border-right: 1px solid color-mix(in srgb, var(--blue) 32%, var(--border)); border-bottom: 1px solid color-mix(in srgb, var(--blue) 32%, var(--border)); background: var(--surface); transform: translate(-50%, -5px) rotate(45deg); }
+.backup-help-tooltip strong { color: var(--blue); font-size: 11px; }
+.backup-help-tooltip small { padding-top: 2px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9px; }
+.backup-help:hover .backup-help-tooltip, .backup-help:focus .backup-help-tooltip, .backup-help:focus-within .backup-help-tooltip { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 .backup-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
 .backup-fields label, .backup-restore-password { display: grid; gap: 6px; color: var(--text); font-size: 10px; font-weight: 750; }
 .backup-fields input, .backup-restore-password input { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface-muted); font-size: 11px; outline: 0; }
@@ -1020,6 +1030,9 @@ html[data-theme="dark"] .enterprise-eyebrow { color: #b9a8ff; }
   .backup-settings { padding: 18px 14px; }
   .backup-fields, .backup-category-columns { grid-template-columns: 1fr; }
   .backup-preview dl { grid-template-columns: 1fr 1fr; }
+  .backup-help-tooltip { right: -36px; left: auto; width: min(260px, calc(100vw - 84px)); transform: translateY(5px); }
+  .backup-help-tooltip::after { right: 20px; left: auto; transform: translateY(-5px) rotate(45deg); }
+  .backup-help:hover .backup-help-tooltip, .backup-help:focus .backup-help-tooltip, .backup-help:focus-within .backup-help-tooltip { transform: translateY(0); }
 }
 .enterprise-upgrade-panel { display: grid; align-content: center; justify-items: center; max-width: 620px; margin: auto; padding: 54px; text-align: center; }
 .enterprise-upgrade-icon { width: 66px; height: 66px; display: grid; place-items: center; margin-bottom: 15px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #6651b8, #3b2e7d); box-shadow: 0 12px 28px rgb(84 64 170 / 25%); }

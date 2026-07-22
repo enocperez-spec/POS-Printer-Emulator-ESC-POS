@@ -6,6 +6,8 @@ This directory contains the static production website for `posprinteremulator.co
 
 - `index.html`: public product, feature, licensing, download, and FAQ page.
 - `application-maintenance-support.html`: canonical permanent-license and optional annual maintenance policy, renewal pricing, and renewal links.
+- `documentation.html`: product documentation and links to task-specific setup guides.
+- `how-to-back-up-and-restore-pos-printer-emulator.html`: illustrated backup and restore instructions, including legacy file-name guidance.
 - `privacy.html`: privacy information.
 - `eula.html`: public End User License Agreement shown during installation.
 - `styles.css` and `script.js`: responsive presentation and interactions.

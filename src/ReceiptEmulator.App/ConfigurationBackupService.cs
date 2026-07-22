@@ -167,6 +167,14 @@ internal static class BackupPackageCodec
 public sealed class ConfigurationBackupService
 {
     public const string FileExtension = ".ppebackup";
+
+    public static bool IsSupportedFileName(string fileName)
+    {
+        var name = Path.GetFileName(fileName);
+        return name.EndsWith(FileExtension, StringComparison.OrdinalIgnoreCase) ||
+               name.EndsWith(FileExtension + ".zip", StringComparison.OrdinalIgnoreCase);
+    }
+
     private const int MaximumProfiles = 100;
     private const int MaximumGraphics = 100;
     private readonly SemaphoreSlim _gate = new(1, 1);

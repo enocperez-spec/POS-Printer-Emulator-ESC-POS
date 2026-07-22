@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>How to Back Up and Restore POS Printer Emulator</title>
+    <meta name="description" content="Create, review, and restore an encrypted POS Printer Emulator configuration backup. Includes screenshots and help for files ending in .ppebackup.zip." />
+    <link rel="canonical" href="https://www.posprinteremulator.com/how-to-back-up-and-restore-pos-printer-emulator" />
+    <link rel="icon" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css?v=20260715" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260722" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"HowTo","name":"How to back up and restore POS Printer Emulator","description":"Create and restore an encrypted POS Printer Emulator configuration backup.","step":[{"@type":"HowToStep","name":"Open Backup & Restore","text":"Open Settings, select Backup & Restore, and use the question-mark help icon when guidance is needed."},{"@type":"HowToStep","name":"Choose the backup file","text":"Choose the .ppebackup file in the application. Do not extract it with Windows."},{"@type":"HowToStep","name":"Enter the password and review","text":"Enter the password used to create the backup and select Review Backup."},{"@type":"HowToStep","name":"Confirm and restore","text":"Review the included and excluded information, select the confirmation checkbox, and restore the configuration."}]}
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator" /></a>
+        <button class="menu-toggle" aria-expanded="false" aria-controls="site-nav" data-menu-toggle><span></span><span></span><span></span></button>
+        <nav class="site-nav" id="site-nav" data-nav><a href="/">Home</a><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a class="button button-small" href="pos-printer-emulator-download">Download</a></nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero">
+        <div class="shell">
+          <div class="breadcrumbs"><a href="/">Home</a><span>/</span><a href="documentation">Documentation</a><span>/</span><span>Backup and restore</span></div>
+          <h1>Back Up and Restore POS Printer Emulator</h1>
+          <p>Protect your printer listeners, profiles, stored logos, printer states, and application preferences in one encrypted file.</p>
+        </div>
+      </section>
+      <section class="page-body">
+        <div class="shell article-layout">
+          <article class="article-content">
+            <div class="callout"><p><strong>Important:</strong> a <code>.ppebackup</code> file is an encrypted POS Printer Emulator backup—not a normal ZIP archive. Do not use Windows Extract Compressed. Restore it from inside the application.</p></div>
+
+            <h2>Create a backup</h2>
+            <p>Open <strong>Settings → Backup &amp; Restore</strong>. Enter the same password twice, optionally include local receipt history when your license permits it, and select <strong>Create Backup</strong>. Save the password separately because it cannot be recovered.</p>
+
+            <h2>Restore a backup</h2>
+            <section class="guide-step">
+              <h3><span class="guide-step-number">1</span>Open the restore help</h3>
+              <p>Open <strong>Settings → Backup &amp; Restore</strong>. Hover over or focus the small question-mark icon beside <strong>Restore from backup</strong> to see the instructions without leaving the application.</p>
+              <figure class="guide-screenshot"><img src="assets/backup-restore-help.png" alt="Backup and Restore settings with the restore help tooltip open" loading="lazy" /><figcaption>The help reminder explains that the backup stays encrypted and must be opened inside POS Printer Emulator.</figcaption></figure>
+            </section>
+
+            <section class="guide-step">
+              <h3><span class="guide-step-number">2</span>Choose the backup and enter its password</h3>
+              <p>Select <strong>Choose .ppebackup file</strong>, choose your backup, enter the password used when it was created, and select <strong>Review Backup</strong>.</p>
+              <p>Files saved by version 0.3.34 may have this name:</p>
+              <code class="file-name-example">pos-printer-emulator-20260722T003102.ppebackup.zip</code>
+              <p>The application accepts that legacy name. If an older installation does not show the file, rename it by removing only the final <code>.zip</code>. Do not extract or modify its contents.</p>
+              <figure class="guide-screenshot"><img src="assets/backup-restore-file.png" alt="Restore form with an encrypted backup selected and password field ready" loading="lazy" /><figcaption>Select the encrypted backup directly. The password is checked before the application changes any configuration.</figcaption></figure>
+            </section>
+
+            <section class="guide-step">
+              <h3><span class="guide-step-number">3</span>Review before restoring</h3>
+              <p>Confirm the creation date, application version, included categories, item counts, exclusions, and any compatibility warnings. Activation keys, registration details, credentials, logs, Windows printer queues, and Epson driver files are never restored from the package.</p>
+              <figure class="guide-screenshot"><img src="assets/backup-restore-review.png" alt="Verified backup preview showing included and excluded configuration before restore" loading="lazy" /><figcaption>No configuration changes occur during review. The Restore Configuration button remains unavailable until you confirm the replacement.</figcaption></figure>
+            </section>
+
+            <section class="guide-step">
+              <h3><span class="guide-step-number">4</span>Confirm and restore</h3>
+              <p>Select <strong>Replace the current configuration</strong>, then select <strong>Restore Configuration</strong>. The application creates a Windows-protected safety snapshot first and automatically rolls back if restoration fails.</p>
+              <figure class="guide-screenshot"><img src="assets/backup-restore-success.png" alt="Configuration restored successfully confirmation in POS Printer Emulator" loading="lazy" /><figcaption>The success message reports what was restored and records the safety snapshot created before the change.</figcaption></figure>
+            </section>
+
+            <h2>Common questions</h2>
+            <ul>
+              <li><strong>Windows says the ZIP folder is empty:</strong> close the extraction wizard. The encrypted backup is not a ZIP file.</li>
+              <li><strong>The password is rejected:</strong> enter the exact password used when creating the backup. It cannot be reset or recovered.</li>
+              <li><strong>The backup came from a higher license tier:</strong> all listener definitions remain preserved, but only the number permitted by the active license can run.</li>
+              <li><strong>The backup was created by a newer version:</strong> install the latest available update before restoring when possible.</li>
+            </ul>
+          </article>
+          <aside class="sidebar-card">
+            <h2>Backup checklist</h2>
+            <p>Keep the encrypted file and password in separate safe locations.</p>
+            <a class="button button-primary" href="documentation">Open documentation</a>
+            <a class="button button-outline" href="pos-printer-emulator-download">Download the application</a>
+            <ul class="sidebar-links"><li><a href="#main">Restore steps</a></li><li><a href="faq">Frequently asked questions</a></li><li><a href="privacy">Privacy information</a></li></ul>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <section class="related"><div class="shell"><h2>Related guides</h2><div class="related-grid"><a href="documentation"><strong>Application documentation</strong><span>Learn each Settings area.</span></a><a href="how-to-test-pos-receipts-without-a-printer"><strong>Test a receipt</strong><span>Send and inspect an ESC/POS job.</span></a><a href="esc-pos-troubleshooting"><strong>Troubleshooting</strong><span>Diagnose receipt and connection problems.</span></a></div></div></section>
+    <footer class="site-footer"><div class="shell footer-top"><a class="brand footer-brand" href="/"><img src="assets/logo-web.png" alt="POS Printer Emulator" /></a><nav><a href="documentation">Documentation</a><a href="pricing">Pricing</a><a href="faq">FAQ</a><a href="privacy">Privacy</a><a href="eula">EULA</a></nav></div><div class="shell footer-bottom"><span>© 2026 POS Printer Emulator.</span><span>Local tools for better receipt testing.</span></div></footer>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>

@@ -935,8 +935,8 @@ static async Task<(byte[] Package, string Password)> ReadBackupUploadAsync(
         throw new ArgumentException("Select a POS Printer Emulator backup file and enter its password.");
     var form = await request.ReadFormAsync(cancellationToken);
     var file = form.Files.GetFile("file") ?? throw new ArgumentException("Select a .ppebackup file.");
-    if (!Path.GetExtension(file.FileName).Equals(ConfigurationBackupService.FileExtension, StringComparison.OrdinalIgnoreCase))
-        throw new ArgumentException("Select a .ppebackup file created by POS Printer Emulator.");
+    if (!ConfigurationBackupService.IsSupportedFileName(file.FileName))
+        throw new ArgumentException("Select a .ppebackup file created by POS Printer Emulator. Files ending in .ppebackup.zip from version 0.3.34 are also accepted.");
     if (file.Length <= 0 || file.Length > BackupPackageCodec.MaximumPackageBytes)
         throw new ArgumentException("Backup files must be between 1 byte and 128 MB.");
     var password = form["password"].ToString();

@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { AlertTriangle, CheckCircle2, DatabaseBackup, Eye, FileArchive, LockKeyhole, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CircleHelp, DatabaseBackup, Eye, FileArchive, LockKeyhole, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
 import { api } from './api'
 import type { BackupPreferences, ConfigurationBackupPreview, ConfigurationRestoreResult, LicenseStatus } from './types'
 
@@ -137,8 +137,8 @@ export function BackupRestoreSettings({ license, preferences, onRestored }: Prop
       </section>
 
       <section className="backup-card">
-        <header><div><RotateCcw size={19} /><div><h4>Restore from backup</h4><p>Review every category and warning before anything changes.</p></div></div></header>
-        <input ref={fileInput} className="visually-hidden" type="file" accept=".ppebackup,application/vnd.pos-printer-emulator.backup" onChange={chooseFile} />
+        <header><div><RotateCcw size={19} /><div><div className="backup-title-with-help"><h4>Restore from backup</h4><span className="backup-help" tabIndex={0} aria-label="How to restore a backup"><CircleHelp size={16} /><span className="backup-help-tooltip" role="tooltip"><strong>How to restore</strong><span>1. Do not extract the backup in Windows.</span><span>2. Choose the .ppebackup file and enter its password.</span><span>3. Select Review Backup, confirm the contents, then restore.</span><small>Files ending in .ppebackup.zip from version 0.3.34 are also accepted.</small></span></span></div><p>Review every category and warning before anything changes.</p></div></div></header>
+        <input ref={fileInput} className="visually-hidden" type="file" accept=".ppebackup,.ppebackup.zip,application/vnd.pos-printer-emulator.backup" onChange={chooseFile} />
         <button className="backup-file-button" onClick={() => fileInput.current?.click()}><Upload size={16} /> {file ? file.name : 'Choose .ppebackup file'}</button>
         <label className="backup-restore-password">Backup password<input type="password" value={restorePassword} onChange={event => { setRestorePassword(event.target.value); setPreview(undefined); setConfirmed(false) }} autoComplete="current-password" placeholder="Password used when the backup was created" /></label>
         <div className="backup-actions"><button onClick={inspectBackup} disabled={!canInspect}><Eye size={16} /> {inspecting ? 'Inspecting…' : 'Review Backup'}</button></div>

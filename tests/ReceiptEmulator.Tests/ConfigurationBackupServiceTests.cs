@@ -49,6 +49,25 @@ public sealed class ConfigurationBackupServiceTests
         Assert.Contains("10 to 256", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("configuration.ppebackup")]
+    [InlineData("configuration.PPEBACKUP")]
+    [InlineData("configuration.ppebackup.zip")]
+    [InlineData("configuration.PPEBACKUP.ZIP")]
+    public void SupportedBackupFileNamesIncludeLegacyZipSuffix(string fileName)
+    {
+        Assert.True(ConfigurationBackupService.IsSupportedFileName(fileName));
+    }
+
+    [Theory]
+    [InlineData("configuration.zip")]
+    [InlineData("configuration.exe")]
+    [InlineData("configuration.ppebackup.txt")]
+    public void UnrelatedFileNamesAreRejected(string fileName)
+    {
+        Assert.False(ConfigurationBackupService.IsSupportedFileName(fileName));
+    }
+
     private static ConfigurationBackupPayload Payload()
     {
         var now = DateTimeOffset.Parse("2026-07-21T15:00:00Z");

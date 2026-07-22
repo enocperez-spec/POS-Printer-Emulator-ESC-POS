@@ -123,16 +123,28 @@ public partial class MainWindow : Window
         Browser.CoreWebView2.DownloadStarting += (_, eventArgs) =>
         {
             var suggestedName = Path.GetFileName(eventArgs.ResultFilePath);
+            var extension = Path.GetExtension(suggestedName).ToLowerInvariant();
+            var (title, filter, defaultExtension) = extension switch
+            {
+                ".ppebackup" => ("Save POS Printer Emulator backup", "POS Printer Emulator backup|*.ppebackup|All files|*.*", "ppebackup"),
+                ".ppeprofile" => ("Save printer profile", "POS Printer Emulator profile|*.ppeprofile|All files|*.*", "ppeprofile"),
+                ".ppecapture" => ("Save receipt capture", "POS Printer Emulator capture|*.ppecapture|All files|*.*", "ppecapture"),
+                ".zip" => ("Save support package", "Compressed support package|*.zip|All files|*.*", "zip"),
+                ".txt" => ("Save text file", "Text file|*.txt|All files|*.*", "txt"),
+                ".bin" => ("Save raw receipt data", "Binary receipt data|*.bin|All files|*.*", "bin"),
+                _ => ("Save POS Printer Emulator file", "POS Printer Emulator files|*.ppebackup;*.ppeprofile;*.ppecapture;*.zip;*.txt;*.bin|All files|*.*", string.Empty)
+            };
             var dialog = new SaveFileDialog
             {
-                Title = "Save receipt file",
+                Title = title,
                 FileName = string.IsNullOrWhiteSpace(suggestedName) ? "receipt-download" : suggestedName,
                 InitialDirectory = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads"),
                 AddExtension = true,
+                DefaultExt = defaultExtension,
                 OverwritePrompt = true,
-                Filter = "Support and receipt files|*.zip;*.txt;*.bin;*.ppecapture|All files|*.*"
+                Filter = filter
             };
 
             eventArgs.Handled = true;
