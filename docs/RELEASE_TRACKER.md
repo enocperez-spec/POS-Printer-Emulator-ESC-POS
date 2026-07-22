@@ -14,11 +14,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Current public release: v0.3.38 — released 2026-07-22**
 
-**Current development: v0.3.39 — Receipt comparison and automated validation**
+**Current development: v0.3.39 — Guided update installation and restart**
 
-**Next release after v0.3.39: v0.3.40 — Guided update installation and restart**
+**Next release after v0.3.39: v0.3.40 — Simple Mode and Expert Mode**
 
-**Future customer-experience sequence: v0.3.41 through v0.3.48**
+**Future scheduled sequence: v0.3.40 through v0.3.48**
 
 **Most recently completed: v0.3.38 — Trial Onboarding Clarity Correction**
 
@@ -82,7 +82,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 uses deterministic captures and profiles for receipt comparison; v0.3.40 closes the in-application update lifecycle; and v0.3.41-v0.3.48 improve everyday usability, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40-v0.3.47 improve everyday usability, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; and v0.3.48 delivers receipt comparison and automated validation after those customer-experience foundations.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -469,30 +469,9 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A fresh or upgraded Trial installation sees the corrected guide, can reopen it, can run the wizard from Step 1, sees one read-only listener in Step 2, can copy exact connection details, and cannot alter listener configuration through either the interface or API.
 
-### v0.3.39 — Receipt comparison and automated validation
+### v0.3.39 — Guided update installation and restart
 
 **Status:** Next
-
-**GitHub:** [Issue #21 — Receipt comparison and automated validation](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21)
-
-**Purpose:** Turn the emulator into a repeatable compatibility-testing tool for POS changes, printer migrations, and regression testing.
-
-**Planned scope:**
-
-- Select any two jobs or compare a job against a named saved baseline.
-- Compare raw bytes, normalized parsed commands, extracted text, warnings, and rendered receipt output.
-- Highlight additions, removals, changed commands, layout changes, and image differences.
-- Allow configurable comparison rules for values such as dates, times, check numbers, and transaction identifiers.
-- Save validation suites made from capture files and printer profiles.
-- Run a validation suite locally and produce clear pass, warning, or fail results.
-- Export human-readable HTML/PDF results and machine-readable JSON results.
-- Add deterministic golden-output tests for the supported renderer behavior.
-
-**Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, and ignored dynamic fields do not cause false failures.
-
-### v0.3.40 — Guided update installation and restart
-
-**Status:** Planned
 
 **GitHub:** [Issue #3 — Guided update installation and restart](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3)
 
@@ -517,7 +496,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** From Settings, a customer can download an update, choose Install and Restart, see the listener stop cleanly, complete the installation with no locked-file error, relaunch automatically on the new version, and retain registration, licensing, settings, stored data, and the previously selected receipt; cancel and failure paths leave the current installation usable.
 
-### v0.3.41 — Simple Mode and Expert Mode
+### v0.3.40 — Simple Mode and Expert Mode
 
 **Status:** Planned
 
@@ -542,7 +521,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A new customer can set up, connect, test, review the latest receipt, and diagnose a problem from Simple Mode, then switch to Expert Mode and find the same state and data.
 
-### v0.3.42 — Accessibility and keyboard usability
+### v0.3.41 — Accessibility and keyboard usability
 
 **Status:** Planned
 
@@ -567,7 +546,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
 
-### v0.3.43 — Automatic configuration restore points
+### v0.3.42 — Automatic configuration restore points
 
 **Status:** Planned
 
@@ -592,7 +571,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
 
-### v0.3.44 — Projects and testing sessions
+### v0.3.43 — Projects and testing sessions
 
 **Status:** Planned
 
@@ -607,17 +586,17 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Provide project selection, recent projects, archive, duplicate, safe move or copy, export, and import workflows.
 - Preserve project filters and the last-open session across restarts without changing active listener routing unexpectedly.
 - Validate imported project schemas, integrity checksums, item limits, and safe paths before committing any data.
-- Integrate projects with receipt comparison while keeping shared built-in profiles and stored logos understandable.
+- Expose stable project identifiers and data boundaries that the later receipt-comparison release can reuse while keeping shared built-in profiles and stored logos understandable.
 
 **License availability:** Pro and Enterprise.
 
 **Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
 
-**Why this order:** The comparison foundation in v0.3.39 makes project-level test organization useful, while v0.3.43 supplies a recovery layer first.
+**Why this order:** The restore-point foundation in v0.3.42 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
 
 **Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
 
-### v0.3.45 — Privacy-safe receipt masking
+### v0.3.44 — Privacy-safe receipt masking
 
 **Status:** Planned
 
@@ -638,11 +617,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Security and privacy:** Never claim perfect automatic detection, default to safer masking, prevent raw values from entering a masked artifact, and keep masking rules local unless the customer deliberately exports them.
 
-**Why this order:** Project and comparison exports increase the likelihood that receipt artifacts will be shared, so privacy controls should follow before broader workflow expansion.
+**Why this order:** Project, support, and receipt exports increase the likelihood that receipt artifacts will be shared, so privacy controls should be established before later comparison reports.
 
 **Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
 
-### v0.3.46 — System tray health and notifications
+### v0.3.45 — System tray health and notifications
 
 **Status:** Planned
 
@@ -667,7 +646,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
 
-### v0.3.47 — Character and code-page assistant
+### v0.3.46 — Character and code-page assistant
 
 **Status:** Planned
 
@@ -688,11 +667,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Security and privacy:** Treat decoded receipt text as local customer data and exclude it from telemetry and diagnostics unless the customer explicitly consents to a reviewed, masked attachment.
 
-**Why this order:** The profile, comparison, privacy, and project foundations make encoding recommendations testable and safe to review before application.
+**Why this order:** The profile, privacy, and project foundations make encoding recommendations safe to review, while deterministic encoding fixtures prepare reliable inputs for the later comparison release.
 
 **Complete when:** Known mojibake fixtures produce the correct diagnosis and preview, saved recommendations render deterministically, and original capture bytes remain unchanged.
 
-### v0.3.48 — Offline Enterprise update packages
+### v0.3.47 — Offline Enterprise update packages
 
 **Status:** Planned
 
@@ -705,7 +684,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 - Publish a portable update package containing the installer, versioned manifest, architecture, checksums, trusted publisher signature, and release metadata.
 - Import from approved removable media and verify every artifact before offering installation.
 - Reject tampered, unsigned, downgraded, wrong-product, wrong-architecture, expired, and unsupported packages without changing the installed application.
-- Reuse the v0.3.40 Install and Restart safety snapshot, active-job drain, controlled shutdown, rollback, relaunch, and confirmation flow.
+- Reuse the v0.3.39 Install and Restart safety snapshot, active-job drain, controlled shutdown, rollback, relaunch, and confirmation flow.
 - Provide a documented offline maintenance-entitlement refresh workflow without changing permanent-license ownership or creating a subscription requirement.
 - Record privacy-safe audit evidence for package verification and installation results.
 
@@ -716,6 +695,30 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Why this order:** It depends on the guided updater, production signing, rollback, and entitlement foundations and therefore belongs after the earlier customer-experience work.
 
 **Complete when:** An offline Enterprise computer installs a valid package and rejects tampered, unsigned, downgraded, incompatible, or unentitled packages without damaging the current installation.
+
+### v0.3.48 — Receipt comparison and automated validation
+
+**Status:** Planned
+
+**GitHub:** [Issue #21 — Receipt comparison and automated validation](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21)
+
+**Purpose:** Turn the emulator into a repeatable compatibility-testing tool for POS changes, printer migrations, and regression testing.
+
+**Planned scope:**
+
+- Select any two jobs or compare a job against a named saved baseline.
+- Compare raw bytes, normalized parsed commands, extracted text, warnings, and rendered receipt output.
+- Highlight additions, removals, changed commands, layout changes, and image differences.
+- Allow configurable comparison rules for values such as dates, times, check numbers, and transaction identifiers.
+- Save validation suites made from capture files, projects, and printer profiles.
+- Run a validation suite locally and produce clear pass, warning, or fail results.
+- Export human-readable HTML/PDF results and machine-readable JSON results with the established privacy-masking controls.
+- Add deterministic golden-output tests for the supported renderer and code-page behavior.
+- Brand the installer welcome, completion, and header areas with the official product artwork while retaining the product icon on Setup, shortcuts, and uninstall entries.
+
+**Why this order:** Projects, privacy masking, encoding diagnostics, and update recovery will already be established, giving comparison suites safer organization, exports, international fixtures, and rollback behavior.
+
+**Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, privacy-safe exports do not expose configured sensitive values, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
 
 ### v0.3.30 — Security remediation (Phase 1)
 
