@@ -1,7 +1,23 @@
 DirectoryIndex index.php
 
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never allow credentials or authenticated Admin Portal traffic over HTTP.
+    RewriteCond %{HTTPS} !=on [OR]
+    RewriteCond %{HTTP_HOST} !^admin\.posprinteremulator\.com$ [NC]
+    RewriteRule ^ https://admin.posprinteremulator.com%{REQUEST_URI} [R=308,L,NE]
+</IfModule>
+
 <IfModule mod_autoindex.c>
     Options -Indexes
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "no-referrer"
+    Header always set X-Frame-Options "DENY"
 </IfModule>
 
 <FilesMatch "^(config\.php|purchase-site\.php|schema\.sql|two-factor\.json|vendor-private-key\.pem)$">
