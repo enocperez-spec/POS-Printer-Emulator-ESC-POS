@@ -6,10 +6,12 @@ import {
   Copy,
   Crown,
   Edit3,
+  LockKeyhole,
   Network,
   Pause,
   Play,
   Plus,
+  Printer,
   RefreshCw,
   Save,
   Server,
@@ -23,6 +25,7 @@ type Props = {
   canManage: boolean
   licenseMode: LicenseStatus['mode']
   maximumListeners: number
+  onOpenSetup?: () => void
   onChanged?: (listeners: PrinterListener[]) => void
 }
 
@@ -65,7 +68,7 @@ function numberLabel(value: number | undefined) {
   return (value ?? 0).toLocaleString()
 }
 
-export function PrinterListenersSettings({ canManage, licenseMode, maximumListeners, onChanged }: Props) {
+export function PrinterListenersSettings({ canManage, licenseMode, maximumListeners, onOpenSetup, onChanged }: Props) {
   const [collection, setCollection] = useState<PrinterListenerCollection>()
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [editingId, setEditingId] = useState<string | 'new'>()
@@ -83,16 +86,21 @@ export function PrinterListenersSettings({ canManage, licenseMode, maximumListen
   }, [onChanged])
 
   useEffect(() => {
-    if (!canManage) return
     let cancelled = false
-    void Promise.all([api.printerListeners(), api.printerProfiles()])
-      .then(([listeners, profileStatus]) => {
+    void api.printerListeners()
+      .then(listeners => {
         if (cancelled) return
         setCollection(listeners)
-        setProfiles(profileStatus.profiles)
         onChanged?.(listeners.listeners)
       })
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load printer listeners.') })
+    if (canManage) {
+      void api.printerProfiles()
+        .then(profileStatus => { if (!cancelled) setProfiles(profileStatus.profiles) })
+        .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load printer profiles.') })
+    } else {
+      setProfiles([])
+    }
 
     const timer = window.setInterval(() => {
       void refreshListeners().catch(() => undefined)
@@ -107,10 +115,6 @@ export function PrinterListenersSettings({ canManage, licenseMode, maximumListen
     () => collection?.listeners.filter(listener => listener.listening || listener.status === 'Running' || listener.status === 'Listening').length ?? 0,
     [collection],
   )
-
-  if (!canManage) {
-    return <MultipleListenerUpgradePanel licenseMode={licenseMode} maximumListeners={maximumListeners} />
-  }
 
   function beginCreate() {
     const usedPorts = new Set(collection?.listeners.map(listener => listener.port) ?? [])
@@ -206,6 +210,21 @@ export function PrinterListenersSettings({ canManage, licenseMode, maximumListen
   const listeners = collection?.listeners ?? []
   const atLimit = collection?.maximumListeners !== undefined && listeners.length >= collection.maximumListeners
 
+  if (!canManage) {
+    return (
+      <SingleListenerReadOnlyPanel
+        licenseMode={licenseMode}
+        maximumListeners={maximumListeners}
+        listener={listeners.find(listener => listener.isDefault) ?? listeners[0]}
+        loading={!collection}
+        error={error}
+        copied={copiedId !== undefined}
+        onCopy={listener => void copyDetails(listener)}
+        onOpenSetup={onOpenSetup}
+      />
+    )
+  }
+
   return (
     <div className="settings-panel printer-listeners-settings">
       <div className="listener-heading">
@@ -269,9 +288,74 @@ export function PrinterListenersSettings({ canManage, licenseMode, maximumListen
   )
 }
 
-function MultipleListenerUpgradePanel({ licenseMode, maximumListeners }: { licenseMode: LicenseStatus['mode']; maximumListeners: number }) {
+function SingleListenerReadOnlyPanel({ licenseMode, maximumListeners, listener, loading, error, copied, onCopy, onOpenSetup }: {
+  licenseMode: LicenseStatus['mode']
+  maximumListeners: number
+  listener?: PrinterListener
+  loading: boolean
+  error?: string
+  copied: boolean
+  onCopy: (listener: PrinterListener) => void
+  onOpenSetup?: () => void
+}) {
+  const localEndpoint = listener ? `127.0.0.1:${listener.port}` : '127.0.0.1:9100'
+  const networkEndpoint = listener?.connectionAddress && listener.connectionAddress !== '127.0.0.1'
+    ? `${listener.connectionAddress}:${listener.port}`
+    : 'Network address unavailable'
+  const running = listener?.listening || listener?.status === 'Running' || listener?.status === 'Listening'
+
   return (
-    <div className="settings-panel enterprise-upgrade-panel">
+    <div className="settings-panel single-listener-settings">
+      <div className="listener-heading">
+        <div>
+          <span className="enterprise-eyebrow"><LockKeyhole size={13} /> {licenseMode} · {maximumListeners} included listener</span>
+          <h2>Your Printer Listener</h2>
+          <p>Follow these two steps: install the Windows printer, then send your POS print jobs to the included listener.</p>
+        </div>
+      </div>
+
+      <div className="single-listener-steps">
+        <section>
+          <span className="single-listener-step-number">1</span>
+          <div><small>INSTALL THE PRINTER</small><h3>Run the Printer Setup Wizard</h3><p>The wizard installs and connects the Windows receipt printer for you.</p></div>
+          <button className="primary-action" onClick={onOpenSetup}><Printer size={15} /> Open setup wizard</button>
+        </section>
+        <section>
+          <span className="single-listener-step-number">2</span>
+          <div><small>CONFIGURE YOUR POS</small><h3>Use the listener address below</h3><p>Set the POS printer protocol to RAW TCP/ESC-POS and enter the matching address and port.</p></div>
+        </section>
+      </div>
+
+      {error ? <div className="listener-message is-error" role="alert"><AlertTriangle size={15} />{error}</div> : null}
+      {loading ? (
+        <div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading your included listener…</div>
+      ) : listener ? (
+        <article className="readonly-listener-card">
+          <header>
+            <div className="listener-card-icon"><Server size={20} /></div>
+            <div><h3>{listener.name}</h3><p>{listener.profileName || listener.profileId}</p></div>
+            <span className={`listener-status ${running ? 'status-running' : 'status-stopped'}`}><i />{running ? 'Running' : listener.status}</span>
+          </header>
+          <div className="readonly-listener-lock"><LockKeyhole size={14} /><span><strong>Included listener — read-only</strong>Its name, port, and profile cannot be edited with the {licenseMode} License.</span></div>
+          <div className="readonly-connection-grid">
+            <div><Server size={17} /><span><small>POS on this computer</small><strong>{localEndpoint}</strong></span></div>
+            <div><Network size={17} /><span><small>POS on another computer</small><strong>{networkEndpoint}</strong></span></div>
+          </div>
+          <div className="readonly-listener-instruction"><strong>Important:</strong> Your POS system must send print jobs to one of these exact addresses and port {listener.port}.</div>
+          <footer><button onClick={() => onCopy(listener)}><Copy size={15} />{copied ? 'Copied connection details' : 'Copy connection details'}</button></footer>
+        </article>
+      ) : (
+        <div className="listener-empty"><Server size={28} /><strong>The included listener could not be found</strong><span>Open the Printer Setup Wizard to restore the default Trial printer configuration.</span></div>
+      )}
+
+      <MultipleListenerUpgradePanel licenseMode={licenseMode} maximumListeners={maximumListeners} compact />
+    </div>
+  )
+}
+
+function MultipleListenerUpgradePanel({ licenseMode, maximumListeners, compact = false }: { licenseMode: LicenseStatus['mode']; maximumListeners: number; compact?: boolean }) {
+  return (
+    <div className={`settings-panel enterprise-upgrade-panel ${compact ? 'is-compact' : ''}`}>
       <div className="enterprise-upgrade-icon"><Crown size={30} /></div>
       <span>Pro and Enterprise feature</span>
       <h2>Run multiple virtual receipt printers</h2>

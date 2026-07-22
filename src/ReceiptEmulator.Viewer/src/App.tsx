@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  CircleHelp,
   CircleStop,
   DatabaseBackup,
   Download,
@@ -50,11 +51,12 @@ import { TrialOnboarding } from './TrialOnboarding'
 import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
+const trialOnboardingStorageKey = 'pos-printer-emulator-trial-onboarding-v2'
 
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.37',
+  version: '0.3.38',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -100,7 +102,7 @@ function App() {
   const [status, setStatus] = useState<ServiceStatus>(emptyStatus)
   const [statusReady, setStatusReady] = useState(false)
   const [trialOnboardingComplete, setTrialOnboardingComplete] = useState(() =>
-    localStorage.getItem('pos-printer-emulator-trial-onboarding-v1') === 'complete',
+    localStorage.getItem(trialOnboardingStorageKey) === 'complete',
   )
   const [jobs, setJobs] = useState<JobSummary[]>([])
   const [selectedId, setSelectedId] = useState<string>()
@@ -152,11 +154,7 @@ function App() {
   }, [listenerFilter])
 
   useEffect(() => {
-    if (!multipleListenersEnabled) {
-      setListeners([])
-      setListenerFilter('all')
-      return
-    }
+    if (!statusReady) return
     let cancelled = false
     const load = async () => {
       try {
@@ -173,7 +171,7 @@ function App() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [multipleListenersEnabled])
+  }, [statusReady])
 
   const checkForUpdates = useCallback(async (force = false) => {
     const result = await api.checkUpdates(force)
@@ -259,8 +257,14 @@ function App() {
   }
 
   function completeTrialOnboarding() {
-    localStorage.setItem('pos-printer-emulator-trial-onboarding-v1', 'complete')
+    localStorage.setItem(trialOnboardingStorageKey, 'complete')
     setTrialOnboardingComplete(true)
+  }
+
+  function reviewTrialOnboarding() {
+    localStorage.removeItem(trialOnboardingStorageKey)
+    setSettingsSection(undefined)
+    setTrialOnboardingComplete(false)
   }
 
   function openOnboardingSection(section: SettingsSection) {
@@ -361,6 +365,7 @@ function App() {
     <div className="app-shell">
       <Header status={status} onSample={renderSample} busy={busy} theme={theme}
         onTheme={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
+        onTrialSetup={reviewTrialOnboarding}
         onSettings={setSettingsSection} />
       {error && (
         <div className="error-banner" role="alert">
@@ -424,6 +429,7 @@ function App() {
       {statusReady && status.license.mode === 'Trial' && !trialOnboardingComplete && !settingsSection && (
         <TrialOnboarding
           status={status}
+          listener={listeners.find(listener => listener.isDefault) ?? listeners[0]}
           onSetup={() => openOnboardingSection('printer')}
           onTroubleshoot={() => openOnboardingSection('support')}
           onDismiss={completeTrialOnboarding}
@@ -469,12 +475,13 @@ function ClearJobsDialog({ request, busy, onCancel, onConfirm }: {
   )
 }
 
-function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
+function Header({ status, onSample, busy, theme, onTheme, onTrialSetup, onSettings }: {
   status: ServiceStatus
   onSample: () => void
   busy: boolean
   theme: 'light' | 'dark'
   onTheme: () => void
+  onTrialSetup: () => void
   onSettings: (section: SettingsSection) => void
 }) {
   const listenerSummary = status.listenerSummary
@@ -498,6 +505,7 @@ function Header({ status, onSample, busy, theme, onTheme, onSettings }: {
       <div className="header-fact"><span>{multipleListenersEnabled && listenerSummary ? 'Listeners' : 'Listener'}</span> {listenerFact}</div>
       {!status.license.isPaid && <div className="trial-allowance"><strong>{status.license.remaining} of {status.license.dailyLimit}</strong> complete Trial POS jobs left today</div>}
       <div className="header-actions">
+        {status.license.mode === 'Trial' && <button className="trial-setup-button" onClick={onTrialSetup} title="Reopen the two-step Trial setup guide"><CircleHelp size={16} /> Trial setup</button>}
         <button className="sample-button" onClick={onSample} disabled={busy} title="Built-in Test Receipts are unlimited and do not use Trial POS jobs">
           <FlaskConical size={16} /> {busy ? 'Rendering…' : 'Test receipt'}
         </button>
@@ -751,7 +759,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <nav className="settings-nav" aria-label="Settings sections">
             <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
             <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>{printerWizardLabel}</span><ChevronRight size={15} /></button>
-            <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{multipleListenersEnabled ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Pro</span>}</button>
+            <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{multipleListenersEnabled ? <ChevronRight size={15} /> : <span className="pro-lock">1 included</span>}</button>
             <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
             <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
@@ -762,7 +770,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} trialMode={status.license.mode === 'Trial'} />}
-            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings canManage={multipleListenersEnabled} licenseMode={status.license.mode} maximumListeners={status.license.maximumListeners} onChanged={onListenersChanged} /></Suspense>}
+            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings canManage={multipleListenersEnabled} licenseMode={status.license.mode} maximumListeners={status.license.maximumListeners} onOpenSetup={() => setSection('printer')} onChanged={onListenersChanged} /></Suspense>}
             {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}

@@ -29,8 +29,7 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 
 | Bug ID | Severity | Summary | Affected version(s) | Target | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
-
-There are no open bugs currently assigned to the v0.3.37 release.
+There are no open bugs currently assigned to the v0.3.38 release.
 
 ## Resolved bugs
 
@@ -50,6 +49,7 @@ There are no open bugs currently assigned to the v0.3.37 release.
 | [BUG-012](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/17) | Medium | Printer Setup Wizard could assign the same TCP/IP port number to more than one Windows printer instead of selecting the next available port. | v0.3.23 and earlier | v0.3.24 | Released | Port selection reads machine-wide Windows printer and TCP/IP-port assignments, excludes an idempotent same-printer reinstall, reserves emulator listeners whose bind address or profile cannot serve the requested Epson endpoint, selects the first free port from 9100 upward, displays it in the summary, creates or reuses the matching Enterprise listener, and rechecks throughout installation. The installed test selected 9101 beside an existing 9100 queue, created the Epson queue, delivered a 112-byte test receipt, and then identified 9102 as next available. |
 | BUG-013 | Medium | The always-available Support diagnostic download returned HTTP 500 if the optional Stored Logos directory was absent. | v0.3.26 development build | v0.3.26 | Released | Missing logo storage is treated as an empty store, imports recreate it safely, six Stored Graphic tests pass, and live expired-maintenance verification returned a privacy-safe diagnostic file with HTTP 200 while update checks remained HTTP 403. |
 | BUG-014 | Medium | Windows appended `.zip` when saving a `.ppebackup`, and the restore picker rejected that legacy file name. | v0.3.34 | v0.3.35 | Released | The desktop save dialog uses a native `.ppebackup` filter and default extension; the API and picker accept both `.ppebackup` and legacy `.ppebackup.zip`; filename regression tests and a complete create-review-restore browser flow pass. |
+| BUG-015 | Medium | The v0.3.37 welcome guide could remain hidden after its persistent completion flag was set, and Trial customers could not review their included listener because Printer Listeners showed only an upgrade panel. | v0.3.37 | v0.3.38 | Released | The guide uses a new versioned state and a permanent Trial setup action; Trial sees one read-only listener with local and LAN IPv4 targets; the production viewer builds; all 166 desktop tests pass; GET returns the listener while Trial POST remains HTTP 403. |
 
 ## Bug record template
 
