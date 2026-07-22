@@ -6,6 +6,16 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.39 — 2026-07-22
+
+- Adds a guided in-application update flow with visible download progress and an explicit install-and-restart confirmation.
+- Requires the official GitHub installer and matching SHA-256 release checksum before an update can be opened.
+- Creates an encrypted safety snapshot and waits for active receipt connections and jobs to finish before stopping listeners.
+- Adds a separate self-contained updater that closes file-locking processes, runs setup with minimal prompts, and automatically relaunches the desktop application.
+- Preserves the selected receipt, search, printer filter, inspector tab, zoom, theme, and collapsed-panel preferences across restart.
+- Shows a plain-language success or recovery result after the updated application relaunches, and keeps listeners running when preparation or administrator approval is canceled.
+- Moves active development to v0.3.40 — Simple Mode and Expert Mode.
+
 ## v0.3.38 — 2026-07-22
 
 - Corrects the v0.3.37 first-launch experience with a versioned welcome guide that existing Trial customers see once after updating and can reopen at any time from **Trial setup** in the top bar.

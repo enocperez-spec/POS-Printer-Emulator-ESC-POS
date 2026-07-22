@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.38 — released 2026-07-22**
+**Current public release: v0.3.39 — released 2026-07-22**
 
-**Current development: v0.3.39 — Guided update installation and restart**
+**Current development: v0.3.40 — Simple Mode and Expert Mode**
 
-**Next release after v0.3.39: v0.3.40 — Simple Mode and Expert Mode**
+**Next release after v0.3.40: v0.3.41 — Accessibility and keyboard usability**
 
-**Future scheduled sequence: v0.3.40 through v0.3.48**
+**Future scheduled sequence: v0.3.40 through v0.3.49**
 
-**Most recently completed: v0.3.38 — Trial Onboarding Clarity Correction**
+**Most recently completed: v0.3.39 — Guided update installation and restart**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -79,10 +79,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.36 | Released | Privacy-preserving geographic analytics dashboard |
 | v0.3.37 | Released | Trial setup and onboarding improvements |
 | v0.3.38 | Released | Trial onboarding clarity correction |
+| v0.3.39 | Released | Guided update installation and restart |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40-v0.3.47 improve everyday usability, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; and v0.3.48 delivers receipt comparison and automated validation after those customer-experience foundations.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40-v0.3.47 improve everyday usability, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.48 delivers receipt comparison and automated validation; and v0.3.49 makes public update awareness available to every license and maintenance state.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -471,30 +472,31 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.39 — Guided update installation and restart
 
-**Status:** Next
+**Status:** Released — 2026-07-22
 
-**GitHub:** [Issue #3 — Guided update installation and restart](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/3)
+**GitHub:** [v0.3.39 release](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39)
 
 **Purpose:** Make application updates reliable and understandable by closing the running application cleanly before the installer replaces its files, then returning the customer to the updated application.
 
-**Planned scope:**
+**Released scope:**
 
 - Download an available installer in the background while the application remains usable.
-- Verify the completed download against the release checksum and trusted publisher signature before offering installation.
+- Verify the completed download against the separately published release SHA-256 checksum before offering installation.
 - Create an automatic pre-update configuration safety snapshot using the v0.3.34 backup foundation.
 - Replace the current update action with a clear **Install and Restart** confirmation that explains the listener will be briefly unavailable.
-- Provide **Install and Restart**, **Install Later**, and **Cancel** choices without closing the application unexpectedly.
+- Provide a clear **Install now** confirmation and a safe defer choice without closing the application unexpectedly.
 - Detect an active incoming print job, finish or preserve it safely, and stop accepting new jobs before shutdown.
-- Save the selected receipt, window state, settings, registration, activation, profiles, stored logos, and local history.
+- Save the selected receipt and workspace view state while preserving registration, activation, settings, profiles, stored logos, and local history through the existing upgrade-safe installer paths.
 - Stop the listener and background service cleanly, launch a separate updater process, and exit every application process that could lock installed files.
 - Wait for file locks to clear, run the installer with minimal prompts, preserve existing registration data, and relaunch POS Printer Emulator automatically.
 - Show the installed version and a success confirmation after restart.
-- Keep the existing version recoverable when installation fails, record update diagnostics in the support log, and show plain-language recovery instructions.
-- Add an optional automatic-download preference while always requiring confirmation before closing and installing.
+- Keep the existing installation available when preparation or installation fails and show plain-language recovery instructions after restart.
 
 **Why this priority:** The external updater and controlled shutdown eliminate the remaining class of self-update file-lock failures while preventing unexpected listener downtime or loss of customer state.
 
-**Complete when:** From Settings, a customer can download an update, choose Install and Restart, see the listener stop cleanly, complete the installation with no locked-file error, relaunch automatically on the new version, and retain registration, licensing, settings, stored data, and the previously selected receipt; cancel and failure paths leave the current installation usable.
+**Completion verification:** The production viewer, service, desktop shell, update security library, external updater, license utilities, and C# build utility compile with zero warnings or errors. All 171 desktop tests, Admin/database commerce tests, PHP syntax validation, and 27-page SEO validation pass. The updater tests reject untrusted download hosts, missing checksums, and checksum mismatches, and verify listener stop/resume behavior. The 120,593,838-byte installer includes `POSPrinterEmulator.Updater.exe`; its independently recalculated SHA-256 value matches the generated checksum file (`34b1e74eb09909e7b9c58e9bd6d9ba7595497b6f596d841de13ee5433005ed63`).
+
+**Complete when:** From Settings, a customer can download an update, confirm installation, see the listener drain and stop cleanly, complete installation without a self-lock, relaunch automatically on the new version, and retain registration, licensing, settings, stored data, and the previously selected receipt; cancel and preparation-failure paths leave the current installation usable.
 
 ### v0.3.40 — Simple Mode and Expert Mode
 
@@ -719,6 +721,33 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Why this order:** Projects, privacy masking, encoding diagnostics, and update recovery will already be established, giving comparison suites safer organization, exports, international fixtures, and rollback behavior.
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, privacy-safe exports do not expose configured sensitive values, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
+
+### v0.3.49 — Update Notifications for All License Types
+
+**Status:** Planned
+
+**GitHub:** [Issue #40 — Update Notifications for All License Types](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40)
+
+**Purpose:** Ensure Trial, Lite, Pro, and Enterprise customers can see when a newer public desktop release exists, even when paid maintenance has expired, without weakening the rules that control in-app installation.
+
+**Planned scope:**
+
+- Separate the public release-notification check from the maintenance-gated installer-download workflow.
+- Show the currently installed version, latest eligible public desktop version, number of releases behind, a short release summary, and a clear update-available indicator.
+- Count eligible published desktop releases between the installed and current versions rather than treating semantic-version subtraction as a release count.
+- Give Trial users a **Download Update** action that opens the official POS Printer Emulator download page for manual installation.
+- Let Lite, Pro, and Enterprise customers with active maintenance continue into the guided in-app updater.
+- Continue notifying paid customers whose maintenance has expired, while showing release details and a renewal option instead of allowing maintenance-gated installation.
+- Cache the latest successful public check, handle offline startup quietly, rate-limit periodic requests, and keep receipt listening and processing non-blocking.
+- Add accessible light- and dark-mode update indicators and screen-reader announcements.
+
+**License and maintenance rules:** Trial receives notifications and an official manual-download link. Paid licenses with active maintenance receive notifications and the guided updater. Paid licenses with expired maintenance receive notifications, release details, and renewal guidance while their purchased version and existing features remain usable.
+
+**Security and privacy:** Query only public release metadata over HTTPS, accept actions only for official website or trusted GitHub destinations, send no activation keys, receipt data, customer information, or printer configuration, and retain checksum verification for every in-app installer.
+
+**Why this order:** Update awareness is useful to every customer, but it can build on the v0.3.39 guided-updater trust and restart foundation without destabilizing the already scheduled customer-experience releases.
+
+**Complete when:** Every license tier receives accurate, non-blocking new-version notifications; the UI shows both versions, versions behind, and a concise summary; Trial opens the official download page; active-maintenance paid users can install in-app; expired-maintenance paid users cannot bypass renewal; and automated tests cover all license states, version counting, offline caching, malformed release data, and trusted-link enforcement.
 
 ### v0.3.30 — Security remediation (Phase 1)
 

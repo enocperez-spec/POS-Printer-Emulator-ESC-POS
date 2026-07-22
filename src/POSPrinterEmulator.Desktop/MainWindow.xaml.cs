@@ -2,10 +2,12 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
+using POSPrinterEmulator.Update;
 
 namespace POSPrinterEmulator.Desktop;
 
@@ -13,7 +15,8 @@ public partial class MainWindow : Window
 {
     private static readonly Uri ViewerUri = new("http://127.0.0.1:5187");
     private static readonly Uri HealthUri = new("http://127.0.0.1:5187/api/status");
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
+    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private readonly SemaphoreSlim _updateGate = new(1, 1);
     private bool _webViewInitialized;
     private bool _viewerReady;
 
@@ -21,7 +24,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Loaded += async (_, _) => await StartAsync();
-        Closed += (_, _) => _httpClient.Dispose();
+        Closed += (_, _) => { _httpClient.Dispose(); _updateGate.Dispose(); };
     }
 
     private async Task StartAsync()
@@ -34,6 +37,7 @@ public partial class MainWindow : Window
             ShowLoading("Opening POS Printer Emulator…");
             await InitializeWebViewAsync();
             Browser.Source = ViewerUri;
+            ShowPreviousUpdateResult();
         }
         catch (Exception exception)
         {
@@ -92,9 +96,12 @@ public partial class MainWindow : Window
             {
                 var request = System.Text.Json.JsonSerializer.Deserialize<DesktopMessage>(eventArgs.WebMessageAsJson,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (request?.Type == "install-update" && Uri.TryCreate(request.Url, UriKind.Absolute, out var updateUri))
+                if (request?.Type == "install-update" &&
+                    Uri.TryCreate(request.Url, UriKind.Absolute, out var updateUri) &&
+                    Uri.TryCreate(request.ChecksumUrl, UriKind.Absolute, out var checksumUri) &&
+                    !string.IsNullOrWhiteSpace(request.Version))
                 {
-                    await DownloadAndLaunchUpdateAsync(updateUri);
+                    await DownloadAndPrepareUpdateAsync(updateUri, checksumUri, request.Version);
                 }
                 else if (request?.Type == "install-printer" && request.Printer is not null)
                 {
@@ -186,40 +193,147 @@ public partial class MainWindow : Window
         _webViewInitialized = true;
     }
 
-    private async Task DownloadAndLaunchUpdateAsync(Uri updateUri)
+    private async Task DownloadAndPrepareUpdateAsync(Uri updateUri, Uri checksumUri, string version)
     {
-        if (!string.Equals(updateUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(updateUri.Host, "github.com", StringComparison.OrdinalIgnoreCase)
-            || !updateUri.AbsolutePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        if (!UpdatePackageSecurity.IsTrustedGitHubAsset(updateUri, ".exe") ||
+            !UpdatePackageSecurity.IsTrustedGitHubAsset(checksumUri, ".sha256"))
         {
-            throw new InvalidOperationException("The update link was not a trusted GitHub installer.");
+            throw new InvalidOperationException("The update files were not trusted GitHub release assets.");
         }
 
-        var downloadDirectory = Path.Combine(
-            Path.GetTempPath(),
-            "POSPrinterEmulator",
-            "Updates",
-            $"{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(downloadDirectory);
-        var installerPath = Path.Combine(downloadDirectory, Path.GetFileName(updateUri.LocalPath));
-        var partialPath = installerPath + ".download";
-        using var updateClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        using var response = await updateClient.GetAsync(updateUri, HttpCompletionOption.ResponseHeadersRead);
+        if (!await _updateGate.WaitAsync(0)) return;
+        string? snapshotId = null;
+        var prepared = false;
+        try
+        {
+            var downloadDirectory = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "Updates",
+                $"{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(downloadDirectory);
+            var installerPath = Path.Combine(downloadDirectory, Path.GetFileName(updateUri.LocalPath));
+            var checksumPath = installerPath + ".sha256";
+
+            PostUpdateState("downloading", "Downloading the verified update…", 0);
+            using var updateClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            await DownloadFileAsync(updateClient, updateUri, installerPath, percent =>
+                PostUpdateState("downloading", $"Downloading update… {percent}%", percent));
+            await DownloadFileAsync(updateClient, checksumUri, checksumPath, null);
+
+            var expected = UpdatePackageSecurity.ParseSha256(
+                await File.ReadAllTextAsync(checksumPath), Path.GetFileName(installerPath));
+            await UpdatePackageSecurity.VerifySha256Async(installerPath, expected);
+            PostUpdateState("verified", "Download complete and security checksum verified.", 100);
+
+            var choice = MessageBox.Show(this,
+                $"POS Printer Emulator {version} is downloaded and verified.\n\n" +
+                "Install now? The application will finish active receipts, save a safety snapshot, close, install the update, and restart automatically.",
+                "Install POS Printer Emulator Update",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (choice != MessageBoxResult.Yes)
+            {
+                PostUpdateState("deferred", "The verified update was not installed. You can start it again when ready.", 100);
+                return;
+            }
+
+            PostUpdateState("preparing", "Finishing active receipts and creating a safety snapshot…", 100);
+            using var prepareResponse = await _httpClient.PostAsync(new Uri(ViewerUri, "/api/updates/prepare"), null);
+            if (!prepareResponse.IsSuccessStatusCode)
+            {
+                var problem = await prepareResponse.Content.ReadFromJsonAsync<ProblemDetailsResponse>();
+                throw new InvalidOperationException(problem?.Detail ?? "The application could not safely prepare for the update.");
+            }
+            var preparation = await prepareResponse.Content.ReadFromJsonAsync<UpdatePreparation>()
+                ?? throw new InvalidOperationException("The update preparation response was empty.");
+            snapshotId = preparation.SafetySnapshotId;
+            prepared = true;
+
+            var installedUpdater = Path.Combine(AppContext.BaseDirectory, "POSPrinterEmulator.Updater.exe");
+            if (!File.Exists(installedUpdater))
+                throw new FileNotFoundException("The guided update component is missing. Repair the application with the latest installer.", installedUpdater);
+            var updaterPath = Path.Combine(downloadDirectory, "POSPrinterEmulator.Updater.exe");
+            File.Copy(installedUpdater, updaterPath, true);
+            var desktopPath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "POSPrinterEmulator.Desktop.exe");
+            var startInfo = new ProcessStartInfo(updaterPath)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                WorkingDirectory = downloadDirectory,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            foreach (var argument in new[]
+            {
+                "--installer", installerPath,
+                "--desktop", desktopPath,
+                "--version", version,
+                "--snapshot", snapshotId,
+                "--desktop-pid", Environment.ProcessId.ToString()
+            }) startInfo.ArgumentList.Add(argument);
+            _ = Process.Start(startInfo) ?? throw new InvalidOperationException("Windows could not start the guided update component.");
+            PostUpdateState("installing", "Closing the application so Windows can install the update…", 100);
+            Application.Current.Shutdown();
+        }
+        catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
+        {
+            if (prepared) await ResumeListenersAsync();
+            PostUpdateState("cancelled", "Windows administrator approval was canceled. The application remains ready to use.", null);
+        }
+        catch (Exception exception)
+        {
+            if (prepared) await ResumeListenersAsync();
+            PostUpdateState("failed", exception.GetBaseException().Message, null);
+            MessageBox.Show(this, $"The update could not be started: {exception.GetBaseException().Message}",
+                "POS Printer Emulator", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _updateGate.Release();
+        }
+    }
+
+    private static async Task DownloadFileAsync(HttpClient client, Uri uri, string destination, Action<int>? progress)
+    {
+        var partial = destination + ".download";
+        using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
-        await using (var output = new FileStream(
-            partialPath,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 81920,
-            FileOptions.Asynchronous | FileOptions.SequentialScan))
+        var total = response.Content.Headers.ContentLength;
+        await using var input = await response.Content.ReadAsStreamAsync();
+        await using var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None,
+            128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var buffer = new byte[128 * 1024];
+        long written = 0;
+        var reported = -1;
+        int read;
+        while ((read = await input.ReadAsync(buffer)) > 0)
         {
-            await response.Content.CopyToAsync(output);
-            await output.FlushAsync();
+            await output.WriteAsync(buffer.AsMemory(0, read));
+            written += read;
+            if (total is > 0)
+            {
+                var percent = (int)Math.Min(100, written * 100 / total.Value);
+                if (percent != reported) { reported = percent; progress?.Invoke(percent); }
+            }
         }
+        await output.FlushAsync();
+        File.Move(partial, destination, true);
+    }
 
-        File.Move(partialPath, installerPath);
-        Process.Start(new ProcessStartInfo(installerPath) { UseShellExecute = true });
+    private async Task ResumeListenersAsync()
+    {
+        try { await _httpClient.PostAsync(new Uri(ViewerUri, "/api/updates/resume"), null); }
+        catch { }
+    }
+
+    private void PostUpdateState(string state, string message, int? percent) =>
+        Browser.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new
+        {
+            type = "update-state", state, message, percent
+        }, JsonOptions));
+
+    private void ShowPreviousUpdateResult()
+    {
+        var result = UpdatePackageSecurity.TakeResult();
+        if (result is null) return;
+        MessageBox.Show(this, result.Message, result.Success ? "Update Complete" : "Update Did Not Finish",
+            MessageBoxButton.OK, result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     private async Task RunPrinterSetupAsync(PrinterInstallRequest request)
@@ -355,6 +469,8 @@ public partial class MainWindow : Window
         Process.Start(new ProcessStartInfo(ViewerUri.AbsoluteUri) { UseShellExecute = true });
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private sealed record DesktopMessage(string Type, string? Url, PrinterInstallRequest? Printer, string? PrinterName);
+    private sealed record DesktopMessage(string Type, string? Url, string? ChecksumUrl, string? Version, PrinterInstallRequest? Printer, string? PrinterName);
+    private sealed record UpdatePreparation(bool Prepared, string SafetySnapshotId);
+    private sealed record ProblemDetailsResponse(string? Detail);
     private sealed record PrinterInstallRequest(string PrinterName, string IpAddress, int Port, bool SameComputer);
 }

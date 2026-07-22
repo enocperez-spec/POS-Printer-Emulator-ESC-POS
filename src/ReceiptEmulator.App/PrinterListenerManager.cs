@@ -81,6 +81,32 @@ public sealed class PrinterListenerManager : IHostedService, IAsyncDisposable
         }
     }
 
+    public async Task PrepareForUpdateAsync(TimeSpan drainTimeout, CancellationToken cancellationToken = default)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(drainTimeout);
+        var idleSamples = 0;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var busy = GetStatus().Listeners.Any(listener =>
+                listener.Counters.ActiveConnections > 0 ||
+                listener.Counters.ActiveJobs > 0 ||
+                listener.Counters.QueuedJobs > 0);
+            idleSamples = busy ? 0 : idleSamples + 1;
+            if (idleSamples >= 2)
+            {
+                await StopAsync(cancellationToken);
+                return;
+            }
+            await Task.Delay(250, cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            "A receipt is still being received or processed. Wait for the active print job to finish, then try the update again.");
+    }
+
+    public Task ResumeAfterUpdatePreparationAsync(CancellationToken cancellationToken = default) =>
+        StartAsync(cancellationToken);
+
     public PrinterListenerCollectionStatus GetStatus()
     {
         var maximumListeners = Math.Clamp(_maximumListeners(), 1, PrinterListenerDefaults.MaximumListeners);

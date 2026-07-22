@@ -7,12 +7,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>POSPrinterEmulator.Desktop</AssemblyName>
     <RootNamespace>POSPrinterEmulator.Desktop</RootNamespace>
-    <Version>0.3.38</Version>
+    <Version>0.3.39</Version>
     <ApplicationIcon>..\..\assets\branding\pos-printer-emulator.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <ProjectReference Include="..\POSPrinterEmulator.Update\POSPrinterEmulator.Update.csproj" />
   </ItemGroup>
 
   <ItemGroup>
