@@ -30,7 +30,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.42 Customer identity, consent, and CRM foundation is the current public release, released July 22, 2026. Active development has moved to v0.3.43 Secure Customer Portal MVP.
+> **Release status:** v0.3.42 Customer identity, consent, and CRM foundation is the current public release, released July 22, 2026. v0.3.43 Secure Customer Portal MVP is awaiting final hosting activation, while stacked development has begun on v0.3.44 self-service renewals, upgrades, and promotional trials.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 

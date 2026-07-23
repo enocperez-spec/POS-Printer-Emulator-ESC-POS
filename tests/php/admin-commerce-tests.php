@@ -138,8 +138,10 @@ $expectSame(false, str_contains($schema, "('v0.3.42', 'v0.3.42', 'Release', 'Aut
 $expectContains("('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress'", $devSupport, 'Admin Dev Support must identify v0.3.43 as current development.');
 $expectContains("('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress'", $schema, 'Fresh database schema must identify v0.3.43 as current development.');
 $expectContains("WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46'", $devSupport, 'Admin Dev Support is missing the v0.3.43 GitHub issue link.');
+$expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress'", $devSupport, 'Admin Dev Support must identify v0.3.44 as in progress.');
+$expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress'", $schema, 'Fresh database schema must identify v0.3.44 as in progress.');
+$expectContains("WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47'", $devSupport, 'Admin Dev Support is missing the v0.3.44 GitHub issue link.');
 $futureReleases = [
-    'v0.3.44' => ['Self-service renewals, upgrades, and promotional trials', 47],
     'v0.3.45' => ['Consent-aware lifecycle communications and CRM analytics', 48],
     'v0.3.46' => ['Accessibility and keyboard usability', 31],
     'v0.3.47' => ['Automatic configuration restore points', 32],

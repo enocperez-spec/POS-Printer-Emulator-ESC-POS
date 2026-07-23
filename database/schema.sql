@@ -395,6 +395,123 @@ CREATE TABLE IF NOT EXISTS portal_mail_outbox (
     CONSTRAINT fk_portal_mail_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS portal_checkout_intents (
+    intent_id CHAR(36) NOT NULL,
+    customer_id CHAR(36) NOT NULL,
+    license_id CHAR(36) NULL,
+    installation_id BIGINT UNSIGNED NULL,
+    checkout_token_hash BINARY(32) NOT NULL,
+    order_type ENUM('MAINTENANCE','UPGRADE') NOT NULL,
+    current_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
+    target_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
+    state ENUM('Prepared','ProviderCreated','Captured','Fulfilled','Canceled','Expired','Refunded','ChargebackReview','Failed') NOT NULL DEFAULT 'Prepared',
+    amount DECIMAL(10,2) NULL,
+    currency CHAR(3) NULL,
+    provider_order_id VARCHAR(64) NULL,
+    provider_capture_id VARCHAR(64) NULL,
+    replacement_license_id CHAR(36) NULL,
+    maintenance_previous_expires_at DATETIME(6) NULL,
+    maintenance_new_expires_at DATETIME(6) NULL,
+    prepared_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    expires_at DATETIME(6) NOT NULL,
+    captured_at DATETIME(6) NULL,
+    fulfilled_at DATETIME(6) NULL,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (intent_id),
+    UNIQUE KEY uq_portal_checkout_token (checkout_token_hash),
+    UNIQUE KEY uq_portal_checkout_provider_order (provider_order_id),
+    UNIQUE KEY uq_portal_checkout_provider_capture (provider_capture_id),
+    KEY ix_portal_checkout_customer (customer_id, prepared_at),
+    KEY ix_portal_checkout_license (license_id, prepared_at),
+    KEY ix_portal_checkout_installation (installation_id, prepared_at),
+    CONSTRAINT fk_portal_checkout_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    CONSTRAINT fk_portal_checkout_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
+    CONSTRAINT fk_portal_checkout_installation FOREIGN KEY (installation_id) REFERENCES installations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portal_checkout_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    intent_id CHAR(36) NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    actor VARCHAR(80) NOT NULL,
+    event_summary VARCHAR(500) NOT NULL,
+    event_data JSON NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_portal_checkout_events (intent_id, created_at),
+    CONSTRAINT fk_portal_checkout_event_intent FOREIGN KEY (intent_id)
+        REFERENCES portal_checkout_intents(intent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portal_promotion_exceptions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    created_by VARCHAR(80) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    consumed_at DATETIME(6) NULL,
+    consumed_by_promotion_id CHAR(36) NULL,
+    PRIMARY KEY (id),
+    KEY ix_portal_promotion_exception_customer (customer_id, consumed_at),
+    CONSTRAINT fk_portal_promotion_exception_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portal_promotions (
+    promotion_id CHAR(36) NOT NULL,
+    customer_id CHAR(36) NOT NULL,
+    license_id CHAR(36) NULL,
+    installation_id BIGINT UNSIGNED NULL,
+    exception_id BIGINT UNSIGNED NULL,
+    previous_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
+    granted_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
+    state ENUM('Active','Expired','Canceled','Superseded') NOT NULL DEFAULT 'Active',
+    entitlement_token_hash BINARY(32) NOT NULL,
+    starts_at DATETIME(6) NOT NULL,
+    expires_at DATETIME(6) NOT NULL,
+    ended_at DATETIME(6) NULL,
+    created_by VARCHAR(80) NOT NULL,
+    exception_reason VARCHAR(500) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (promotion_id),
+    UNIQUE KEY uq_portal_promotion_token (entitlement_token_hash),
+    KEY ix_portal_promotion_customer (customer_id, created_at),
+    KEY ix_portal_promotion_license (license_id, state),
+    KEY ix_portal_promotion_installation (installation_id, state),
+    CONSTRAINT fk_portal_promotion_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    CONSTRAINT fk_portal_promotion_account FOREIGN KEY (customer_id) REFERENCES portal_accounts(customer_id),
+    CONSTRAINT fk_portal_promotion_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
+    CONSTRAINT fk_portal_promotion_installation FOREIGN KEY (installation_id) REFERENCES installations(id),
+    CONSTRAINT fk_portal_promotion_exception FOREIGN KEY (exception_id) REFERENCES portal_promotion_exceptions(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portal_promotion_claims (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    promotion_id CHAR(36) NOT NULL,
+    claim_type ENUM('Customer','Account','License','Installation') NOT NULL,
+    claim_hash BINARY(32) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_portal_promotion_claim (claim_type, claim_hash),
+    KEY ix_portal_promotion_claim_promotion (promotion_id),
+    CONSTRAINT fk_portal_promotion_claim_promotion FOREIGN KEY (promotion_id)
+        REFERENCES portal_promotions(promotion_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portal_promotion_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    promotion_id CHAR(36) NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    actor VARCHAR(80) NOT NULL,
+    previous_state VARCHAR(32) NULL,
+    new_state VARCHAR(32) NULL,
+    reason VARCHAR(500) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_portal_promotion_events (promotion_id, created_at),
+    CONSTRAINT fk_portal_promotion_event FOREIGN KEY (promotion_id)
+        REFERENCES portal_promotions(promotion_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS support_request_attachments (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     reference_code VARCHAR(32) NOT NULL,
@@ -527,7 +644,7 @@ VALUES
     ('v0.3.41', 'v0.3.41', 'Release', 'Installer Branding Correction', 'Released', 341, 'Correct the stretched product artwork in the Windows installer.', 'Independent square and tall installer artwork with validated proportions.', 'Preserve the official product logo at installer dimensions.', 'The v0.3.41 installer displays proportional artwork and rejects invalid banner dimensions.', '2026-07-22 00:00:00.000000'),
     ('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released', 342, 'Connect registrations, installations, licenses, maintenance, support, and consent through one privacy-aware customer record.', 'Canonical customers; safe unverified backfill; duplicate review and merge history; verified ownership evidence; masked key lookup; consent, suppression, lifecycle, and audit ledgers; permission-controlled Admin search and export; and authenticated service APIs.', 'The Customer Portal and automated communications require trustworthy identity and consent foundations.', 'Existing entitlements remain unchanged, duplicate emails are not automatically merged, customer actions are auditable, exports exclude prohibited data, and CRM security tests pass.', '2026-07-22 00:00:00.000000'),
     ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress', 343, 'Give verified customers secure self-service access to owned product records.', 'Verified accounts, recovery, optional MFA, masked licenses, maintenance, downloads, preferences, support history, and device deactivation.', 'The portal depends on v0.3.42 ownership and consent boundaries.', 'Customers can access only their own verified records and sensitive actions require reauthentication.', NULL),
-    ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Planned', 344, 'Provide auditable self-service commercial workflows without turning permanent licenses into subscriptions.', 'PayPal maintenance renewal, tier upgrades, refunds, idempotent fulfillment, and one five-day promotional paid-edition trial.', 'Commercial workflows require the secure portal and canonical ownership records.', 'Payments and temporary entitlements are idempotent, auditable, and restore prior permanent access correctly.', NULL),
+    ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress', 344, 'Provide auditable self-service commercial workflows without turning permanent licenses into subscriptions.', 'PayPal maintenance renewal, tier upgrades, refunds, idempotent fulfillment, and one five-day promotional paid-edition trial.', 'Commercial workflows require the secure portal and canonical ownership records.', 'Payments and temporary entitlements are idempotent, auditable, and restore prior permanent access correctly.', NULL),
     ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Planned', 345, 'Deliver useful lifecycle messages through Brevo while honoring consent and provider limits.', 'Protected Brevo integration, durable priority outbox, quota deferral, templates, authenticated webhooks, suppression, minimal telemetry, segmentation, and Admin dashboards.', 'Communication automation must follow the consent and commercial foundations.', 'Eligible messages send exactly once, opt-outs and suppressions are honored, quotas do not lose mail, and prohibited data never reaches Brevo.', NULL),
     ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Planned', 346, 'Make primary workflows usable with keyboard and assistive technology.', 'Focus order, semantics, scaling, high contrast, reduced motion, captions, and WCAG regression checks.', 'Accessibility should be established before additional interface growth.', 'Primary workflows pass keyboard, Narrator, scaling, contrast, and automated checks.', NULL),
     ('v0.3.47', 'v0.3.47', 'Release', 'Automatic configuration restore points', 'Planned', 347, 'Protect customers from accidental configuration loss.', 'Encrypted pre-change and scheduled restore points, bounded retention, previews, transactional restore, and rollback.', 'Recovery protection precedes greater configuration complexity.', 'Customers restore a previous configuration without partial state, secret exposure, or license loss.', NULL),

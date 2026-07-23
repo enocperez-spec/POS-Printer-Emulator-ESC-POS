@@ -13,6 +13,12 @@ PHP customer purchase site for `https://buy.posprinteremulator.com`. All owner c
 
 Every new paid license is permanent and includes one year of Application Maintenance and Support. The activation key carries the initial maintenance expiration in the signed v3 payload.
 
+## Verified Customer Portal checkout
+
+v0.3.44 adds `/self-service.php?session=...` for verified Customer Portal accounts. The session value is a short-lived opaque token whose digest is stored in the Admin database. The Buy service resolves it over the authenticated server channel, calculates maintenance or upward-upgrade pricing from current Admin-controlled offers, and binds one PayPal order to one checkout intent.
+
+Upgrade pricing is the positive difference between the current permanent edition and the target edition. Trial upgrades use the full target-edition price. The capture is durably recorded before entitlement mutation, so a lost response can be retried without issuing duplicate value. The existing public purchase and maintenance pages remain available.
+
 ## Optional maintenance renewal
 
 `?product=maintenance&tier=Lite`, `Pro`, or `Enterprise` opens the one-time annual renewal flow. The customer enters the License ID and matching registration details. The Buy server verifies the license with the Admin maintenance service before creating a PayPal order; the browser cannot choose a different tier or amount.

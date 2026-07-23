@@ -82,6 +82,7 @@ function db(): PDO
         maintenance_previous_expires_at TEXT,
         maintenance_new_expires_at TEXT,
         maintenance_token TEXT,
+        portal_intent_id TEXT,
         last_error TEXT
     )");
     $orderColumns = $db->query('PRAGMA table_info(orders)')->fetchAll();
@@ -96,10 +97,12 @@ function db(): PDO
         'maintenance_previous_expires_at' => 'ALTER TABLE orders ADD COLUMN maintenance_previous_expires_at TEXT',
         'maintenance_new_expires_at' => 'ALTER TABLE orders ADD COLUMN maintenance_new_expires_at TEXT',
         'maintenance_token' => 'ALTER TABLE orders ADD COLUMN maintenance_token TEXT',
+        'portal_intent_id' => 'ALTER TABLE orders ADD COLUMN portal_intent_id TEXT',
     ];
     foreach ($orderAdditions as $column => $statement) {
         if (!in_array($column,$orderColumnNames,true)) $db->exec($statement);
     }
+    $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uq_orders_portal_intent ON orders(portal_intent_id) WHERE portal_intent_id IS NOT NULL');
     $db->exec("CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id INTEGER NOT NULL,
@@ -399,6 +402,66 @@ function maintenance_service_request(array $payload): array
         throw new DomainException($message!==''?$message:'The maintenance service could not be reached. '.$error);
     }
     return $data;
+}
+
+function portal_commerce_service_request(array $payload): array
+{
+    $baseUrl = rtrim((string)config('maintenance.base_url'), '/');
+    $token = (string)config('maintenance.api_token');
+    if (!preg_match('#^https://[A-Za-z0-9.-]+$#', $baseUrl) || strlen($token) < 32) {
+        throw new RuntimeException('The secure Customer Portal checkout service is not configured.');
+    }
+    $curl = curl_init($baseUrl . '/api/v1/portal-commerce.php');
+    curl_setopt_array($curl, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'X-PPE-Admin-Token: ' . $token,
+        ],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+    ]);
+    $body = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    curl_close($curl);
+    $decoded = json_decode((string)$body, true);
+    if (!is_array($decoded) || $status < 200 || $status >= 300) {
+        $message = is_array($decoded) ? trim((string)($decoded['error'] ?? '')) : '';
+        throw new DomainException($message !== '' ? $message : 'The secure checkout service is temporarily unavailable.');
+    }
+    return $decoded;
+}
+
+function self_service_offer(string $orderType, string $currentTier, string $targetTier): array
+{
+    $targetTier = clean_license_tier($targetTier);
+    if (strtoupper($orderType) === 'MAINTENANCE') {
+        return maintenance_offer($targetTier);
+    }
+    if (strtoupper($orderType) !== 'UPGRADE') {
+        throw new InvalidArgumentException('The checkout type is invalid.');
+    }
+    $target = license_offer($targetTier);
+    $currentAmount = '0.00';
+    if ($currentTier !== 'Trial') {
+        $current = license_offer(clean_license_tier($currentTier));
+        if (!hash_equals((string)$target['currency'], (string)$current['currency'])) {
+            throw new RuntimeException('Upgrade pricing currencies do not match.');
+        }
+        $currentAmount = (string)$current['price'];
+    }
+    $difference = round((float)$target['price'] - (float)$currentAmount, 2);
+    if ($difference <= 0) {
+        throw new DomainException('This license does not have a paid upgrade path to the selected level.');
+    }
+    return [
+        'tier' => $targetTier,
+        'price' => number_format($difference, 2, '.', ''),
+        'currency' => (string)$target['currency'],
+    ];
 }
 
 function audit(int $orderId, string $event, ?string $details = null): void

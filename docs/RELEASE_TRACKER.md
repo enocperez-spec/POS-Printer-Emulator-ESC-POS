@@ -14,9 +14,9 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 **Current public release: v0.3.42 — released 2026-07-22**
 
-**Current development: v0.3.43 — Secure Customer Portal MVP**
+**Current development: v0.3.44 — Self-service renewals, upgrades, and promotional trials**
 
-**Next release after v0.3.43: v0.3.44 — Self-service renewals, upgrades, and promotional trials**
+**Next release after v0.3.44: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
 
 **Future scheduled sequence: v0.3.43 through v0.3.54**
 
@@ -605,7 +605,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.44 — Self-service renewals, upgrades, and promotional trials
 
-**Status:** Planned
+**Status:** In progress
 
 **GitHub:** [Issue #47 — Self-service renewals, upgrades, and promotional trials](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47)
 

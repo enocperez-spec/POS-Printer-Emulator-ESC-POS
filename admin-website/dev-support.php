@@ -649,7 +649,7 @@ $releaseSync = database()->prepare(
          'Verified enrollment; secure sessions and recovery; optional TOTP MFA; masked license, maintenance, purchase, computer, download, support, and promotional-eligibility views; contact and preference management; support submission and replies; controlled old-computer deactivation; accessibility; and responsive deployment.',
          'The portal depends on v0.3.42 customer ownership, consent, audit, and authenticated API foundations.',
          'Verified customers can manage only their own records and primary portal workflows pass authorization, recovery, accessibility, desktop, and mobile tests.', NULL),
-        ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Planned', 344,
+        ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress', 344,
          'Add auditable commercial self-service while preserving permanent-license ownership.',
          'Server-controlled PayPal renewals and upgrades; exact product and price confirmation; idempotent fulfillment, refunds, and chargebacks; one five-day paid-edition promotion per verified customer; prior-license restoration; repeat prevention; audited exceptions; and offline and clock-tamper handling.',
          'Payments and temporary entitlements require the verified ownership and portal foundations before campaigns direct customers to them.',

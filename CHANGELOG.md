@@ -4,6 +4,14 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.44 — In development
+
+- Begins the secure self-service commercial workflow for verified Customer Portal accounts.
+- Adds server-owned checkout intents for optional annual maintenance renewals and permanent license upgrades.
+- Adds one-time promotional eligibility records, prior-entitlement snapshots, five-day expiration, and restoration audit events.
+- Keeps PayPal credentials, product prices, activation-key signing, and entitlement transitions on protected backend services.
+- Requires reauthentication for checkout and promotion actions and binds every action to the authenticated customer.
+
 ## v0.3.43 — In development
 
 - Adds the Secure Customer Portal foundation for verified Trial, Lite, Pro, and Enterprise customers.
