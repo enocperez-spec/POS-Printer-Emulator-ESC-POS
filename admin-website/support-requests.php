@@ -10,6 +10,28 @@ $requests = [];
 $selected = null;
 
 try {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'reply') {
+        require_csrf();
+        $reference = trim((string)($_POST['reference'] ?? ''));
+        $message = trim((string)($_POST['message'] ?? ''));
+        if (!preg_match('/^SUP-[A-F0-9]{12}$/', $reference) || $message === '' || mb_strlen($message) > 5000) {
+            throw new DomainException('Enter a support reply of no more than 5,000 characters.');
+        }
+        $requestOwner = $pdo->prepare('SELECT customer_id FROM support_requests WHERE reference_code=:reference LIMIT 1');
+        $requestOwner->execute(['reference' => $reference]);
+        $replyCustomerId = $requestOwner->fetchColumn();
+        if (!is_string($replyCustomerId) || $replyCustomerId === '') {
+            throw new DomainException('That Customer Portal request is unavailable.');
+        }
+        $reply = $pdo->prepare(
+            "INSERT INTO portal_support_replies(reference_code,customer_id,message,author_type)
+             VALUES(:reference,:customer_id,:message,'Support')"
+        );
+        $reply->execute(['reference' => $reference, 'customer_id' => $replyCustomerId, 'message' => $message]);
+        header('Location: /support-requests.php?request=' . rawurlencode($reference), true, 303);
+        exit;
+    }
+
     if (isset($_GET['attachment'])) {
         $attachmentId = filter_var($_GET['attachment'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($attachmentId === false) {
@@ -33,7 +55,7 @@ try {
     }
 
     $requests = $pdo->query(
-        "SELECT r.reference_code, r.license_id, r.request_type, r.subject, r.contact_name,
+        "SELECT r.reference_code, r.customer_id, r.license_id, r.request_type, r.subject, r.contact_name,
                 r.contact_email, r.private_diagnostics, r.github_issue_number, r.github_issue_url,
                 r.state, r.created_at, r.submitted_at,
                 (SELECT COUNT(*) FROM support_request_attachments a WHERE a.reference_code=r.reference_code) attachment_count
@@ -51,7 +73,15 @@ try {
         $attachmentQuery = $pdo->prepare('SELECT id, file_name, content_type, OCTET_LENGTH(content) size FROM support_request_attachments WHERE reference_code = :reference ORDER BY id');
         $attachmentQuery->execute(['reference' => $selected['reference_code']]);
         $selected['attachments'] = $attachmentQuery->fetchAll();
+        $replyQuery = $pdo->prepare(
+            'SELECT author_type,message,created_at FROM portal_support_replies
+             WHERE reference_code=:reference AND customer_id=:customer_id ORDER BY created_at'
+        );
+        $replyQuery->execute(['reference' => $selected['reference_code'], 'customer_id' => $selected['customer_id']]);
+        $selected['replies'] = $replyQuery->fetchAll();
     }
+} catch (DomainException $exception) {
+    $error = $exception->getMessage();
 } catch (Throwable $exception) {
     error_log('POS Printer Emulator Support Requests page failure: ' . $exception->getMessage());
     $error = 'Support requests are not available yet. Deploy the v0.3.33 database schema and try again.';
@@ -79,5 +109,6 @@ function support_size(int $bytes): string
 <dl><div><dt>Customer</dt><dd><?= e((string)$selected['contact_name']) ?></dd></div><div><dt>Email</dt><dd><a href="mailto:<?= e((string)$selected['contact_email']) ?>"><?= e((string)$selected['contact_email']) ?></a></dd></div><div><dt>License ID</dt><dd><code><?= e((string)$selected['license_id']) ?></code></dd></div><div><dt>Status</dt><dd><?= e((string)$selected['state']) ?></dd></div></dl>
 <section class="private-material"><h3>Private attachments</h3><?php if (($selected['attachments'] ?? []) === []): ?><p>No attachments were included.</p><?php else: ?><ul><?php foreach ($selected['attachments'] as $attachment): ?><li><span><?= e((string)$attachment['file_name']) ?> <small><?= e((string)$attachment['content_type']) ?> · <?= e(support_size((int)$attachment['size'])) ?></small></span><a href="?attachment=<?= (int)$attachment['id'] ?>">Download</a></li><?php endforeach; ?></ul><?php endif; ?></section>
 <details class="private-diagnostics"><summary>Redacted diagnostic log</summary><?php if (trim((string)$selected['private_diagnostics']) === ''): ?><p>No diagnostic log was included.</p><?php else: ?><pre><?= e((string)$selected['private_diagnostics']) ?></pre><?php endif; ?></details>
+<?php if (!empty($selected['customer_id'])): ?><section class="private-material"><h3>Customer Portal conversation</h3><?php if (($selected['replies'] ?? []) === []): ?><p>No replies yet.</p><?php else: ?><ul><?php foreach ($selected['replies'] as $reply): ?><li><span><strong><?= e((string)$reply['author_type']) ?></strong> · <?= e((string)$reply['created_at']) ?> UTC<br><?= nl2br(e((string)$reply['message'])) ?></span></li><?php endforeach; ?></ul><?php endif; ?><form method="post"><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="reply"><input type="hidden" name="reference" value="<?= e((string)$selected['reference_code']) ?>"><label for="support-reply">Reply to customer</label><textarea id="support-reply" name="message" rows="5" maxlength="5000" required></textarea><button type="submit">Add private reply</button></form></section><?php endif; ?>
 <?php else: ?><div class="support-empty"><strong>Select a support request</strong><p>Private contact information and diagnostics appear here.</p></div><?php endif; ?>
 </section></div></main></div></body></html>

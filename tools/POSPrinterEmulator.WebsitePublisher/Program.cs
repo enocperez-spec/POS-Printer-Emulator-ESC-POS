@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -17,6 +18,10 @@ const string AdminPasswordVariable = "PPE_ADMIN_PASSWORD";
 const string LicensePrivateKeyPathVariable = "PPE_LICENSE_PRIVATE_KEY_PATH";
 const string GoogleVerificationVariable = "PPE_GOOGLE_SITE_VERIFICATION";
 const string BingVerificationVariable = "PPE_BING_SITE_AUTH_TOKEN";
+const string PortalBaseUrlVariable = "PPE_PORTAL_BASE_URL";
+const string PortalMailTransportVariable = "PPE_PORTAL_MAIL_TRANSPORT";
+const string PortalMailFromVariable = "PPE_PORTAL_MAIL_FROM";
+const string PortalMailReplyToVariable = "PPE_PORTAL_MAIL_REPLY_TO";
 const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -30,6 +35,9 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher download-protected <private/remote-file> <local-file> [remote-directory]");
     Console.WriteLine("  website-publisher configure-crm-secrets [remote-directory]");
     Console.WriteLine("  website-publisher migrate-crm <https-migration-url>");
+    Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
+    Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
+    Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
     return 0;
@@ -43,6 +51,16 @@ if (args[0].Equals("migrate-crm", StringComparison.OrdinalIgnoreCase))
         throw new ArgumentException("The migrate-crm command requires an HTTPS migration URL.");
     }
     await MigrateCrmAsync(migrationUri);
+    return 0;
+}
+if (args[0].Equals("migrate-customer-portal", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var migrationUri) ||
+        migrationUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The migrate-customer-portal command requires an HTTPS migration URL.");
+    }
+    await MigrateCustomerPortalAsync(migrationUri);
     return 0;
 }
 
@@ -120,6 +138,21 @@ try
             break;
         case "configure-crm-secrets":
             ConfigureCrmSecrets(client, args.Length > 1 ? args[1] : ".");
+            break;
+        case "configure-customer-portal":
+            ConfigureCustomerPortal(client, args.Length > 1 ? args[1] : ".");
+            break;
+        case "configure-customer-portal-from-admin":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException(
+                    "The configure-customer-portal-from-admin command requires the Admin Portal remote directory.");
+            }
+
+            ConfigureCustomerPortalFromAdmin(
+                client,
+                args[1],
+                args.Length > 2 ? args[2] : ".");
             break;
         default:
             throw new ArgumentException($"Unknown command: {args[0]}");
@@ -450,7 +483,218 @@ static void ConfigureCrmSecrets(SftpClient client, string remoteDirectory)
     Console.WriteLine($"Saved an encrypted current-user recovery copy to {recoveryPath}.");
 }
 
+static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException("Customer Portal deployment-secret recovery uses Windows data protection.");
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+    var privateDirectory = CombineRemote(remoteRoot, "private");
+    EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
+
+    var serviceToken = RecoverCrmServiceToken();
+    var recoveryDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "POSPrinterEmulator",
+        "deployment-secrets");
+    Directory.CreateDirectory(recoveryDirectory);
+    var recoveryPath = Path.Combine(recoveryDirectory, "customer-portal-v0.3.43.secrets.bin");
+    string encryptionKey;
+    if (File.Exists(recoveryPath))
+    {
+        var protectedRecovery = File.ReadAllBytes(recoveryPath);
+        var recovery = ProtectedData.Unprotect(protectedRecovery, null, DataProtectionScope.CurrentUser);
+        using var document = JsonDocument.Parse(recovery);
+        encryptionKey = document.RootElement.GetProperty("encryptionKey").GetString()
+            ?? throw new InvalidDataException("The protected Customer Portal encryption key is unavailable.");
+    }
+    else
+    {
+        encryptionKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var recovery = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            version = 1,
+            createdAtUtc = DateTimeOffset.UtcNow,
+            encryptionKey
+        });
+        File.WriteAllBytes(
+            recoveryPath,
+            ProtectedData.Protect(recovery, null, DataProtectionScope.CurrentUser));
+    }
+
+    var databasePort = uint.TryParse(Environment.GetEnvironmentVariable(DatabasePortVariable), out var port) ? port : 3306;
+    var baseUrl = Environment.GetEnvironmentVariable(PortalBaseUrlVariable) ?? "https://userportal.posprinteremulator.com";
+    if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) ||
+        baseUri.Scheme != Uri.UriSchemeHttps ||
+        !string.IsNullOrEmpty(baseUri.Query) ||
+        !string.IsNullOrEmpty(baseUri.Fragment))
+    {
+        throw new InvalidOperationException($"{PortalBaseUrlVariable} must be a canonical HTTPS URL.");
+    }
+    var mailTransport = (Environment.GetEnvironmentVariable(PortalMailTransportVariable) ?? "php_mail").ToLowerInvariant();
+    if (mailTransport is not "php_mail" and not "outbox")
+    {
+        throw new InvalidOperationException($"{PortalMailTransportVariable} must be php_mail or outbox.");
+    }
+    var mailFrom = Environment.GetEnvironmentVariable(PortalMailFromVariable) ?? "support@posprinteremulator.com";
+    var mailReplyTo = Environment.GetEnvironmentVariable(PortalMailReplyToVariable) ?? mailFrom;
+    if (!System.Net.Mail.MailAddress.TryCreate(mailFrom, out _) ||
+        !System.Net.Mail.MailAddress.TryCreate(mailReplyTo, out _))
+    {
+        throw new InvalidOperationException("Customer Portal sender addresses are invalid.");
+    }
+
+    var config = $"""
+        <?php
+        declare(strict_types=1);
+
+        return [
+            'database' => [
+                'host' => {PhpString(RequiredEnvironmentVariable(DatabaseHostVariable))},
+                'port' => {databasePort},
+                'username' => {PhpString(RequiredEnvironmentVariable(DatabaseUserVariable))},
+                'password' => {PhpString(RequiredEnvironmentVariable(DatabasePasswordVariable))},
+                'name' => {PhpString(Environment.GetEnvironmentVariable(DatabaseNameVariable) ?? string.Empty)},
+            ],
+            'portal' => [
+                'base_url' => {PhpString(baseUri.GetLeftPart(UriPartial.Path).TrimEnd('/'))},
+                'encryption_key' => {PhpString(encryptionKey)},
+                'mail_transport' => {PhpString(mailTransport)},
+                'mail_from' => {PhpString(mailFrom)},
+                'mail_reply_to' => {PhpString(mailReplyTo)},
+                'support_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
+                'support_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-support.php',
+                'support_backend_token' => {PhpString(serviceToken)},
+            ],
+        ];
+        """;
+    UploadText(client, CombineRemote(privateDirectory, "config.php"), config);
+    Console.WriteLine("Uploaded protected Customer Portal configuration. No database, encryption, or service credentials were displayed.");
+    Console.WriteLine($"Reused or saved an encrypted current-user recovery copy at {recoveryPath}.");
+}
+
+static void ConfigureCustomerPortalFromAdmin(
+    SftpClient client,
+    string adminRemoteDirectory,
+    string portalRemoteDirectory)
+{
+    var adminRoot = ResolveRemotePath(client, adminRemoteDirectory).TrimEnd('/');
+    if (adminRoot.Length == 0)
+    {
+        adminRoot = "/";
+    }
+
+    var remoteConfigPath = CombineRemote(adminRoot, "private/config.php");
+    if (!client.Exists(remoteConfigPath))
+    {
+        throw new FileNotFoundException(
+            "The protected Admin Portal database configuration is unavailable.",
+            remoteConfigPath);
+    }
+
+    var temporaryConfigPath = Path.Combine(
+        Path.GetTempPath(),
+        $"ppe-admin-config-{Guid.NewGuid():N}.php");
+    try
+    {
+        using (var output = new FileStream(
+                   temporaryConfigPath,
+                   FileMode.CreateNew,
+                   FileAccess.Write,
+                   FileShare.None,
+                   4096,
+                   FileOptions.WriteThrough))
+        {
+            client.DownloadFile(remoteConfigPath, output);
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "php",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-r");
+        startInfo.ArgumentList.Add(
+            "$c=require $argv[1]; echo json_encode($c['database'], JSON_THROW_ON_ERROR);");
+        startInfo.ArgumentList.Add(temporaryConfigPath);
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start PHP to read the protected Admin configuration.");
+        var databaseJson = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Could not read the protected Admin database configuration: {error.Trim()}");
+        }
+
+        using var database = JsonDocument.Parse(databaseJson);
+        var root = database.RootElement;
+        var values = new Dictionary<string, string?>
+        {
+            [DatabaseHostVariable] = root.GetProperty("host").GetString(),
+            [DatabasePortVariable] = root.TryGetProperty("port", out var port)
+                ? port.ToString()
+                : "3306",
+            [DatabaseUserVariable] = root.GetProperty("username").GetString(),
+            [DatabasePasswordVariable] = root.GetProperty("password").GetString(),
+            [DatabaseNameVariable] = root.GetProperty("name").GetString()
+        };
+        var previousValues = values.Keys.ToDictionary(
+            name => name,
+            Environment.GetEnvironmentVariable,
+            StringComparer.Ordinal);
+        try
+        {
+            foreach (var (name, value) in values)
+            {
+                Environment.SetEnvironmentVariable(name, value);
+            }
+
+            ConfigureCustomerPortal(client, portalRemoteDirectory);
+        }
+        finally
+        {
+            foreach (var (name, value) in previousValues)
+            {
+                Environment.SetEnvironmentVariable(name, value);
+            }
+        }
+    }
+    finally
+    {
+        if (File.Exists(temporaryConfigPath))
+        {
+            File.Delete(temporaryConfigPath);
+        }
+    }
+}
+
 static async Task MigrateCrmAsync(Uri migrationUri)
+{
+    var serviceToken = RecoverCrmServiceToken();
+    await RunProtectedMigrationAsync(migrationUri, serviceToken, "CRM");
+    Console.WriteLine("Protected customer CRM migration completed successfully.");
+}
+
+static async Task MigrateCustomerPortalAsync(Uri migrationUri)
+{
+    var serviceToken = RecoverCrmServiceToken();
+    await RunProtectedMigrationAsync(migrationUri, serviceToken, "Customer Portal");
+    Console.WriteLine("Protected Customer Portal migration completed successfully.");
+}
+
+static string RecoverCrmServiceToken()
 {
     if (!OperatingSystem.IsWindows())
     {
@@ -465,7 +709,7 @@ static async Task MigrateCrmAsync(Uri migrationUri)
     {
         throw new FileNotFoundException("The protected CRM deployment-secret recovery file is unavailable.", recoveryPath);
     }
-    var protectedRecovery = await File.ReadAllBytesAsync(recoveryPath);
+    var protectedRecovery = File.ReadAllBytes(recoveryPath);
     var recovery = ProtectedData.Unprotect(protectedRecovery, null, DataProtectionScope.CurrentUser);
     using var document = JsonDocument.Parse(recovery);
     var serviceToken = document.RootElement.GetProperty("serviceToken").GetString();
@@ -473,7 +717,11 @@ static async Task MigrateCrmAsync(Uri migrationUri)
     {
         throw new InvalidDataException("The protected CRM service token is unavailable.");
     }
+    return serviceToken;
+}
 
+static async Task RunProtectedMigrationAsync(Uri migrationUri, string serviceToken, string name)
+{
     using var request = new HttpRequestMessage(HttpMethod.Post, migrationUri);
     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
     request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
@@ -482,14 +730,13 @@ static async Task MigrateCrmAsync(Uri migrationUri)
     var body = await response.Content.ReadAsStringAsync();
     if (!response.IsSuccessStatusCode)
     {
-        throw new InvalidOperationException($"CRM migration failed with HTTP {(int)response.StatusCode}.");
+        throw new InvalidOperationException($"{name} migration failed with HTTP {(int)response.StatusCode}.");
     }
     using var result = JsonDocument.Parse(body);
     if (!result.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
     {
-        throw new InvalidDataException("The CRM migration response was invalid.");
+        throw new InvalidDataException($"The {name} migration response was invalid.");
     }
-    Console.WriteLine("Protected customer CRM migration completed successfully.");
 }
 
 static void UploadText(SftpClient client, string remotePath, string content)

@@ -71,6 +71,15 @@ if (!str_contains($legacyAdmin, "https://admin.posprinteremulator.com/") ||
     $failures[] = 'The retired website admin endpoint must remain a redirect-only route to the Admin Portal.';
 }
 
+foreach (['website/api/v1/telemetry.php', 'website/api/_geography.php', 'website/api/setup.php', 'website/download.php'] as $relativePath) {
+    $output = [];
+    $code = 0;
+    exec('php -l ' . escapeshellarg($root . '/' . $relativePath), $output, $code);
+    if ($code !== 0) {
+        $failures[] = "{$relativePath} failed PHP syntax validation.";
+    }
+}
+
 if ($failures !== []) {
     fwrite(STDERR, "Main website contract tests failed:\n- " . implode("\n- ", $failures) . "\n");
     exit(1);

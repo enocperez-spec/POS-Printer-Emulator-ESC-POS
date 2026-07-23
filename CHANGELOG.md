@@ -4,6 +4,16 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.43 — In development
+
+- Adds the Secure Customer Portal foundation for verified Trial, Lite, Pro, and Enterprise customers.
+- Adds generic-response email enrollment and password recovery with one-time hashed tokens.
+- Adds Argon2id passwords, protected sessions, rotation and revocation, lockouts, persistent rate limits, optional authenticator MFA, and one-time recovery codes.
+- Adds customer-owned views for masked licenses, maintenance, installations, purchases, downloads, support history, consent, and privacy-safe account activity.
+- Adds reauthenticated computer deactivation with ownership checks, audit evidence, and cooldown protection.
+- Adds private support submissions and replies with a server-to-server Admin Portal handoff so GitHub credentials never reach the customer browser.
+- Adds account preferences, append-only consent evidence, privacy-safe JSON export, and account closure that preserves permanent license and transaction evidence.
+
 ## Upcoming security releases
 
 ## v0.3.42 — 2026-07-22

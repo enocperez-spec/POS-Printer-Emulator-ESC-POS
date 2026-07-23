@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>POSPrinterEmulator.Updater</AssemblyName>
     <RootNamespace>POSPrinterEmulator.Updater</RootNamespace>
-    <Version>0.3.42</Version>
+    <Version>0.3.43</Version>
     <ApplicationIcon>..\..\assets\branding\pos-printer-emulator.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

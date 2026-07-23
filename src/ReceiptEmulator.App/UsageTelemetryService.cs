@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Channels;
 
@@ -239,6 +240,8 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         customerName = status.CustomerName,
         emailAddress = status.EmailAddress,
         appVersion = ProductInfo.Version,
+        deviceLabel = Environment.MachineName,
+        windowsVersion = RuntimeInformation.OSDescription,
         licenseMode = status.Mode,
         licenseId = status.LicenseId,
         maintenanceStatus = status.Maintenance.State,
