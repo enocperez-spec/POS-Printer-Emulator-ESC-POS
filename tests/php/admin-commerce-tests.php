@@ -170,7 +170,6 @@ $expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle comm
 $expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released'", $schema, 'Fresh database schema must identify v0.3.45 as released.');
 $expectContains("WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'", $devSupport, 'Admin Dev Support is missing the v0.3.45 GitHub release link.');
 $futureReleases = [
-    'v0.3.46' => ['Accessibility and keyboard usability', 31],
     'v0.3.47' => ['Five-Day Promotional Trial Experience', 52],
     'v0.3.48' => ['Automatic configuration restore points', 32],
     'v0.3.49' => ['Projects and testing sessions', 33],
@@ -182,12 +181,15 @@ $futureReleases = [
     'v0.3.55' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
-    $status = $version === 'v0.3.46' ? 'In progress' : 'Planned';
+    $status = 'Planned';
     $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', '{$status}'";
     $expectContains($expectedRow, $devSupport, "Admin Dev Support is missing {$status} {$version} {$title}.");
     $expectContains($expectedRow, $schema, "Fresh database schema is missing {$status} {$version} {$title}.");
     $expectContains("WHEN '{$version}' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/{$issue}'", $devSupport, "Admin Dev Support is missing the {$version} GitHub issue link.");
 }
+$expectContains("('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.46 as released.');
+$expectContains("('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released'", $schema, 'Fresh database schema must identify v0.3.46 as released.');
+$expectContains("WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'", $devSupport, 'Admin Dev Support is missing the v0.3.46 GitHub release link.');
 $expectContains("WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'", $devSupport, 'Admin Dev Support is missing the v0.3.40 GitHub release link.');
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $devSupport, 'Admin Dev Support is missing BUG-015.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $schema, 'Fresh database schema is missing released v0.3.33.');

@@ -30,7 +30,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.45 Consent-aware lifecycle communications and CRM analytics is the current public release, released July 23, 2026.
+> **Release status:** v0.3.46 Accessibility and window usability is the current public release, released July 23, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -38,7 +38,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.45-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.46-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -164,7 +164,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.41-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.46-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 

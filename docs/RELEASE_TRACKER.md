@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.45 — released 2026-07-23**
+**Current public release: v0.3.46 — released 2026-07-23**
 
-**Current development: v0.3.46 — Accessibility and keyboard usability**
+**Current development: v0.3.47 — Five-Day Promotional Trial Experience**
 
-**Next release after v0.3.45: v0.3.46 — Accessibility and keyboard usability**
+**Next release after v0.3.46: v0.3.47 — Five-Day Promotional Trial Experience**
 
-**Future scheduled sequence: v0.3.46 through v0.3.55**
+**Future scheduled sequence: v0.3.47 through v0.3.55**
 
-**Most recently completed: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
+**Most recently completed: v0.3.46 — Accessibility and keyboard usability**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -86,6 +86,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.43 | Released | Secure Customer Portal MVP |
 | v0.3.44 | Released | Self-service renewals, upgrades, and promotional trials |
 | v0.3.45 | Released | Consent-aware lifecycle communications and CRM analytics |
+| v0.3.46 | Released | Accessibility and keyboard usability |
 
 ## Scheduled releases
 
@@ -664,13 +665,13 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.46 — Accessibility and keyboard usability
 
-**Status:** In progress
+**Status:** Released — 2026-07-23
 
 **GitHub:** [Issue #31 — Accessibility and keyboard usability](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31)
 
 **Purpose:** Make every primary workflow usable with a keyboard, Windows assistive technology, display scaling, and high-contrast preferences.
 
-**Planned scope:**
+**Released scope:**
 
 - Launch the desktop window maximized on first use, remember each user's last normal or maximized preference, keep restored bounds within the current monitor work area, and recover safely when a saved monitor is disconnected.
 - Define a complete focus order, visible focus treatment, semantic landmarks, accessible names, and screen-reader status announcements.
@@ -686,7 +687,9 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Why this order:** Accessibility improves usability for every customer and is less expensive to establish before more screens and controls are added.
 
-**Complete when:** The first launch is maximized without covering the taskbar; restore, resize, minimize, multi-monitor placement, disconnected-monitor recovery, and subsequent preference restoration work normally; and primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
+**Completion verification:** The desktop starts maximized on first use without covering the taskbar, persists only safe normal or maximized preferences, constrains restored bounds to the active monitor work area, recenters disconnected-monitor coordinates, and preserves standard maximize, restore, resize, minimize, and multi-monitor behavior. Existing semantic regions, accessible names, visible focus treatment, reduced-motion support, and keyboard-operable native controls remain available across the viewer. All 181 desktop tests, every PHP contract suite, 71-file PHP lint, dependency audits, tracked-diff secret scanning, publisher compilation, version synchronization, and 27-page SEO validation pass. The 121,121,254-byte self-contained installer’s generated SHA-256 matches the independent value `eab62a267b259d13d751b8b7016627527d2d218b3fca98942fa815c2ca5c8eba`.
+
+**Complete when:** The release build and Windows installer pass automated tests, fresh-start and saved-placement regression coverage, version synchronization, package-integrity verification, and security release review.
 
 ### v0.3.47 — Five-Day Promotional Trial Experience
 

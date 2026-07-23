@@ -291,7 +291,7 @@ function communication_test_parameters(string $templateKey, string $customerName
         ],
         'release_announcement' => [
             'customer_name' => $customerName, 'installed_version' => '0.3.44',
-            'latest_version' => 'v0.3.45', 'release_summary' => 'Consent-aware lifecycle communications',
+            'latest_version' => 'v0.3.46', 'release_summary' => 'Maximized startup and taskbar-safe window placement',
             'download_url' => 'https://www.posprinteremulator.com/download',
         ],
         'inactivity_help' => ['customer_name' => $customerName, 'support_url' => $portal],

@@ -705,11 +705,11 @@ $releaseSync = database()->prepare(
          'Protected Brevo transactional email, contact, template, and authenticated webhook APIs; authenticated sender domain; configurable 300-send provider quota with a 290-send automated cap and 50 reserved service slots; durable priority outbox and next-day deferral; separated service and marketing messages; retries, quiet hours, caps, approvals, pause, and emergency stop; welcome, Trial, promotion, release, inactivity, support, and maintenance schedules; unsubscribe, bounce, complaint, and closure suppression; minimal consented telemetry; segmentation; and Admin dashboards.',
          'Automation follows only after identity, portal destinations, commercial workflows, consent, and lifecycle events are reliable.',
          'Eligible messages send exactly once, opt-outs and suppressions are honored, more than 300 queued messages respect the configured quota without loss or starving service mail, dashboards reconcile, and prohibited data is absent from Brevo payloads and logs.', '2026-07-23 00:00:00.000000'),
-        ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'In progress', 346,
+        ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released', 346,
          'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.',
          'Maximized first launch; taskbar-safe remembered placement; disconnected-monitor recovery; focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
          'Accessibility should be established before additional desktop screens and controls increase remediation cost.',
-         'Window placement behaves safely and primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', NULL),
+         'Window placement behaves safely and primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', UTC_TIMESTAMP(6)),
         ('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Planned', 347,
          'Replace manual promotional-key entry with a one-click server-authorized Lite, Pro, or Enterprise evaluation.',
          'Edition selection; verified-customer eligibility; privacy-preserving installation identity; signed automatic activation; eligible, activating, active, expired, used, and offline states; exact five-day countdown; purchase actions; safe prior-license restoration; and server-side idempotency, uniqueness, and anti-repeat controls.',
@@ -837,7 +837,7 @@ database()->prepare(
          WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.43'
          WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.44'
          WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'
-         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
+         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'
          WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/52'
          WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
