@@ -45,6 +45,8 @@ $contains("'httponly' => true", $bootstrap, 'Portal session cookie must be HttpO
 $contains("'samesite' => 'Strict'", $bootstrap, 'Portal session cookie must use SameSite Strict.');
 $contains("Content-Security-Policy", $bootstrap, 'Portal must send a Content Security Policy.');
 $contains("Cache-Control: no-store", $bootstrap, 'Portal pages must not be cached.');
+$contains("SHOW DATABASES", $bootstrap, 'Portal must discover the single legacy database when its configured name is blank.');
+$contains("count(\$available) !== 1", $bootstrap, 'Portal must reject ambiguous database discovery.');
 $contains("portal_require_csrf", $portal, 'Portal mutations must enforce CSRF.');
 $contains("portal_require_csrf", $logout, 'Sign out must enforce CSRF.');
 $contains("PASSWORD_ARGON2ID", $auth, 'Portal passwords must use Argon2id.');
