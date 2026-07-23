@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.42 — released 2026-07-22**
+**Current public release: v0.3.44 — released 2026-07-23**
 
-**Current development: v0.3.43 — Secure Customer Portal MVP**
+**Current development: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
 
-**Next release after v0.3.43: v0.3.44 — Self-service renewals, upgrades, and promotional trials**
+**Next release after v0.3.44: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
 
-**Future scheduled sequence: v0.3.43 through v0.3.54**
+**Future scheduled sequence: v0.3.45 through v0.3.54**
 
-**Most recently completed: v0.3.42 — Customer identity, consent, and CRM foundation**
+**Most recently completed: v0.3.44 — Self-service renewals, upgrades, and promotional trials**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -83,6 +83,8 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.40 | Released | Simple Mode and Expert Mode |
 | v0.3.41 | Released | Installer Branding Correction |
 | v0.3.42 | Released | Customer identity, consent, and CRM foundation |
+| v0.3.43 | Released | Secure Customer Portal MVP |
+| v0.3.44 | Released | Self-service renewals, upgrades, and promotional trials |
 
 ## Scheduled releases
 
@@ -579,7 +581,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.43 — Secure Customer Portal MVP
 
-**Status:** In progress
+**Status:** Released — 2026-07-23
 
 **GitHub:** [Issue #46 — Secure Customer Portal MVP](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46)
 
@@ -605,7 +607,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.44 — Self-service renewals, upgrades, and promotional trials
 
-**Status:** Planned
+**Status:** Released — 2026-07-23
 
 **GitHub:** [Issue #47 — Self-service renewals, upgrades, and promotional trials](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47)
 

@@ -18,5 +18,7 @@ return [
         'support_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
         'support_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-support.php',
         'support_backend_token' => 'replace-on-server',
+        'promotion_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-promotion.php',
+        'buy_base_url' => 'https://buy.posprinteremulator.com',
     ],
 ];

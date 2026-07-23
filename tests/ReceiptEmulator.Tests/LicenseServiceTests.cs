@@ -621,6 +621,65 @@ public sealed class LicenseServiceTests
                 _ => throw new UnauthorizedAccessException("Access denied.")));
     }
 
+    [Fact]
+    public void TrialPromotionUnlocksEnterpriseAndRestoresTrialAfterExpiration()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = NewRoot();
+        var configuration = Configuration(root, vendorKey);
+        var now = new DateTimeOffset(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
+        var installationId = Guid.NewGuid();
+        var service = new LicenseService(new TestEnvironment(), configuration, () => now);
+        service.BindInstallationId(installationId);
+        var token = PromotionEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            Guid.NewGuid(),
+            PromotionSubjectType.Installation,
+            installationId,
+            now,
+            now.AddDays(5),
+            LicenseTier.Trial,
+            LicenseTier.Enterprise);
+
+        var promoted = service.InstallPromotionEntitlement(token);
+
+        Assert.Equal("Enterprise", promoted.Mode);
+        Assert.True(promoted.Promotion.IsActive);
+        Assert.True(promoted.Features.History);
+        Assert.Equal(15, promoted.MaximumListeners);
+
+        now = now.AddDays(5).AddMinutes(1);
+        var restored = service.GetStatus();
+        Assert.Equal("Trial", restored.Mode);
+        Assert.False(restored.Promotion.IsActive);
+        Assert.Equal("Expired", restored.Promotion.State);
+        Assert.False(restored.Features.History);
+        Assert.Equal(1, restored.MaximumListeners);
+    }
+
+    [Fact]
+    public void PromotionIsBoundToTheSelectedPermanentLicense()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var now = new DateTimeOffset(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
+        var service = new LicenseService(new TestEnvironment(), Configuration(NewRoot(), vendorKey), () => now);
+        var activation = ActivationKeyCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(), "Promo Customer", "promo@example.com", LicenseTier.Lite, now, now.AddYears(1));
+        service.Activate("Promo Customer", "promo@example.com", activation);
+        var token = PromotionEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            Guid.NewGuid(),
+            PromotionSubjectType.License,
+            Guid.NewGuid(),
+            now,
+            now.AddDays(5),
+            LicenseTier.Lite,
+            LicenseTier.Enterprise);
+
+        Assert.Contains("different license", Assert.Throws<InvalidOperationException>(() =>
+            service.InstallPromotionEntitlement(token)).Message);
+    }
+
     private sealed class TestEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = "Testing";

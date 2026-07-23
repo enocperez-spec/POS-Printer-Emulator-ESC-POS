@@ -644,16 +644,16 @@ $releaseSync = database()->prepare(
          'Canonical verified customer IDs; normalized registration, installation, license, maintenance, purchase, support, consent, suppression, and event records; safe backfill; Admin customer search, filters, detail, and controlled export; masked key lookup; retention and correction workflows; and authenticated service APIs.',
          'Every later portal, renewal, promotional, email, and analytics workflow depends on trustworthy ownership and consent evidence.',
          'Existing entitlements migrate unchanged, verified customers resolve to one auditable profile, unauthorized enumeration is blocked, and prohibited receipt or secret data is absent.', '2026-07-22 00:00:00.000000'),
-        ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress', 343,
+        ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Released', 343,
          'Give verified customers secure self-service access at userportal.posprinteremulator.com.',
          'Verified enrollment; secure sessions and recovery; optional TOTP MFA; masked license, maintenance, purchase, computer, download, support, and promotional-eligibility views; contact and preference management; support submission and replies; controlled old-computer deactivation; accessibility; and responsive deployment.',
          'The portal depends on v0.3.42 customer ownership, consent, audit, and authenticated API foundations.',
-         'Verified customers can manage only their own records and primary portal workflows pass authorization, recovery, accessibility, desktop, and mobile tests.', NULL),
-        ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Planned', 344,
+         'Verified customers can manage only their own records and primary portal workflows pass authorization, recovery, accessibility, desktop, and mobile tests.', '2026-07-23 00:00:00.000000'),
+        ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released', 344,
          'Add auditable commercial self-service while preserving permanent-license ownership.',
          'Server-controlled PayPal renewals and upgrades; exact product and price confirmation; idempotent fulfillment, refunds, and chargebacks; one five-day paid-edition promotion per verified customer; prior-license restoration; repeat prevention; audited exceptions; and offline and clock-tamper handling.',
          'Payments and temporary entitlements require the verified ownership and portal foundations before campaigns direct customers to them.',
-         'Renewals and upgrades fulfill exactly once, eligible promotions occur exactly once, expiration restores the prior license, and failure and refund tests keep entitlements consistent.', NULL),
+         'Renewals and upgrades fulfill exactly once, eligible promotions occur exactly once, expiration restores the prior license, and failure and refund tests keep entitlements consistent.', '2026-07-23 00:00:00.000000'),
         ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Planned', 345,
          'Improve onboarding, conversion, renewal, and support follow-up through Brevo without building a custom mail server.',
          'Protected Brevo transactional email, contact, template, and authenticated webhook APIs; authenticated sender domain; configurable 300-send provider quota with a 290-send automated cap and 50 reserved service slots; durable priority outbox and next-day deferral; separated service and marketing messages; retries, quiet hours, caps, approvals, pause, and emergency stop; welcome, Trial, promotion, release, inactivity, support, and maintenance schedules; unsubscribe, bounce, complaint, and closure suppression; minimal consented telemetry; segmentation; and Admin dashboards.',
@@ -783,8 +783,8 @@ database()->prepare(
          WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'
          WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.41'
          WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.42'
-         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46'
-         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47'
+         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.43'
+         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.44'
          WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48'
          WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
          WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'

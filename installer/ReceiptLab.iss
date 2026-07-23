@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.43"
+#define MyAppVersion "0.3.44"
 #define MyAppPublisher "EPCOM Ltd."
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -306,6 +306,7 @@ var
   RegistrationPath: String;
   LicensePath: String;
   MaintenancePath: String;
+  PromotionPath: String;
 begin
   if not RegistrationIsValid(False) then
   begin
@@ -330,9 +331,11 @@ begin
   RegistrationPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\registration.json');
   LicensePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\license.json');
   MaintenancePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\maintenance.json');
+  PromotionPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\promotion.json');
   if FileExists(RegistrationPath + '.upgrade-backup') or
      FileExists(LicensePath + '.upgrade-backup') or
-     FileExists(MaintenancePath + '.upgrade-backup') then
+     FileExists(MaintenancePath + '.upgrade-backup') or
+     FileExists(PromotionPath + '.upgrade-backup') then
   begin
     if not RestorePreservedUpgradeState then
     begin
@@ -380,6 +383,15 @@ begin
       end;
       Log('Preserved the existing maintenance entitlement for this upgrade.');
     end;
+    if FileExists(PromotionPath) then
+    begin
+      if not CopyFile(PromotionPath, PromotionPath + '.upgrade-backup', True) then
+      begin
+        Result := 'Setup could not preserve the existing promotional entitlement. Close POS Printer Emulator and run setup again.';
+        exit;
+      end;
+      Log('Preserved the existing promotional entitlement for this upgrade.');
+    end;
   end;
 
   Result := '';
@@ -419,7 +431,8 @@ begin
   Result :=
     RestorePreservedUpgradeFile(DataPath + '\registration.json') and
     RestorePreservedUpgradeFile(DataPath + '\license.json') and
-    RestorePreservedUpgradeFile(DataPath + '\maintenance.json');
+    RestorePreservedUpgradeFile(DataPath + '\maintenance.json') and
+    RestorePreservedUpgradeFile(DataPath + '\promotion.json');
 end;
 
 function CompletePreservedUpgradeState: Boolean;
@@ -444,6 +457,12 @@ begin
      (not DeleteFile(DataPath + '\maintenance.json.upgrade-backup')) then
   begin
     Log('Could not remove the completed maintenance upgrade backup.');
+    Result := False;
+  end;
+  if FileExists(DataPath + '\promotion.json.upgrade-backup') and
+     (not DeleteFile(DataPath + '\promotion.json.upgrade-backup')) then
+  begin
+    Log('Could not remove the completed promotion upgrade backup.');
     Result := False;
   end;
 end;

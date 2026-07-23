@@ -22,6 +22,7 @@ const string PortalBaseUrlVariable = "PPE_PORTAL_BASE_URL";
 const string PortalMailTransportVariable = "PPE_PORTAL_MAIL_TRANSPORT";
 const string PortalMailFromVariable = "PPE_PORTAL_MAIL_FROM";
 const string PortalMailReplyToVariable = "PPE_PORTAL_MAIL_REPLY_TO";
+const string BuyBaseUrlVariable = "PPE_BUY_BASE_URL";
 const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -38,6 +39,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
     Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
     Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
+    Console.WriteLine("  website-publisher migrate-self-service-commerce <https-migration-url>");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
     return 0;
@@ -61,6 +63,16 @@ if (args[0].Equals("migrate-customer-portal", StringComparison.OrdinalIgnoreCase
         throw new ArgumentException("The migrate-customer-portal command requires an HTTPS migration URL.");
     }
     await MigrateCustomerPortalAsync(migrationUri);
+    return 0;
+}
+if (args[0].Equals("migrate-self-service-commerce", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var migrationUri) ||
+        migrationUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The migrate-self-service-commerce command requires an HTTPS migration URL.");
+    }
+    await MigrateSelfServiceCommerceAsync(migrationUri);
     return 0;
 }
 
@@ -549,6 +561,14 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
     {
         throw new InvalidOperationException("Customer Portal sender addresses are invalid.");
     }
+    var buyBaseUrl = Environment.GetEnvironmentVariable(BuyBaseUrlVariable) ?? "https://buy.posprinteremulator.com";
+    if (!Uri.TryCreate(buyBaseUrl, UriKind.Absolute, out var buyUri) ||
+        buyUri.Scheme != Uri.UriSchemeHttps ||
+        !string.IsNullOrEmpty(buyUri.Query) ||
+        !string.IsNullOrEmpty(buyUri.Fragment))
+    {
+        throw new InvalidOperationException($"{BuyBaseUrlVariable} must be a canonical HTTPS URL.");
+    }
 
     var config = $"""
         <?php
@@ -571,6 +591,8 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
                 'support_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
                 'support_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-support.php',
                 'support_backend_token' => {PhpString(serviceToken)},
+                'promotion_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-promotion.php',
+                'buy_base_url' => {PhpString(buyUri.GetLeftPart(UriPartial.Path).TrimEnd('/'))},
             ],
         ];
         """;
@@ -692,6 +714,13 @@ static async Task MigrateCustomerPortalAsync(Uri migrationUri)
     var serviceToken = RecoverCrmServiceToken();
     await RunProtectedMigrationAsync(migrationUri, serviceToken, "Customer Portal");
     Console.WriteLine("Protected Customer Portal migration completed successfully.");
+}
+
+static async Task MigrateSelfServiceCommerceAsync(Uri migrationUri)
+{
+    var serviceToken = RecoverCrmServiceToken();
+    await RunProtectedMigrationAsync(migrationUri, serviceToken, "self-service commerce");
+    Console.WriteLine("Protected self-service commerce migration completed successfully.");
 }
 
 static string RecoverCrmServiceToken()

@@ -1,0 +1,65 @@
+.self-service {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(32, 194, 255, .12), transparent 34rem),
+    #f7fbff;
+  color: #0a1d38;
+}
+
+.service-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 34rem);
+  gap: clamp(2rem, 7vw, 7rem);
+  align-items: center;
+  min-height: calc(100vh - 11rem);
+  max-width: 82rem;
+  margin: 0 auto;
+  padding: clamp(3rem, 8vw, 7rem) 2rem;
+}
+
+.service-heading h1 {
+  margin: .5rem 0 1.5rem;
+  font-size: clamp(3.2rem, 7vw, 6.6rem);
+  line-height: .92;
+  letter-spacing: -.07em;
+}
+
+.service-heading .lede { max-width: 42rem; }
+
+.service-review {
+  background: #fff;
+  border: 1px solid #d5e3f0;
+  border-radius: 1.4rem;
+  box-shadow: 0 2rem 6rem rgba(7, 23, 45, .14);
+  padding: clamp(1.5rem, 4vw, 2.6rem);
+}
+
+.review-label {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: .42rem .72rem;
+  background: #e9f9f4;
+  color: #087552;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.service-review h2 { font-size: clamp(1.55rem, 3vw, 2.15rem); margin: 1rem 0; }
+.service-review h2 span { color: #1588d2; padding: 0 .35rem; }
+.review-price { display: flex; gap: .75rem; align-items: baseline; padding: .35rem 0 1.35rem; border-bottom: 1px solid #e3ebf3; }
+.review-price strong { font-size: 2.65rem; letter-spacing: -.05em; }
+.review-price span { color: #66758c; }
+.review-facts { margin: 0; }
+.review-facts div { display: grid; grid-template-columns: 9rem 1fr; gap: 1rem; padding: .9rem 0; border-bottom: 1px solid #e8eef5; }
+.review-facts dt { color: #65748b; }
+.review-facts dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.review-terms { margin: 1.2rem 0; padding: 1rem; border-radius: .85rem; background: #f3f8fd; }
+.review-terms p { margin: .35rem 0 0; color: #51647d; font-size: .91rem; line-height: 1.55; }
+.service-error { margin-bottom: 1.25rem; border-left: 4px solid #d84040; background: #fff2f2; border-radius: .7rem; padding: 1rem; }
+.service-error p { margin: .4rem 0 0; }
+.service-button { display: inline-flex; text-decoration: none; padding: .8rem 1rem; border-radius: .65rem; border: 1px solid #b9cbe0; }
+
+@media (max-width: 800px) {
+  .service-shell { grid-template-columns: 1fr; padding: 2.5rem 1rem 4rem; }
+  .service-heading h1 { font-size: clamp(3rem, 14vw, 5rem); }
+  .review-facts div { grid-template-columns: 1fr; gap: .25rem; }
+}

@@ -96,6 +96,44 @@ function issue_maintenance_token(
     return 'PPEM1-' . rtrim(strtr(base64_encode($payload . sign_license_payload($payload,$privateKeyOverride)), '+/', '-_'), '=');
 }
 
+function issue_promotion_token(
+    string $promotionId,
+    string $subjectType,
+    string $subjectId,
+    string $previousTier,
+    string $grantedTier,
+    DateTimeImmutable $issuedAt,
+    DateTimeImmutable $expiresAt,
+    ?string $privateKeyOverride = null
+): string {
+    $subjectValue = match ($subjectType) {
+        'License' => 1,
+        'Installation' => 2,
+        default => throw new InvalidArgumentException('The promotion subject is invalid.'),
+    };
+    $previousValue = $previousTier === 'Trial' ? 0 : activation_tier_value($previousTier);
+    $grantedValue = activation_tier_value($grantedTier);
+    $rank = ['Trial'=>0,'Lite'=>1,'Pro'=>2,'Enterprise'=>3];
+    if (!isset($rank[$previousTier],$rank[$grantedTier]) ||
+        $rank[$grantedTier] <= $rank[$previousTier] ||
+        $expiresAt <= $issuedAt ||
+        $expiresAt->getTimestamp() - $issuedAt->getTimestamp() > 5 * 86400 + 300) {
+        throw new InvalidArgumentException('The promotion claims are invalid.');
+    }
+    $payload = chr(1)
+        . dotnet_guid_bytes(canonical_license_uuid($promotionId))
+        . chr($subjectValue)
+        . dotnet_guid_bytes(canonical_license_uuid($subjectId))
+        . pack_unix_seconds($issuedAt->getTimestamp())
+        . pack_unix_seconds($expiresAt->getTimestamp())
+        . chr($previousValue)
+        . chr($grantedValue);
+    if (strlen($payload) !== 52) {
+        throw new RuntimeException('The promotion payload has an unexpected length.');
+    }
+    return 'PPEP1-' . rtrim(strtr(base64_encode($payload . sign_license_payload($payload,$privateKeyOverride)), '+/', '-_'), '=');
+}
+
 function sign_license_payload(string $payload, ?string $privateKeyOverride = null): string
 {
     $privateKeyPath = dirname(__DIR__) . '/private/vendor-private-key.pem';

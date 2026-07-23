@@ -40,6 +40,15 @@ export type LicenseStatus = {
     renewalUrl?: string
     message: string
   }
+  promotion: {
+    isApplicable: boolean
+    isActive: boolean
+    state: 'None' | 'Active' | 'Expired' | 'Invalid' | 'Mismatch' | 'ClockRollback'
+    previousTier?: string
+    grantedTier?: string
+    expiresAt?: string
+    message: string
+  }
   features: FeatureStatus
 }
 
@@ -110,6 +119,10 @@ export type ActivationRequest = {
 }
 
 export type MaintenanceEntitlementRequest = {
+  entitlementToken: string
+}
+
+export type PromotionEntitlementRequest = {
   entitlementToken: string
 }
 

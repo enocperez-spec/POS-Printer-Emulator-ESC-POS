@@ -63,6 +63,7 @@ const emptyStatus: ServiceStatus = {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
     maintenance: { isApplicable: false, isActive: false, isGrandfathered: false, state: 'NotApplicable', message: 'Annual maintenance is included for one year with a paid license purchase.' },
+    promotion: { isApplicable: true, isActive: false, state: 'None', message: 'No promotional access is installed.' },
     features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false },
   },
 }
@@ -1012,6 +1013,9 @@ function LicenseSettings({ status, onActivated }: {
   const [maintenanceRefreshBusy, setMaintenanceRefreshBusy] = useState(false)
   const [maintenanceMessage, setMaintenanceMessage] = useState<string>()
   const [maintenanceMessageKind, setMaintenanceMessageKind] = useState<'success' | 'info' | 'error'>('info')
+  const [promotionKey, setPromotionKey] = useState('')
+  const [promotionBusy, setPromotionBusy] = useState(false)
+  const [promotionMessage, setPromotionMessage] = useState<string>()
   const showActivationForm = !status.license.isPaid || changingLicense
   const upgradeGuidance = status.license.mode === 'Lite'
     ? 'Upgrade to Pro for up to 2 printer listeners, or Enterprise for up to 15.'
@@ -1071,6 +1075,22 @@ function LicenseSettings({ status, onActivated }: {
     }
   }
 
+  async function applyPromotion(event: FormEvent) {
+    event.preventDefault()
+    setPromotionBusy(true)
+    setPromotionMessage(undefined)
+    try {
+      const license = await api.applyPromotion({ entitlementToken: promotionKey })
+      setPromotionKey('')
+      setPromotionMessage('Promotional access was applied successfully.')
+      onActivated(license)
+    } catch (cause) {
+      setPromotionMessage(cause instanceof Error ? cause.message : 'The promotional access key could not be validated.')
+    } finally {
+      setPromotionBusy(false)
+    }
+  }
+
   return (
     <div className="settings-panel license-settings">
       <div className={`license-hero ${status.license.isPaid ? 'is-paid' : ''} ${status.license.isEnterprise ? 'is-enterprise' : ''}`}>
@@ -1089,6 +1109,29 @@ function LicenseSettings({ status, onActivated }: {
         <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
       </div>
+
+      {(status.license.promotion.isApplicable || status.license.promotion.state !== 'None') && (
+        <section className={`maintenance-card ${status.license.promotion.isActive ? 'is-active' : ''}`}>
+          <div className="maintenance-heading">
+            <div><FlaskConical size={18} /><strong>Five-day promotional access</strong></div>
+            <span>{status.license.promotion.isActive ? 'Active' : status.license.promotion.state}</span>
+          </div>
+          <p>{status.license.promotion.message}</p>
+          {status.license.promotion.expiresAt && (
+            <dl>
+              <div><dt>Promotional tier</dt><dd>{status.license.promotion.grantedTier}</dd></div>
+              <div><dt>Ends</dt><dd>{formatMaintenanceDate(status.license.promotion.expiresAt)}</dd></div>
+            </dl>
+          )}
+          {!status.license.promotion.isActive && status.license.promotion.isApplicable && (
+            <form onSubmit={applyPromotion}>
+              <label>Promotional access key<textarea required rows={3} value={promotionKey} onChange={event => setPromotionKey(event.target.value)} placeholder="PPEP1-…" spellCheck={false} /></label>
+              {promotionMessage && <div className="maintenance-message" role="status">{promotionMessage}</div>}
+              <button className="secondary-action" type="submit" disabled={promotionBusy}><FlaskConical size={16} /> {promotionBusy ? 'Applying…' : 'Start promotional access'}</button>
+            </form>
+          )}
+        </section>
+      )}
 
       {status.license.isPaid && (
         <section className={`maintenance-card ${status.license.maintenance.isActive ? 'is-active' : 'is-expired'}`}>
