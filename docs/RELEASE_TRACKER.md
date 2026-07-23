@@ -579,7 +579,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.43 — Secure Customer Portal MVP
 
-**Status:** Planned
+**Status:** In progress
 
 **GitHub:** [Issue #46 — Secure Customer Portal MVP](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46)
 

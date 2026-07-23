@@ -644,7 +644,7 @@ $releaseSync = database()->prepare(
          'Canonical verified customer IDs; normalized registration, installation, license, maintenance, purchase, support, consent, suppression, and event records; safe backfill; Admin customer search, filters, detail, and controlled export; masked key lookup; retention and correction workflows; and authenticated service APIs.',
          'Every later portal, renewal, promotional, email, and analytics workflow depends on trustworthy ownership and consent evidence.',
          'Existing entitlements migrate unchanged, verified customers resolve to one auditable profile, unauthorized enumeration is blocked, and prohibited receipt or secret data is absent.', '2026-07-22 00:00:00.000000'),
-        ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Planned', 343,
+        ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress', 343,
          'Give verified customers secure self-service access at userportal.posprinteremulator.com.',
          'Verified enrollment; secure sessions and recovery; optional TOTP MFA; masked license, maintenance, purchase, computer, download, support, and promotional-eligibility views; contact and preference management; support submission and replies; controlled old-computer deactivation; accessibility; and responsive deployment.',
          'The portal depends on v0.3.42 customer ownership, consent, audit, and authenticated API foundations.',
@@ -782,7 +782,7 @@ database()->prepare(
          WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'
          WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'
          WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.41'
-         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/45'
+         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.42'
          WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46'
          WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47'
          WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48'

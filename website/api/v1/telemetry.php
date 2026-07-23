@@ -150,6 +150,8 @@ try {
         $customerName = required_string($body, 'customerName', 160, true);
         $emailAddress = strtolower(required_string($body, 'emailAddress', 254, true));
         $appVersion = required_string($body, 'appVersion', 32);
+        $deviceLabel = required_string($body, 'deviceLabel', 120, false);
+        $windowsVersion = required_string($body, 'windowsVersion', 120, false);
         $submittedLicenseId = empty($body['licenseId']) ? null : required_string($body, 'licenseId', 36);
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         $geography = request_geography();
@@ -166,9 +168,9 @@ try {
             $maintenance=resolve_maintenance_telemetry($body,$managedLicense);
             $statement = $pdo->prepare(
                 'INSERT INTO installations
-                    (installation_uuid, token_hash, customer_name, email_address, app_version, license_mode, license_id,
+                    (installation_uuid, device_label, token_hash, customer_name, email_address, app_version, windows_version, license_mode, license_id,
                      maintenance_status, maintenance_expires_at, country_code, region_code, geo_updated_at)
-                 VALUES (:uuid, UNHEX(SHA2(:token, 256)), :customer, :email, :version, :mode, :license_id,
+                 VALUES (:uuid, :device_label, UNHEX(SHA2(:token, 256)), :customer, :email, :version, :windows_version, :mode, :license_id,
                          :maintenance_status, :maintenance_expires_at, :country_code, :region_code, UTC_TIMESTAMP(6))');
             $statement->execute([
                 'uuid' => strtolower($installationUuid),
@@ -176,6 +178,8 @@ try {
                 'customer' => $customerName,
                 'email' => $emailAddress,
                 'version' => $appVersion,
+                'device_label' => $deviceLabel === '' ? null : $deviceLabel,
+                'windows_version' => $windowsVersion === '' ? null : $windowsVersion,
                 'mode' => $managedLicense['mode'],
                 'license_id' => $managedLicense['license_id'],
                 'maintenance_status'=>$maintenance['status'],
@@ -214,12 +218,15 @@ try {
     }
 
     $find = $pdo->prepare(
-        'SELECT id, country_code, region_code, geo_updated_at FROM installations
+        'SELECT id, country_code, region_code, geo_updated_at, portal_deactivated_at FROM installations
          WHERE installation_uuid = :uuid AND token_hash = UNHEX(SHA2(:token, 256))');
     $find->execute(['uuid' => strtolower($installationUuid), 'token' => $installationToken]);
     $installation = $find->fetch();
     if (!is_array($installation)) {
         json_response(['error' => 'Authentication failed.'], 401);
+    }
+    if (!empty($installation['portal_deactivated_at'])) {
+        json_response(['ok' => true, 'deactivated' => true]);
     }
     $installationId = (int)$installation['id'];
 
@@ -231,6 +238,8 @@ try {
     $customerName = required_string($body, 'customerName', 160, true);
     $emailAddress = strtolower(required_string($body, 'emailAddress', 254, true));
     $appVersion = required_string($body, 'appVersion', 32);
+    $deviceLabel = required_string($body, 'deviceLabel', 120, false);
+    $windowsVersion = required_string($body, 'windowsVersion', 120, false);
     $submittedLicenseId = empty($body['licenseId']) ? null : required_string($body, 'licenseId', 36);
     $launches = $event === 'launch' ? $count : 0;
     $jobs = $event === 'print_job' ? $count : 0;
@@ -260,10 +269,12 @@ try {
     $mode = $managedLicense['mode'];
     $licenseId = $managedLicense['license_id'];
     $update = $pdo->prepare(
-        'UPDATE installations SET
+        "UPDATE installations SET
             customer_name = :customer,
             email_address = :email,
             app_version = :version,
+            device_label = COALESCE(NULLIF(:device_label,''),device_label),
+            windows_version = COALESCE(NULLIF(:windows_version,''),windows_version),
             license_mode = :mode,
             license_id = :license_id,
             maintenance_status = :maintenance_status,
@@ -277,11 +288,13 @@ try {
             launch_count = launch_count + :launch_increment,
             print_job_count = print_job_count + :job_increment,
             activation_count = activation_count + :activations
-         WHERE id = :id');
+         WHERE id = :id");
     $update->execute([
         'customer' => $customerName,
         'email' => $emailAddress,
         'version' => $appVersion,
+        'device_label' => $deviceLabel,
+        'windows_version' => $windowsVersion,
         'mode' => $mode,
         'license_id' => $licenseId,
         'maintenance_status'=>$maintenance['status'],

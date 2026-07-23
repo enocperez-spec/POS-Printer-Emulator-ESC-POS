@@ -1,6 +1,23 @@
 <?php
 declare(strict_types=1);
 
+$buyRoot = dirname(__DIR__, 2) . '/buy-website';
+$testConfigPath = $buyRoot . '/private/config.php';
+$createdTestConfig = false;
+if (!is_file($testConfigPath)) {
+    $exampleConfigPath = $buyRoot . '/private/config.example.php';
+    if (!copy($exampleConfigPath, $testConfigPath)) {
+        fwrite(STDERR, "Could not create the temporary Buy-site test configuration.\n");
+        exit(1);
+    }
+    $createdTestConfig = true;
+    register_shutdown_function(static function () use ($testConfigPath): void {
+        if (is_file($testConfigPath)) {
+            @unlink($testConfigPath);
+        }
+    });
+}
+
 require dirname(__DIR__, 2) . '/buy-website/includes/bootstrap.php';
 require dirname(__DIR__, 2) . '/buy-website/includes/license_keys.php';
 
