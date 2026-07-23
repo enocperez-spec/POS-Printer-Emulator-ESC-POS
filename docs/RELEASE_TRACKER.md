@@ -633,7 +633,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.45 — Consent-aware lifecycle communications and CRM analytics
 
-**Status:** Planned
+**Status:** In progress
 
 **GitHub:** [Issue #48 — Consent-aware lifecycle communications and CRM analytics](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48)
 

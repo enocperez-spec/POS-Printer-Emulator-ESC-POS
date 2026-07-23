@@ -42,9 +42,9 @@ function admin_role(): string
 function admin_can(string $capability): bool
 {
     $capabilities = [
-        'owner' => ['customers.read', 'customers.export', 'customers.consent', 'customers.audit', 'licenses.manage', 'pricing.manage'],
-        'support' => ['customers.read'],
-        'analyst' => [],
+        'owner' => ['customers.read', 'customers.export', 'customers.consent', 'customers.audit', 'licenses.manage', 'pricing.manage', 'communications.read', 'communications.manage', 'communications.export'],
+        'support' => ['customers.read', 'communications.read'],
+        'analyst' => ['communications.read'],
     ];
     return in_array($capability, $capabilities[admin_role()] ?? [], true);
 }
@@ -55,6 +55,18 @@ function require_admin_capability(string $capability): void
         http_response_code(403);
         exit('This Admin Portal account is not authorized for that action.');
     }
+}
+
+function require_recent_admin_authentication(string $returnPath = '/'): void
+{
+    $verifiedAt = (int)($_SESSION['two_factor_verified_at'] ?? 0);
+    if ($verifiedAt > 0 && time() - $verifiedAt <= 900) {
+        return;
+    }
+    $_SESSION['two_factor_verified'] = false;
+    $_SESSION['return_after_two_factor'] = str_starts_with($returnPath, '/') ? $returnPath : '/';
+    header('Location: /two-factor.php');
+    exit;
 }
 
 function csrf_token(): string

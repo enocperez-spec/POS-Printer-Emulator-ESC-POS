@@ -22,9 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['password_verified'] = false;
     } elseif (verify_totp($secret, (string)($_POST['code'] ?? ''))) {
         $_SESSION['two_factor_verified'] = true;
+        $_SESSION['two_factor_verified_at'] = time();
         $_SESSION['two_factor_attempts'] = 0;
         session_regenerate_id(true);
-        header('Location: /');
+        $returnPath = (string)($_SESSION['return_after_two_factor'] ?? '/');
+        unset($_SESSION['return_after_two_factor']);
+        header('Location: ' . (str_starts_with($returnPath, '/') ? $returnPath : '/'));
         exit;
     } else {
         $_SESSION['two_factor_attempts'] = $attempts + 1;

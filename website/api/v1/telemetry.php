@@ -132,6 +132,46 @@ function link_telemetry_customer(PDO $pdo, int $installationId, string $customer
     }
 }
 
+function record_consented_lifecycle(PDO $pdo, int $installationId, string $stage, string $licenseTier, int $eventCount): void
+{
+    if ($eventCount < 1 || !in_array($stage, ['Launch', 'Print Job', 'Activation', 'Heartbeat'], true) ||
+        !in_array($licenseTier, ['Trial', 'Lite', 'Pro', 'Enterprise'], true)) {
+        return;
+    }
+    try {
+        $customer = $pdo->prepare(
+            "SELECT i.customer_id,
+                    (SELECT cc.consent_state FROM customer_consents cc
+                     WHERE cc.customer_id=i.customer_id AND cc.consent_type='Product Analytics'
+                     ORDER BY cc.recorded_at DESC,cc.id DESC LIMIT 1) analytics_consent
+             FROM installations i WHERE i.id=:installation_id LIMIT 1"
+        );
+        $customer->execute(['installation_id' => $installationId]);
+        $row = $customer->fetch();
+        if (!is_array($row) || empty($row['customer_id']) || (string)$row['analytics_consent'] !== 'Granted') {
+            return;
+        }
+        $presence = $pdo->prepare(
+            'INSERT IGNORE INTO customer_lifecycle_presence(activity_date,lifecycle_stage,license_tier,customer_hash)
+             VALUES(UTC_DATE(),:stage,:tier,UNHEX(SHA2(:customer_id,256)))'
+        );
+        $presence->execute(['stage' => $stage, 'tier' => $licenseTier, 'customer_id' => $row['customer_id']]);
+        $daily = $pdo->prepare(
+            'INSERT INTO customer_lifecycle_daily(activity_date,lifecycle_stage,license_tier,customer_count,event_count)
+             VALUES(UTC_DATE(),:stage,:tier,:customer_count,:event_count)
+             ON DUPLICATE KEY UPDATE customer_count=customer_count+VALUES(customer_count),event_count=event_count+VALUES(event_count)'
+        );
+        $daily->execute([
+            'stage' => $stage, 'tier' => $licenseTier,
+            'customer_count' => $presence->rowCount() === 1 ? 1 : 0,
+            'event_count' => min(1000, $eventCount),
+        ]);
+    } catch (PDOException $exception) {
+        // Lifecycle analytics are additive and optional. Core licensing telemetry must remain available during deployment.
+        if (!in_array((string)$exception->getCode(), ['42S02', '42S22'], true)) throw $exception;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['error' => 'Method not allowed.'], 405);
 }
@@ -310,6 +350,10 @@ try {
         'id' => $installationId,
     ]);
     link_telemetry_customer($pdo,$installationId,$customerName,$emailAddress,$licenseId);
+    if ($launches > 0) record_consented_lifecycle($pdo,$installationId,'Launch',$mode,$launches);
+    if ($jobs > 0) record_consented_lifecycle($pdo,$installationId,'Print Job',$mode,$jobs);
+    if ($activations > 0) record_consented_lifecycle($pdo,$installationId,'Activation',$mode,$activations);
+    if ($event === 'heartbeat') record_consented_lifecycle($pdo,$installationId,'Heartbeat',$mode,1);
 
     if ($launches > 0 || $jobs > 0) {
         $daily = $pdo->prepare(

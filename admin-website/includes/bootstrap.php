@@ -22,6 +22,14 @@ function private_config(): array
             }
             $config = array_replace_recursive($config, $crmSecrets);
         }
+        $communicationSecretsPath = dirname(__DIR__) . '/private/communications.php';
+        if (is_file($communicationSecretsPath)) {
+            $communicationSecrets = require $communicationSecretsPath;
+            if (!is_array($communicationSecrets)) {
+                throw new RuntimeException('Protected communications configuration is invalid.');
+            }
+            $config = array_replace_recursive($config, $communicationSecrets);
+        }
     }
     return $config;
 }

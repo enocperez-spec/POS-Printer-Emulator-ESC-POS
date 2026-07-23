@@ -179,9 +179,10 @@ $futureReleases = [
     'v0.3.54' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
-    $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', 'Planned'";
-    $expectContains($expectedRow, $devSupport, "Admin Dev Support is missing planned {$version} {$title}.");
-    $expectContains($expectedRow, $schema, "Fresh database schema is missing planned {$version} {$title}.");
+    $status = $version === 'v0.3.45' ? 'In progress' : 'Planned';
+    $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', '{$status}'";
+    $expectContains($expectedRow, $devSupport, "Admin Dev Support is missing {$status} {$version} {$title}.");
+    $expectContains($expectedRow, $schema, "Fresh database schema is missing {$status} {$version} {$title}.");
     $expectContains("WHEN '{$version}' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/{$issue}'", $devSupport, "Admin Dev Support is missing the {$version} GitHub issue link.");
 }
 $expectContains("WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'", $devSupport, 'Admin Dev Support is missing the v0.3.40 GitHub release link.');
