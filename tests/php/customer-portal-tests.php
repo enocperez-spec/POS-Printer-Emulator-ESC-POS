@@ -30,6 +30,7 @@ $commerceMigration = $read('database/migrate-self-service-commerce-v0.3.44.sql')
 $commerceMigrationEndpoint = $read('admin-website/api/v1/migrate-self-service-commerce.php');
 $commerceSchemaHelper = $read('admin-website/includes/self_service_commerce_schema.php');
 $commerceBackend = $read('admin-website/api/v1/portal-commerce.php');
+$promotionBackend = $read('admin-website/api/v1/portal-promotion.php');
 $portalOrderCreate = $read('buy-website/api/create-portal-order.php');
 $portalOrderCapture = $read('buy-website/api/capture-portal-order.php');
 $portalCheckout = $read('buy-website/self-service.php');
@@ -63,6 +64,9 @@ $contains("support-handoff|", $portal, 'Pending support handoffs must be safely 
 $contains("activation_key_ending", $data, 'Portal must use only a masked activation-key ending.');
 $contains("'consentHistory'", $data, 'Portal account export and preferences must include auditable consent history.');
 $contains("Five-day paid-edition promotion", $portal, 'Portal must clearly explain the one-time promotional trial.');
+$contains("start-promotion", $portal, 'Portal must let eligible customers request promotional access.');
+$contains("portal_start_promotion_backend", $portal, 'Portal must issue promotions through the protected backend.');
+$contains("portal_recently_reauthenticated", $portal, 'Portal promotion issuance must require recent password confirmation.');
 $contains("portal_recently_reauthenticated", $portal, 'Portal commerce must require recent password confirmation.');
 $contains("UNHEX(SHA2(:token,256))", $portal, 'Portal checkout tokens must be persisted only as digests.');
 $contains("DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 20 MINUTE)", $portal, 'Portal checkout sessions must expire quickly.');
@@ -74,6 +78,10 @@ $contains("'self-service-commerce-v0.3.44'", $commerceMigrationEndpoint, 'Commer
 $contains("require_commerce_service_token", $commerceBackend, 'Commerce fulfillment must authenticate the Buy service.');
 $contains("state='Captured'", $commerceBackend, 'Verified payment capture must be recorded before entitlement fulfillment.');
 $contains("apply_paid_maintenance_renewal", $commerceBackend, 'Self-service maintenance must reuse idempotent renewal fulfillment.');
+$contains("promotion_require_service_token", $promotionBackend, 'Promotion issuance must authenticate the portal service.');
+$contains("portal_promotion_claims", $promotionBackend, 'Promotion issuance must enforce one-time identity claims.');
+$contains("portal_promotion_exceptions", $promotionBackend, 'Repeat promotions must require an unused Admin exception.');
+$contains("issue_promotion_token", $promotionBackend, 'Promotion issuance must return a signed entitlement.');
 $contains("portal_commerce_service_request", $portalOrderCreate, 'Buy order creation must resolve the opaque portal session server to server.');
 $contains("self_service_offer", $portalOrderCreate, 'Buy order creation must calculate prices on the server.');
 $contains("portal_commerce_service_request", $portalOrderCapture, 'Buy capture must fulfill through the canonical Admin service.');
@@ -98,6 +106,7 @@ $expect(!preg_match('/(?:password|token|secret|encryption_key)\s*=>\s*[\'"][A-Za
 $contains('"configure-customer-portal"', $publisher, 'Publisher must support protected Customer Portal configuration.');
 $contains("ProtectedData.Protect", $publisher, 'Publisher must protect the persistent portal encryption key locally.');
 $contains("migrate-customer-portal", $publisher, 'Publisher must support an authenticated Customer Portal migration.');
+$contains("'promotion_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-promotion.php'", $publisher, 'Publisher must configure the protected promotion endpoint.');
 $contains("https://userportal.posprinteremulator.com/", $mainWebsite, 'The main website must link customers to the Customer Portal.');
 
 $portalFiles = new RecursiveIteratorIterator(

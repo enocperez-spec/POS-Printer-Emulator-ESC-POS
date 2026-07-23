@@ -114,6 +114,15 @@ public sealed record MaintenanceStatus(
     string? RenewalUrl,
     string Message);
 
+public sealed record PromotionStatus(
+    bool IsApplicable,
+    bool IsActive,
+    string State,
+    string? PreviousTier,
+    string? GrantedTier,
+    DateTimeOffset? ExpiresAt,
+    string Message);
+
 public sealed record LicenseStatus(
     string Mode,
     bool IsPaid,
@@ -127,6 +136,7 @@ public sealed record LicenseStatus(
     string EmailAddress,
     Guid? LicenseId,
     MaintenanceStatus Maintenance,
+    PromotionStatus Promotion,
     FeatureStatus Features)
 {
     // Kept in the JSON contract for compatibility with pre-Lite viewer bundles.
@@ -138,6 +148,8 @@ public sealed record ActivationRequest(string CustomerName, string EmailAddress,
 public sealed record SingleListenerSetupRequest(int Port);
 
 public sealed record MaintenanceEntitlementRequest(string EntitlementToken);
+
+public sealed record PromotionEntitlementRequest(string EntitlementToken);
 
 public sealed record MaintenanceRefreshResult(
     LicenseStatus License,
@@ -151,6 +163,7 @@ public sealed record LicenseStorageDiagnostics(
     bool RegistrationFileExists,
     bool LicenseFileExists,
     bool MaintenanceFileExists,
+    bool PromotionFileExists,
     string? LastErrorType,
     string? LastErrorMessage);
 

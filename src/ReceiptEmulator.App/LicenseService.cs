@@ -14,12 +14,15 @@ public sealed class LicenseService
     private readonly string _registrationPath;
     private readonly string _activationPath;
     private readonly string _maintenancePath;
+    private readonly string _promotionPath;
     private readonly string _publicKeyPem;
     private readonly Func<DateTimeOffset> _utcNow;
     private TrialState _trialState;
     private RegistrationInfo _registration;
     private ActivationRecord? _activation;
     private MaintenanceRecord? _maintenance;
+    private PromotionRecord? _promotion;
+    private Guid? _installationId;
     private Exception? _lastStorageError;
 
     public LicenseService(IHostEnvironment environment, IConfiguration? configuration = null)
@@ -43,6 +46,7 @@ public sealed class LicenseService
         _registrationPath = Path.Combine(RootPath, "registration.json");
         _activationPath = Path.Combine(RootPath, "license.json");
         _maintenancePath = Path.Combine(RootPath, "maintenance.json");
+        _promotionPath = Path.Combine(RootPath, "promotion.json");
         _publicKeyPem = environment.IsEnvironment("Testing") &&
                         !string.IsNullOrWhiteSpace(configuration?["Licensing:PublicKeyPem"])
             ? configuration!["Licensing:PublicKeyPem"]!
@@ -52,6 +56,7 @@ public sealed class LicenseService
         _registration = Load<RegistrationInfo>(_registrationPath) ?? new RegistrationInfo(string.Empty, string.Empty);
         _activation = Load<ActivationRecord>(_activationPath);
         _maintenance = Load<MaintenanceRecord>(_maintenancePath);
+        _promotion = Load<PromotionRecord>(_promotionPath);
     }
 
     public static string DefaultRootPath => Path.Combine(
@@ -66,7 +71,7 @@ public sealed class LicenseService
         {
             lock (_sync)
             {
-                return IsPaid(GetValidatedLicense()?.Tier ?? LicenseTier.Trial);
+                return IsPaid(GetEffectiveTier(GetValidatedLicense()).Tier);
             }
         }
     }
@@ -80,7 +85,7 @@ public sealed class LicenseService
         {
             lock (_sync)
             {
-                return GetValidatedLicense()?.Tier == LicenseTier.Enterprise;
+                return GetEffectiveTier(GetValidatedLicense()).Tier == LicenseTier.Enterprise;
             }
         }
     }
@@ -102,7 +107,8 @@ public sealed class LicenseService
         {
             RollDateForward();
             var license = GetValidatedLicense();
-            var tier = license?.Tier ?? LicenseTier.Trial;
+            var effective = GetEffectiveTier(license);
+            var tier = effective.Tier;
             var isPaid = IsPaid(tier);
             var isEnterprise = license?.Tier == LicenseTier.Enterprise;
             var maximumListeners = GetMaximumListeners(tier);
@@ -121,6 +127,7 @@ public sealed class LicenseService
                 _registration.EmailAddress,
                 license?.LicenseId,
                 maintenance,
+                effective.Status,
                 new FeatureStatus(
                     History: isPaid,
                     Exports: isPaid,
@@ -140,7 +147,7 @@ public sealed class LicenseService
         lock (_sync)
         {
             RollDateForward();
-            if (GetValidatedLicense() is not null)
+            if (IsPaid(GetEffectiveTier(GetValidatedLicense()).Tier))
             {
                 status = GetStatus();
                 return true;
@@ -251,6 +258,69 @@ public sealed class LicenseService
         }
     }
 
+    public void BindInstallationId(Guid installationId)
+    {
+        if (installationId == Guid.Empty)
+        {
+            throw new ArgumentException("The installation identifier is required.", nameof(installationId));
+        }
+        lock (_sync)
+        {
+            _installationId = installationId;
+        }
+    }
+
+    public LicenseStatus InstallPromotionEntitlement(string entitlementToken)
+    {
+        lock (_sync)
+        {
+            if (!PromotionEntitlementCodec.TryValidateWithPublicKey(
+                    entitlementToken,
+                    _publicKeyPem,
+                    out var entitlement,
+                    out var error) || entitlement is null)
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            var license = GetValidatedLicense();
+            var permanentTier = license?.Tier ?? LicenseTier.Trial;
+            if (entitlement.PreviousTier != permanentTier)
+            {
+                throw new InvalidOperationException(
+                    "This promotional access key does not match the current permanent license tier.");
+            }
+
+            var subjectMatches = entitlement.SubjectType switch
+            {
+                PromotionSubjectType.License => license is not null && entitlement.SubjectId == license.LicenseId,
+                PromotionSubjectType.Installation => license is null &&
+                    _installationId is { } installationId &&
+                    entitlement.SubjectId == installationId,
+                _ => false
+            };
+            if (!subjectMatches)
+            {
+                throw new InvalidOperationException(
+                    "This promotional access key was issued for a different license or installation.");
+            }
+
+            var now = _utcNow();
+            if (entitlement.IssuedAt > now.AddMinutes(5) || entitlement.ExpiresAt <= now)
+            {
+                throw new InvalidOperationException("This promotional access period has expired or is not active yet.");
+            }
+
+            var record = new PromotionRecord(
+                string.Concat(entitlementToken.Where(character => !char.IsWhiteSpace(character))),
+                now,
+                now);
+            SavePersistedJson(_promotionPath, record);
+            _promotion = record;
+            return GetStatus();
+        }
+    }
+
     public LicenseStatus RecordMaintenanceUnavailable(
         string remoteStatus,
         DateTimeOffset? remoteExpiresAt)
@@ -306,7 +376,7 @@ public sealed class LicenseService
         {
             lock (_sync)
             {
-                return GetMaximumListeners(GetValidatedLicense()?.Tier ?? LicenseTier.Trial);
+                return GetMaximumListeners(GetEffectiveTier(GetValidatedLicense()).Tier);
             }
         }
     }
@@ -323,6 +393,7 @@ public sealed class LicenseService
                 File.Exists(_registrationPath),
                 File.Exists(_activationPath),
                 File.Exists(_maintenancePath),
+                File.Exists(_promotionPath),
                 _lastStorageError?.GetType().FullName,
                 _lastStorageError?.Message);
         }
@@ -425,6 +496,7 @@ public sealed class LicenseService
         RestoreUpgradeFile("registration.json");
         RestoreUpgradeFile("license.json");
         RestoreUpgradeFile("maintenance.json");
+        RestoreUpgradeFile("promotion.json");
     }
 
     public static void CompleteUpgradeStateAtDefaultPath()
@@ -432,6 +504,7 @@ public sealed class LicenseService
         DeleteUpgradeFile("registration.json");
         DeleteUpgradeFile("license.json");
         DeleteUpgradeFile("maintenance.json");
+        DeleteUpgradeFile("promotion.json");
     }
 
     private ActivationLicense? GetValidatedLicense()
@@ -518,6 +591,92 @@ public sealed class LicenseService
             State: state,
             RenewalUrl: renewalUrl,
             Message: message);
+    }
+
+    private EffectiveLicense GetEffectiveTier(ActivationLicense? license)
+    {
+        var permanentTier = license?.Tier ?? LicenseTier.Trial;
+        var notActive = new PromotionStatus(
+            IsApplicable: permanentTier != LicenseTier.Enterprise,
+            IsActive: false,
+            State: "None",
+            PreviousTier: null,
+            GrantedTier: null,
+            ExpiresAt: null,
+            Message: permanentTier == LicenseTier.Enterprise
+                ? "Enterprise already includes all product features."
+                : "No promotional access is installed.");
+        if (_promotion is null)
+        {
+            return new EffectiveLicense(permanentTier, notActive);
+        }
+        if (!PromotionEntitlementCodec.TryValidateWithPublicKey(
+                _promotion.EntitlementToken,
+                _publicKeyPem,
+                out var entitlement,
+                out _) || entitlement is null)
+        {
+            return new EffectiveLicense(permanentTier, notActive with
+            {
+                State = "Invalid",
+                Message = "The saved promotional access record is invalid. Your permanent license remains active."
+            });
+        }
+
+        var subjectMatches = entitlement.SubjectType switch
+        {
+            PromotionSubjectType.License => license is not null && entitlement.SubjectId == license.LicenseId,
+            PromotionSubjectType.Installation => license is null &&
+                _installationId is { } installationId &&
+                entitlement.SubjectId == installationId,
+            _ => false
+        };
+        if (!subjectMatches || entitlement.PreviousTier != permanentTier)
+        {
+            return new EffectiveLicense(permanentTier, notActive with
+            {
+                State = "Mismatch",
+                Message = "This promotion belongs to a different license or installation. Your permanent license remains active."
+            });
+        }
+
+        var now = _utcNow();
+        var observed = _promotion.HighestObservedTime > now ? _promotion.HighestObservedTime : now;
+        if (now < _promotion.HighestObservedTime.AddMinutes(-5))
+        {
+            return new EffectiveLicense(permanentTier, notActive with
+            {
+                State = "ClockRollback",
+                PreviousTier = entitlement.PreviousTier.ToString(),
+                GrantedTier = entitlement.GrantedTier.ToString(),
+                ExpiresAt = entitlement.ExpiresAt,
+                Message = "Promotional access was paused because the system clock moved backward. Restore the correct time and reopen the application."
+            });
+        }
+        if (observed > _promotion.HighestObservedTime.AddMinutes(1))
+        {
+            _promotion = _promotion with { HighestObservedTime = observed };
+            SavePersistedJson(_promotionPath, _promotion);
+        }
+        if (observed >= entitlement.ExpiresAt)
+        {
+            return new EffectiveLicense(permanentTier, notActive with
+            {
+                State = "Expired",
+                PreviousTier = entitlement.PreviousTier.ToString(),
+                GrantedTier = entitlement.GrantedTier.ToString(),
+                ExpiresAt = entitlement.ExpiresAt,
+                Message = $"The five-day promotion ended. The {permanentTier} License was restored automatically."
+            });
+        }
+        return new EffectiveLicense(entitlement.GrantedTier, new PromotionStatus(
+            IsApplicable: true,
+            IsActive: true,
+            State: "Active",
+            PreviousTier: entitlement.PreviousTier.ToString(),
+            GrantedTier: entitlement.GrantedTier.ToString(),
+            ExpiresAt: entitlement.ExpiresAt,
+            Message: $"{entitlement.GrantedTier} promotional access is active until {entitlement.ExpiresAt:u}."));
     }
 
     private MaintenanceEntitlement? GetValidatedMaintenanceEntitlement(ActivationLicense license)
@@ -748,4 +907,9 @@ public sealed class LicenseService
         DateTimeOffset? RemoteExpiresAt = null,
         Guid? LicenseId = null,
         LicenseTier? Tier = null);
+    private sealed record PromotionRecord(
+        string EntitlementToken,
+        DateTimeOffset InstalledAt,
+        DateTimeOffset HighestObservedTime);
+    private sealed record EffectiveLicense(LicenseTier Tier, PromotionStatus Status);
 }

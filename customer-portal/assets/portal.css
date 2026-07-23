@@ -276,6 +276,28 @@ td small.block { color: var(--muted); display: block; margin-top: 3px; }
 .maintenance-panel > div:first-child, .promotion-panel > div:first-child { max-width: 650px; }
 .maintenance-action { display: grid; gap: 12px; min-width: 240px; }
 .maintenance-action span { color: var(--muted); }
+.promotion-delivery {
+  background: #effcf6;
+  border: 1px solid #8ed8bb;
+  border-radius: var(--radius);
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 24px;
+}
+.promotion-delivery textarea {
+  background: white;
+  border: 1px solid #a7c8bb;
+  border-radius: 8px;
+  color: #123b2c;
+  font: 600 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  min-height: 110px;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  resize: vertical;
+  width: 100%;
+}
+.promotion-delivery .button { justify-self: start; }
 
 @media (max-width: 1050px) {
   .overview-grid { grid-template-columns: 1fr; }

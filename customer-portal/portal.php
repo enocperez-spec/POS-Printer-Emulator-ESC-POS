@@ -67,6 +67,51 @@ function portal_checkout_url(string $token): string
     return $baseUrl . '/self-service.php?session=' . rawurlencode($token);
 }
 
+function portal_start_promotion_backend(
+    string $customerId,
+    ?string $licenseId,
+    ?int $installationId,
+    string $grantedTier
+): array {
+    $config = portal_config()['portal'] ?? [];
+    $endpoint = (string)($config['promotion_backend_url'] ?? '');
+    $token = (string)($config['support_backend_token'] ?? '');
+    if (!preg_match('#^https://#', $endpoint) ||
+        !preg_match('/^[A-Za-z0-9_-]{43,128}$/', $token) ||
+        !function_exists('curl_init')) {
+        throw new RuntimeException('The promotional access service is not configured.');
+    }
+    $curl = curl_init($endpoint);
+    curl_setopt_array($curl, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode([
+            'customerId' => $customerId,
+            'licenseId' => $licenseId,
+            'installationId' => $installationId,
+            'grantedTier' => $grantedTier,
+        ], JSON_THROW_ON_ERROR),
+    ]);
+    $response = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    curl_close($curl);
+    $decoded = is_string($response) ? json_decode($response, true) : null;
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        $message = is_array($decoded) ? trim((string)($decoded['error'] ?? '')) : '';
+        throw new DomainException($message !== '' ? $message : 'Promotional access could not be started. Try again later.');
+    }
+    if (!preg_match('/^PPEP1-[A-Za-z0-9_-]+$/', (string)($decoded['entitlementToken'] ?? ''))) {
+        throw new RuntimeException('The promotion service returned an invalid entitlement.');
+    }
+    return $decoded;
+}
+
 function portal_uuid(): string
 {
     $bytes = random_bytes(16);
@@ -251,6 +296,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $intentId
             );
             header('Location: ' . portal_checkout_url($token), true, 303);
+            exit;
+        } elseif ($action === 'start-promotion') {
+            $fresh = portal_current_account();
+            if (!is_array($fresh) || !portal_recently_reauthenticated($fresh)) {
+                throw new DomainException('Confirm your password first. Reauthentication is valid for five minutes.');
+            }
+            if (!portal_rate_limit('promotion|' . $customerId, 3, 86400)) {
+                throw new DomainException('Too many promotion requests were made. Wait and try again.');
+            }
+            $targetTier = ucfirst(strtolower(trim((string)($_POST['target_tier'] ?? 'Enterprise'))));
+            if (!in_array($targetTier, ['Lite', 'Pro', 'Enterprise'], true)) {
+                throw new DomainException('Choose a valid promotional tier.');
+            }
+            $licenseId = trim((string)($_POST['license_id'] ?? ''));
+            $installationId = filter_var(
+                $_POST['installation_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]]
+            );
+            $delivery = portal_start_promotion_backend(
+                $customerId,
+                $licenseId !== '' ? $licenseId : null,
+                $installationId !== false ? (int)$installationId : null,
+                $targetTier
+            );
+            $_SESSION['promotion_delivery'] = $delivery;
+            portal_audit(
+                $customerId,
+                'Portal Promotion Started',
+                "Customer started temporary {$targetTier} access.",
+                (string)$delivery['promotionId']
+            );
+            header('Location: /portal.php?page=plans', true, 303);
             exit;
         } elseif ($action === 'support-request') {
             $type = (string)($_POST['request_type'] ?? '');
@@ -441,6 +519,8 @@ foreach ($snapshot['consents'] as $consent) {
 }
 $recoveryCodes = $_SESSION['new_recovery_codes'] ?? [];
 unset($_SESSION['new_recovery_codes']);
+$promotionDelivery = $_SESSION['promotion_delivery'] ?? null;
+unset($_SESSION['promotion_delivery']);
 
 function portal_nav_icon(string $name): string
 {
@@ -533,14 +613,32 @@ function portal_nav_icon(string $name): string
       <div><span class="plan-kicker">Optional annual coverage</span><h2>Application Maintenance &amp; Support</h2><p>Renewing adds one year of updates and technical support. The software and purchased features remain permanent if coverage expires.</p></div>
       <?php if (is_array($primaryLicense)): ?><div class="maintenance-action"><span>Current coverage through <strong><?= portal_e(portal_date($primaryLicense['maintenance_expires_at'])) ?></strong></span><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="prepare-checkout"><input type="hidden" name="order_type" value="MAINTENANCE"><input type="hidden" name="target_tier" value="<?= portal_e((string)$primaryLicense['license_tier']) ?>"><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><button class="button primary" type="submit">Renew maintenance</button></form></div><?php else: ?><p>Maintenance is included when you purchase a permanent license.</p><?php endif; ?>
     </section>
-    <section class="promotion-panel"><div><span class="plan-kicker">Try before upgrading</span><h2>Five-day paid-edition promotion</h2><p>One free promotion per verified customer. No payment method is required. Your current permanent tier is restored automatically when the promotion ends.</p></div><button class="button secondary disabled" type="button" aria-disabled="true">Eligibility service being connected</button></section>
+    <?php if (is_array($promotionDelivery)): ?>
+      <section class="promotion-delivery" role="status">
+        <div><span class="plan-kicker">Promotion ready</span><h2><?= portal_e((string)$promotionDelivery['grantedTier']) ?> access through <?= portal_e(portal_date((string)$promotionDelivery['expiresAt'])) ?></h2><p>Copy this delivery key. In POS Printer Emulator, open <strong>Settings → License</strong>, paste it under Five-day promotional access, and choose Start promotional access.</p></div>
+        <textarea readonly rows="5" aria-label="Promotional access key"><?= portal_e((string)$promotionDelivery['entitlementToken']) ?></textarea>
+        <button class="button secondary" type="button" data-copy-promotion>Copy promotional key</button>
+      </section>
+    <?php endif; ?>
+    <section class="promotion-panel">
+      <div><span class="plan-kicker">Try before upgrading</span><h2>Five-day paid-edition promotion</h2><p>One free promotion per verified customer. No payment method is required. Your current permanent tier is restored automatically when the promotion ends.</p></div>
+      <?php $trialPromotion = array_values(array_filter($installations, static fn(array $row): bool => $row['license_mode'] === 'Trial' && empty($row['portal_deactivated_at'])))[0] ?? null; ?>
+      <?php if ($currentTier === 'Enterprise'): ?><span class="current-plan">Enterprise already includes every feature</span>
+      <?php elseif (is_array($primaryLicense) || is_array($trialPromotion)): ?>
+        <form method="post">
+          <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="start-promotion"><input type="hidden" name="target_tier" value="Enterprise">
+          <?php if (is_array($primaryLicense)): ?><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><?php else: ?><input type="hidden" name="installation_id" value="<?= (int)$trialPromotion['id'] ?>"><?php endif; ?>
+          <button class="button secondary" type="submit">Start five-day Enterprise promotion</button>
+        </form>
+      <?php else: ?><button class="button secondary disabled" type="button" disabled>Add an active installation first</button><?php endif; ?>
+    </section>
   <?php elseif ($page === 'computers'): ?>
     <div class="page-heading"><div><h1>Computers</h1><p>Deactivate an old computer only when you no longer use POS Printer Emulator on it.</p></div></div>
     <section class="reauth-panel"><h2>Confirm sensitive actions</h2><p>Enter your Customer Portal password. Confirmation remains valid for five minutes.</p><form method="post" class="inline-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="reauthenticate"><label><span class="sr-only">Password</span><input type="password" name="password" autocomplete="current-password" placeholder="Portal password" required></label><button class="button secondary" type="submit">Confirm password</button></form></section>
     <section class="data-section"><div class="table-wrap"><table><thead><tr><th>Computer</th><th>Version</th><th>First seen</th><th>Last seen</th><th>Action</th></tr></thead><tbody><?php foreach ($installations as $installation): ?><tr><td><?= portal_e((string)($installation['device_label'] ?: 'Computer ' . substr((string)$installation['installation_uuid'], -6))) ?><small class="block"><?= portal_e((string)($installation['windows_version'] ?: 'Windows device')) ?></small></td><td><?= portal_e((string)$installation['app_version']) ?></td><td><?= portal_e(portal_date($installation['first_seen_at'])) ?></td><td><?= portal_e(portal_datetime($installation['last_seen_at'])) ?></td><td><?php if ($installation['portal_deactivated_at']): ?><span>Deactivated <?= portal_e(portal_date($installation['portal_deactivated_at'])) ?></span><?php else: ?><form method="post" class="device-action" data-confirm="Deactivate this computer? The application on it may lose server access."><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="deactivate-device"><input type="hidden" name="installation_id" value="<?= (int)$installation['id'] ?>"><label><span class="sr-only">Reason</span><input name="reason" maxlength="300" placeholder="Reason for transfer" required></label><button class="danger-link" type="submit">Deactivate</button></form><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div></section>
   <?php elseif ($page === 'downloads'): ?>
     <div class="page-heading"><div><h1>Downloads</h1><p>Download only the official signed-by-checksum GitHub release.</p></div></div>
-    <section class="download-panel"><div><h2>POS Printer Emulator v0.3.42</h2><p>Windows 11 Pro · x64 · self-contained installer</p></div><a class="button primary" href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.42/POSPrinterEmulatorSetup-0.3.42-win-x64.exe" rel="noopener">Download installer</a><a href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.42/POSPrinterEmulatorSetup-0.3.42-win-x64.exe.sha256">SHA-256 checksum</a></section>
+    <section class="download-panel"><div><h2>POS Printer Emulator v0.3.44</h2><p>Windows 11 Pro · x64 · self-contained installer</p></div><a class="button primary" href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.44/POSPrinterEmulatorSetup-0.3.44-win-x64.exe" rel="noopener">Download installer</a><a href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.44/POSPrinterEmulatorSetup-0.3.44-win-x64.exe.sha256">SHA-256 checksum</a></section>
     <section class="info-band"><h2>Update eligibility</h2><p>All customers can see when a newer version exists. Paid update downloads and assisted support follow the maintenance date shown on the Licenses page.</p></section>
   <?php elseif ($page === 'support'): ?>
     <div class="page-heading"><div><h1>Support</h1><p>Submit a private support request without exposing receipt data or activation keys.</p></div></div>

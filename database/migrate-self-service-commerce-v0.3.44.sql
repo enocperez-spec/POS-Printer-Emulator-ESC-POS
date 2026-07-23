@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS portal_promotion_events (
 INSERT INTO development_items
     (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
 VALUES
-    ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress', 344,
+    ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released', 344,
      'Provide auditable self-service commercial workflows without turning permanent licenses into subscriptions.',
      'PayPal maintenance renewal, tier upgrades, refunds, idempotent fulfillment, and one five-day promotional paid-edition trial.',
      'Commercial workflows require the secure portal and canonical ownership records.',
@@ -125,5 +125,9 @@ ON DUPLICATE KEY UPDATE
     planned_scope=VALUES(planned_scope),
     priority_reason=VALUES(priority_reason),
     completion_criteria=VALUES(completion_criteria);
+
+UPDATE development_items
+SET completed_at='2026-07-23 00:00:00.000000'
+WHERE item_key='v0.3.44';
 
 COMMIT;

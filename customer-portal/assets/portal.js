@@ -15,4 +15,12 @@
       }
     });
   });
+
+  const copyPromotion = document.querySelector('[data-copy-promotion]');
+  copyPromotion?.addEventListener('click', async () => {
+    const value = copyPromotion.closest('.promotion-delivery')?.querySelector('textarea')?.value;
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    copyPromotion.textContent = 'Copied';
+  });
 })();

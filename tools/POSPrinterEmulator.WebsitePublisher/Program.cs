@@ -591,6 +591,7 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
                 'support_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
                 'support_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-support.php',
                 'support_backend_token' => {PhpString(serviceToken)},
+                'promotion_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-promotion.php',
                 'buy_base_url' => {PhpString(buyUri.GetLeftPart(UriPartial.Path).TrimEnd('/'))},
             ],
         ];

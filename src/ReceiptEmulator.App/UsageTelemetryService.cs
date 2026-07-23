@@ -36,6 +36,7 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         _logger = logger;
         _statePath = Path.Combine(license.RootPath, "telemetry-state.json");
         _state = LoadState() ?? new TelemetryState(Guid.NewGuid(), null);
+        _license.BindInstallationId(_state.InstallationId);
         _events = Channel.CreateBounded<TelemetryEvent>(new BoundedChannelOptions(512)
         {
             FullMode = BoundedChannelFullMode.DropOldest,

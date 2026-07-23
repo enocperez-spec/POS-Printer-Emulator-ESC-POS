@@ -30,7 +30,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.42 Customer identity, consent, and CRM foundation is the current public release, released July 22, 2026. v0.3.43 Secure Customer Portal MVP is awaiting final hosting activation, while stacked development has begun on v0.3.44 self-service renewals, upgrades, and promotional trials.
+> **Release status:** v0.3.44 Self-service renewals, upgrades, and promotional trials is the current public release, released July 23, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -38,7 +38,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.42-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.44-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -268,8 +268,8 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.40 — Simple Mode and Expert Mode:** Add guided setup, live connection details, Test Receipt, latest-receipt review, capture import, diagnostics, and support in Simple Mode while preserving the complete inspection workspace as Expert Mode.
 - **Released in v0.3.41 — Installer Branding Correction:** Replace the stretched square wizard artwork with a correctly proportioned tall banner and reject invalid banner dimensions during packaging.
 - **Released in v0.3.42 — Customer identity, consent, and CRM foundation:** Unify verified customers, registrations, installations, licenses, purchases, maintenance, support, lifecycle events, and consent in an auditable privacy-aware administrative record.
-- **v0.3.43 — Secure Customer Portal MVP:** Launch `userportal.posprinteremulator.com` with verified accounts, secure recovery, optional MFA, masked license and maintenance details, downloads, preferences, support history, and controlled device deactivation.
-- **v0.3.44 — Self-service renewals, upgrades, and promotional trials:** Reuse the server-side PayPal and entitlement systems for maintenance renewal, license upgrades, and one auditable five-day paid-edition promotion per verified customer.
+- **Released in v0.3.43 — Secure Customer Portal MVP:** Launch `userportal.posprinteremulator.com` with verified accounts, secure recovery, optional MFA, masked license and maintenance details, downloads, preferences, support history, and controlled device deactivation.
+- **Released in v0.3.44 — Self-service renewals, upgrades, and promotional trials:** Reuse the server-side PayPal and entitlement systems for maintenance renewal, license upgrades, and one auditable five-day paid-edition promotion per verified customer.
 - **v0.3.45 — Consent-aware lifecycle communications and CRM analytics:** Integrate Brevo with a Free-plan-safe priority queue, protected API and webhook credentials, reliable scheduling and suppression, onboarding/renewal/support messages, minimal consented telemetry, segmentation, and Admin Portal performance dashboards.
 - **v0.3.46 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, and accessibility regression checks.
 - **v0.3.47 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.

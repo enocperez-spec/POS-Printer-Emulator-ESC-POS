@@ -1,4 +1,4 @@
-import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionEntitlementRequest, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -107,6 +107,11 @@ export const api = {
     body: JSON.stringify(request),
   }),
   applyMaintenance: (request: MaintenanceEntitlementRequest) => json<LicenseStatus>('/api/license/maintenance/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  }),
+  applyPromotion: (request: PromotionEntitlementRequest) => json<LicenseStatus>('/api/license/promotion/apply', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),

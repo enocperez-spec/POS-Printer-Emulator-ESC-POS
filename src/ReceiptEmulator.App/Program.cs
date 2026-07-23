@@ -658,6 +658,9 @@ app.MapGet("/api/support/activation-diagnostics", (LicenseService license) =>
         .AppendLine($"Registration file exists: {storage.RegistrationFileExists}")
         .AppendLine($"License file exists: {storage.LicenseFileExists}")
         .AppendLine($"Maintenance file exists: {storage.MaintenanceFileExists}")
+        .AppendLine($"Promotion file exists: {storage.PromotionFileExists}")
+        .AppendLine($"Promotion status: {status.Promotion.State}")
+        .AppendLine($"Promotion expiration: {status.Promotion.ExpiresAt?.ToString("O") ?? "Not applicable"}")
         .AppendLine($"Last storage error type: {storage.LastErrorType ?? "None"}")
         .AppendLine($"Last storage error: {storage.LastErrorMessage ?? "None"}")
         .AppendLine()
@@ -820,6 +823,29 @@ app.MapPost("/api/license/maintenance/apply", (
             .LogError(exception, "A validated maintenance entitlement could not be saved to local storage");
         return Results.Problem(
             "The maintenance renewal could not be saved on this computer. Download Activation Diagnostics and try again.",
+            statusCode: 500);
+    }
+});
+
+app.MapPost("/api/license/promotion/apply", (
+    PromotionEntitlementRequest request,
+    LicenseService license,
+    ILoggerFactory loggerFactory) =>
+{
+    try
+    {
+        return Results.Ok(license.InstallPromotionEntitlement(request.EntitlementToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
+    catch (Exception exception)
+    {
+        loggerFactory.CreateLogger("PromotionEntitlement")
+            .LogError(exception, "A validated promotion entitlement could not be saved to local storage");
+        return Results.Problem(
+            "The promotional access key could not be saved on this computer. Download Activation Diagnostics and try again.",
             statusCode: 500);
     }
 });

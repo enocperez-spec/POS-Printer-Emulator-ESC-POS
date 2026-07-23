@@ -6,10 +6,12 @@ require __DIR__ . '/includes/license_keys.php';
 require __DIR__ . '/includes/license_management.php';
 require __DIR__ . '/includes/customer_crm.php';
 require __DIR__ . '/includes/purchase_site.php';
+require __DIR__ . '/includes/self_service_commerce_schema.php';
 require_authentication();
 
 $pdo = database();
 ensure_license_management_schema($pdo);
+ensure_self_service_commerce_schema($pdo);
 backfill_customer_crm($pdo);
 $actor = trim((string)($_SESSION['admin_username'] ?? 'owner')) ?: 'owner';
 $syncWarning = '';
@@ -50,7 +52,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $result = ['issued' => null, 'message' => ''];
-        if ($action === 'issue') {
+        if ($action === 'promotion_exception') {
+            $customerId = strtolower(trim((string)($_POST['customer_id'] ?? '')));
+            $reason = trim((string)($_POST['reason'] ?? ''));
+            if (!preg_match('/^[0-9a-f-]{36}$/', $customerId) || $reason === '' || mb_strlen($reason) > 500) {
+                throw new InvalidArgumentException('Choose a customer and enter a reason of no more than 500 characters.');
+            }
+            $customer = $pdo->prepare("SELECT 1 FROM customers WHERE customer_id=:customer_id AND status='Active'");
+            $customer->execute(['customer_id' => $customerId]);
+            if (!$customer->fetchColumn()) {
+                throw new DomainException('The selected active customer was not found.');
+            }
+            $existing = $pdo->prepare(
+                'SELECT 1 FROM portal_promotion_exceptions WHERE customer_id=:customer_id AND consumed_at IS NULL'
+            );
+            $existing->execute(['customer_id' => $customerId]);
+            if ($existing->fetchColumn()) {
+                throw new DomainException('This customer already has an unused promotion exception.');
+            }
+            $insert = $pdo->prepare(
+                'INSERT INTO portal_promotion_exceptions(customer_id,reason,created_by)
+                 VALUES(:customer_id,:reason,:actor)'
+            );
+            $insert->execute(['customer_id' => $customerId, 'reason' => $reason, 'actor' => $actor]);
+            $result = ['issued' => null, 'message' => 'One additional five-day promotion was authorized and recorded.'];
+        } elseif ($action === 'issue') {
             $submittedToken = (string)($_POST['issue_token'] ?? '');
             if ($submittedToken === '' || !hash_equals($issueToken, $submittedToken)) {
                 throw new DomainException('This key request was already processed or expired. Refresh and review it again.');
@@ -173,6 +199,16 @@ $maintenanceEvents = $pdo->query(
      LEFT JOIN issued_licenses l ON l.license_id = m.license_id
      ORDER BY m.created_at DESC LIMIT 100'
 )->fetchAll();
+$promotionCustomers = $pdo->query(
+    "SELECT customer_id,display_name,canonical_email FROM customers
+     WHERE status='Active' ORDER BY display_name,canonical_email LIMIT 500"
+)->fetchAll();
+$promotionExceptions = $pdo->query(
+    'SELECT e.customer_id,c.display_name,c.canonical_email,e.reason,e.created_by,e.created_at,e.consumed_at
+     FROM portal_promotion_exceptions e
+     INNER JOIN customers c ON c.customer_id=e.customer_id
+     ORDER BY e.created_at DESC LIMIT 100'
+)->fetchAll();
 
 $licenseStatus = static function (array $license): string {
     $state = (string)$license['control_state'];
@@ -223,6 +259,18 @@ $licenseStatus = static function (array $license): string {
         <?php if ($issued === null): ?><div class="waiting-content"><span class="key-symbol" aria-hidden="true">◇</span><h2>Activation key</h2><p>A signed key or replacement key will appear here after the action is confirmed.</p></div>
         <?php else: ?><div class="success-heading"><span aria-hidden="true">✓</span><div><strong><?= e((string)$issued['license_tier']) ?> activation key generated</strong><small><?= e((string)$issued['issued_at']) ?> UTC</small></div></div><dl><div><dt>Customer</dt><dd><?= e((string)$issued['customer_name']) ?></dd></div><div><dt>Email</dt><dd><?= e((string)$issued['email_address']) ?></dd></div><div><dt>License ID</dt><dd><?= e((string)$issued['license_id']) ?></dd></div></dl><label class="key-label">Activation key<textarea id="generated-key" rows="4" readonly><?= e((string)$issued['activation_key']) ?></textarea></label><button type="button" class="copy-key" data-copy-target="generated-key">Copy activation key</button><p class="key-note">Send this key securely. The customer enters it in Settings → License; no reinstall is required.</p><?php endif; ?>
       </div>
+    </section>
+
+    <section class="table-panel license-table">
+      <div class="table-toolbar"><div><h2>Promotional access exceptions</h2><p>Authorize one additional five-day promotion only after reviewing the customer’s history. Every exception is confirmed and audited.</p></div></div>
+      <form method="post" class="generator-form" data-confirm="Authorize one additional five-day promotion for this customer?">
+        <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="promotion_exception"><input type="hidden" name="confirmed" value="yes">
+        <label>Customer<select name="customer_id" required><option value="">Choose a verified customer</option><?php foreach ($promotionCustomers as $customer): ?><option value="<?=e((string)$customer['customer_id'])?>"><?=e((string)$customer['display_name'])?> · <?=e((string)$customer['canonical_email'])?></option><?php endforeach; ?></select></label>
+        <label>Administrative reason<textarea name="reason" maxlength="500" rows="3" required placeholder="Why is a repeat promotion appropriate?"></textarea></label>
+        <label class="confirmation-check"><input type="checkbox" required><span>I reviewed this exception and understand it permits one additional promotional entitlement.</span></label>
+        <button class="primary-button" type="submit">Authorize one additional promotion</button>
+      </form>
+      <div class="table-scroll"><table><thead><tr><th>Customer</th><th>Email</th><th>Reason</th><th>Created by</th><th>Created</th><th>Status</th></tr></thead><tbody><?php foreach($promotionExceptions as $exception): ?><tr><td><?=e((string)$exception['display_name'])?></td><td><?=e((string)$exception['canonical_email'])?></td><td><?=e((string)$exception['reason'])?></td><td><?=e((string)$exception['created_by'])?></td><td><?=e((string)$exception['created_at'])?></td><td><?=empty($exception['consumed_at'])?'Available':'Consumed'?></td></tr><?php endforeach; ?><?php if(!$promotionExceptions): ?><tr><td colspan="6">No promotional exceptions have been authorized.</td></tr><?php endif; ?></tbody></table></div>
     </section>
 
     <section class="table-panel license-table">

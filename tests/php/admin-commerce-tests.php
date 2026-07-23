@@ -32,6 +32,29 @@ $expectSame('Enterprise', activation_tier_name(2), 'Activation byte 2 must remai
 $expectSame('Lite', activation_tier_name(3), 'Activation byte 3 must decode as Lite.');
 $expectThrows(static fn(): string => activation_tier_name(4), 'Unknown activation bytes must be rejected.');
 
+if (function_exists('openssl_pkey_new')) {
+    $promotionKey = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+    if ($promotionKey === false) {
+        $failures[] = 'Promotion signing test key could not be generated.';
+    } else {
+    openssl_pkey_export($promotionKey, $promotionPrivatePem);
+    $promotionIssued = new DateTimeImmutable('2026-07-23T12:00:00Z');
+    $promotionToken = issue_promotion_token(
+        '11111111-2222-4333-8444-555555555555',
+        'Installation',
+        'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        'Trial',
+        'Enterprise',
+        $promotionIssued,
+        $promotionIssued->modify('+5 days'),
+        $promotionPrivatePem
+    );
+    $expectContains('PPEP1-', $promotionToken, 'Promotional entitlement must use the PPEP1 format.');
+    $promotionPayload = base64_decode(strtr(substr($promotionToken, 6), '-_', '+/'), true);
+        $expectSame(116, strlen($promotionPayload ?: ''), 'Promotional entitlement must contain a 52-byte payload and 64-byte signature.');
+    }
+}
+
 foreach (['Lite', 'Pro', 'Enterprise'] as $tier) {
     $expectSame($tier, canonical_paid_tier($tier), "{$tier} must be accepted by License Manager.");
 }
@@ -65,6 +88,8 @@ $expectContains("value=\"maintenance\"",$pricingPage,'Admin Pricing is missing s
 $expectContains('extend_maintenance',$licensesPage,'License Manager is missing manual maintenance extension controls.');
 $expectContains('revoke_maintenance',$licensesPage,'License Manager is missing maintenance revocation controls.');
 $expectContains('data-prepare-action="restore_maintenance"',$licensesPage,'License Manager is missing confirmed maintenance restoration controls.');
+$expectContains("name=\"action\" value=\"promotion_exception\"",$licensesPage,'License Manager is missing confirmed promotion exception controls.');
+$expectContains('portal_promotion_exceptions',$licensesPage,'License Manager must audit promotional exceptions.');
 $managementCode=file_get_contents($root.'/admin-website/includes/license_management.php')?:'';
 $expectContains("if (!empty(\$license['maintenance_revoked_at']))",$managementCode,'Paid renewal must not bypass an Admin maintenance revocation.');
 $expectContains('Restore maintenance before changing this license level.',$managementCode,'Tier replacement must not silently clear an Admin maintenance revocation.');
@@ -135,12 +160,12 @@ $expectContains("('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, 
 $expectContains("('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.42 as released.');
 $expectSame(1, substr_count($schema, "('v0.3.42', 'v0.3.42', 'Release'"), 'Fresh database schema must not contain a stale v0.3.42 roadmap override.');
 $expectSame(false, str_contains($schema, "('v0.3.42', 'v0.3.42', 'Release', 'Automatic configuration restore points'"), 'An obsolete roadmap sequence still overwrites v0.3.42.');
-$expectContains("('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress'", $devSupport, 'Admin Dev Support must identify v0.3.43 as current development.');
-$expectContains("('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'In progress'", $schema, 'Fresh database schema must identify v0.3.43 as current development.');
-$expectContains("WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46'", $devSupport, 'Admin Dev Support is missing the v0.3.43 GitHub issue link.');
-$expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress'", $devSupport, 'Admin Dev Support must identify v0.3.44 as in progress.');
-$expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'In progress'", $schema, 'Fresh database schema must identify v0.3.44 as in progress.');
-$expectContains("WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47'", $devSupport, 'Admin Dev Support is missing the v0.3.44 GitHub issue link.');
+$expectContains("('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.43 as released.');
+$expectContains("('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Released'", $schema, 'Fresh database schema must identify v0.3.43 as released.');
+$expectContains("WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.43'", $devSupport, 'Admin Dev Support is missing the v0.3.43 GitHub release link.');
+$expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.44 as released.');
+$expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released'", $schema, 'Fresh database schema must identify v0.3.44 as released.');
+$expectContains("WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.44'", $devSupport, 'Admin Dev Support is missing the v0.3.44 GitHub release link.');
 $futureReleases = [
     'v0.3.45' => ['Consent-aware lifecycle communications and CRM analytics', 48],
     'v0.3.46' => ['Accessibility and keyboard usability', 31],
