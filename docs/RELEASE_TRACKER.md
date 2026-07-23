@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.45 — released 2026-07-23**
+**Current public release: v0.3.46 — released 2026-07-23**
 
-**Current development: v0.3.46 — Accessibility and keyboard usability**
+**Current development: v0.3.47 — Five-Day Promotional Trial Experience**
 
-**Next release after v0.3.45: v0.3.46 — Accessibility and keyboard usability**
+**Next release after v0.3.46: v0.3.47 — Five-Day Promotional Trial Experience**
 
-**Future scheduled sequence: v0.3.46 through v0.3.54**
+**Future scheduled sequence: v0.3.47 through v0.3.55**
 
-**Most recently completed: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
+**Most recently completed: v0.3.46 — Accessibility and keyboard usability**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -86,10 +86,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.43 | Released | Secure Customer Portal MVP |
 | v0.3.44 | Released | Self-service renewals, upgrades, and promotional trials |
 | v0.3.45 | Released | Consent-aware lifecycle communications and CRM analytics |
+| v0.3.46 | Released | Accessibility and keyboard usability |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46-v0.3.52 improve accessibility, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.53 delivers receipt comparison and automated validation; and v0.3.54 makes public update awareness available to every license and maintenance state.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48-v0.3.53 improve recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.54 delivers receipt comparison and automated validation; and v0.3.55 makes public update awareness available to every license and maintenance state.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -664,14 +665,15 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.46 — Accessibility and keyboard usability
 
-**Status:** Planned
+**Status:** Released — 2026-07-23
 
 **GitHub:** [Issue #31 — Accessibility and keyboard usability](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31)
 
 **Purpose:** Make every primary workflow usable with a keyboard, Windows assistive technology, display scaling, and high-contrast preferences.
 
-**Planned scope:**
+**Released scope:**
 
+- Launch the desktop window maximized on first use, remember each user's last normal or maximized preference, keep restored bounds within the current monitor work area, and recover safely when a saved monitor is disconnected.
 - Define a complete focus order, visible focus treatment, semantic landmarks, accessible names, and screen-reader status announcements.
 - Add documented shortcuts for Test Receipt, Settings, search, job navigation, panel controls, help, and the mode switch.
 - Support Windows text scaling, 200 percent display scaling, high contrast, reduced motion, and application zoom without clipped controls.
@@ -685,9 +687,40 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Why this order:** Accessibility improves usability for every customer and is less expensive to establish before more screens and controls are added.
 
-**Complete when:** Primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
+**Completion verification:** The desktop starts maximized on first use without covering the taskbar, persists only safe normal or maximized preferences, constrains restored bounds to the active monitor work area, recenters disconnected-monitor coordinates, and preserves standard maximize, restore, resize, minimize, and multi-monitor behavior. Existing semantic regions, accessible names, visible focus treatment, reduced-motion support, and keyboard-operable native controls remain available across the viewer. All 181 desktop tests, every PHP contract suite, 71-file PHP lint, dependency audits, tracked-diff secret scanning, publisher compilation, version synchronization, and 27-page SEO validation pass. The 121,121,254-byte self-contained installer’s generated SHA-256 matches the independent value `eab62a267b259d13d751b8b7016627527d2d218b3fca98942fa815c2ca5c8eba`.
 
-### v0.3.47 — Automatic configuration restore points
+**Complete when:** The release build and Windows installer pass automated tests, fresh-start and saved-placement regression coverage, version synchronization, package-integrity verification, and security release review.
+
+### v0.3.47 — Five-Day Promotional Trial Experience
+
+**Status:** Planned
+
+**GitHub:** [Issue #52 — Five-Day Promotional Trial Experience](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/52)
+
+**Purpose:** Replace the manual promotional-key entry area with a polished, one-click, server-authorized evaluation of Lite, Pro, or Enterprise.
+
+**Planned scope:**
+
+- Present accessible Lite, Pro, and Enterprise edition choices with plain-language feature and printer-listener differences, then provide one prominent **Start Five-Day Trial** action.
+- Send the selected edition, canonical customer or registration ID, and a privacy-preserving stable installation/device fingerprint to the licensing backend over TLS.
+- Let the server verify eligibility, atomically record the one promotion allowed across all editions, create a signed five-day entitlement, and return it to the application.
+- Activate and securely store the returned entitlement automatically without exposing a promotional key field or requiring copying and pasting.
+- Show distinct eligible, activating, active, expired, already-used, offline, and temporary-service-failure states that match the rest of the License screen.
+- While active, show **Five-Day Trial Active**, the selected edition, activation and expiration dates and times, exact days and hours remaining, and a purchase action for that edition.
+- Treat the evaluation as five consecutive 24-hour days from the server activation timestamp and use trusted time plus rollback-resistant entitlement checks so changing the Windows clock cannot extend it.
+- At expiration, remove only the temporary entitlement and restore the prior permanent license or normal Trial/unlicensed state without damaging permanent ownership.
+- After use, remove the start action and show: **Your Five-Day Promotional Trial has already been used. Please select a license edition to continue using the application.**
+- Prevent reinstall, deleted local state, a different installation, concurrent requests, double clicks, retries, or selecting another edition from creating another promotion.
+
+**License availability:** Eligible registered customers may evaluate Lite, Pro, or Enterprise once in total. Eligibility is determined by the licensing server, not by the current local license tier or local files.
+
+**Security and privacy:** Keep the entitlement-signing private key on the protected server and only the verification key in the desktop application. Use a canonical customer record, server-side transaction and uniqueness constraints, idempotency keys, rate limits, generic non-enumerating failures, and an HMAC-derived device fingerprint instead of storing raw hardware identifiers. Do not display or log activation keys, credentials, receipt data, or raw device identifiers. A new promotion cannot start offline.
+
+**Why this order:** v0.3.42-v0.3.44 already provide verified customer identity, Customer Portal ownership, and server-side promotional entitlement foundations. This release closes the confusing desktop workflow before more configuration screens are added.
+
+**Complete when:** Lite, Pro, and Enterprise selections each receive the correct signed entitlement without manual key entry; the countdown and lifecycle states are accurate and accessible; duplicate, concurrent, cross-edition, reinstall, deleted-state, alternate-installation, and clock-rollback attempts cannot create or extend a promotion; expiration safely restores the prior license state; offline activation fails without losing customer data; the exact already-used message appears; logs contain no prohibited data; and backend, migration, concurrency, desktop, UI, expiry, privacy, and security tests pass.
+
+### v0.3.48 — Automatic configuration restore points
 
 **Status:** Planned
 
@@ -712,7 +745,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
 
-### v0.3.48 — Projects and testing sessions
+### v0.3.49 — Projects and testing sessions
 
 **Status:** Planned
 
@@ -733,11 +766,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
 
-**Why this order:** The restore-point foundation in v0.3.47 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
+**Why this order:** The restore-point foundation in v0.3.48 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
 
 **Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
 
-### v0.3.49 — Privacy-safe receipt masking
+### v0.3.50 — Privacy-safe receipt masking
 
 **Status:** Planned
 
@@ -762,7 +795,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
 
-### v0.3.50 — System tray health and notifications
+### v0.3.51 — System tray health and notifications
 
 **Status:** Planned
 
@@ -787,7 +820,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
 
-### v0.3.51 — Character and code-page assistant
+### v0.3.52 — Character and code-page assistant
 
 **Status:** Planned
 
@@ -812,7 +845,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Known mojibake fixtures produce the correct diagnosis and preview, saved recommendations render deterministically, and original capture bytes remain unchanged.
 
-### v0.3.52 — Offline Enterprise update packages
+### v0.3.53 — Offline Enterprise update packages
 
 **Status:** Planned
 
@@ -837,7 +870,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** An offline Enterprise computer installs a valid package and rejects tampered, unsigned, downgraded, incompatible, or unentitled packages without damaging the current installation.
 
-### v0.3.53 — Receipt comparison and automated validation
+### v0.3.54 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -861,7 +894,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, privacy-safe exports do not expose configured sensitive values, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
 
-### v0.3.54 — Update Notifications for All License Types
+### v0.3.55 — Update Notifications for All License Types
 
 **Status:** Planned
 

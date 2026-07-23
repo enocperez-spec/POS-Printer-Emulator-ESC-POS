@@ -170,15 +170,15 @@ $expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle comm
 $expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released'", $schema, 'Fresh database schema must identify v0.3.45 as released.');
 $expectContains("WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'", $devSupport, 'Admin Dev Support is missing the v0.3.45 GitHub release link.');
 $futureReleases = [
-    'v0.3.46' => ['Accessibility and keyboard usability', 31],
-    'v0.3.47' => ['Automatic configuration restore points', 32],
-    'v0.3.48' => ['Projects and testing sessions', 33],
-    'v0.3.49' => ['Privacy-safe receipt masking', 34],
-    'v0.3.50' => ['System tray health and notifications', 35],
-    'v0.3.51' => ['Character and code-page assistant', 36],
-    'v0.3.52' => ['Offline Enterprise update packages', 37],
-    'v0.3.53' => ['Receipt comparison and automated validation', 21],
-    'v0.3.54' => ['Update Notifications for All License Types', 40],
+    'v0.3.47' => ['Five-Day Promotional Trial Experience', 52],
+    'v0.3.48' => ['Automatic configuration restore points', 32],
+    'v0.3.49' => ['Projects and testing sessions', 33],
+    'v0.3.50' => ['Privacy-safe receipt masking', 34],
+    'v0.3.51' => ['System tray health and notifications', 35],
+    'v0.3.52' => ['Character and code-page assistant', 36],
+    'v0.3.53' => ['Offline Enterprise update packages', 37],
+    'v0.3.54' => ['Receipt comparison and automated validation', 21],
+    'v0.3.55' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
     $status = 'Planned';
@@ -187,6 +187,9 @@ foreach ($futureReleases as $version => [$title, $issue]) {
     $expectContains($expectedRow, $schema, "Fresh database schema is missing {$status} {$version} {$title}.");
     $expectContains("WHEN '{$version}' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/{$issue}'", $devSupport, "Admin Dev Support is missing the {$version} GitHub issue link.");
 }
+$expectContains("('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.46 as released.');
+$expectContains("('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released'", $schema, 'Fresh database schema must identify v0.3.46 as released.');
+$expectContains("WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'", $devSupport, 'Admin Dev Support is missing the v0.3.46 GitHub release link.');
 $expectContains("WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'", $devSupport, 'Admin Dev Support is missing the v0.3.40 GitHub release link.');
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $devSupport, 'Admin Dev Support is missing BUG-015.');
 $expectContains("('v0.3.33', 'v0.3.33', 'Release', 'Enhanced support package and connection diagnostics', 'Released'", $schema, 'Fresh database schema is missing released v0.3.33.');
@@ -199,6 +202,7 @@ $expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation a
 $expectContains("('BUG-015', 'Trial welcome and included listener were difficult to find'", $schema, 'Fresh database schema is missing BUG-015.');
 $expectContains("'pending-release-renumber-v0.3.33'", $devSupport, 'Admin Dev Support is missing the pending-release renumber migration.');
 $expectContains("'receipt-comparison-to-end-v0.3.48'", $devSupport, 'Admin Dev Support is missing the receipt-comparison rescheduling migration.');
+$expectContains("'five-day-promotional-trial-v0.3.47'", $devSupport, 'Admin Dev Support is missing the promotional-trial release migration.');
 $expectContains("WHEN 'v0.3.27' THEN 'v0.3.33'", $devSupport, 'Bug targets are not migrated from v0.3.27 to v0.3.33.');
 $expectContains("WHEN 'v0.3.33' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/20'", $devSupport, 'Admin Dev Support is missing the v0.3.33 diagnostics issue link.');
 $expectContains("WHEN 'v0.3.34' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'", $devSupport, 'Admin Dev Support is missing the v0.3.34 release link.');
@@ -206,7 +210,8 @@ $expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'", $devSupport, 'Admin Dev Support is missing the v0.3.36 release link.');
 $expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'", $devSupport, 'Admin Dev Support is missing the v0.3.39 release link.');
 $expectContains("WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'", $devSupport, 'Admin Dev Support is missing the v0.3.38 release link.');
-$expectContains("WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.53 comparison issue link.');
+$expectContains("WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.54 comparison issue link.');
+$expectContains('server-authorized Lite, Pro, or Enterprise evaluation', $devSupport, 'Admin Dev Support is missing the promotional-trial server authorization scope.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
 $expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');

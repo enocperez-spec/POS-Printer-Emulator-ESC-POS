@@ -30,7 +30,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.45 Consent-aware lifecycle communications and CRM analytics is the current public release, released July 23, 2026.
+> **Release status:** v0.3.46 Accessibility and window usability is the current public release, released July 23, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -38,7 +38,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.45-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.46-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -164,7 +164,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.41-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.46-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -271,15 +271,16 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.43 — Secure Customer Portal MVP:** Launch `userportal.posprinteremulator.com` with verified accounts, secure recovery, optional MFA, masked license and maintenance details, downloads, preferences, support history, and controlled device deactivation.
 - **Released in v0.3.44 — Self-service renewals, upgrades, and promotional trials:** Reuse the server-side PayPal and entitlement systems for maintenance renewal, license upgrades, and one auditable five-day paid-edition promotion per verified customer.
 - **v0.3.45 — Consent-aware lifecycle communications and CRM analytics:** Integrate Brevo with a Free-plan-safe priority queue, protected API and webhook credentials, reliable scheduling and suppression, onboarding/renewal/support messages, minimal consented telemetry, segmentation, and Admin Portal performance dashboards.
-- **v0.3.46 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, and accessibility regression checks.
-- **v0.3.47 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
-- **v0.3.48 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
-- **v0.3.49 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
-- **v0.3.50 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
-- **v0.3.51 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
-- **v0.3.52 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
-- **v0.3.53 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.54 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
+- **v0.3.46 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, accessibility regression checks, maximized first launch, and taskbar-safe remembered window placement.
+- **v0.3.47 — Five-Day Promotional Trial Experience:** Let an eligible registered customer select Lite, Pro, or Enterprise and activate one server-authorized five-day evaluation automatically, with a clear countdown, purchase path, safe expiration, and permanent repeat-trial prevention.
+- **v0.3.48 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
+- **v0.3.49 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
+- **v0.3.50 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
+- **v0.3.51 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
+- **v0.3.52 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
+- **v0.3.53 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
+- **v0.3.54 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.55 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 
