@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.41 — released 2026-07-22**
+**Current public release: v0.3.42 — released 2026-07-22**
 
-**Current development: v0.3.42 — Accessibility and keyboard usability**
+**Current development: v0.3.43 — Secure Customer Portal MVP**
 
-**Next release after v0.3.42: v0.3.43 — Automatic configuration restore points**
+**Next release after v0.3.43: v0.3.44 — Self-service renewals, upgrades, and promotional trials**
 
-**Future scheduled sequence: v0.3.42 through v0.3.50**
+**Future scheduled sequence: v0.3.43 through v0.3.54**
 
-**Most recently completed: v0.3.41 — Installer Branding Correction**
+**Most recently completed: v0.3.42 — Customer identity, consent, and CRM foundation**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -82,10 +82,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.39 | Released | Guided update installation and restart |
 | v0.3.40 | Released | Simple Mode and Expert Mode |
 | v0.3.41 | Released | Installer Branding Correction |
+| v0.3.42 | Released | Customer identity, consent, and CRM foundation |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.48 improve accessibility, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.49 delivers receipt comparison and automated validation; and v0.3.50 makes public update awareness available to every license and maintenance state.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46-v0.3.52 improve accessibility, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.53 delivers receipt comparison and automated validation; and v0.3.54 makes public update awareness available to every license and maintenance state.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -547,7 +548,116 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Completion verification:** The banner displays proportionally at its intended `164x314` size, the C# packaging tool builds with zero warnings and errors, Inno Setup 6.7.1 reads both independent branding files, and the self-contained installer compiles successfully.
 
-### v0.3.42 — Accessibility and keyboard usability
+### v0.3.42 — Customer identity, consent, and CRM foundation
+
+**Status:** Released — 2026-07-22
+
+**GitHub:** [Issue #45 — Customer identity, consent, and CRM foundation](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/45)
+
+**Purpose:** Establish one privacy-aware customer record that safely connects registrations, installations, licenses, purchases, maintenance, support, product usage, and communication preferences before any customer portal or marketing automation is exposed.
+
+**Planned scope:**
+
+- Add a canonical customer ID and verified-email workflow with safe account matching, duplicate review, merge history, and no automatic merge based only on an unverified email address.
+- Create normalized customer, installation, activation, license, maintenance, purchase, support, consent, event, and email-suppression records in the existing administrative database.
+- Backfill existing Trial registrations and paid licenses without changing active entitlements, maintenance dates, activation keys, or application behavior.
+- Add an Admin Portal customer list and detail view with search, tier, maintenance, activity, version, consent, and support filters plus permission-controlled CSV export.
+- Store activation-key fingerprints and masked key endings for lookup; keep any recoverable key material encrypted and unavailable to logs, analytics, exports, URLs, or routine staff views.
+- Record append-only consent and administrative audit evidence, including policy version, source, timestamp, actor, and the difference between required service messages and optional marketing.
+- Define retention, deletion, correction, export, and account-closure workflows for customer personal information.
+- Publish versioned, authenticated service APIs that the later portal and campaign releases can reuse.
+
+**License availability:** Administrative foundation for Trial, Lite, Pro, and Enterprise customers. It does not change desktop feature entitlements.
+
+**Security and privacy:** Require verified ownership before linking records, least-privilege Admin Portal roles, MFA for privileged access, CSRF protection, rate limits, encrypted secrets, field-level masking, audit logging, short-lived exports, and data minimization. External print-job counts are aggregate numbers only; receipt text, raw print data, screenshots, and private-network addresses are excluded.
+
+**Why this order:** Every later portal, renewal, trial, email, and analytics workflow depends on a trustworthy customer identity and consent ledger. Building those screens first would create duplicate accounts and unsafe access-control shortcuts.
+
+**Complete when:** Existing records migrate with unchanged entitlements, verified customers resolve to one auditable profile, duplicate and export controls work, unauthorized users cannot enumerate customer data, secrets and receipt contents never enter CRM outputs, and database/API/security regression tests pass.
+
+**Release verification:** The additive production migration completed through the protected service operation; existing entitlements and maintenance dates remained unchanged; legacy recoverable activation keys were protected with AES-256-GCM; bearer authentication and Apache header forwarding were verified; PHP contract tests, all 171 desktop tests, the production viewer build, responsive Admin Portal checks, and secret scans passed.
+
+### v0.3.43 — Secure Customer Portal MVP
+
+**Status:** Planned
+
+**GitHub:** [Issue #46 — Secure Customer Portal MVP](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46)
+
+**Purpose:** Let customers securely view and maintain their own account, license, maintenance, installation, purchase, download, and support information at `userportal.posprinteremulator.com`.
+
+**Planned scope:**
+
+- Add verified account invitation and enrollment, secure sign-in, logout, session management, password reset, optional TOTP multifactor authentication, recovery codes, and account lock/rate-limit protections.
+- Show masked license details, edition and status, purchase and renewal history, maintenance dates, activated computers, eligible downloads and updates, support requests, and promotional-trial eligibility.
+- Allow customers to update contact details and communication preferences, download their account data, close the account where legally and operationally permitted, and review consent history.
+- Reuse the existing support backend so customers can submit requests, upload validated attachments, reply to existing requests, and see status and history without exposing GitHub credentials or private administrative notes.
+- Allow a confirmed old-computer deactivation within the existing transfer rules, with reauthentication, audit evidence, cooldowns, and recovery guidance.
+- Provide contextual upgrade and renewal options as links or disabled previews; payment and entitlement mutation remain in v0.3.44.
+- Add accessible responsive pages, customer-safe error messages, privacy notices, and a production deployment configuration for the new subdomain.
+
+**License availability:** Trial, Lite, Pro, and Enterprise customers with a verified account.
+
+**Security and privacy:** Enforce server-side ownership on every object, generic account-recovery responses, secure HttpOnly SameSite cookies, session rotation, CSRF protection, CSP and security headers, upload quarantine and validation, reauthentication for sensitive actions, and immutable audit history. Never display full activation keys after the initial protected delivery workflow.
+
+**Why this order:** The portal can safely expose self-service read and support workflows only after v0.3.42 establishes canonical identities, ownership links, consent, and audited APIs.
+
+**Complete when:** A verified customer can sign in, see only their own masked records, manage account preferences, submit and reply to support requests, deactivate an eligible old computer, recover access securely, and complete all primary workflows on desktop and mobile with authorization and accessibility tests passing.
+
+### v0.3.44 — Self-service renewals, upgrades, and promotional trials
+
+**Status:** Planned
+
+**GitHub:** [Issue #47 — Self-service renewals, upgrades, and promotional trials](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47)
+
+**Purpose:** Add auditable self-service commercial actions while preserving permanent-license ownership and preventing duplicate promotional trials.
+
+**Planned scope:**
+
+- Reuse the server-side PayPal order and confirmation flow for maintenance renewals and Trial/Lite/Pro/Enterprise upgrades without putting PayPal secrets or license-signing keys in the browser or desktop application.
+- Show the exact product, current tier, target tier, price, maintenance effect, effective date, and refund/support terms before payment confirmation.
+- Apply idempotent payment webhooks and entitlement transitions, issue receipts, record purchase history, and recover safely from delayed or duplicate provider callbacks.
+- Allow each verified customer one five-day promotional trial of an eligible paid edition, record its previous entitlement, and automatically restore that entitlement when the promotion ends.
+- Prevent repeated promotions using verified customer, account, installation, and license history while allowing audited administrator exceptions with a required reason and confirmation.
+- Show activation and expiration dates, remaining time, temporary listener allowance, and the features that will relock; send lifecycle events to the v0.3.45 communication queue without requiring that release to be active.
+- Add failed-payment, expired-session, refund, chargeback, downgrade, offline-expiration, and clock-manipulation handling with clear customer and administrator status.
+
+**License availability:** Verified Trial, Lite, Pro, and Enterprise accounts, subject to product and promotional eligibility rules.
+
+**Security and privacy:** Verify provider signatures, bind orders to server-side products and prices, make fulfillment idempotent, reauthenticate sensitive actions, sign temporary entitlements, retain the prior license safely, rate-limit promotion attempts, and audit every financial or entitlement transition.
+
+**Why this order:** Payments and temporary entitlements depend on the ownership, portal, audit, and consent foundations from v0.3.42-v0.3.43 but should be proven before automated campaigns can direct customers into these workflows.
+
+**Complete when:** A customer can renew or upgrade once from a verified PayPal payment, a duplicate webhook cannot issue duplicate value, an eligible customer receives exactly one five-day promotion, expiration restores the prior license automatically, and failure/refund/security tests leave entitlements consistent.
+
+### v0.3.45 — Consent-aware lifecycle communications and CRM analytics
+
+**Status:** Planned
+
+**GitHub:** [Issue #48 — Consent-aware lifecycle communications and CRM analytics](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48)
+
+**Purpose:** Improve onboarding, conversion, renewal, and support follow-up through reliable service messages and optional marketing without building an unsafe custom mail server.
+
+**Planned scope:**
+
+- Integrate Brevo through its server-side transactional email, contact, template, and webhook APIs with separate protected production/test credentials, authenticated sending domains, and suppression handling.
+- Support the Brevo Free plan through a configurable provider quota, a durable priority queue, a conservative default of 290 automated sends per day, 50 reserved service-message slots, next-quota-window deferral, and Admin visibility into used, reserved, queued, deferred, and failed mail. The design must not rely on Brevo retaining messages submitted after its current 300-send daily limit.
+- Add reviewed templates and schedules for verification, welcome, setup guidance, Trial usage and expiration, promotional trials, upgrade education, release announcements, inactivity, support status, and maintenance reminders at 60, 30, 14, 7, 0, and post-expiration intervals.
+- Separate required service communications from optional marketing; honor consent, unsubscribe, global suppression, hard bounce, complaint, and account-closure state before every send.
+- Add an outbox/worker with idempotency, retries, dead-letter review, quiet hours, frequency caps, time zones, preview/test-send, approval, pause, and emergency-stop controls.
+- Show delivery, bounce, complaint, open, click, unsubscribe, renewal, upgrade, and conversion results while clearly labeling privacy-limited or unreliable engagement metrics.
+- Add Admin Portal dashboards and segments for registrations, active/inactive customers, Trial conversion, purchases, upgrades, maintenance, support, outdated versions, uninstall reasons, and follow-up queues.
+- Collect only consented, minimal desktop lifecycle telemetry: install/uninstall attempt, version, coarse last-activity date, listener activation, aggregate Trial/job counts, license state, and basic health category. Keep telemetry optional where required and acknowledge offline/manual-uninstall gaps.
+- Permit reviewed CSV export and manual email triggering only for authorized roles, with audience count, consent checks, confirmation, and audit evidence.
+
+**License availability:** Service messages follow account and transaction needs across all tiers. Optional marketing requires recorded consent and can be disabled independently.
+
+**Security and privacy:** Keep the Brevo API key and webhook bearer token outside every public directory, authenticate webhook calls, validate and deduplicate events, authenticate the sender domain with the account-specific Brevo code, DKIM, and DMARC records, prohibit activation keys, receipt data, raw logs, credentials, full IP addresses, and personal print content in Brevo payloads or analytics, minimize tracking, redact logs, restrict exports, and publish an updated privacy/retention notice before collection begins.
+
+**Why this order:** Automation is useful only after customer identity, portal destinations, payment/renewal workflows, consent, suppression, and auditable lifecycle events are reliable.
+
+**Complete when:** Test customers receive each eligible message exactly once, opted-out customers receive no marketing, required service mail still follows documented rules, bounce/complaint suppressions stop future sends, renewal links reach the correct portal action, the Free-plan quota test safely queues more than 300 messages without loss or starving reserved service mail, dashboards reconcile to source events, and no prohibited data appears in Brevo payloads or logs. The detailed provider contract is recorded in [`design/v0.3.45-brevo-email-integration.md`](design/v0.3.45-brevo-email-integration.md).
+
+### v0.3.46 — Accessibility and keyboard usability
 
 **Status:** Planned
 
@@ -572,7 +682,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
 
-### v0.3.43 — Automatic configuration restore points
+### v0.3.47 — Automatic configuration restore points
 
 **Status:** Planned
 
@@ -597,7 +707,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
 
-### v0.3.44 — Projects and testing sessions
+### v0.3.48 — Projects and testing sessions
 
 **Status:** Planned
 
@@ -618,11 +728,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
 
-**Why this order:** The restore-point foundation in v0.3.43 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
+**Why this order:** The restore-point foundation in v0.3.47 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
 
 **Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
 
-### v0.3.45 — Privacy-safe receipt masking
+### v0.3.49 — Privacy-safe receipt masking
 
 **Status:** Planned
 
@@ -647,7 +757,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
 
-### v0.3.46 — System tray health and notifications
+### v0.3.50 — System tray health and notifications
 
 **Status:** Planned
 
@@ -672,7 +782,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
 
-### v0.3.47 — Character and code-page assistant
+### v0.3.51 — Character and code-page assistant
 
 **Status:** Planned
 
@@ -697,7 +807,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Known mojibake fixtures produce the correct diagnosis and preview, saved recommendations render deterministically, and original capture bytes remain unchanged.
 
-### v0.3.48 — Offline Enterprise update packages
+### v0.3.52 — Offline Enterprise update packages
 
 **Status:** Planned
 
@@ -722,7 +832,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** An offline Enterprise computer installs a valid package and rejects tampered, unsigned, downgraded, incompatible, or unentitled packages without damaging the current installation.
 
-### v0.3.49 — Receipt comparison and automated validation
+### v0.3.53 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -746,7 +856,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, privacy-safe exports do not expose configured sensitive values, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
 
-### v0.3.50 — Update Notifications for All License Types
+### v0.3.54 — Update Notifications for All License Types
 
 **Status:** Planned
 

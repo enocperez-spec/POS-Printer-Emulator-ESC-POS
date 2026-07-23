@@ -83,18 +83,22 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 19. **v0.3.39 — Guided update installation and restart (released 2026-07-22).** Verify downloaded installers, create a pre-update safety snapshot, confirm downtime, shut down cleanly, run an external updater, preserve state, recover from failure, and relaunch automatically.
 20. **v0.3.40 — Simple Mode and Expert Mode.** Provide task-focused setup, connection, testing, latest-receipt, and support actions while preserving the complete receipt-inspection workspace and state.
 21. **v0.3.41 — Installer Branding Correction.** Use independent square and tall installer artwork with validated proportions so the official product mark remains undistorted across wizard layouts and DPI scales.
-22. **v0.3.42 — Accessibility and keyboard usability.** Establish keyboard, screen-reader, high-contrast, scaling, reduced-motion, caption, and automated accessibility requirements across primary workflows.
-23. **v0.3.43 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
-24. **v0.3.44 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
-25. **v0.3.45 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
-26. **v0.3.46 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
-27. **v0.3.47 — Character and code-page assistant.** Analyze encoding commands and bytes, compare supported code-page interpretations, and persist explicit profile choices separately from captures.
-28. **v0.3.48 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
-29. **v0.3.49 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-30. **v0.3.50 — Update Notifications for All License Types.** Notify every license and maintenance state about public releases while preserving the correct manual-download, guided-update, and renewal boundaries.
-30. Service-to-viewer authentication and installer repair mode.
-31. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
-32. Optional online activation revocation and license transfer workflow.
-33. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
-34. PNG export and deterministic PDF generation.
-35. Production code-signing and expanded unattended deployment validation.
+22. **v0.3.42 — Customer identity, consent, and CRM foundation.** Add canonical verified customers, normalized ownership and lifecycle records, consent/audit ledgers, privacy-safe Admin Portal search and export, and authenticated service APIs without collecting receipt contents.
+23. **v0.3.43 — Secure Customer Portal MVP.** Expose ownership-scoped account, license, maintenance, installation, purchase, download, preference, and support views through verified accounts, secure recovery, optional TOTP MFA, and reauthenticated sensitive actions.
+24. **v0.3.44 — Self-service renewals, upgrades, and promotional trials.** Reuse server-side PayPal and signed-entitlement services for idempotent renewals, upgrades, refunds, and a single five-day paid-edition promotion that restores the prior permanent license automatically.
+25. **v0.3.45 — Consent-aware lifecycle communications and CRM analytics.** Use Brevo through a protected server-side API, authenticated webhooks and sending domain, a durable Free-plan-aware priority outbox, consent and suppression enforcement, lifecycle schedules, minimal opt-in telemetry, and privacy-aware conversion and support dashboards.
+26. **v0.3.46 — Accessibility and keyboard usability.** Establish keyboard, screen-reader, high-contrast, scaling, reduced-motion, caption, and automated accessibility requirements across primary workflows.
+27. **v0.3.47 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
+28. **v0.3.48 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
+29. **v0.3.49 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
+30. **v0.3.50 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
+31. **v0.3.51 — Character and code-page assistant.** Analyze encoding commands and bytes, compare supported code-page interpretations, and persist explicit profile choices separately from captures.
+32. **v0.3.52 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
+33. **v0.3.53 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+34. **v0.3.54 — Update Notifications for All License Types.** Notify every license and maintenance state about public releases while preserving the correct manual-download, guided-update, and renewal boundaries.
+35. Service-to-viewer authentication and installer repair mode.
+36. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
+37. Optional online activation revocation and license transfer workflow.
+38. Hardened Thermal adapter with image, QR, barcode, and code-page parity.
+39. PNG export and deterministic PDF generation.
+40. Production code-signing and expanded unattended deployment validation.

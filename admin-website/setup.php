@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
 require __DIR__ . '/includes/license_management.php';
+require __DIR__ . '/includes/customer_crm.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -180,6 +181,7 @@ try {
         $pdo->exec("ALTER TABLE issued_licenses MODIFY license_tier ENUM('Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Pro'");
     }
     ensure_license_management_schema($pdo);
+    ensure_customer_crm_schema($pdo);
     respond(['ok' => true, 'statements' => count($statements)]);
 } catch (InvalidArgumentException|JsonException $exception) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {

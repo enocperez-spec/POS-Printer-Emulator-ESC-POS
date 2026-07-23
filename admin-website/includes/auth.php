@@ -33,6 +33,30 @@ function require_password_authentication(): void
     }
 }
 
+function admin_role(): string
+{
+    $configured = strtolower(trim((string)(private_config()['admin']['role'] ?? 'owner')));
+    return in_array($configured, ['owner', 'support', 'analyst'], true) ? $configured : 'owner';
+}
+
+function admin_can(string $capability): bool
+{
+    $capabilities = [
+        'owner' => ['customers.read', 'customers.export', 'customers.consent', 'customers.audit', 'licenses.manage', 'pricing.manage'],
+        'support' => ['customers.read'],
+        'analyst' => [],
+    ];
+    return in_array($capability, $capabilities[admin_role()] ?? [], true);
+}
+
+function require_admin_capability(string $capability): void
+{
+    if (!admin_can($capability)) {
+        http_response_code(403);
+        exit('This Admin Portal account is not authorized for that action.');
+    }
+}
+
 function csrf_token(): string
 {
     if (empty($_SESSION['csrf'])) {

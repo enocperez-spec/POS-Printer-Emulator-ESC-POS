@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS installations (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     installation_uuid CHAR(36) NOT NULL,
+    customer_id CHAR(36) NULL,
     token_hash BINARY(32) NOT NULL,
     customer_name VARCHAR(160) NOT NULL,
     email_address VARCHAR(254) NOT NULL,
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS installations (
     KEY ix_installations_last_seen (last_seen_at),
     KEY ix_installations_email (email_address),
     KEY ix_installations_license_id (license_id),
+    KEY ix_installations_customer (customer_id),
     KEY ix_installations_geography (country_code, region_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -58,10 +60,16 @@ CREATE TABLE IF NOT EXISTS download_events_daily (
 CREATE TABLE IF NOT EXISTS issued_licenses (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     license_id CHAR(36) NOT NULL,
+    customer_id CHAR(36) NULL,
     customer_name VARCHAR(160) NOT NULL,
     email_address VARCHAR(254) NOT NULL,
     license_tier ENUM('Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Pro',
     activation_key VARCHAR(512) NOT NULL,
+    activation_key_ciphertext VARBINARY(768) NULL,
+    activation_key_nonce BINARY(12) NULL,
+    activation_key_tag BINARY(16) NULL,
+    activation_key_fingerprint BINARY(32) NULL,
+    activation_key_ending CHAR(4) NULL,
     issued_at DATETIME(6) NOT NULL,
     created_by VARCHAR(80) NOT NULL DEFAULT 'owner',
     control_state ENUM('Enabled', 'Deactivated', 'Revoked', 'Deleted') NOT NULL DEFAULT 'Enabled',
@@ -78,6 +86,8 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     UNIQUE KEY uq_issued_licenses_license_id (license_id),
+    UNIQUE KEY uq_issued_licenses_key_fingerprint (activation_key_fingerprint),
+    KEY ix_issued_licenses_customer (customer_id),
     KEY ix_issued_licenses_email (email_address),
     KEY ix_issued_licenses_issued_at (issued_at),
     KEY ix_issued_licenses_revoked_at (revoked_at),
@@ -120,6 +130,7 @@ CREATE TABLE IF NOT EXISTS support_request_rate_limits (
 
 CREATE TABLE IF NOT EXISTS support_requests (
     reference_code VARCHAR(32) NOT NULL,
+    customer_id CHAR(36) NULL,
     license_id CHAR(36) NOT NULL,
     request_type ENUM('Bug Report', 'Feature Request', 'License Issue', 'Other Issue') NOT NULL,
     subject VARCHAR(160) NOT NULL,
@@ -132,8 +143,136 @@ CREATE TABLE IF NOT EXISTS support_requests (
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     submitted_at DATETIME(6) NULL,
     PRIMARY KEY (reference_code),
+    KEY ix_support_requests_customer (customer_id),
     KEY ix_support_license_created (license_id, created_at),
     KEY ix_support_state_created (state, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customers (
+    customer_id CHAR(36) NOT NULL,
+    display_name VARCHAR(160) NOT NULL,
+    canonical_email VARCHAR(254) NOT NULL,
+    email_hash BINARY(32) NOT NULL,
+    email_verified_at DATETIME(6) NULL,
+    status ENUM('Active','Merged','Closed') NOT NULL DEFAULT 'Active',
+    merged_into_customer_id CHAR(36) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (customer_id),
+    KEY ix_customers_email_hash (email_hash),
+    KEY ix_customers_status_updated (status, updated_at),
+    KEY ix_customers_merged_into (merged_into_customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_consents (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NOT NULL,
+    consent_type ENUM('Service','Marketing','Product Analytics') NOT NULL,
+    consent_state ENUM('Granted','Denied','Withdrawn','Not Asked') NOT NULL,
+    policy_version VARCHAR(40) NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    actor VARCHAR(80) NOT NULL,
+    evidence_digest BINARY(32) NULL,
+    recorded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_customer_consents_customer (customer_id, consent_type, recorded_at),
+    CONSTRAINT fk_customer_consents_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_purchases (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NULL,
+    purchase_reference VARCHAR(64) NOT NULL,
+    order_type ENUM('LICENSE','MAINTENANCE') NOT NULL,
+    license_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
+    purchase_status VARCHAR(40) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    currency CHAR(3) NOT NULL,
+    paid_at DATETIME(6) NULL,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_customer_purchase_reference (purchase_reference),
+    KEY ix_customer_purchases_customer (customer_id, paid_at),
+    CONSTRAINT fk_customer_purchases_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    source_reference VARCHAR(96) NULL,
+    actor VARCHAR(80) NOT NULL,
+    event_summary VARCHAR(500) NOT NULL,
+    occurred_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_customer_events_customer (customer_id, occurred_at),
+    KEY ix_customer_events_type (event_type, occurred_at),
+    CONSTRAINT fk_customer_events_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_email_suppressions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NOT NULL,
+    email_hash BINARY(32) NOT NULL,
+    reason ENUM('Unsubscribed','Bounced','Complaint','Account Closed','Administrative') NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    actor VARCHAR(80) NOT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    released_at DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    KEY ix_email_suppressions_customer (customer_id, active),
+    KEY ix_email_suppressions_hash (email_hash, active),
+    CONSTRAINT fk_email_suppressions_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_merge_history (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    source_customer_id CHAR(36) NOT NULL,
+    target_customer_id CHAR(36) NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    actor VARCHAR(80) NOT NULL,
+    merged_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_customer_merge_source (source_customer_id),
+    KEY ix_customer_merge_target (target_customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_email_verifications (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NOT NULL,
+    email_hash BINARY(32) NOT NULL,
+    token_hash BINARY(32) NOT NULL,
+    requested_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    expires_at DATETIME(6) NOT NULL,
+    used_at DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_customer_verification_token (token_hash),
+    KEY ix_customer_verification_customer (customer_id, expires_at),
+    CONSTRAINT fk_customer_verification_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_admin_audit (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NULL,
+    action VARCHAR(64) NOT NULL,
+    actor VARCHAR(80) NOT NULL,
+    object_type VARCHAR(40) NOT NULL,
+    object_reference VARCHAR(96) NULL,
+    reason VARCHAR(500) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_customer_audit_customer (customer_id, created_at),
+    KEY ix_customer_audit_action (action, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_api_rate_limits (
+    bucket_hash BINARY(32) NOT NULL,
+    hits INT UNSIGNED NOT NULL,
+    reset_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (bucket_hash),
+    KEY ix_customer_api_rate_reset (reset_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS support_request_attachments (
@@ -265,15 +404,20 @@ VALUES
     ('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Correction', 'Released', 338, 'Make Trial setup impossible to lose and show customers exactly where their POS must send print jobs.', 'Versioned and reopenable two-step welcome guide; wizard-first instruction; visible read-only included listener; local and LAN IPv4 endpoints; copyable RAW TCP details; and retained server-side mutation denial.', 'The v0.3.37 guide could remain dismissed and hid the included listener behind an upgrade panel, leaving customers unsure how to connect.', 'Fresh and upgraded Trial installations see and can reopen the guide, view one locked listener, copy exact connection details, and receive HTTP 403 for listener mutations.', '2026-07-22 00:00:00.000000'),
     ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Released', 339, 'Close the application safely before an update replaces installed files, then return the customer to the updated application.', 'Background installer download; SHA-256 verification; pre-update safety snapshot; install confirmation and safe deferral; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; and recovery-safe failure handling.', 'A controlled external updater eliminates self-update file locks without unexpected listener downtime or lost customer state.', 'Install and Restart completes without locked-file errors, relaunches the new version, preserves customer state and data, and leaves the current installation usable after cancellation or failure.', '2026-07-22 00:00:00.000000'),
     ('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Released', 340, 'Give new customers a task-focused experience while preserving the complete expert workspace.', 'Simple task cards; plain-language health and next action; retained Expert Mode; remembered mode choice; state-preserving switching; and unchanged server-side license enforcement.', 'Persistent task guidance addresses customer confusion without removing advanced receipt inspection.', 'Customers complete setup, connection, testing, review, and diagnostics in Simple Mode and switch to Expert Mode without losing state.', '2026-07-22 00:00:00.000000'),
-    ('v0.3.41', 'v0.3.41', 'Release', 'Accessibility and keyboard usability', 'Planned', 341, 'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.', 'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.', 'Accessibility should be established before additional screens and controls increase remediation cost.', 'Primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', NULL),
-    ('v0.3.42', 'v0.3.42', 'Release', 'Automatic configuration restore points', 'Planned', 342, 'Protect customers from accidental configuration loss without requiring manual backups.', 'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.', 'Recovery protection should precede projects and additional customer configuration complexity.', 'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
-    ('v0.3.43', 'v0.3.43', 'Release', 'Projects and testing sessions', 'Planned', 343, 'Organize receipts and configuration by customer, store, migration, register, or support engagement.', 'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.', 'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.', 'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
-    ('v0.3.44', 'v0.3.44', 'Release', 'Privacy-safe receipt masking', 'Planned', 344, 'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.', 'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.', 'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.', 'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
-    ('v0.3.45', 'v0.3.45', 'Release', 'System tray health and notifications', 'Planned', 345, 'Keep customers informed about important listener events without leaving the main window open.', 'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.', 'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.', 'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
-    ('v0.3.46', 'v0.3.46', 'Release', 'Character and code-page assistant', 'Planned', 346, 'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.', 'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.', 'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.', 'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', NULL),
-    ('v0.3.47', 'v0.3.47', 'Release', 'Offline Enterprise update packages', 'Planned', 347, 'Support secure updates on restricted or air-gapped POS networks.', 'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.', 'This depends on guided updates, production signing, rollback, and entitlement foundations.', 'A valid offline package installs successfully while tampered, unsigned, downgraded, incompatible, or unentitled packages leave the current installation unchanged.', NULL),
-    ('v0.3.48', 'v0.3.48', 'Release', 'Receipt comparison and automated validation', 'Planned', 348, 'Provide repeatable compatibility and regression testing.', 'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, privacy-safe HTML, PDF, and JSON results; brand the installer welcome, completion, header, Setup executable, shortcuts, and uninstall entry with official product artwork.', 'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.', 'Known-good captures pass, intentional changes fail precisely, ignored dynamic fields avoid false failures, privacy-safe exports protect configured sensitive values, and the compiled installer displays official branding at normal and high-DPI scaling.', NULL),
-    ('v0.3.49', 'v0.3.49', 'Release', 'Update Notifications for All License Types', 'Planned', 349, 'Notify every license tier about newer public desktop releases even when paid maintenance has expired.', 'Public release notification checks for Trial, Lite, Pro, and Enterprise; installed and latest versions; eligible releases-behind count; concise update summary; accessible visual indicator; Trial manual-download action; active-maintenance guided update; expired-maintenance release and renewal guidance; offline cache; rate limiting; and trusted-link enforcement.', 'Update awareness should be universal while in-app installation continues to honor maintenance entitlements.', 'Every license state receives accurate non-blocking notifications, Trial opens the official download page, active-maintenance paid users can install in-app, expired-maintenance users cannot bypass renewal, and privacy, offline, counting, and trust tests pass.', NULL),
+    ('v0.3.41', 'v0.3.41', 'Release', 'Installer Branding Correction', 'Released', 341, 'Correct the stretched product artwork in the Windows installer.', 'Independent square and tall installer artwork with validated proportions.', 'Preserve the official product logo at installer dimensions.', 'The v0.3.41 installer displays proportional artwork and rejects invalid banner dimensions.', '2026-07-22 00:00:00.000000'),
+    ('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released', 342, 'Connect registrations, installations, licenses, maintenance, support, and consent through one privacy-aware customer record.', 'Canonical customers; safe unverified backfill; duplicate review and merge history; verified ownership evidence; masked key lookup; consent, suppression, lifecycle, and audit ledgers; permission-controlled Admin search and export; and authenticated service APIs.', 'The Customer Portal and automated communications require trustworthy identity and consent foundations.', 'Existing entitlements remain unchanged, duplicate emails are not automatically merged, customer actions are auditable, exports exclude prohibited data, and CRM security tests pass.', '2026-07-22 00:00:00.000000'),
+    ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Planned', 343, 'Give verified customers secure self-service access to owned product records.', 'Verified accounts, recovery, optional MFA, masked licenses, maintenance, downloads, preferences, support history, and device deactivation.', 'The portal depends on v0.3.42 ownership and consent boundaries.', 'Customers can access only their own verified records and sensitive actions require reauthentication.', NULL),
+    ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Planned', 344, 'Provide auditable self-service commercial workflows without turning permanent licenses into subscriptions.', 'PayPal maintenance renewal, tier upgrades, refunds, idempotent fulfillment, and one five-day promotional paid-edition trial.', 'Commercial workflows require the secure portal and canonical ownership records.', 'Payments and temporary entitlements are idempotent, auditable, and restore prior permanent access correctly.', NULL),
+    ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Planned', 345, 'Deliver useful lifecycle messages through Brevo while honoring consent and provider limits.', 'Protected Brevo integration, durable priority outbox, quota deferral, templates, authenticated webhooks, suppression, minimal telemetry, segmentation, and Admin dashboards.', 'Communication automation must follow the consent and commercial foundations.', 'Eligible messages send exactly once, opt-outs and suppressions are honored, quotas do not lose mail, and prohibited data never reaches Brevo.', NULL),
+    ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Planned', 346, 'Make primary workflows usable with keyboard and assistive technology.', 'Focus order, semantics, scaling, high contrast, reduced motion, captions, and WCAG regression checks.', 'Accessibility should be established before additional interface growth.', 'Primary workflows pass keyboard, Narrator, scaling, contrast, and automated checks.', NULL),
+    ('v0.3.47', 'v0.3.47', 'Release', 'Automatic configuration restore points', 'Planned', 347, 'Protect customers from accidental configuration loss.', 'Encrypted pre-change and scheduled restore points, bounded retention, previews, transactional restore, and rollback.', 'Recovery protection precedes greater configuration complexity.', 'Customers restore a previous configuration without partial state, secret exposure, or license loss.', NULL),
+    ('v0.3.48', 'v0.3.48', 'Release', 'Projects and testing sessions', 'Planned', 348, 'Organize receipt testing into isolated customer projects.', 'Projects, sessions, notes, tags, profiles, captures, baselines, reports, safe export, and integrity validation.', 'Projects establish clean boundaries for later comparison suites.', 'Projects remain isolated and export without leaking unrelated data.', NULL),
+    ('v0.3.49', 'v0.3.49', 'Release', 'Privacy-safe receipt masking', 'Planned', 349, 'Reduce sensitive data exposure when receipts are shared.', 'Privacy View, configurable masking, safe screenshots, exports, reports, and support attachments with original preservation.', 'Sharing workflows require explicit privacy controls.', 'Privacy-safe artifacts contain no configured sensitive values.', NULL),
+    ('v0.3.50', 'v0.3.50', 'Release', 'System tray health and notifications', 'Planned', 350, 'Keep customers informed while the main window is closed.', 'Tray health, quick actions, privacy-safe alerts, deduplication, rate limits, and recovery clearing.', 'Background awareness reduces missed faults.', 'One actionable notification represents each fault and clears after recovery.', NULL),
+    ('v0.3.51', 'v0.3.51', 'Release', 'Character and code-page assistant', 'Planned', 351, 'Help customers correct receipt encoding problems.', 'Encoding diagnosis, byte tracing, code-page previews, profile recommendations, and immutable captures.', 'Deterministic encoding improves later comparisons.', 'Known fixtures produce the correct diagnosis without changing original bytes.', NULL),
+    ('v0.3.52', 'v0.3.52', 'Release', 'Offline Enterprise update packages', 'Planned', 352, 'Support secure updates on restricted networks.', 'Signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.', 'Restricted networks require a trusted offline workflow.', 'Valid packages install and invalid packages leave the current installation unchanged.', NULL),
+    ('v0.3.53', 'v0.3.53', 'Release', 'Receipt comparison and automated validation', 'Planned', 353, 'Provide repeatable compatibility testing.', 'Compare bytes, commands, text, warnings, and rendering against baselines with machine-readable results.', 'Earlier projects, privacy, and encoding work provide safe deterministic inputs.', 'Known-good captures pass and intentional differences fail precisely.', NULL),
+    ('v0.3.54', 'v0.3.54', 'Release', 'Update Notifications for All License Types', 'Planned', 354, 'Notify every license tier about newer public releases.', 'Installed/latest versions, releases behind, summary, manual Trial download, entitlement-aware update and renewal actions, offline cache, and trusted links.', 'Awareness is universal while installation still honors maintenance.', 'Every license state receives accurate notification without bypassing maintenance rules.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
@@ -420,31 +564,6 @@ WHERE item_key = 'v0.3.38';
 INSERT INTO development_roadmap
     (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
 VALUES
-    ('v0.3.48', 'v0.3.48', 'Release', 'Receipt comparison and automated validation', 'Planned', 348,
-     'Provide repeatable compatibility and regression testing.',
-     'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, privacy-safe HTML, PDF, and JSON results; brand the installer welcome, completion, header, Setup executable, shortcuts, and uninstall entry with official product artwork.',
-     'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.',
-     'Known-good captures pass, intentional changes fail precisely, ignored dynamic fields avoid false failures, privacy-safe exports protect configured sensitive values, and the compiled installer displays official branding at normal and high-DPI scaling.')
-ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),title=VALUES(title),status=VALUES(status),priority_rank=VALUES(priority_rank),purpose=VALUES(purpose),planned_scope=VALUES(planned_scope),priority_reason=VALUES(priority_reason),completion_criteria=VALUES(completion_criteria),completed_at=NULL;
-
-UPDATE development_roadmap
-SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-WHERE item_key = 'v0.3.48';
-
-INSERT INTO development_roadmap
-    (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria, github_url)
-VALUES
-    ('v0.3.49', 'v0.3.49', 'Release', 'Update Notifications for All License Types', 'Planned', 349,
-     'Notify every license tier about newer public desktop releases even when paid maintenance has expired.',
-     'Public release notification checks for Trial, Lite, Pro, and Enterprise; installed and latest versions; eligible releases-behind count; concise update summary; accessible visual indicator; Trial manual-download action; active-maintenance guided update; expired-maintenance release and renewal guidance; offline cache; rate limiting; and trusted-link enforcement.',
-     'Update awareness should be universal while in-app installation continues to honor maintenance entitlements.',
-     'Every license state receives accurate non-blocking notifications, Trial opens the official download page, active-maintenance paid users can install in-app, expired-maintenance users cannot bypass renewal, and privacy, offline, counting, and trust tests pass.',
-     'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40')
-ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),title=VALUES(title),status=VALUES(status),priority_rank=VALUES(priority_rank),purpose=VALUES(purpose),planned_scope=VALUES(planned_scope),priority_reason=VALUES(priority_reason),completion_criteria=VALUES(completion_criteria),github_url=VALUES(github_url),completed_at=NULL;
-
-INSERT INTO development_roadmap
-    (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria)
-VALUES
     ('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Released', 339,
      'Close the application safely before an update replaces installed files, then return the customer to the updated application.',
      'Background installer download; SHA-256 verification; pre-update safety snapshot; install confirmation and safe deferral; active-job drain; listener and service shutdown; external updater process; file-lock wait; state preservation; minimal-prompt installation; automatic relaunch; success confirmation; and recovery-safe failure handling.',
@@ -461,18 +580,6 @@ UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40',
     completed_at = '2026-07-22 00:00:00.000000'
 WHERE item_key = 'v0.3.40';
-
-INSERT INTO development_roadmap
-    (item_key, version_label, item_type, title, status, priority_rank, purpose, planned_scope, priority_reason, completion_criteria, github_url)
-VALUES
-    ('v0.3.41', 'v0.3.41', 'Release', 'Accessibility and keyboard usability', 'Planned', 341, 'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.', 'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.', 'Accessibility should be established before additional screens and controls increase remediation cost.', 'Primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'),
-    ('v0.3.42', 'v0.3.42', 'Release', 'Automatic configuration restore points', 'Planned', 342, 'Protect customers from accidental configuration loss without requiring manual backups.', 'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.', 'Recovery protection should precede projects and additional customer configuration complexity.', 'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'),
-    ('v0.3.43', 'v0.3.43', 'Release', 'Projects and testing sessions', 'Planned', 343, 'Organize receipts and configuration by customer, store, migration, register, or support engagement.', 'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.', 'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.', 'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'),
-    ('v0.3.44', 'v0.3.44', 'Release', 'Privacy-safe receipt masking', 'Planned', 344, 'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.', 'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.', 'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.', 'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'),
-    ('v0.3.45', 'v0.3.45', 'Release', 'System tray health and notifications', 'Planned', 345, 'Keep customers informed about important listener events without leaving the main window open.', 'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.', 'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.', 'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'),
-    ('v0.3.46', 'v0.3.46', 'Release', 'Character and code-page assistant', 'Planned', 346, 'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.', 'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.', 'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.', 'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'),
-    ('v0.3.47', 'v0.3.47', 'Release', 'Offline Enterprise update packages', 'Planned', 347, 'Support secure updates on restricted or air-gapped POS networks.', 'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.', 'This depends on guided updates, production signing, rollback, and entitlement foundations.', 'A valid offline package installs successfully while tampered, unsigned, downgraded, incompatible, or unentitled packages leave the current installation unchanged.', 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37')
-ON DUPLICATE KEY UPDATE version_label=VALUES(version_label),item_type=VALUES(item_type),title=VALUES(title),status=VALUES(status),priority_rank=VALUES(priority_rank),purpose=VALUES(purpose),planned_scope=VALUES(planned_scope),priority_reason=VALUES(priority_reason),completion_criteria=VALUES(completion_criteria),github_url=VALUES(github_url),completed_at=NULL;
 
 UPDATE development_roadmap
 SET github_url = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.34'

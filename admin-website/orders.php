@@ -4,6 +4,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/purchase_site.php';
 require __DIR__ . '/includes/license_keys.php';
 require __DIR__ . '/includes/license_management.php';
+require __DIR__ . '/includes/customer_crm.php';
 require_authentication();
 
 $allowedStatuses = ['PAID_AWAITING_APPROVAL','APPROVED','EMAILED','EMAIL_FAILED'];
@@ -38,6 +39,10 @@ $orders = [];
 try {
     $response = purchase_site_request('/api/admin-orders.php?status=' . urlencode($status));
     $orders = is_array($response['orders'] ?? null) ? $response['orders'] : [];
+    $crmPdo = database();
+    ensure_license_management_schema($crmPdo);
+    backfill_customer_crm($crmPdo);
+    sync_customer_purchases($crmPdo, $orders);
 } catch (Throwable $exception) {
     error_log('Purchase order list failed: ' . $exception->getMessage());
     $error = $error !== '' ? $error : $exception->getMessage();
@@ -48,7 +53,7 @@ foreach ($orders as $candidate) if (hash_equals((string)$candidate['public_id'],
 $statusLabel = static fn(string $value): string => match($value){'PAID_AWAITING_APPROVAL'=>'Paid — awaiting approval','APPROVED'=>'Approved — email pending','EMAILED'=>'Key emailed','EMAIL_FAILED'=>'Email issue',default=>str_replace('_',' ',$value)};
 ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Purchase Orders | POS Printer Emulator Admin Portal</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260715-3"><link rel="stylesheet" href="assets/orders.css?v=20260715-1"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
 <body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator <small>Admin Portal</small></span></a><form method="post" action="/logout.php" class="logout-form"><span>Admin Account</span><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><button>Log out</button></form></header>
-<aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a class="active" href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a></nav><p>Only verified PayPal payments can be approved.</p></aside>
+<aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/customers.php"><span aria-hidden="true">◎</span>Customers</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a class="active" href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a></nav><p>Only verified PayPal payments can be approved.</p></aside>
 <main class="orders-main"><div class="page-heading"><div><h1>Purchase Orders</h1><p>Approve verified permanent-license and one-time maintenance-renewal payments.</p></div></div>
 <?php if($flash!==''):?><div class="order-success" role="status"><?=e($flash)?></div><?php endif;?><?php if($error!==''):?><div class="order-error" role="alert"><?=e($error)?></div><?php endif;?>
 <nav class="order-tabs" aria-label="Order status"><a class="<?=$status==='PAID_AWAITING_APPROVAL'?'active':''?>" href="?status=PAID_AWAITING_APPROVAL">Awaiting approval</a><a class="<?=$status==='APPROVED'?'active':''?>" href="?status=APPROVED">Email pending</a><a class="<?=$status==='EMAILED'?'active':''?>" href="?status=EMAILED">Key emailed</a><a class="<?=$status==='EMAIL_FAILED'?'active':''?>" href="?status=EMAIL_FAILED">Email issue</a></nav>

@@ -14,6 +14,14 @@ function private_config(): array
             throw new RuntimeException('Server configuration is unavailable.');
         }
         $config = require $path;
+        $crmSecretsPath = dirname(__DIR__) . '/private/crm-secrets.php';
+        if (is_file($crmSecretsPath)) {
+            $crmSecrets = require $crmSecretsPath;
+            if (!is_array($crmSecrets)) {
+                throw new RuntimeException('Protected CRM configuration is invalid.');
+            }
+            $config = array_replace_recursive($config, $crmSecrets);
+        }
     }
     return $config;
 }

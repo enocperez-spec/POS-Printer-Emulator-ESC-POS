@@ -28,8 +28,21 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher upload-schema <schema-file> [remote-directory]");
     Console.WriteLine("  website-publisher upload-protected <local-file> <private/remote-file> [remote-directory]");
     Console.WriteLine("  website-publisher download-protected <private/remote-file> <local-file> [remote-directory]");
+    Console.WriteLine("  website-publisher configure-crm-secrets [remote-directory]");
+    Console.WriteLine("  website-publisher migrate-crm <https-migration-url>");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
+    return 0;
+}
+
+if (args[0].Equals("migrate-crm", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var migrationUri) ||
+        migrationUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The migrate-crm command requires an HTTPS migration URL.");
+    }
+    await MigrateCrmAsync(migrationUri);
     return 0;
 }
 
@@ -104,6 +117,9 @@ try
             }
 
             DownloadProtectedFile(client, args[1], Path.GetFullPath(args[2]), args.Length > 3 ? args[3] : ".");
+            break;
+        case "configure-crm-secrets":
+            ConfigureCrmSecrets(client, args.Length > 1 ? args[1] : ".");
             break;
         default:
             throw new ArgumentException($"Unknown command: {args[0]}");
@@ -365,6 +381,115 @@ static void DownloadProtectedFile(SftpClient client, string relativeRemotePath, 
     }
 
     Console.WriteLine($"Downloaded and size-verified protected file {normalized} ({output.Length:N0} bytes).");
+}
+
+static void ConfigureCrmSecrets(SftpClient client, string remoteDirectory)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException("CRM deployment-secret recovery uses Windows data protection.");
+    }
+
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0)
+    {
+        remoteRoot = "/";
+    }
+
+    var privateDirectory = CombineRemote(remoteRoot, "private");
+    EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
+
+    var serviceToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+    var serviceTokenHash = Convert.ToHexString(
+        SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(serviceToken))).ToLowerInvariant();
+    var activationKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+    var config = $"""
+        <?php
+        declare(strict_types=1);
+
+        return [
+            'service_api' => [
+                'token_hash' => {PhpString(serviceTokenHash)},
+            ],
+            'data_protection' => [
+                'activation_key_key' => {PhpString(activationKey)},
+            ],
+        ];
+        """;
+    UploadText(client, CombineRemote(privateDirectory, "crm-secrets.php"), config);
+
+    var recovery = JsonSerializer.SerializeToUtf8Bytes(new
+    {
+        version = 1,
+        createdAtUtc = DateTimeOffset.UtcNow,
+        serviceToken,
+        activationKey
+    });
+    var protectedRecovery = ProtectedData.Protect(recovery, null, DataProtectionScope.CurrentUser);
+    var recoveryDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "POSPrinterEmulator",
+        "deployment-secrets");
+    Directory.CreateDirectory(recoveryDirectory);
+    var recoveryPath = Path.Combine(recoveryDirectory, "crm-v0.3.42.secrets.bin");
+    File.WriteAllBytes(recoveryPath, protectedRecovery);
+    var metadataPath = Path.Combine(recoveryDirectory, "crm-v0.3.42.metadata.json");
+    File.WriteAllText(metadataPath, JsonSerializer.Serialize(new
+    {
+        version = 1,
+        createdAtUtc = DateTimeOffset.UtcNow,
+        purpose = "Admin CRM service authentication and activation-key data protection",
+        protectedFor = Environment.UserName,
+        recoveryFile = Path.GetFileName(recoveryPath)
+    }, new JsonSerializerOptions { WriteIndented = true }));
+
+    Console.WriteLine("Uploaded protected CRM configuration. Token and encryption-key values were not displayed.");
+    Console.WriteLine($"Saved an encrypted current-user recovery copy to {recoveryPath}.");
+}
+
+static async Task MigrateCrmAsync(Uri migrationUri)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException("CRM deployment-secret recovery uses Windows data protection.");
+    }
+    var recoveryPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "POSPrinterEmulator",
+        "deployment-secrets",
+        "crm-v0.3.42.secrets.bin");
+    if (!File.Exists(recoveryPath))
+    {
+        throw new FileNotFoundException("The protected CRM deployment-secret recovery file is unavailable.", recoveryPath);
+    }
+    var protectedRecovery = await File.ReadAllBytesAsync(recoveryPath);
+    var recovery = ProtectedData.Unprotect(protectedRecovery, null, DataProtectionScope.CurrentUser);
+    using var document = JsonDocument.Parse(recovery);
+    var serviceToken = document.RootElement.GetProperty("serviceToken").GetString();
+    if (string.IsNullOrWhiteSpace(serviceToken))
+    {
+        throw new InvalidDataException("The protected CRM service token is unavailable.");
+    }
+
+    using var request = new HttpRequestMessage(HttpMethod.Post, migrationUri);
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+    request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException($"CRM migration failed with HTTP {(int)response.StatusCode}.");
+    }
+    using var result = JsonDocument.Parse(body);
+    if (!result.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
+    {
+        throw new InvalidDataException("The CRM migration response was invalid.");
+    }
+    Console.WriteLine("Protected customer CRM migration completed successfully.");
 }
 
 static void UploadText(SftpClient client, string remotePath, string content)

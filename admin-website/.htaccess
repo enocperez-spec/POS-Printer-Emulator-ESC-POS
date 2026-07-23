@@ -3,6 +3,10 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Preserve bearer authentication for PHP-CGI/FastCGI service endpoints.
+    RewriteCond %{HTTP:Authorization} ^(.+)
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%1]
+
     # Never allow credentials or authenticated Admin Portal traffic over HTTP.
     RewriteCond %{HTTPS} !=on [OR]
     RewriteCond %{HTTP_HOST} !^admin\.posprinteremulator\.com$ [NC]

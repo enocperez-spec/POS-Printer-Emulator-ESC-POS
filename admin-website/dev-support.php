@@ -468,6 +468,62 @@ function migrate_installer_branding_fix_schedule(): void
 
 migrate_installer_branding_fix_schedule();
 
+function migrate_crm_customer_portal_schedule(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+        $claim->execute(['crm-customer-portal-roadmap-v0.3.42']);
+        if ($claim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        // Reserve v0.3.42-v0.3.45 for the four dependency-ordered CRM and
+        // Customer Portal releases. Preserve every existing planned scope by
+        // shifting it forward four release numbers, highest number first.
+        for ($old = 50; $old >= 42; $old--) {
+            $new = $old + 4;
+            $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.{$new}', version_label='v0.3.{$new}', priority_rank=3{$new} WHERE item_key='v0.3.{$old}'");
+        }
+
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release
+                     WHEN 'v0.3.42' THEN 'v0.3.46' WHEN 'v0.3.43' THEN 'v0.3.47'
+                     WHEN 'v0.3.44' THEN 'v0.3.48' WHEN 'v0.3.45' THEN 'v0.3.49'
+                     WHEN 'v0.3.46' THEN 'v0.3.50' WHEN 'v0.3.47' THEN 'v0.3.51'
+                     WHEN 'v0.3.48' THEN 'v0.3.52' WHEN 'v0.3.49' THEN 'v0.3.53'
+                     WHEN 'v0.3.50' THEN 'v0.3.54' ELSE target_release END,
+                 fixed_version = CASE fixed_version
+                     WHEN 'v0.3.42' THEN 'v0.3.46' WHEN 'v0.3.43' THEN 'v0.3.47'
+                     WHEN 'v0.3.44' THEN 'v0.3.48' WHEN 'v0.3.45' THEN 'v0.3.49'
+                     WHEN 'v0.3.46' THEN 'v0.3.50' WHEN 'v0.3.47' THEN 'v0.3.51'
+                     WHEN 'v0.3.48' THEN 'v0.3.52' WHEN 'v0.3.49' THEN 'v0.3.53'
+                     WHEN 'v0.3.50' THEN 'v0.3.54' ELSE fixed_version END
+             WHERE target_release BETWEEN 'v0.3.42' AND 'v0.3.50'
+                OR fixed_version BETWEEN 'v0.3.42' AND 'v0.3.50'"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
+    }
+}
+
+migrate_crm_customer_portal_schedule();
+
+function mark_customer_crm_release_in_progress(): void
+{
+    $pdo = database();
+    $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+    $claim->execute(['customer-crm-v0.3.42-in-progress']);
+    $pdo->exec("UPDATE development_roadmap SET status='In progress' WHERE item_key='v0.3.42' AND status='Planned'");
+}
+
+mark_customer_crm_release_in_progress();
+
 // Keep the protected tracker aligned with repository releases after a deployment.
 $releaseSync = database()->prepare(
     "INSERT INTO development_roadmap
@@ -558,12 +614,12 @@ $releaseSync = database()->prepare(
          'Versioned and reopenable two-step welcome guide; wizard-first instruction; visible read-only included listener; local and LAN IPv4 endpoints; copyable RAW TCP details; and retained server-side mutation denial.',
          'The v0.3.37 guide could remain dismissed and hid the included listener behind an upgrade panel, leaving customers unsure how to connect.',
          'Fresh and upgraded Trial installations see and can reopen the guide, view one locked listener, copy exact connection details, and receive HTTP 403 for listener mutations.', UTC_TIMESTAMP(6)),
-        ('v0.3.50', 'v0.3.50', 'Release', 'Update Notifications for All License Types', 'Planned', 350,
+        ('v0.3.54', 'v0.3.54', 'Release', 'Update Notifications for All License Types', 'Planned', 354,
          'Notify every license tier about newer public desktop releases even when paid maintenance has expired.',
          'Public release notification checks for Trial, Lite, Pro, and Enterprise; installed and latest versions; eligible releases-behind count; concise update summary; accessible visual indicator; Trial manual-download action; active-maintenance guided update; expired-maintenance release and renewal guidance; offline cache; rate limiting; and trusted-link enforcement.',
          'Update awareness should be universal while in-app installation continues to honor maintenance entitlements.',
          'Every license state receives accurate non-blocking notifications, Trial opens the official download page, active-maintenance paid users can install in-app, expired-maintenance users cannot bypass renewal, and privacy, offline, counting, and trust tests pass.', NULL),
-        ('v0.3.49', 'v0.3.49', 'Release', 'Receipt comparison and automated validation', 'Planned', 349,
+        ('v0.3.53', 'v0.3.53', 'Release', 'Receipt comparison and automated validation', 'Planned', 353,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and privacy-safe HTML, PDF, and JSON results.',
          'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.',
@@ -583,37 +639,57 @@ $releaseSync = database()->prepare(
          'Dedicated 656x1256 wizard banner at the exact 164:314 display ratio; unchanged official square mark; independent compact header icon; and packaging validation for the PNG, required files, directives, and aspect ratio.',
          'A dedicated maintenance release avoids silently replacing the already-published v0.3.40 installer.',
          'The C# packaging tool builds without warnings or errors, Inno Setup reads both independent branding assets, and the compiled installer displays the product mark without stretching.', UTC_TIMESTAMP(6)),
-        ('v0.3.42', 'v0.3.42', 'Release', 'Accessibility and keyboard usability', 'Planned', 342,
+        ('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released', 342,
+         'Create one privacy-aware customer record before exposing portal or automated marketing workflows.',
+         'Canonical verified customer IDs; normalized registration, installation, license, maintenance, purchase, support, consent, suppression, and event records; safe backfill; Admin customer search, filters, detail, and controlled export; masked key lookup; retention and correction workflows; and authenticated service APIs.',
+         'Every later portal, renewal, promotional, email, and analytics workflow depends on trustworthy ownership and consent evidence.',
+         'Existing entitlements migrate unchanged, verified customers resolve to one auditable profile, unauthorized enumeration is blocked, and prohibited receipt or secret data is absent.', '2026-07-22 00:00:00.000000'),
+        ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Planned', 343,
+         'Give verified customers secure self-service access at userportal.posprinteremulator.com.',
+         'Verified enrollment; secure sessions and recovery; optional TOTP MFA; masked license, maintenance, purchase, computer, download, support, and promotional-eligibility views; contact and preference management; support submission and replies; controlled old-computer deactivation; accessibility; and responsive deployment.',
+         'The portal depends on v0.3.42 customer ownership, consent, audit, and authenticated API foundations.',
+         'Verified customers can manage only their own records and primary portal workflows pass authorization, recovery, accessibility, desktop, and mobile tests.', NULL),
+        ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Planned', 344,
+         'Add auditable commercial self-service while preserving permanent-license ownership.',
+         'Server-controlled PayPal renewals and upgrades; exact product and price confirmation; idempotent fulfillment, refunds, and chargebacks; one five-day paid-edition promotion per verified customer; prior-license restoration; repeat prevention; audited exceptions; and offline and clock-tamper handling.',
+         'Payments and temporary entitlements require the verified ownership and portal foundations before campaigns direct customers to them.',
+         'Renewals and upgrades fulfill exactly once, eligible promotions occur exactly once, expiration restores the prior license, and failure and refund tests keep entitlements consistent.', NULL),
+        ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Planned', 345,
+         'Improve onboarding, conversion, renewal, and support follow-up through Brevo without building a custom mail server.',
+         'Protected Brevo transactional email, contact, template, and authenticated webhook APIs; authenticated sender domain; configurable 300-send provider quota with a 290-send automated cap and 50 reserved service slots; durable priority outbox and next-day deferral; separated service and marketing messages; retries, quiet hours, caps, approvals, pause, and emergency stop; welcome, Trial, promotion, release, inactivity, support, and maintenance schedules; unsubscribe, bounce, complaint, and closure suppression; minimal consented telemetry; segmentation; and Admin dashboards.',
+         'Automation follows only after identity, portal destinations, commercial workflows, consent, and lifecycle events are reliable.',
+         'Eligible messages send exactly once, opt-outs and suppressions are honored, more than 300 queued messages respect the configured quota without loss or starving service mail, dashboards reconcile, and prohibited data is absent from Brevo payloads and logs.', NULL),
+        ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Planned', 346,
          'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.',
          'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
-         'Accessibility should be established before additional screens and controls increase remediation cost.',
+         'Accessibility should be established before additional desktop screens and controls increase remediation cost.',
          'Primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', NULL),
-        ('v0.3.43', 'v0.3.43', 'Release', 'Automatic configuration restore points', 'Planned', 343,
+        ('v0.3.47', 'v0.3.47', 'Release', 'Automatic configuration restore points', 'Planned', 347,
          'Protect customers from accidental configuration loss without requiring manual backups.',
          'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
          'Recovery protection should precede projects and additional customer configuration complexity.',
          'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
-        ('v0.3.44', 'v0.3.44', 'Release', 'Projects and testing sessions', 'Planned', 344,
+        ('v0.3.48', 'v0.3.48', 'Release', 'Projects and testing sessions', 'Planned', 348,
          'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
          'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
          'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.',
          'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
-        ('v0.3.45', 'v0.3.45', 'Release', 'Privacy-safe receipt masking', 'Planned', 345,
+        ('v0.3.49', 'v0.3.49', 'Release', 'Privacy-safe receipt masking', 'Planned', 349,
          'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
          'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.',
          'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
-        ('v0.3.46', 'v0.3.46', 'Release', 'System tray health and notifications', 'Planned', 346,
+        ('v0.3.50', 'v0.3.50', 'Release', 'System tray health and notifications', 'Planned', 350,
          'Keep customers informed about important listener events without leaving the main window open.',
          'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
          'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.',
          'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
-        ('v0.3.47', 'v0.3.47', 'Release', 'Character and code-page assistant', 'Planned', 347,
+        ('v0.3.51', 'v0.3.51', 'Release', 'Character and code-page assistant', 'Planned', 351,
          'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
          'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.',
          'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.',
          'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', NULL),
-        ('v0.3.48', 'v0.3.48', 'Release', 'Offline Enterprise update packages', 'Planned', 348,
+        ('v0.3.52', 'v0.3.52', 'Release', 'Offline Enterprise update packages', 'Planned', 352,
          'Support secure updates on restricted or air-gapped POS networks.',
          'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.',
          'This depends on guided updates, production signing, rollback, and entitlement foundations.',
@@ -706,15 +782,19 @@ database()->prepare(
          WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'
          WHEN 'v0.3.40' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.40'
          WHEN 'v0.3.41' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.41'
-         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
-         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
-         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
-         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
-         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
-         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
-         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
-         WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
+         WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/45'
+         WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/46'
+         WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/47'
+         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48'
+         WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
+         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
+         WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
+         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
+         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
+         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -722,7 +802,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -1010,7 +1090,7 @@ function lines(string $value): array
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dev Support | POS Printer Emulator</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/dev-support.css?v=20260715-1"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
 <body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator <small>Admin Portal</small></span></a><form method="post" action="/logout.php" class="logout-form"><span>Admin Account</span><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><button>Log out</button></form></header>
-<aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a class="active" href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a></nav><p>GitHub and Dev Support statuses must stay aligned.</p></aside>
+<aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/customers.php"><span aria-hidden="true">◎</span>Customers</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a class="active" href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a></nav><p>GitHub and Dev Support statuses must stay aligned.</p></aside>
 <main class="dev-support-main"><div class="page-heading"><div><h1>Dev Support</h1><p>Track product releases and defects from the protected Admin Portal.</p></div></div>
 <?php if ($notice !== ''): ?><div class="dev-notice" role="status"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="dev-error" role="alert"><?= e($error) ?></div><?php endif; ?>

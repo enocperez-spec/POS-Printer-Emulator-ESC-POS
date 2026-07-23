@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/includes/bootstrap.php';
 require dirname(__DIR__) . '/includes/license_management.php';
+require dirname(__DIR__) . '/includes/customer_crm.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -140,7 +141,7 @@ function authenticate_support_license(PDO $pdo, string $licenseId, string $regis
 {
     $licenseId = canonical_license_uuid($licenseId);
     if (!preg_match('/^[0-9a-f]{64}$/', $registrationDigest)) support_response(['error' => 'Unauthorized.'], 401);
-    $query = $pdo->prepare('SELECT license_id, customer_name, email_address, license_tier, control_state, maintenance_expires_at, maintenance_revoked_at FROM issued_licenses WHERE license_id = :id LIMIT 1');
+    $query = $pdo->prepare('SELECT license_id, customer_id, customer_name, email_address, license_tier, control_state, maintenance_expires_at, maintenance_revoked_at FROM issued_licenses WHERE license_id = :id LIMIT 1');
     $query->execute(['id' => $licenseId]);
     $license = $query->fetch();
     if (!is_array($license) ||
@@ -246,6 +247,7 @@ try {
     $pdo = database();
     ensure_license_management_schema($pdo);
     ensure_support_schema($pdo);
+    backfill_customer_crm($pdo);
     $license = authenticate_support_license($pdo, $licenseId, $registrationDigest);
     enforce_support_rate_limit($pdo, $licenseId);
 
@@ -258,8 +260,8 @@ try {
 
     $diagnostics = support_redact((string)($body['diagnostics'] ?? ''));
     if (!is_array($existingRow)) {
-        $insert = $pdo->prepare('INSERT INTO support_requests (reference_code,license_id,request_type,subject,contact_name,contact_email,private_diagnostics) VALUES (:reference,:license_id,:request_type,:subject,:contact_name,:contact_email,:diagnostics)');
-        $insert->execute(['reference' => $reference, 'license_id' => $licenseId, 'request_type' => $requestType, 'subject' => $subject, 'contact_name' => $contactName, 'contact_email' => $contactEmail, 'diagnostics' => $diagnostics === '' ? null : $diagnostics]);
+        $insert = $pdo->prepare('INSERT INTO support_requests (reference_code,customer_id,license_id,request_type,subject,contact_name,contact_email,private_diagnostics) VALUES (:reference,:customer_id,:license_id,:request_type,:subject,:contact_name,:contact_email,:diagnostics)');
+        $insert->execute(['reference' => $reference, 'customer_id' => $license['customer_id'] ?? null, 'license_id' => $licenseId, 'request_type' => $requestType, 'subject' => $subject, 'contact_name' => $contactName, 'contact_email' => $contactEmail, 'diagnostics' => $diagnostics === '' ? null : $diagnostics]);
         if ($decodedAttachments !== []) {
             $attachmentInsert = $pdo->prepare('INSERT INTO support_request_attachments (reference_code,file_name,content_type,content) VALUES (:reference,:file_name,:content_type,:content)');
             foreach ($decodedAttachments as $attachment) {

@@ -129,16 +129,25 @@ $expectContains("('v0.3.38', 'v0.3.38', 'Release', 'Trial Onboarding Clarity Cor
 $expectContains("('v0.3.39', 'v0.3.39', 'Release', 'Guided update installation and restart', 'Released'", $devSupport, 'Guided update installation was not marked released.');
 $expectContains("('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Released'", $devSupport, 'v0.3.40 was not marked released in Admin Dev Support.');
 $expectContains("('v0.3.40', 'v0.3.40', 'Release', 'Simple Mode and Expert Mode', 'Released'", $schema, 'Fresh database schema is missing released v0.3.40.');
+$expectContains("('v0.3.41', 'v0.3.41', 'Release', 'Installer Branding Correction', 'Released'", $devSupport, 'Admin Dev Support is missing released v0.3.41 installer correction.');
+$expectContains("('v0.3.41', 'v0.3.41', 'Release', 'Installer Branding Correction', 'Released'", $schema, 'Fresh database schema is missing released v0.3.41 installer correction.');
+$expectContains("('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released'", $schema, 'Fresh database schema must identify v0.3.42 as released.');
+$expectContains("('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.42 as released.');
+$expectSame(1, substr_count($schema, "('v0.3.42', 'v0.3.42', 'Release'"), 'Fresh database schema must not contain a stale v0.3.42 roadmap override.');
+$expectSame(false, str_contains($schema, "('v0.3.42', 'v0.3.42', 'Release', 'Automatic configuration restore points'"), 'An obsolete roadmap sequence still overwrites v0.3.42.');
 $futureReleases = [
-    'v0.3.41' => ['Accessibility and keyboard usability', 31],
-    'v0.3.42' => ['Automatic configuration restore points', 32],
-    'v0.3.43' => ['Projects and testing sessions', 33],
-    'v0.3.44' => ['Privacy-safe receipt masking', 34],
-    'v0.3.45' => ['System tray health and notifications', 35],
-    'v0.3.46' => ['Character and code-page assistant', 36],
-    'v0.3.47' => ['Offline Enterprise update packages', 37],
-    'v0.3.48' => ['Receipt comparison and automated validation', 21],
-    'v0.3.49' => ['Update Notifications for All License Types', 40],
+    'v0.3.43' => ['Secure Customer Portal MVP', 46],
+    'v0.3.44' => ['Self-service renewals, upgrades, and promotional trials', 47],
+    'v0.3.45' => ['Consent-aware lifecycle communications and CRM analytics', 48],
+    'v0.3.46' => ['Accessibility and keyboard usability', 31],
+    'v0.3.47' => ['Automatic configuration restore points', 32],
+    'v0.3.48' => ['Projects and testing sessions', 33],
+    'v0.3.49' => ['Privacy-safe receipt masking', 34],
+    'v0.3.50' => ['System tray health and notifications', 35],
+    'v0.3.51' => ['Character and code-page assistant', 36],
+    'v0.3.52' => ['Offline Enterprise update packages', 37],
+    'v0.3.53' => ['Receipt comparison and automated validation', 21],
+    'v0.3.54' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
     $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', 'Planned'";
@@ -165,7 +174,7 @@ $expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'", $devSupport, 'Admin Dev Support is missing the v0.3.36 release link.');
 $expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'", $devSupport, 'Admin Dev Support is missing the v0.3.39 release link.');
 $expectContains("WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'", $devSupport, 'Admin Dev Support is missing the v0.3.38 release link.');
-$expectContains("WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.48 comparison issue link.');
+$expectContains("WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.53 comparison issue link.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
 $expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');

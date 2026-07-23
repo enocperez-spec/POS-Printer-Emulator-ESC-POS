@@ -30,7 +30,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.41 Installer Branding Correction is the current public release, released July 22, 2026. Active development has moved to v0.3.42 Accessibility and keyboard usability.
+> **Release status:** v0.3.42 Customer identity, consent, and CRM foundation is the current public release, released July 22, 2026. Active development has moved to v0.3.43 Secure Customer Portal MVP.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -38,7 +38,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.41-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.42-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -105,6 +105,8 @@ Optional one-year renewals are **Lite $9.99**, **Pro $19.99**, and **Enterprise 
 Version 0.3.36 reports installation registration, Trial, Lite, Pro, or Enterprise status, maintenance status and coverage date, application version, launch counts, emulated print-job counts, last-seen time, and approximate country or U.S. state to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. The public IP address may be processed transiently to derive those coarse codes but is not stored in the product-analytics database. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
 
 The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
+
+Version 0.3.42 adds the protected Customers workspace and its exact-ID service API. Before deploying it, merge the `service_api` and `data_protection` sections from [`admin-website/private/service-api.example.php`](admin-website/private/service-api.example.php) into the server-owned `admin-website/private/config.php`. Store only the SHA-256 digest of a random service token and a Base64-encoded independent 32-byte activation-key encryption key. Keep both values in the deployment vault, verify that production PHP provides OpenSSL AES-256-GCM, upload the additive schema, run the authenticated setup action, and then open Customers to complete the idempotent ownership backfill. Never commit the live token, encryption key, database credentials, or generated private configuration.
 
 Production operators should follow the [integration-token rotation runbook](docs/SECURITY_TOKEN_ROTATION.md) whenever purchase-site or Admin Portal credentials are created, rotated, or suspected of exposure.
 
@@ -265,15 +267,19 @@ The permanent status list for every completed, scheduled, and future release is 
 - **v0.3.39 — Guided update installation and restart:** Download and verify updates in the background, create a pre-update safety snapshot, close the application safely, install, and relaunch automatically.
 - **Released in v0.3.40 — Simple Mode and Expert Mode:** Add guided setup, live connection details, Test Receipt, latest-receipt review, capture import, diagnostics, and support in Simple Mode while preserving the complete inspection workspace as Expert Mode.
 - **Released in v0.3.41 — Installer Branding Correction:** Replace the stretched square wizard artwork with a correctly proportioned tall banner and reject invalid banner dimensions during packaging.
-- **v0.3.42 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, and accessibility regression checks.
-- **v0.3.43 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
-- **v0.3.44 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
-- **v0.3.45 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
-- **v0.3.46 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
-- **v0.3.47 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
-- **v0.3.48 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
-- **v0.3.49 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.50 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
+- **Released in v0.3.42 — Customer identity, consent, and CRM foundation:** Unify verified customers, registrations, installations, licenses, purchases, maintenance, support, lifecycle events, and consent in an auditable privacy-aware administrative record.
+- **v0.3.43 — Secure Customer Portal MVP:** Launch `userportal.posprinteremulator.com` with verified accounts, secure recovery, optional MFA, masked license and maintenance details, downloads, preferences, support history, and controlled device deactivation.
+- **v0.3.44 — Self-service renewals, upgrades, and promotional trials:** Reuse the server-side PayPal and entitlement systems for maintenance renewal, license upgrades, and one auditable five-day paid-edition promotion per verified customer.
+- **v0.3.45 — Consent-aware lifecycle communications and CRM analytics:** Integrate Brevo with a Free-plan-safe priority queue, protected API and webhook credentials, reliable scheduling and suppression, onboarding/renewal/support messages, minimal consented telemetry, segmentation, and Admin Portal performance dashboards.
+- **v0.3.46 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, and accessibility regression checks.
+- **v0.3.47 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
+- **v0.3.48 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
+- **v0.3.49 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
+- **v0.3.50 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
+- **v0.3.51 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
+- **v0.3.52 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
+- **v0.3.53 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.54 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

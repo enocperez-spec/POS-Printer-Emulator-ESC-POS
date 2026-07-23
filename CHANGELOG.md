@@ -6,11 +6,22 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.42 — 2026-07-22
+
+- Adds canonical customer records that connect registrations, installations, paid licenses, purchases, maintenance, support references, and aggregate lifecycle activity without uploading receipt contents.
+- Adds an Admin Portal Customers workspace with masked list data, detailed ownership records, maintenance, application-version, activity, consent, support, and duplicate-review filters.
+- Adds independently confirmed email ownership, append-only consent evidence, suppression records, permanent merge history, capability-controlled CSV export, and administrative audit events.
+- Adds exact-ID server-to-server customer access with bearer-token authentication, persistent rate limiting, generic not-found responses, and no full activation keys.
+- Protects recoverable activation keys using AES-256-GCM with a deployment-only key, stores only fingerprints and masked endings for routine lookup, and retains encrypted recovery material outside the repository.
+- Migrates existing records without changing license tiers, maintenance dates, activation keys, listener allowances, or desktop feature entitlements.
+- Passes all 171 desktop tests, the production viewer build, PHP CRM and commerce contract tests, production migration validation, and secret scanning.
+- Moves active development to v0.3.43 — Secure Customer Portal MVP.
+
 ## v0.3.41 — 2026-07-22
 
 - Fixes BUG-016 by replacing the stretched square installer artwork with a dedicated `164:314` wizard banner that preserves the official logo proportions.
 - Keeps the square icon for the compact wizard header and adds packaging validation that rejects an invalid or incorrectly proportioned banner before compilation.
-- Moves active development to v0.3.42 — Accessibility and keyboard usability.
+- Moves active development to v0.3.42 — Customer identity, consent, and CRM foundation.
 
 ## v0.3.40 — 2026-07-22
 

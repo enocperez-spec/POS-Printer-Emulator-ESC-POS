@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/data_protection.php';
+
 function ensure_license_management_schema(PDO $pdo): void
 {
     static $ready = false;
@@ -44,6 +46,11 @@ function ensure_license_management_schema(PDO $pdo): void
             'maintenance_revoked_at' => 'ALTER TABLE issued_licenses ADD COLUMN maintenance_revoked_at DATETIME(6) NULL AFTER maintenance_expires_at',
             'row_version' => 'ALTER TABLE issued_licenses ADD COLUMN row_version BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER maintenance_revoked_at',
             'updated_at' => 'ALTER TABLE issued_licenses ADD COLUMN updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) AFTER created_at',
+            'activation_key_ciphertext' => 'ALTER TABLE issued_licenses ADD COLUMN activation_key_ciphertext VARBINARY(768) NULL AFTER activation_key',
+            'activation_key_nonce' => 'ALTER TABLE issued_licenses ADD COLUMN activation_key_nonce BINARY(12) NULL AFTER activation_key_ciphertext',
+            'activation_key_tag' => 'ALTER TABLE issued_licenses ADD COLUMN activation_key_tag BINARY(16) NULL AFTER activation_key_nonce',
+            'activation_key_fingerprint' => 'ALTER TABLE issued_licenses ADD COLUMN activation_key_fingerprint BINARY(32) NULL AFTER activation_key_nonce',
+            'activation_key_ending' => 'ALTER TABLE issued_licenses ADD COLUMN activation_key_ending CHAR(4) NULL AFTER activation_key_fingerprint',
         ];
         foreach ($additions as $name => $statement) {
             if (!isset($columns[$name])) {
@@ -272,12 +279,16 @@ function insert_issued_license(
     if (!in_array($source, ['Manual', 'Purchase'], true)) {
         throw new InvalidArgumentException('The license source is invalid.');
     }
+    $activationKey = (string)$issued['activation_key'];
+    $protectedKey = protect_activation_key($activationKey);
     $statement = $pdo->prepare(
         'INSERT INTO issued_licenses
-            (license_id, customer_name, email_address, license_tier, activation_key, issued_at,
+            (license_id, customer_name, email_address, license_tier, activation_key, activation_key_ciphertext,
+             activation_key_nonce, activation_key_tag, activation_key_fingerprint, activation_key_ending, issued_at,
              created_by, control_state, license_source, source_reference, maintenance_expires_at)
          VALUES
-            (:license_id, :customer_name, :email_address, :license_tier, :activation_key, :issued_at,
+            (:license_id, :customer_name, :email_address, :license_tier, :activation_key, :activation_key_ciphertext,
+             :activation_key_nonce, :activation_key_tag, UNHEX(SHA2(:activation_key_digest_value,256)), :activation_key_ending, :issued_at,
              :created_by, \'Enabled\', :license_source, :source_reference, :maintenance_expires_at)'
     );
     $statement->execute([
@@ -285,7 +296,12 @@ function insert_issued_license(
         'customer_name' => (string)$issued['customer_name'],
         'email_address' => (string)$issued['email_address'],
         'license_tier' => canonical_paid_tier((string)$issued['license_tier']),
-        'activation_key' => (string)$issued['activation_key'],
+        'activation_key' => $protectedKey['plaintext'],
+        'activation_key_ciphertext' => $protectedKey['ciphertext'],
+        'activation_key_nonce' => $protectedKey['nonce'],
+        'activation_key_tag' => $protectedKey['tag'],
+        'activation_key_digest_value' => $activationKey,
+        'activation_key_ending' => crm_activation_key_ending_compat($activationKey),
         'issued_at' => (string)$issued['issued_at'],
         'created_by' => substr($actor !== '' ? $actor : 'owner', 0, 80),
         'license_source' => $source,
@@ -313,7 +329,7 @@ function insert_issued_license(
 function find_license_for_update(PDO $pdo, string $licenseId): array
 {
     $statement = $pdo->prepare(
-        'SELECT license_id, customer_name, email_address, license_tier, activation_key, issued_at,
+        'SELECT license_id, customer_name, email_address, license_tier, issued_at,
                 control_state, deactivated_at, revoked_at, deleted_at, superseded_by_license_id,
                 license_source, source_reference, maintenance_expires_at, maintenance_revoked_at, row_version
          FROM issued_licenses WHERE license_id = :license_id FOR UPDATE'
@@ -706,7 +722,7 @@ function sync_purchase_licenses(PDO $pdo, array $licenses, string $actor = 'purc
     $pdo->beginTransaction();
     try {
         $exists = $pdo->prepare(
-            'SELECT customer_name, email_address, license_tier, activation_key, license_source, source_reference,
+            'SELECT customer_name, email_address, license_tier, activation_key, activation_key_ciphertext, activation_key_nonce, activation_key_tag, license_source, source_reference,
                     maintenance_expires_at, maintenance_revoked_at
              FROM issued_licenses WHERE license_id = :license_id'
         );
@@ -735,7 +751,7 @@ function sync_purchase_licenses(PDO $pdo, array $licenses, string $actor = 'purc
                 if (!hash_equals((string)$existing['customer_name'], $issued['customer_name']) ||
                     !hash_equals((string)$existing['email_address'], $issued['email_address']) ||
                     !hash_equals((string)$existing['license_tier'], $issued['license_tier']) ||
-                    !hash_equals((string)$existing['activation_key'], $issued['activation_key'])) {
+                    !hash_equals(reveal_activation_key($existing), $issued['activation_key'])) {
                     throw new DomainException('A purchase license conflicts with an existing License Manager record.');
                 }
                 if ((string)$existing['maintenance_expires_at'] < $issued['maintenance_expires_at']) {

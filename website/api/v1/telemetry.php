@@ -87,6 +87,51 @@ function resolve_maintenance_telemetry(array $body, array $managedLicense): arra
     return ['status'=>$status,'expires_at'=>$expiresAt];
 }
 
+function telemetry_customer_uuid(): string
+{
+    $bytes=random_bytes(16);$bytes[6]=chr((ord($bytes[6])&0x0f)|0x40);$bytes[8]=chr((ord($bytes[8])&0x3f)|0x80);$hex=bin2hex($bytes);
+    return substr($hex,0,8).'-'.substr($hex,8,4).'-'.substr($hex,12,4).'-'.substr($hex,16,4).'-'.substr($hex,20);
+}
+
+function link_telemetry_customer(PDO $pdo, int $installationId, string $customerName, string $emailAddress, ?string $licenseId): void
+{
+    try {
+        $lock=$pdo->prepare('SELECT customer_id FROM installations WHERE id=:id FOR UPDATE');$lock->execute(['id'=>$installationId]);
+        $current=$lock->fetchColumn();
+        $customerId=null;
+        if($licenseId!==null&&$licenseId!==''){
+            $licensed=$pdo->prepare('SELECT customer_id FROM issued_licenses WHERE license_id=:license_id LIMIT 1');
+            $licensed->execute(['license_id'=>$licenseId]);$linked=$licensed->fetchColumn();
+            if(is_string($linked)&&$linked!=='')$customerId=$linked;
+        }
+        if($customerId===null&&is_string($current)&&$current!==''){
+            if($licenseId!==null&&$licenseId!==''){
+                $linkLicense=$pdo->prepare('UPDATE issued_licenses SET customer_id=:customer_id WHERE license_id=:license_id AND customer_id IS NULL');
+                $linkLicense->execute(['customer_id'=>$current,'license_id'=>$licenseId]);
+            }
+            return;
+        }
+        if($customerId===null){
+            // A Trial registration remains its own unverified customer. Email equality is never ownership proof.
+            $customerId=telemetry_customer_uuid();
+            $email=strtolower(trim($emailAddress));
+            $create=$pdo->prepare('INSERT INTO customers(customer_id,display_name,canonical_email,email_hash) VALUES(:id,:name,:email,UNHEX(SHA2(:email_hash_value,256)))');
+            $create->execute(['id'=>$customerId,'name'=>trim($customerName)!==''?substr(trim($customerName),0,160):'Unregistered customer','email'=>$email,'email_hash_value'=>$email]);
+            if($licenseId!==null&&$licenseId!==''){
+                $linkLicense=$pdo->prepare('UPDATE issued_licenses SET customer_id=:customer_id WHERE license_id=:license_id AND customer_id IS NULL');
+                $linkLicense->execute(['customer_id'=>$customerId,'license_id'=>$licenseId]);
+            }
+            $event=$pdo->prepare("INSERT INTO customer_events(customer_id,event_type,source,source_reference,actor,event_summary) VALUES(:id,'CUSTOMER_CREATED','Telemetry',:reference,'system','Customer record created from an authenticated installation registration.')");
+            $event->execute(['id'=>$customerId,'reference'=>'installation:'.$installationId]);
+        }
+        $attach=$pdo->prepare('UPDATE installations SET customer_id=:customer_id WHERE id=:id');
+        $attach->execute(['customer_id'=>$customerId,'id'=>$installationId]);
+    }catch(PDOException $exception){
+        // CRM deployment is additive. Preserve telemetry while the protected database is upgraded.
+        if(!in_array((string)$exception->getCode(),['42S02','42S22'],true))throw $exception;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['error' => 'Method not allowed.'], 405);
 }
@@ -138,6 +183,7 @@ try {
                 'country_code' => $geography['country_code'],
                 'region_code' => $geography['region_code'],
             ]);
+            link_telemetry_customer($pdo,(int)$pdo->lastInsertId(),$customerName,$emailAddress,$managedLicense['license_id']);
             $pdo->commit();
         } catch (PDOException $exception) {
             if ($pdo->inTransaction()) {
@@ -250,6 +296,7 @@ try {
         'activations' => $activations,
         'id' => $installationId,
     ]);
+    link_telemetry_customer($pdo,$installationId,$customerName,$emailAddress,$licenseId);
 
     if ($launches > 0 || $jobs > 0) {
         $daily = $pdo->prepare(

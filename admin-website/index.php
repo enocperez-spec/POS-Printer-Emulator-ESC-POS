@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/license_management.php';
 require __DIR__ . '/includes/geography_analytics.php';
+require __DIR__ . '/includes/customer_crm.php';
 require_authentication();
 
 $requestedDays = (int)($_GET['days'] ?? 30);
@@ -11,6 +12,7 @@ $days = in_array($requestedDays, [7, 30, 90], true) ? $requestedDays : 30;
 $pdo = database();
 ensure_license_management_schema($pdo);
 ensure_geography_analytics_schema($pdo);
+backfill_customer_crm($pdo);
 $summary = $pdo->query(
     "SELECT
         SUM(license_mode = 'Trial') AS trials,
@@ -71,7 +73,7 @@ $co2Metric = static fn(float $grams): string => $grams >= 1000000
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>License &amp; Usage | POS Printer Emulator</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/admin-overrides.css?v=20260719-lite"><link rel="stylesheet" href="assets/geography.css?v=20260722-1"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
 <body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator <small>Admin Portal</small></span></a><form method="post" action="/logout.php" class="logout-form"><span>Admin Account</span><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><button>Log out</button></form></header>
-<aside class="sidebar"><nav><a class="active" href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a><a href="https://posprinteremulator.com/privacy.html"><span aria-hidden="true">⚙</span>Settings</a></nav><p>No receipt contents<br>are collected.</p></aside>
+<aside class="sidebar"><nav><a class="active" href="/"><span aria-hidden="true">▥</span>Dashboard</a><a href="/customers.php"><span aria-hidden="true">◎</span>Customers</a><a href="/#installations"><span aria-hidden="true">□</span>Installations</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a><a href="https://posprinteremulator.com/privacy.html"><span aria-hidden="true">⚙</span>Settings</a></nav><p>No receipt contents<br>are collected.</p></aside>
 <main id="dashboard"><div class="page-heading"><h1>License &amp; Usage</h1><form method="get"><label><span class="sr-only">Date range</span><select id="date-range" name="days"><option value="7" <?= $days === 7 ? 'selected' : '' ?>>Last 7 days</option><option value="30" <?= $days === 30 ? 'selected' : '' ?>>Last 30 days</option><option value="90" <?= $days === 90 ? 'selected' : '' ?>>Last 90 days</option></select></label></form></div>
 <section class="metrics" aria-label="Summary">
 <article class="trial"><svg class="metric-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="22" cy="14" r="8"/><path d="M8 39v-5c0-7 6-11 14-11s14 4 14 11v5M36 29v12m-5-5 5 5 5-5"/></svg><div><span>Trial installations</span><strong><?= $metric($summary['trials'] ?? 0) ?></strong></div></article>
