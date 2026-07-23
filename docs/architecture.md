@@ -88,14 +88,15 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 24. **v0.3.44 — Self-service renewals, upgrades, and promotional trials.** Reuse server-side PayPal and signed-entitlement services for idempotent renewals, upgrades, refunds, and a single five-day paid-edition promotion that restores the prior permanent license automatically.
 25. **v0.3.45 — Consent-aware lifecycle communications and CRM analytics.** Use Brevo through a protected server-side API, authenticated webhooks and sending domain, a durable Free-plan-aware priority outbox, consent and suppression enforcement, lifecycle schedules, minimal opt-in telemetry, and privacy-aware conversion and support dashboards.
 26. **v0.3.46 — Accessibility and keyboard usability.** Establish keyboard, screen-reader, high-contrast, scaling, reduced-motion, caption, and automated accessibility requirements across primary workflows.
-27. **v0.3.47 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
-28. **v0.3.48 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
-29. **v0.3.49 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
-30. **v0.3.50 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
-31. **v0.3.51 — Character and code-page assistant.** Analyze encoding commands and bytes, compare supported code-page interpretations, and persist explicit profile choices separately from captures.
-32. **v0.3.52 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
-33. **v0.3.53 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
-34. **v0.3.54 — Update Notifications for All License Types.** Notify every license and maintenance state about public releases while preserving the correct manual-download, guided-update, and renewal boundaries.
+27. **v0.3.47 — Five-Day Promotional Trial Experience.** Use the verified customer and licensing services to authorize one Lite, Pro, or Enterprise evaluation, issue a signed temporary entitlement, prevent replay and repeat use, and restore the prior license at expiry.
+28. **v0.3.48 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
+29. **v0.3.49 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
+30. **v0.3.50 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
+31. **v0.3.51 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
+32. **v0.3.52 — Character and code-page assistant.** Analyze encoding commands and bytes, compare supported code-page interpretations, and persist explicit profile choices separately from captures.
+33. **v0.3.53 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
+34. **v0.3.54 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
+35. **v0.3.55 — Update Notifications for All License Types.** Notify every license and maintenance state about public releases while preserving the correct manual-download, guided-update, and renewal boundaries.
 35. Service-to-viewer authentication and installer repair mode.
 36. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
 37. Optional online activation revocation and license transfer workflow.
