@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.40"
+#define MyAppVersion "0.3.41"
 #define MyAppPublisher "EPCOM Ltd."
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -19,7 +19,7 @@ OutputBaseFilename=POSPrinterEmulatorSetup-{#MyAppVersion}-win-x64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-WizardImageFile=..\assets\branding\pos-printer-emulator-icon.png
+WizardImageFile=..\assets\branding\pos-printer-emulator-installer-banner.png
 WizardSmallImageFile=..\assets\branding\pos-printer-emulator-icon.png
 WizardImageBackColor=$FFFFFF
 WizardSmallImageBackColor=$FFFFFF

@@ -6,6 +6,12 @@ For the current release status, scheduled versions, future backlog, and release-
 
 ## Upcoming security releases
 
+## v0.3.41 — 2026-07-22
+
+- Fixes BUG-016 by replacing the stretched square installer artwork with a dedicated `164:314` wizard banner that preserves the official logo proportions.
+- Keeps the square icon for the compact wizard header and adds packaging validation that rejects an invalid or incorrectly proportioned banner before compilation.
+- Moves active development to v0.3.42 — Accessibility and keyboard usability.
+
 ## v0.3.40 — 2026-07-22
 
 - Adds a persistent **Simple Mode** with plain-language health, the next recommended action, and a numbered setup, connection, and verification workflow.

@@ -10,18 +10,19 @@ public sealed class UpdateServiceTests
     [Fact]
     public async Task ReportsANewerInstallerRelease()
     {
-        using var client = CreateClient("""
+        var newerVersion = GetNewerVersion();
+        using var client = CreateClient($$"""
             {
-              "tag_name": "v0.3.41",
-              "html_url": "https://github.com/example/releases/tag/v0.3.41",
+              "tag_name": "v{{newerVersion}}",
+              "html_url": "https://github.com/example/releases/tag/v{{newerVersion}}",
               "assets": [
                 {
-                  "name": "POSPrinterEmulatorSetup-0.3.41-win-x64.exe",
-                  "browser_download_url": "https://github.com/example/releases/download/v0.3.41/setup.exe"
+                  "name": "POSPrinterEmulatorSetup-{{newerVersion}}-win-x64.exe",
+                  "browser_download_url": "https://github.com/example/releases/download/v{{newerVersion}}/setup.exe"
                 },
                 {
-                  "name": "POSPrinterEmulatorSetup-0.3.41-win-x64.exe.sha256",
-                  "browser_download_url": "https://github.com/example/releases/download/v0.3.41/setup.exe.sha256"
+                  "name": "POSPrinterEmulatorSetup-{{newerVersion}}-win-x64.exe.sha256",
+                  "browser_download_url": "https://github.com/example/releases/download/v{{newerVersion}}/setup.exe.sha256"
                 }
               ]
             }
@@ -32,7 +33,7 @@ public sealed class UpdateServiceTests
 
         Assert.True(status.CheckSucceeded);
         Assert.True(status.UpdateAvailable);
-        Assert.Equal("0.3.41", status.LatestVersion);
+        Assert.Equal(newerVersion, status.LatestVersion);
         Assert.EndsWith("setup.exe", status.DownloadUrl);
         Assert.EndsWith("setup.exe.sha256", status.ChecksumUrl);
     }
@@ -40,13 +41,14 @@ public sealed class UpdateServiceTests
     [Fact]
     public async Task DoesNotOfferAnInstallerWithoutItsSecurityChecksum()
     {
-        using var client = CreateClient("""
+        var newerVersion = GetNewerVersion();
+        using var client = CreateClient($$"""
             {
-              "tag_name": "v0.3.41",
-              "html_url": "https://github.com/example/releases/tag/v0.3.41",
+              "tag_name": "v{{newerVersion}}",
+              "html_url": "https://github.com/example/releases/tag/v{{newerVersion}}",
               "assets": [{
-                "name": "POSPrinterEmulatorSetup-0.3.41-win-x64.exe",
-                "browser_download_url": "https://github.com/example/releases/download/v0.3.41/setup.exe"
+                "name": "POSPrinterEmulatorSetup-{{newerVersion}}-win-x64.exe",
+                "browser_download_url": "https://github.com/example/releases/download/v{{newerVersion}}/setup.exe"
               }]
             }
             """);
@@ -80,10 +82,11 @@ public sealed class UpdateServiceTests
     [Fact]
     public async Task DoesNotOfferAReleaseWithoutAWindowsInstaller()
     {
-        using var client = CreateClient("""
+        var newerVersion = GetNewerVersion();
+        using var client = CreateClient($$"""
             {
-              "tag_name": "v0.3.41",
-              "html_url": "https://github.com/example/releases/tag/v0.3.41",
+              "tag_name": "v{{newerVersion}}",
+              "html_url": "https://github.com/example/releases/tag/v{{newerVersion}}",
               "assets": []
             }
             """);
@@ -118,6 +121,12 @@ public sealed class UpdateServiceTests
     {
         BaseAddress = new Uri("https://api.github.com/repos/example/project/")
     };
+
+    private static string GetNewerVersion()
+    {
+        var installed = Version.Parse(ProductInfo.Version);
+        return $"{installed.Major}.{installed.Minor}.{installed.Build + 1}";
+    }
 
     private sealed class JsonHandler(string json, HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
