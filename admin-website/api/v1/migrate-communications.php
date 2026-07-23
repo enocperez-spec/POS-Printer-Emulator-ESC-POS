@@ -29,7 +29,7 @@ try {
     ensure_communication_schema($pdo);
     $migration = $pdo->prepare('INSERT IGNORE INTO development_migrations(migration_key) VALUES(:migration_key)');
     $migration->execute(['migration_key' => 'consent-aware-communications-v0.3.45']);
-    $pdo->exec("UPDATE development_roadmap SET status='In progress',completed_at=NULL WHERE item_key='v0.3.45'");
+    $pdo->exec("UPDATE development_roadmap SET status='Released',completed_at=COALESCE(completed_at,UTC_TIMESTAMP(6)) WHERE item_key='v0.3.45'");
     $summary = communication_dashboard_summary($pdo);
     communications_migration_response([
         'ok' => true,

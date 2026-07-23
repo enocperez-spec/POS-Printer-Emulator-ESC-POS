@@ -166,8 +166,10 @@ $expectContains("WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.44 as released.');
 $expectContains("('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released'", $schema, 'Fresh database schema must identify v0.3.44 as released.');
 $expectContains("WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.44'", $devSupport, 'Admin Dev Support is missing the v0.3.44 GitHub release link.');
+$expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.45 as released.');
+$expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released'", $schema, 'Fresh database schema must identify v0.3.45 as released.');
+$expectContains("WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'", $devSupport, 'Admin Dev Support is missing the v0.3.45 GitHub release link.');
 $futureReleases = [
-    'v0.3.45' => ['Consent-aware lifecycle communications and CRM analytics', 48],
     'v0.3.46' => ['Accessibility and keyboard usability', 31],
     'v0.3.47' => ['Automatic configuration restore points', 32],
     'v0.3.48' => ['Projects and testing sessions', 33],
@@ -179,7 +181,7 @@ $futureReleases = [
     'v0.3.54' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
-    $status = $version === 'v0.3.45' ? 'In progress' : 'Planned';
+    $status = 'Planned';
     $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', '{$status}'";
     $expectContains($expectedRow, $devSupport, "Admin Dev Support is missing {$status} {$version} {$title}.");
     $expectContains($expectedRow, $schema, "Fresh database schema is missing {$status} {$version} {$title}.");

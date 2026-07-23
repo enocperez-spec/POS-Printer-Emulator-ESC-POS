@@ -654,11 +654,11 @@ $releaseSync = database()->prepare(
          'Server-controlled PayPal renewals and upgrades; exact product and price confirmation; idempotent fulfillment, refunds, and chargebacks; one five-day paid-edition promotion per verified customer; prior-license restoration; repeat prevention; audited exceptions; and offline and clock-tamper handling.',
          'Payments and temporary entitlements require the verified ownership and portal foundations before campaigns direct customers to them.',
          'Renewals and upgrades fulfill exactly once, eligible promotions occur exactly once, expiration restores the prior license, and failure and refund tests keep entitlements consistent.', '2026-07-23 00:00:00.000000'),
-        ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'In progress', 345,
+        ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released', 345,
          'Improve onboarding, conversion, renewal, and support follow-up through Brevo without building a custom mail server.',
          'Protected Brevo transactional email, contact, template, and authenticated webhook APIs; authenticated sender domain; configurable 300-send provider quota with a 290-send automated cap and 50 reserved service slots; durable priority outbox and next-day deferral; separated service and marketing messages; retries, quiet hours, caps, approvals, pause, and emergency stop; welcome, Trial, promotion, release, inactivity, support, and maintenance schedules; unsubscribe, bounce, complaint, and closure suppression; minimal consented telemetry; segmentation; and Admin dashboards.',
          'Automation follows only after identity, portal destinations, commercial workflows, consent, and lifecycle events are reliable.',
-         'Eligible messages send exactly once, opt-outs and suppressions are honored, more than 300 queued messages respect the configured quota without loss or starving service mail, dashboards reconcile, and prohibited data is absent from Brevo payloads and logs.', NULL),
+         'Eligible messages send exactly once, opt-outs and suppressions are honored, more than 300 queued messages respect the configured quota without loss or starving service mail, dashboards reconcile, and prohibited data is absent from Brevo payloads and logs.', '2026-07-23 00:00:00.000000'),
         ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Planned', 346,
          'Make primary workflows usable with keyboard, assistive technology, scaling, and high contrast.',
          'Focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
@@ -785,7 +785,7 @@ database()->prepare(
          WHEN 'v0.3.42' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.42'
          WHEN 'v0.3.43' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.43'
          WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.44'
-         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48'
+         WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'
          WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31'
          WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
