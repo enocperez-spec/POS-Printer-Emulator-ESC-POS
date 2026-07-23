@@ -29,7 +29,7 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 
 | Bug ID | Severity | Summary | Affected version(s) | Target | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
-There are no open bugs currently assigned to the v0.3.38 release.
+There are no open bugs currently assigned to the v0.3.41 release.
 
 ## Resolved bugs
 
@@ -50,6 +50,7 @@ There are no open bugs currently assigned to the v0.3.38 release.
 | BUG-013 | Medium | The always-available Support diagnostic download returned HTTP 500 if the optional Stored Logos directory was absent. | v0.3.26 development build | v0.3.26 | Released | Missing logo storage is treated as an empty store, imports recreate it safely, six Stored Graphic tests pass, and live expired-maintenance verification returned a privacy-safe diagnostic file with HTTP 200 while update checks remained HTTP 403. |
 | BUG-014 | Medium | Windows appended `.zip` when saving a `.ppebackup`, and the restore picker rejected that legacy file name. | v0.3.34 | v0.3.35 | Released | The desktop save dialog uses a native `.ppebackup` filter and default extension; the API and picker accept both `.ppebackup` and legacy `.ppebackup.zip`; filename regression tests and a complete create-review-restore browser flow pass. |
 | BUG-015 | Medium | The v0.3.37 welcome guide could remain hidden after its persistent completion flag was set, and Trial customers could not review their included listener because Printer Listeners showed only an upgrade panel. | v0.3.37 | v0.3.38 | Released | The guide uses a new versioned state and a permanent Trial setup action; Trial sees one read-only listener with local and LAN IPv4 targets; the production viewer builds; all 166 desktop tests pass; GET returns the listener while Trial POST remains HTTP 403. |
+| [BUG-016](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/43) | Low | The square product icon was stretched vertically in the installer welcome and completion banner. | v0.3.40 | v0.3.41 | Released | The installer uses a dedicated 656x1256 banner at Inno Setup's exact 164:314 ratio, the square header icon remains separate, the packaging guard verifies the PNG and aspect ratio, and Inno Setup 6.7.1 compiles the corrected installer successfully. |
 
 ## Bug record template
 

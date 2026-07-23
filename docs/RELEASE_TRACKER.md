@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.40 — released 2026-07-22**
+**Current public release: v0.3.41 — released 2026-07-22**
 
-**Current development: v0.3.41 — Accessibility and keyboard usability**
+**Current development: v0.3.42 — Accessibility and keyboard usability**
 
-**Next release after v0.3.41: v0.3.42 — Automatic configuration restore points**
+**Next release after v0.3.42: v0.3.43 — Automatic configuration restore points**
 
-**Future scheduled sequence: v0.3.41 through v0.3.49**
+**Future scheduled sequence: v0.3.42 through v0.3.50**
 
-**Most recently completed: v0.3.40 — Simple Mode and Expert Mode**
+**Most recently completed: v0.3.41 — Installer Branding Correction**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -81,10 +81,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.38 | Released | Trial onboarding clarity correction |
 | v0.3.39 | Released | Guided update installation and restart |
 | v0.3.40 | Released | Simple Mode and Expert Mode |
+| v0.3.41 | Released | Installer Branding Correction |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40-v0.3.47 improve everyday usability, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.48 delivers receipt comparison and automated validation; and v0.3.49 makes public update awareness available to every license and maintenance state.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.48 improve accessibility, recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.49 delivers receipt comparison and automated validation; and v0.3.50 makes public update awareness available to every license and maintenance state.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -526,7 +527,27 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Completion verification:** The production viewer compiles with TypeScript strict checks and Vite, all 171 desktop tests pass, Admin/database and website contract tests pass, and browser QA confirms the remembered mode switch, live listener details, copy confirmation, immediate Test Receipt rendering, setup-wizard routing, diagnostics routing, responsive behavior without horizontal overflow, and a clean console. The concept comparison and intentional differences are recorded in [`design/v0.3.40-fidelity-ledger.md`](design/v0.3.40-fidelity-ledger.md). The 120,603,760-byte installer contains v0.3.40.0 service, desktop, and updater executables, and its independently recalculated SHA-256 value matches the generated checksum (`6a2ac6093e65fb47113ad1ae9fcacad2b8e13673f68c850d31b939d90f3cafce`). Authenticode signing remains unavailable, so the checksum must be verified before distribution.
 
-### v0.3.41 — Accessibility and keyboard usability
+### v0.3.41 — Installer Branding Correction
+
+**Status:** Released on 2026-07-22
+
+**Purpose:** Correct the visibly stretched product logo on the Windows installer welcome and completion pages without silently replacing the published v0.3.40 package.
+
+**Released scope:**
+
+- Added a dedicated `656x1256` installer wizard banner at Inno Setup's exact `164:314` display ratio.
+- Preserved the official square product icon without redrawing or stretching it.
+- Kept the square icon as the independent compact wizard-header image.
+- Added build validation for the PNG signature, required branding files, installer directives, and banner aspect ratio.
+- Recorded and resolved BUG-016 in the repository and Admin Portal trackers.
+
+**License availability:** All license tiers.
+
+**Security and privacy:** The correction changes only embedded installer artwork and build validation; it adds no network access, customer data, or privilege changes.
+
+**Completion verification:** The banner displays proportionally at its intended `164x314` size, the C# packaging tool builds with zero warnings and errors, Inno Setup 6.7.1 reads both independent branding files, and the self-contained installer compiles successfully.
+
+### v0.3.42 — Accessibility and keyboard usability
 
 **Status:** Planned
 
@@ -551,7 +572,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
 
-### v0.3.42 — Automatic configuration restore points
+### v0.3.43 — Automatic configuration restore points
 
 **Status:** Planned
 
@@ -576,7 +597,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
 
-### v0.3.43 — Projects and testing sessions
+### v0.3.44 — Projects and testing sessions
 
 **Status:** Planned
 
@@ -597,11 +618,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
 
-**Why this order:** The restore-point foundation in v0.3.42 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
+**Why this order:** The restore-point foundation in v0.3.43 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
 
 **Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
 
-### v0.3.44 — Privacy-safe receipt masking
+### v0.3.45 — Privacy-safe receipt masking
 
 **Status:** Planned
 
@@ -626,7 +647,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
 
-### v0.3.45 — System tray health and notifications
+### v0.3.46 — System tray health and notifications
 
 **Status:** Planned
 
@@ -651,7 +672,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
 
-### v0.3.46 — Character and code-page assistant
+### v0.3.47 — Character and code-page assistant
 
 **Status:** Planned
 
@@ -676,7 +697,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Known mojibake fixtures produce the correct diagnosis and preview, saved recommendations render deterministically, and original capture bytes remain unchanged.
 
-### v0.3.47 — Offline Enterprise update packages
+### v0.3.48 — Offline Enterprise update packages
 
 **Status:** Planned
 
@@ -701,7 +722,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** An offline Enterprise computer installs a valid package and rejects tampered, unsigned, downgraded, incompatible, or unentitled packages without damaging the current installation.
 
-### v0.3.48 — Receipt comparison and automated validation
+### v0.3.49 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -725,7 +746,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, privacy-safe exports do not expose configured sensitive values, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
 
-### v0.3.49 — Update Notifications for All License Types
+### v0.3.50 — Update Notifications for All License Types
 
 **Status:** Planned
 

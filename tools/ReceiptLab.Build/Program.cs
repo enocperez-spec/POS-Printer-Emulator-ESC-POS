@@ -222,7 +222,7 @@ internal static class ReceiptLabBuild
         var requiredDirectives = new[]
         {
             @"SetupIconFile=..\assets\branding\pos-printer-emulator.ico",
-            @"WizardImageFile=..\assets\branding\pos-printer-emulator-icon.png",
+            @"WizardImageFile=..\assets\branding\pos-printer-emulator-installer-banner.png",
             @"WizardSmallImageFile=..\assets\branding\pos-printer-emulator-icon.png"
         };
 
@@ -235,13 +235,42 @@ internal static class ReceiptLabBuild
         }
 
         var brandingDirectory = Path.Combine(Root, "assets", "branding");
-        foreach (var fileName in new[] { "pos-printer-emulator.ico", "pos-printer-emulator-icon.png" })
+        foreach (var fileName in new[]
+                 {
+                     "pos-printer-emulator.ico",
+                     "pos-printer-emulator-icon.png",
+                     "pos-printer-emulator-installer-banner.png"
+                 })
         {
             if (!File.Exists(Path.Combine(brandingDirectory, fileName)))
             {
                 throw new FileNotFoundException($"The installer branding asset is missing: {fileName}");
             }
         }
+
+        var bannerPath = Path.Combine(brandingDirectory, "pos-printer-emulator-installer-banner.png");
+        var (bannerWidth, bannerHeight) = ReadPngDimensions(bannerPath);
+        if (bannerWidth * 314 != bannerHeight * 164)
+        {
+            throw new InvalidOperationException(
+                $"The installer wizard banner must use the Inno Setup 164:314 aspect ratio without stretching; " +
+                $"found {bannerWidth}x{bannerHeight}.");
+        }
+    }
+
+    private static (int Width, int Height) ReadPngDimensions(string path)
+    {
+        Span<byte> header = stackalloc byte[24];
+        using var stream = File.OpenRead(path);
+        if (stream.Read(header) != header.Length ||
+            !header[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
+        {
+            throw new InvalidOperationException($"The installer branding asset is not a valid PNG: {path}");
+        }
+
+        var width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header[16..20]);
+        var height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header[20..24]);
+        return (width, height);
     }
 
     private static async Task VerifyPublishedApplicationsAsync()
