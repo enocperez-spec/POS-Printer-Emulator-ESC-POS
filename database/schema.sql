@@ -279,6 +279,145 @@ CREATE TABLE IF NOT EXISTS customer_api_rate_limits (
     KEY ix_customer_api_rate_reset (reset_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS communication_settings (
+    setting_key VARCHAR(64) NOT NULL,
+    setting_value VARCHAR(500) NOT NULL,
+    updated_by VARCHAR(80) NOT NULL,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_templates (
+    template_key VARCHAR(64) NOT NULL,
+    display_name VARCHAR(120) NOT NULL,
+    message_class ENUM('Service','Marketing') NOT NULL,
+    essential TINYINT(1) NOT NULL DEFAULT 0,
+    brevo_template_id BIGINT UNSIGNED NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 0,
+    frequency_cap_hours SMALLINT UNSIGNED NOT NULL DEFAULT 24,
+    description VARCHAR(500) NOT NULL,
+    updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (template_key),
+    KEY ix_communication_templates_enabled (enabled, message_class)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_campaigns (
+    campaign_id CHAR(36) NOT NULL,
+    campaign_name VARCHAR(120) NOT NULL,
+    template_key VARCHAR(64) NOT NULL,
+    segment_key VARCHAR(64) NOT NULL,
+    state ENUM('Draft','Scheduled','Running','Paused','Completed','Cancelled') NOT NULL DEFAULT 'Draft',
+    scheduled_at DATETIME(6) NULL,
+    created_by VARCHAR(80) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (campaign_id),
+    KEY ix_communication_campaigns_state (state, scheduled_at),
+    CONSTRAINT fk_communication_campaign_template FOREIGN KEY (template_key) REFERENCES communication_templates(template_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_outbox (
+    message_id CHAR(36) NOT NULL,
+    customer_id CHAR(36) NOT NULL,
+    template_key VARCHAR(64) NOT NULL,
+    campaign_id CHAR(36) NULL,
+    message_class ENUM('Service','Marketing') NOT NULL,
+    essential TINYINT(1) NOT NULL DEFAULT 0,
+    manual_send TINYINT(1) NOT NULL DEFAULT 0,
+    priority TINYINT UNSIGNED NOT NULL DEFAULT 50,
+    recipient_hash BINARY(32) NOT NULL,
+    parameters_json TEXT NOT NULL,
+    idempotency_key VARCHAR(160) NOT NULL,
+    state ENUM('Pending','Processing','Deferred','Sent','Failed','DeliveryUnknown','Cancelled') NOT NULL DEFAULT 'Pending',
+    attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    available_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    locked_at DATETIME(6) NULL,
+    provider_message_id VARCHAR(160) NULL,
+    last_error_code VARCHAR(64) NULL,
+    last_error_detail VARCHAR(240) NULL,
+    sent_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (message_id),
+    UNIQUE KEY uq_communication_idempotency (idempotency_key),
+    KEY ix_communication_outbox_ready (state, priority, available_at),
+    KEY ix_communication_outbox_customer (customer_id, created_at),
+    KEY ix_communication_outbox_template (template_key, state, created_at),
+    CONSTRAINT fk_communication_outbox_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    CONSTRAINT fk_communication_outbox_template FOREIGN KEY (template_key) REFERENCES communication_templates(template_key),
+    CONSTRAINT fk_communication_outbox_campaign FOREIGN KEY (campaign_id) REFERENCES communication_campaigns(campaign_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_delivery_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    provider_event_key BINARY(32) NOT NULL,
+    message_id CHAR(36) NULL,
+    provider_message_id VARCHAR(160) NULL,
+    event_type VARCHAR(40) NOT NULL,
+    event_summary VARCHAR(240) NOT NULL,
+    occurred_at DATETIME(6) NOT NULL,
+    received_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_communication_provider_event (provider_event_key),
+    KEY ix_communication_delivery_message (message_id, occurred_at),
+    KEY ix_communication_delivery_type (event_type, occurred_at),
+    CONSTRAINT fk_communication_delivery_message FOREIGN KEY (message_id) REFERENCES communication_outbox(message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_quota_daily (
+    quota_date DATE NOT NULL,
+    provider_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    automated_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    service_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    marketing_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    manual_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (quota_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_lifecycle_daily (
+    activity_date DATE NOT NULL,
+    lifecycle_stage VARCHAR(40) NOT NULL,
+    license_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
+    customer_count INT UNSIGNED NOT NULL DEFAULT 0,
+    event_count INT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (activity_date, lifecycle_stage, license_tier)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_lifecycle_presence (
+    activity_date DATE NOT NULL,
+    lifecycle_stage VARCHAR(40) NOT NULL,
+    license_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
+    customer_hash BINARY(32) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (activity_date,lifecycle_stage,license_tier,customer_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO communication_settings(setting_key,setting_value,updated_by) VALUES
+    ('emergency_stop','1','system'),
+    ('marketing_pause','1','system'),
+    ('provider_timezone','America/New_York','system'),
+    ('provider_daily_limit','300','system'),
+    ('automated_daily_limit','290','system'),
+    ('service_reserve','50','system');
+
+INSERT IGNORE INTO communication_templates
+    (template_key,display_name,message_class,essential,enabled,frequency_cap_hours,description)
+VALUES
+    ('email_verification','Email verification','Service',1,0,1,'Verify a customer-controlled email address.'),
+    ('password_recovery','Password recovery','Service',1,0,1,'Recover access to the Customer Portal.'),
+    ('purchase_confirmation','Purchase confirmation','Service',1,0,1,'Confirm a completed purchase without including an activation key.'),
+    ('activation_ready','Activation ready','Service',1,0,1,'Direct the customer to the secure portal for activation delivery.'),
+    ('support_confirmation','Support request confirmation','Service',1,0,1,'Confirm a submitted support request and reference number.'),
+    ('maintenance_reminder','Maintenance reminder','Service',0,0,168,'Remind an eligible customer before maintenance coverage ends.'),
+    ('welcome_setup','Welcome and setup guidance','Service',0,0,72,'Help a newly registered customer complete setup.'),
+    ('release_announcement','Release announcement','Marketing',0,0,168,'Announce an available product release to opted-in customers.'),
+    ('trial_guidance','Trial guidance','Marketing',0,0,168,'Offer setup guidance to opted-in Trial customers.'),
+    ('inactivity_help','Inactivity help','Marketing',0,0,720,'Offer help to an opted-in customer after an inactivity interval.'),
+    ('promotion','Product promotion','Marketing',0,0,720,'Send an owner-approved promotion to opted-in customers.');
+
 CREATE TABLE IF NOT EXISTS portal_accounts (
     customer_id CHAR(36) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -645,7 +784,7 @@ VALUES
     ('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released', 342, 'Connect registrations, installations, licenses, maintenance, support, and consent through one privacy-aware customer record.', 'Canonical customers; safe unverified backfill; duplicate review and merge history; verified ownership evidence; masked key lookup; consent, suppression, lifecycle, and audit ledgers; permission-controlled Admin search and export; and authenticated service APIs.', 'The Customer Portal and automated communications require trustworthy identity and consent foundations.', 'Existing entitlements remain unchanged, duplicate emails are not automatically merged, customer actions are auditable, exports exclude prohibited data, and CRM security tests pass.', '2026-07-22 00:00:00.000000'),
     ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Released', 343, 'Give verified customers secure self-service access to owned product records.', 'Verified accounts, recovery, optional MFA, masked licenses, maintenance, downloads, preferences, support history, and device deactivation.', 'The portal depends on v0.3.42 ownership and consent boundaries.', 'Customers can access only their own verified records and sensitive actions require reauthentication.', '2026-07-23 00:00:00.000000'),
     ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released', 344, 'Provide auditable self-service commercial workflows without turning permanent licenses into subscriptions.', 'PayPal maintenance renewal, tier upgrades, refunds, idempotent fulfillment, and one five-day promotional paid-edition trial.', 'Commercial workflows require the secure portal and canonical ownership records.', 'Payments and temporary entitlements are idempotent, auditable, and restore prior permanent access correctly.', '2026-07-23 00:00:00.000000'),
-    ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Planned', 345, 'Deliver useful lifecycle messages through Brevo while honoring consent and provider limits.', 'Protected Brevo integration, durable priority outbox, quota deferral, templates, authenticated webhooks, suppression, minimal telemetry, segmentation, and Admin dashboards.', 'Communication automation must follow the consent and commercial foundations.', 'Eligible messages send exactly once, opt-outs and suppressions are honored, quotas do not lose mail, and prohibited data never reaches Brevo.', NULL),
+    ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released', 345, 'Deliver useful lifecycle messages through Brevo while honoring consent and provider limits.', 'Protected Brevo integration, durable priority outbox, quota deferral, templates, authenticated webhooks, suppression, minimal telemetry, segmentation, and Admin dashboards.', 'Communication automation must follow the consent and commercial foundations.', 'Eligible messages send exactly once, opt-outs and suppressions are honored, quotas do not lose mail, and prohibited data never reaches Brevo.', '2026-07-23 00:00:00.000000'),
     ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Planned', 346, 'Make primary workflows usable with keyboard and assistive technology.', 'Focus order, semantics, scaling, high contrast, reduced motion, captions, and WCAG regression checks.', 'Accessibility should be established before additional interface growth.', 'Primary workflows pass keyboard, Narrator, scaling, contrast, and automated checks.', NULL),
     ('v0.3.47', 'v0.3.47', 'Release', 'Automatic configuration restore points', 'Planned', 347, 'Protect customers from accidental configuration loss.', 'Encrypted pre-change and scheduled restore points, bounded retention, previews, transactional restore, and rollback.', 'Recovery protection precedes greater configuration complexity.', 'Customers restore a previous configuration without partial state, secret exposure, or license loss.', NULL),
     ('v0.3.48', 'v0.3.48', 'Release', 'Projects and testing sessions', 'Planned', 348, 'Organize receipt testing into isolated customer projects.', 'Projects, sessions, notes, tags, profiles, captures, baselines, reports, safe export, and integrity validation.', 'Projects establish clean boundaries for later comparison suites.', 'Projects remain isolated and export without leaking unrelated data.', NULL),

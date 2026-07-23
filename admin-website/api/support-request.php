@@ -4,6 +4,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/includes/bootstrap.php';
 require dirname(__DIR__) . '/includes/license_management.php';
 require dirname(__DIR__) . '/includes/customer_crm.php';
+require dirname(__DIR__) . '/includes/communications.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -294,6 +295,24 @@ try {
     $issue = create_github_issue(support_config(), "[{$requestType}] {$subject}", $issueBody, ['support-request', $label]);
     $update = $pdo->prepare("UPDATE support_requests SET state='Submitted', github_issue_number=:number, github_issue_url=:url, submitted_at=UTC_TIMESTAMP(6) WHERE reference_code=:reference");
     $update->execute(['number' => $issue['number'], 'url' => $issue['url'], 'reference' => $reference]);
+    if (!empty($license['customer_id'])) {
+        try {
+            communication_enqueue(
+                $pdo,
+                (string)$license['customer_id'],
+                'support_confirmation',
+                [
+                    'customer_name' => $contactName,
+                    'support_reference' => $reference,
+                    'support_url' => (string)$issue['url'],
+                ],
+                'support:' . $reference
+            );
+        } catch (Throwable $exception) {
+            // Support submission must succeed even when email is disabled, unverified, or suppressed.
+            error_log('POS Printer Emulator support confirmation not queued: ' . get_class($exception));
+        }
+    }
     support_response(['reference' => $reference, 'state' => 'Submitted', 'message' => 'Your support request was submitted securely.', 'issueNumber' => $issue['number'], 'issueUrl' => $issue['url']]);
 } catch (InvalidArgumentException $exception) {
     support_response(['error' => 'Invalid license information.'], 401);

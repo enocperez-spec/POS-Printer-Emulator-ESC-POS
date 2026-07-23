@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__, 2) . '/includes/bootstrap.php';
+require dirname(__DIR__, 2) . '/includes/communications.php';
 require dirname(__DIR__, 2) . '/includes/customer_crm.php';
 require dirname(__DIR__, 2) . '/includes/license_keys.php';
 require dirname(__DIR__, 2) . '/includes/license_management.php';
@@ -414,6 +415,40 @@ try {
             'providerCaptureId' => $providerCaptureId,
         ]);
         $pdo->commit();
+        try {
+            $customer = $pdo->prepare('SELECT display_name FROM customers WHERE customer_id=:customer_id LIMIT 1');
+            $customer->execute(['customer_id' => $intent['customer_id']]);
+            $displayName = $customer->fetchColumn();
+            if (is_string($displayName)) {
+                communication_enqueue(
+                    $pdo,
+                    (string)$intent['customer_id'],
+                    'purchase_confirmation',
+                    [
+                        'customer_name' => $displayName,
+                        'license_tier' => (string)$intent['target_tier'],
+                        'portal_url' => 'https://userportal.posprinteremulator.com/',
+                    ],
+                    'purchase:' . $sourceReference
+                );
+                if ((string)$intent['order_type'] !== 'MAINTENANCE') {
+                    communication_enqueue(
+                        $pdo,
+                        (string)$intent['customer_id'],
+                        'activation_ready',
+                        [
+                            'customer_name' => $displayName,
+                            'license_tier' => (string)$intent['target_tier'],
+                            'portal_url' => 'https://userportal.posprinteremulator.com/',
+                        ],
+                        'activation-ready:' . $sourceReference
+                    );
+                }
+            }
+        } catch (Throwable $exception) {
+            // Payment fulfillment remains authoritative when an optional delivery template is unavailable.
+            error_log('POS Printer Emulator purchase communication not queued: ' . get_class($exception));
+        }
         commerce_response(['ok' => true, 'idempotent' => false, 'intentId' => (string)$intent['intent_id']] + $fulfillment);
     }
 

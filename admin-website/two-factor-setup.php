@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         save_two_factor_secret($secret);
         unset($_SESSION['pending_two_factor_secret']);
         $_SESSION['two_factor_verified'] = true;
+        $_SESSION['two_factor_verified_at'] = time();
         $_SESSION['two_factor_attempts'] = 0;
         session_regenerate_id(true);
         header('Location: /');

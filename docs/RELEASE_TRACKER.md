@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.44 — released 2026-07-23**
+**Current public release: v0.3.45 — released 2026-07-23**
 
-**Current development: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
+**Current development: v0.3.46 — Accessibility and keyboard usability**
 
-**Next release after v0.3.44: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
+**Next release after v0.3.45: v0.3.46 — Accessibility and keyboard usability**
 
-**Future scheduled sequence: v0.3.45 through v0.3.54**
+**Future scheduled sequence: v0.3.46 through v0.3.54**
 
-**Most recently completed: v0.3.44 — Self-service renewals, upgrades, and promotional trials**
+**Most recently completed: v0.3.45 — Consent-aware lifecycle communications and CRM analytics**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -85,6 +85,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.42 | Released | Customer identity, consent, and CRM foundation |
 | v0.3.43 | Released | Secure Customer Portal MVP |
 | v0.3.44 | Released | Self-service renewals, upgrades, and promotional trials |
+| v0.3.45 | Released | Consent-aware lifecycle communications and CRM analytics |
 
 ## Scheduled releases
 
@@ -633,13 +634,13 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.45 — Consent-aware lifecycle communications and CRM analytics
 
-**Status:** Planned
+**Status:** Released — 2026-07-23
 
 **GitHub:** [Issue #48 — Consent-aware lifecycle communications and CRM analytics](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/48)
 
 **Purpose:** Improve onboarding, conversion, renewal, and support follow-up through reliable service messages and optional marketing without building an unsafe custom mail server.
 
-**Planned scope:**
+**Released scope:**
 
 - Integrate Brevo through its server-side transactional email, contact, template, and webhook APIs with separate protected production/test credentials, authenticated sending domains, and suppression handling.
 - Support the Brevo Free plan through a configurable provider quota, a durable priority queue, a conservative default of 290 automated sends per day, 50 reserved service-message slots, next-quota-window deferral, and Admin visibility into used, reserved, queued, deferred, and failed mail. The design must not rely on Brevo retaining messages submitted after its current 300-send daily limit.
@@ -656,6 +657,8 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Security and privacy:** Keep the Brevo API key and webhook bearer token outside every public directory, authenticate webhook calls, validate and deduplicate events, authenticate the sender domain with the account-specific Brevo code, DKIM, and DMARC records, prohibit activation keys, receipt data, raw logs, credentials, full IP addresses, and personal print content in Brevo payloads or analytics, minimize tracking, redact logs, restrict exports, and publish an updated privacy/retention notice before collection begins.
 
 **Why this order:** Automation is useful only after customer identity, portal destinations, payment/renewal workflows, consent, suppression, and auditable lifecycle events are reliable.
+
+**Completion verification:** All 175 desktop tests and every PHP contract suite pass. The website publisher builds with zero warnings or errors, 27 public pages pass canonical SEO validation, and application, installer, website, Admin Dev Support, and release-manifest versions are synchronized at v0.3.45. The self-contained 121,124,875-byte installer was rebuilt from source and its independently calculated SHA-256 value matches the generated checksum (`acb551f999e5921e96729073a15303d195938202377ac56e8500e966c28fba06`). Provider delivery and marketing remain paused until protected Brevo REST credentials, verified sender identity, and approved template IDs are installed on the production server.
 
 **Complete when:** Test customers receive each eligible message exactly once, opted-out customers receive no marketing, required service mail still follows documented rules, bounce/complaint suppressions stop future sends, renewal links reach the correct portal action, the Free-plan quota test safely queues more than 300 messages without loss or starving reserved service mail, dashboards reconcile to source events, and no prohibited data appears in Brevo payloads or logs. The detailed provider contract is recorded in [`design/v0.3.45-brevo-email-integration.md`](design/v0.3.45-brevo-email-integration.md).
 

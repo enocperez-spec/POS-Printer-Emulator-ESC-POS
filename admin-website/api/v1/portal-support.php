@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 2) . '/includes/bootstrap.php';
 require dirname(__DIR__, 2) . '/includes/customer_crm.php';
+require dirname(__DIR__, 2) . '/includes/communications.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -126,6 +127,26 @@ try {
     );
     $update->execute(['number' => $issue['number'], 'url' => $issue['url'], 'reference' => $reference]);
     $pdo->commit();
+    try {
+        $customer = $pdo->prepare('SELECT customer_id,display_name FROM customers WHERE customer_id=(SELECT customer_id FROM support_requests WHERE reference_code=:reference) LIMIT 1');
+        $customer->execute(['reference' => $reference]);
+        $customerRow = $customer->fetch();
+        if (is_array($customerRow)) {
+            communication_enqueue(
+                $pdo,
+                (string)$customerRow['customer_id'],
+                'support_confirmation',
+                [
+                    'customer_name' => (string)$customerRow['display_name'],
+                    'support_reference' => $reference,
+                    'support_url' => (string)$issue['url'],
+                ],
+                'support:' . $reference
+            );
+        }
+    } catch (Throwable $exception) {
+        error_log('Customer Portal support confirmation not queued: ' . get_class($exception));
+    }
     portal_support_response([
         'ok' => true,
         'reference' => $reference,

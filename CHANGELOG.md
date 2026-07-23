@@ -4,6 +4,18 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.45 — 2026-07-23
+
+- Adds protected Brevo REST delivery, authenticated webhooks, and a durable priority outbox without exposing provider credentials to browsers or desktop binaries.
+- Separates required service messages from consented marketing and rechecks verified ownership, consent, suppressions, recipient hash, and account status immediately before delivery.
+- Adds a configurable 300-message provider limit, 290-message automated cap, 50 reserved service slots, quiet hours, frequency caps, bounded retries, dead-letter review, and safe next-window deferral.
+- Connects Customer Portal verification and recovery, purchase and activation notices, support confirmation, onboarding, Trial guidance, inactivity follow-up, release announcements, and maintenance reminders to the same policy-aware queue.
+- Adds an Admin Portal Communications workspace with service and marketing pause controls, template mappings, controlled test sends, quota visibility, delivery events, aggregate lifecycle segments, and privacy-safe export.
+- Adds consented, aggregate lifecycle telemetry while excluding receipt text, raw print data, activation keys, credentials, logs, private listener addresses, and customer email fields from template parameters and analytics.
+- Requires recent administrator two-factor verification for communications mutations and export.
+- Ships with delivery and marketing paused; provider credentials and approved Brevo template IDs remain protected deployment configuration.
+- Passes all PHP suites, 175 desktop tests, publisher compilation, installer packaging, version synchronization, and secret scanning.
+
 ## v0.3.44 — 2026-07-23
 
 - Begins the secure self-service commercial workflow for verified Customer Portal accounts.

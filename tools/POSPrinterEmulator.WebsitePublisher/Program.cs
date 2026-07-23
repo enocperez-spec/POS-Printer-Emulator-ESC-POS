@@ -23,6 +23,12 @@ const string PortalMailTransportVariable = "PPE_PORTAL_MAIL_TRANSPORT";
 const string PortalMailFromVariable = "PPE_PORTAL_MAIL_FROM";
 const string PortalMailReplyToVariable = "PPE_PORTAL_MAIL_REPLY_TO";
 const string BuyBaseUrlVariable = "PPE_BUY_BASE_URL";
+const string BrevoApiKeyVariable = "PPE_BREVO_API_KEY";
+const string BrevoSenderEmailVariable = "PPE_BREVO_SENDER_EMAIL";
+const string BrevoSenderNameVariable = "PPE_BREVO_SENDER_NAME";
+const string BrevoReplyToEmailVariable = "PPE_BREVO_REPLY_TO_EMAIL";
+const string BrevoModeVariable = "PPE_BREVO_MODE";
+const string BrevoTestAllowlistVariable = "PPE_BREVO_TEST_ALLOWLIST";
 const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -35,7 +41,9 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher upload-protected <local-file> <private/remote-file> [remote-directory]");
     Console.WriteLine("  website-publisher download-protected <private/remote-file> <local-file> [remote-directory]");
     Console.WriteLine("  website-publisher configure-crm-secrets [remote-directory]");
+    Console.WriteLine("  website-publisher configure-communications [remote-directory]");
     Console.WriteLine("  website-publisher migrate-crm <https-migration-url>");
+    Console.WriteLine("  website-publisher migrate-communications <https-migration-url>");
     Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
     Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
     Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
@@ -53,6 +61,16 @@ if (args[0].Equals("migrate-crm", StringComparison.OrdinalIgnoreCase))
         throw new ArgumentException("The migrate-crm command requires an HTTPS migration URL.");
     }
     await MigrateCrmAsync(migrationUri);
+    return 0;
+}
+if (args[0].Equals("migrate-communications", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var migrationUri) ||
+        migrationUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The migrate-communications command requires an HTTPS migration URL.");
+    }
+    await MigrateCommunicationsAsync(migrationUri);
     return 0;
 }
 if (args[0].Equals("migrate-customer-portal", StringComparison.OrdinalIgnoreCase))
@@ -150,6 +168,9 @@ try
             break;
         case "configure-crm-secrets":
             ConfigureCrmSecrets(client, args.Length > 1 ? args[1] : ".");
+            break;
+        case "configure-communications":
+            ConfigureCommunications(client, args.Length > 1 ? args[1] : ".");
             break;
         case "configure-customer-portal":
             ConfigureCustomerPortal(client, args.Length > 1 ? args[1] : ".");
@@ -495,6 +516,172 @@ static void ConfigureCrmSecrets(SftpClient client, string remoteDirectory)
     Console.WriteLine($"Saved an encrypted current-user recovery copy to {recoveryPath}.");
 }
 
+static void ConfigureCommunications(SftpClient client, string remoteDirectory)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException("Communications deployment-secret recovery uses Windows data protection.");
+    }
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0) remoteRoot = "/";
+    var privateDirectory = CombineRemote(remoteRoot, "private");
+    EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
+
+    var apiKey = RequiredEnvironmentVariable(BrevoApiKeyVariable).Trim();
+    if (apiKey.Length is < 32 or > 256 || apiKey.Any(char.IsWhiteSpace))
+    {
+        throw new InvalidOperationException($"{BrevoApiKeyVariable} is not a valid Brevo REST API key.");
+    }
+    var senderEmail = RequiredEnvironmentVariable(BrevoSenderEmailVariable).Trim();
+    var replyToEmail = (Environment.GetEnvironmentVariable(BrevoReplyToEmailVariable) ?? senderEmail).Trim();
+    if (!System.Net.Mail.MailAddress.TryCreate(senderEmail, out _) ||
+        !System.Net.Mail.MailAddress.TryCreate(replyToEmail, out _))
+    {
+        throw new InvalidOperationException("The Brevo sender or reply-to address is invalid.");
+    }
+    var senderName = (Environment.GetEnvironmentVariable(BrevoSenderNameVariable) ?? "POS Printer Emulator").Trim();
+    if (senderName.Length is < 2 or > 100)
+    {
+        throw new InvalidOperationException($"{BrevoSenderNameVariable} must contain 2 to 100 characters.");
+    }
+    var mode = (Environment.GetEnvironmentVariable(BrevoModeVariable) ?? "test").Trim().ToLowerInvariant();
+    if (mode is not "test" and not "live" and not "disabled")
+    {
+        throw new InvalidOperationException($"{BrevoModeVariable} must be disabled, test, or live.");
+    }
+    var allowlist = (Environment.GetEnvironmentVariable(BrevoTestAllowlistVariable) ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    if (allowlist.Any(address => !System.Net.Mail.MailAddress.TryCreate(address, out _)))
+    {
+        throw new InvalidOperationException($"{BrevoTestAllowlistVariable} contains an invalid email address.");
+    }
+    if (mode == "test" && allowlist.Length == 0)
+    {
+        throw new InvalidOperationException($"{BrevoTestAllowlistVariable} must contain at least one address in test mode.");
+    }
+
+    var recoveryDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "POSPrinterEmulator",
+        "deployment-secrets");
+    Directory.CreateDirectory(recoveryDirectory);
+    var recoveryPath = Path.Combine(recoveryDirectory, "communications-v0.3.45.secrets.bin");
+    string webhookToken;
+    long? webhookId = null;
+    if (File.Exists(recoveryPath))
+    {
+        var recovered = ProtectedData.Unprotect(File.ReadAllBytes(recoveryPath), null, DataProtectionScope.CurrentUser);
+        using var document = JsonDocument.Parse(recovered);
+        webhookToken = document.RootElement.GetProperty("webhookToken").GetString()
+            ?? throw new InvalidDataException("The protected communications webhook token is unavailable.");
+        if (document.RootElement.TryGetProperty("webhookId", out var storedId) && storedId.TryGetInt64(out var parsedId))
+        {
+            webhookId = parsedId;
+        }
+    }
+    else
+    {
+        webhookToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+    var phpAllowlist = string.Join(", ", allowlist.Select(address => PhpString(address.ToLowerInvariant())));
+    var config = $"""
+        <?php
+        declare(strict_types=1);
+
+        return [
+            'communications' => [
+                'enabled' => {PhpString(mode == "disabled" ? "0" : "1")} === '1',
+                'mode' => {PhpString(mode)},
+                'brevo_api_base' => 'https://api.brevo.com/v3',
+                'brevo_api_key' => {PhpString(apiKey)},
+                'webhook_token' => {PhpString(webhookToken)},
+                'sender_email' => {PhpString(senderEmail)},
+                'sender_name' => {PhpString(senderName)},
+                'reply_to_email' => {PhpString(replyToEmail)},
+                'reply_to_name' => {PhpString(senderName + " Support")},
+                'provider_daily_limit' => 300,
+                'automated_daily_limit' => 290,
+                'service_reserve' => 50,
+                'timezone' => 'America/New_York',
+                'quiet_hours_start' => 20,
+                'quiet_hours_end' => 8,
+                'test_allowlist' => [{phpAllowlist}],
+            ],
+        ];
+        """;
+    webhookId = ConfigureBrevoWebhook(apiKey, webhookToken, webhookId);
+    var recovery = JsonSerializer.SerializeToUtf8Bytes(new
+    {
+        version = 1,
+        createdAtUtc = DateTimeOffset.UtcNow,
+        mode,
+        senderEmail,
+        replyToEmail,
+        webhookToken,
+        webhookId
+    });
+    File.WriteAllBytes(recoveryPath, ProtectedData.Protect(recovery, null, DataProtectionScope.CurrentUser));
+    UploadText(client, CombineRemote(privateDirectory, "communications.php"), config);
+    var cron = """
+        <?php
+        declare(strict_types=1);
+
+        if (PHP_SAPI !== 'cli') {
+            http_response_code(404);
+            exit;
+        }
+        require __DIR__ . '/../includes/bootstrap.php';
+        require __DIR__ . '/../includes/communications.php';
+        $pdo = database();
+        communication_schedule_lifecycle($pdo);
+        for ($index = 0; $index < 50; $index++) {
+            $result = communication_worker_process_one($pdo);
+            if ($result['status'] === 'idle') break;
+        }
+        """;
+    UploadText(client, CombineRemote(privateDirectory, "communications-cron.php"), cron);
+
+    Console.WriteLine("Uploaded protected Brevo communications configuration. Provider credentials were not displayed.");
+    Console.WriteLine($"Saved encrypted webhook recovery metadata to {recoveryPath}.");
+}
+
+static long ConfigureBrevoWebhook(string apiKey, string webhookToken, long? existingId)
+{
+    var endpoint = existingId is > 0
+        ? new Uri($"https://api.brevo.com/v3/webhooks/{existingId.Value}")
+        : new Uri("https://api.brevo.com/v3/webhooks");
+    var payload = JsonSerializer.Serialize(new
+    {
+        description = "POS Printer Emulator transactional delivery events",
+        url = "https://admin.posprinteremulator.com/api/v1/brevo-webhook.php",
+        events = new[] { "sent", "delivered", "hardBounce", "softBounce", "blocked", "spam", "invalid", "deferred", "click", "opened", "unsubscribed" },
+        type = "transactional",
+        auth = new { type = "bearer", token = webhookToken },
+        batched = false
+    });
+    using var request = new HttpRequestMessage(existingId is > 0 ? HttpMethod.Put : HttpMethod.Post, endpoint);
+    request.Headers.Add("api-key", apiKey);
+    request.Headers.Accept.ParseAdd("application/json");
+    request.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    using var response = http.Send(request);
+    var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException($"Brevo webhook configuration failed with HTTP {(int)response.StatusCode}.");
+    }
+    if (existingId is > 0) return existingId.Value;
+    using var result = JsonDocument.Parse(body);
+    if (!result.RootElement.TryGetProperty("id", out var id) || !id.TryGetInt64(out var createdId) || createdId < 1)
+    {
+        throw new InvalidDataException("Brevo did not return a valid webhook identifier.");
+    }
+    return createdId;
+}
+
 static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
 {
     if (!OperatingSystem.IsWindows())
@@ -707,6 +894,13 @@ static async Task MigrateCrmAsync(Uri migrationUri)
     var serviceToken = RecoverCrmServiceToken();
     await RunProtectedMigrationAsync(migrationUri, serviceToken, "CRM");
     Console.WriteLine("Protected customer CRM migration completed successfully.");
+}
+
+static async Task MigrateCommunicationsAsync(Uri migrationUri)
+{
+    var serviceToken = RecoverCrmServiceToken();
+    await RunProtectedMigrationAsync(migrationUri, serviceToken, "communications");
+    Console.WriteLine("Protected communications migration completed successfully.");
 }
 
 static async Task MigrateCustomerPortalAsync(Uri migrationUri)

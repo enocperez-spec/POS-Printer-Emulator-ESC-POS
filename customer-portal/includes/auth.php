@@ -246,7 +246,8 @@ function portal_request_enrollment(string $email): void
         (string)$customer['canonical_email'],
         'Portal Enrollment',
         'Verify your POS Printer Emulator customer account',
-        "Use this one-time link within 30 minutes to create your Customer Portal password:\n\n{$link}\n\nIf you did not request this, no action is required."
+        "Use this one-time link within 30 minutes to create your Customer Portal password:\n\n{$link}\n\nIf you did not request this, no action is required.",
+        ['customer_name' => (string)$customer['display_name'], 'verification_url' => $link]
     );
 }
 
@@ -271,7 +272,8 @@ function portal_request_password_reset(string $email): void
         (string)$account['canonical_email'],
         'Password Reset',
         'Reset your POS Printer Emulator Customer Portal password',
-        "Use this one-time link within 30 minutes to reset your Customer Portal password:\n\n{$link}\n\nIf you did not request this, no action is required."
+        "Use this one-time link within 30 minutes to reset your Customer Portal password:\n\n{$link}\n\nIf you did not request this, no action is required.",
+        ['customer_name' => (string)$account['display_name'], 'reset_url' => $link]
     );
 }
 
