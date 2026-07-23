@@ -8,6 +8,7 @@
         Height="820"
         MinWidth="980"
         MinHeight="680"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="#F7F9FC">
   <Grid>

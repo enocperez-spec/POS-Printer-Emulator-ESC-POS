@@ -19,10 +19,23 @@ public partial class MainWindow : Window
     private readonly SemaphoreSlim _updateGate = new(1, 1);
     private bool _webViewInitialized;
     private bool _viewerReady;
+    private WindowState _lastNonMinimizedWindowState = WindowState.Maximized;
 
     public MainWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) =>
+        {
+            _lastNonMinimizedWindowState = WindowPlacementManager.Apply(this);
+        };
+        StateChanged += (_, _) =>
+        {
+            if (WindowState is WindowState.Normal or WindowState.Maximized)
+            {
+                _lastNonMinimizedWindowState = WindowState;
+            }
+        };
+        Closing += (_, _) => WindowPlacementManager.Save(this, _lastNonMinimizedWindowState);
         Loaded += async (_, _) => await StartAsync();
         Closed += (_, _) => { _httpClient.Dispose(); _updateGate.Dispose(); };
     }

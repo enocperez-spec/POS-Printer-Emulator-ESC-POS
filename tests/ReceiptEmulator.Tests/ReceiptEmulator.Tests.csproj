@@ -17,4 +17,8 @@
     <ProjectReference Include="..\..\src\POSPrinterEmulator.Licensing\POSPrinterEmulator.Licensing.csproj" />
     <ProjectReference Include="..\..\src\POSPrinterEmulator.Update\POSPrinterEmulator.Update.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\POSPrinterEmulator.Desktop\WindowPlacementPreferences.cs"
+             Link="Desktop\WindowPlacementPreferences.cs" />
+  </ItemGroup>
 </Project>

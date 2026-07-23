@@ -4,6 +4,14 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.46 — Unreleased
+
+- Launches the desktop application maximized on first use without covering the Windows taskbar.
+- Remembers each Windows user's last restored size, position, and maximized or normal state.
+- Restores saved windows within the available monitor work area and safely recenters the window if a previously used monitor is disconnected.
+- Never persists a minimized startup state, so minimizing the application does not make it appear missing at the next launch.
+- Preserves standard Windows maximize, restore, resize, minimize, and multi-monitor behavior.
+
 ## v0.3.45 — 2026-07-23
 
 - Adds protected Brevo REST delivery, authenticated webhooks, and a durable priority outbox without exposing provider credentials to browsers or desktop binaries.

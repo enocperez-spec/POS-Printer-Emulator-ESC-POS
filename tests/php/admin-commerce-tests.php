@@ -181,7 +181,7 @@ $futureReleases = [
     'v0.3.54' => ['Update Notifications for All License Types', 40],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
-    $status = 'Planned';
+    $status = $version === 'v0.3.46' ? 'In progress' : 'Planned';
     $expectedRow = "('{$version}', '{$version}', 'Release', '{$title}', '{$status}'";
     $expectContains($expectedRow, $devSupport, "Admin Dev Support is missing {$status} {$version} {$title}.");
     $expectContains($expectedRow, $schema, "Fresh database schema is missing {$status} {$version} {$title}.");

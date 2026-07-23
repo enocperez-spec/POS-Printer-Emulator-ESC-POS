@@ -664,7 +664,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.46 — Accessibility and keyboard usability
 
-**Status:** Planned
+**Status:** In progress
 
 **GitHub:** [Issue #31 — Accessibility and keyboard usability](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/31)
 
@@ -672,6 +672,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Planned scope:**
 
+- Launch the desktop window maximized on first use, remember each user's last normal or maximized preference, keep restored bounds within the current monitor work area, and recover safely when a saved monitor is disconnected.
 - Define a complete focus order, visible focus treatment, semantic landmarks, accessible names, and screen-reader status announcements.
 - Add documented shortcuts for Test Receipt, Settings, search, job navigation, panel controls, help, and the mode switch.
 - Support Windows text scaling, 200 percent display scaling, high contrast, reduced motion, and application zoom without clipped controls.
@@ -685,7 +686,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Why this order:** Accessibility improves usability for every customer and is less expensive to establish before more screens and controls are added.
 
-**Complete when:** Primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
+**Complete when:** The first launch is maximized without covering the taskbar; restore, resize, minimize, multi-monitor placement, disconnected-monitor recovery, and subsequent preference restoration work normally; and primary setup, receipt, listener, export, update, backup, and support workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.
 
 ### v0.3.47 — Automatic configuration restore points
 
