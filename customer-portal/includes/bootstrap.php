@@ -40,20 +40,35 @@ function portal_database(): PDO
     }
     $database = portal_config()['database'] ?? [];
     $name = trim((string)($database['name'] ?? ''));
-    if (!preg_match('/^[A-Za-z0-9_$-]+$/', $name)) {
-        throw new RuntimeException('The configured database name is invalid.');
-    }
     $dsn = sprintf(
-        'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+        'mysql:host=%s;port=%d;charset=utf8mb4',
         (string)($database['host'] ?? ''),
-        (int)($database['port'] ?? 3306),
-        $name
+        (int)($database['port'] ?? 3306)
     );
     $pdo = new PDO($dsn, (string)($database['username'] ?? ''), (string)($database['password'] ?? ''), [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
+
+    if ($name === '') {
+        $systemDatabases = ['information_schema', 'mysql', 'performance_schema', 'sys'];
+        $available = $pdo->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN);
+        $available = array_values(array_filter(
+            $available,
+            static fn($databaseName): bool =>
+                !in_array(strtolower((string)$databaseName), $systemDatabases, true)
+        ));
+        if (count($available) !== 1) {
+            throw new RuntimeException('The database name must be configured explicitly.');
+        }
+        $name = (string)$available[0];
+    }
+
+    if (!preg_match('/^[A-Za-z0-9_$-]+$/', $name)) {
+        throw new RuntimeException('The configured database name is invalid.');
+    }
+    $pdo->exec('USE `' . str_replace('`', '``', $name) . '`');
     $pdo->exec("SET time_zone = '+00:00'");
     return $pdo;
 }
