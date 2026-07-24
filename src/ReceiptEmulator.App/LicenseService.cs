@@ -138,7 +138,8 @@ public sealed class LicenseService
                     PrinterProfiles: isPaid,
                     Updates: maintenance.IsActive,
                     Support: maintenance.IsActive,
-                    MultipleListeners: maximumListeners > 1));
+                    MultipleListeners: maximumListeners > 1,
+                    ReceiptImages: isPaid));
         }
     }
 

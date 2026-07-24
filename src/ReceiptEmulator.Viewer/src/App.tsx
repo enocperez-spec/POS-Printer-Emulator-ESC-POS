@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type RefObject } from 'react'
 import {
   AlertTriangle,
   Braces,
@@ -43,6 +43,7 @@ import {
 import { api } from './api'
 import { QRCodeSVG } from 'qrcode.react'
 import BarcodeRenderer from 'react-barcode'
+import { toBlob } from 'html-to-image'
 import { PrinterSetupWizard } from './PrinterSetupWizard'
 import { PrinterStateSettings } from './PrinterStateSettings'
 import { PrinterProfilesSettings } from './PrinterProfilesSettings'
@@ -58,13 +59,13 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.47',
+  version: '0.3.49',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
     maintenance: { isApplicable: false, isActive: false, isGrandfathered: false, state: 'NotApplicable', message: 'Annual maintenance is included for one year with a paid license purchase.' },
     promotion: { isApplicable: true, isActive: false, state: 'None', message: 'No promotional access is installed.' },
-    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false },
+    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false, receiptImages: false },
   },
 }
 
@@ -112,6 +113,45 @@ function saveDownload(blob: Blob, fileName: string) {
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+}
+
+type ReceiptImageAction = 'copy' | 'save'
+type ReceiptImageDesktopResult = {
+  type: 'receipt-image-result'
+  action: ReceiptImageAction
+  success: boolean
+  message: string
+}
+
+function receiptImageBridge() {
+  return (window as Window & {
+    chrome?: {
+      webview?: {
+        postMessage: (message: unknown) => void
+        addEventListener: (name: string, handler: (event: { data: unknown }) => void) => void
+        removeEventListener: (name: string, handler: (event: { data: unknown }) => void) => void
+      }
+    }
+  }).chrome?.webview
+}
+
+function receiptImageFileName(job: ReceiptJob) {
+  const timestamp = new Date(job.receivedAt).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '')
+  return `Receipt-${job.id.replaceAll('-', '')}-${timestamp}.png`
+}
+
+async function blobToBase64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('The receipt image could not be prepared.'))
+    reader.onload = () => {
+      const value = typeof reader.result === 'string' ? reader.result : ''
+      const separator = value.indexOf(',')
+      if (separator < 0) reject(new Error('The receipt image could not be prepared.'))
+      else resolve(value.slice(separator + 1))
+    }
+    reader.readAsDataURL(blob)
+  })
 }
 
 function App() {
@@ -841,6 +881,105 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
   exporting?: 'text' | 'raw' | 'capture'
 }) {
   const storedGraphicMap = useMemo(() => new Map(storedGraphics.map(graphic => [graphic.keyCode, graphic])), [storedGraphics])
+  const receiptRef = useRef<HTMLElement>(null)
+  const [imageBusy, setImageBusy] = useState<ReceiptImageAction>()
+  const [imageMessage, setImageMessage] = useState<string>()
+  const [imageError, setImageError] = useState<string>()
+  const receiptImagesAllowed = license.features.receiptImages || (import.meta.env.DEV && license.features.exports)
+
+  useEffect(() => {
+    const bridge = receiptImageBridge()
+    if (!bridge) return
+    const handler = (event: { data: unknown }) => {
+      const result = event.data as Partial<ReceiptImageDesktopResult>
+      if (result.type !== 'receipt-image-result' || (result.action !== 'copy' && result.action !== 'save')) return
+      setImageBusy(undefined)
+      if (result.success) {
+        setImageError(undefined)
+        setImageMessage(result.message ?? (result.action === 'copy' ? 'Receipt image copied to clipboard.' : 'Receipt image saved.'))
+      } else {
+        setImageMessage(undefined)
+        setImageError(result.message ?? `The receipt image could not be ${result.action === 'copy' ? 'copied' : 'saved'}. Please try again.`)
+      }
+    }
+    bridge.addEventListener('message', handler)
+    return () => bridge.removeEventListener('message', handler)
+  }, [])
+
+  async function createReceiptImage() {
+    const node = receiptRef.current
+    if (!node) throw new Error('Select a receipt before creating an image.')
+    await document.fonts.ready
+    const width = Math.max(1, node.scrollWidth)
+    const height = Math.max(1, node.scrollHeight)
+    const pixelRatio = Math.max(0.1, Math.min(
+      2,
+      16_000 / width,
+      16_000 / height,
+      Math.sqrt(24_000_000 / (width * height)),
+    ))
+    const blob = await toBlob(node, {
+      backgroundColor: '#ffffff',
+      cacheBust: false,
+      pixelRatio,
+      width,
+      height,
+      style: { boxShadow: 'none', margin: '0', transform: 'none' },
+    })
+    if (!blob || blob.size === 0) throw new Error('The receipt image renderer did not return a PNG file.')
+    if (blob.size > 40 * 1024 * 1024) throw new Error('The receipt image is too large to copy or save safely.')
+    return blob
+  }
+
+  async function exportReceiptImage(action: ReceiptImageAction) {
+    if (!job || imageBusy) return
+    setImageBusy(action)
+    setImageMessage(undefined)
+    setImageError(undefined)
+    try {
+      try {
+        await api.authorizeReceiptImage(job.id, action)
+      } catch (cause) {
+        // The development viewer can be paired with the currently installed service while this release is tested.
+        // Production builds always require the dedicated server-side authorization endpoint.
+        if (!(import.meta.env.DEV && license.features.exports && cause instanceof Error && (cause.message.includes('(404)') || cause.message.includes('(405)')))) throw cause
+      }
+      const blob = await createReceiptImage()
+      const bridge = receiptImageBridge()
+      if (bridge) {
+        bridge.postMessage({
+          type: 'receipt-image',
+          action,
+          jobId: job.id,
+          suggestedName: receiptImageFileName(job),
+          imageBase64: await blobToBase64(blob),
+        })
+        return
+      }
+
+      if (action === 'copy') {
+        if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+          throw new Error('Image clipboard access is unavailable in this browser.')
+        }
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        setImageMessage('Receipt image copied to clipboard.')
+      } else {
+        saveDownload(blob, receiptImageFileName(job))
+        setImageMessage('Receipt image saved.')
+      }
+    } catch (cause) {
+      const fallback = action === 'copy'
+        ? 'The receipt image could not be copied. Please try again.'
+        : 'The receipt image could not be saved. Please try again.'
+      const licenseMessage = cause instanceof Error && cause.message.includes('requires a Lite, Pro, or Enterprise License')
+        ? cause.message
+        : undefined
+      setImageError(licenseMessage ?? fallback)
+    } finally {
+      if (!receiptImageBridge()) setImageBusy(undefined)
+    }
+  }
+
   return (
     <section className="preview-pane">
       <div className="pane-heading"><strong>Receipt preview</strong></div>
@@ -861,6 +1000,15 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
         {job && (license.features.exports
           ? <button className="toolbar-link" onClick={() => onDownload('capture')} disabled={exporting !== undefined}><Package size={16} /> {exporting === 'capture' ? 'Saving…' : 'Capture'}</button>
           : <button className="premium-disabled" disabled title="Available with a Lite, Pro, or Enterprise License"><LockKeyhole size={15} /> Capture</button>)}
+        {job && (receiptImagesAllowed
+          ? <details className="receipt-image-menu">
+              <summary aria-label="Receipt image actions"><ImageIcon size={16} /> Image <ChevronDown size={14} /></summary>
+              <div>
+                <button type="button" onClick={() => exportReceiptImage('copy')} disabled={imageBusy !== undefined}><Copy size={15} /> {imageBusy === 'copy' ? 'Copying…' : 'Copy Receipt as Image'}</button>
+                <button type="button" onClick={() => exportReceiptImage('save')} disabled={imageBusy !== undefined}><Download size={15} /> {imageBusy === 'save' ? 'Saving…' : 'Save Receipt as PNG'}</button>
+              </div>
+            </details>
+          : <button className="premium-disabled" disabled title="Available with a Lite, Pro, or Enterprise License"><LockKeyhole size={15} /><ImageIcon size={16} /> Image</button>)}
         {job && <button onClick={onReplay} disabled={!license.features.premiumFeatures || replaying}
           className={!license.features.premiumFeatures ? 'premium-disabled' : ''}
           title={!license.features.premiumFeatures ? 'Available with a Lite, Pro, or Enterprise License' : 'Replay this receipt without sending it from the POS again'}>
@@ -873,11 +1021,13 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
         </button>
       </div>
       <div className="preview-canvas">
+        {imageMessage && <div className="receipt-image-notice success" role="status"><CheckCircle2 size={16} />{imageMessage}</div>}
+        {imageError && <div className="receipt-image-notice error" role="alert"><AlertTriangle size={16} />{imageError}</div>}
         {job ? (
           <>
             {job.origin === 'Trial Limit' && <div className="trial-limit-banner" role="status"><AlertTriangle size={17} /><div><strong>Trial Limit Reached</strong><span>The original bytes and receipt content after line 10 were permanently discarded. Upgrade for unlimited complete jobs.</span></div><a href="https://buy.posprinteremulator.com/" target="_blank" rel="noreferrer">View licenses</a></div>}
             <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})`, width: `${Math.round(364 * job.profilePaperWidthMm / 80)}px` }}>
-              <ReceiptPaper lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
+              <ReceiptPaper articleRef={receiptRef} lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
             </div>
           </>
         ) : (
@@ -893,9 +1043,9 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
   )
 }
 
-function ReceiptPaper({ lines, watermark, storedGraphics, paperWidthMm }: { lines: ReceiptLine[]; watermark: boolean; storedGraphics: Map<string, StoredGraphic>; paperWidthMm: number }) {
+function ReceiptPaper({ lines, watermark, storedGraphics, paperWidthMm, articleRef }: { lines: ReceiptLine[]; watermark: boolean; storedGraphics: Map<string, StoredGraphic>; paperWidthMm: number; articleRef?: RefObject<HTMLElement | null> }) {
   return (
-    <article className="receipt-paper" style={{ width: `${Math.round(364 * paperWidthMm / 80)}px` }}>
+    <article ref={articleRef} className="receipt-paper" style={{ width: `${Math.round(364 * paperWidthMm / 80)}px` }}>
       {watermark && (
         <div className="trial-watermark" aria-hidden="true">
           {Array.from({ length: 8 }, (_, index) => <span key={index}>TRIAL · NOT FOR PRODUCTION USE</span>)}

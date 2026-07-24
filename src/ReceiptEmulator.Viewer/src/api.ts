@@ -101,6 +101,10 @@ export const api = {
   },
   replayJob: (id: string) => json<{ id: string; origin: string }>(`/api/jobs/${id}/replay`, { method: 'POST' }),
   downloadJob: (id: string, format: 'text' | 'raw' | 'capture') => download(`/api/jobs/${id}/${format}`),
+  authorizeReceiptImage: (id: string, action: 'copy' | 'save') => json<{ authorized: boolean }>(
+    `/api/jobs/${id}/receipt-image/authorize`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) },
+  ),
   activate: (request: ActivationRequest) => json<LicenseStatus>('/api/license/activate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

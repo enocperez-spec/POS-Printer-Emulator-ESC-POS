@@ -9,6 +9,7 @@ export type FeatureStatus = {
   updates: boolean
   support: boolean
   multipleListeners?: boolean
+  receiptImages: boolean
 }
 
 export type ListenerSummary = {

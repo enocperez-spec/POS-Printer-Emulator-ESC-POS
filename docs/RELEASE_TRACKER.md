@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.48 — released 2026-07-23**
+**Current public release: v0.3.49 — released 2026-07-24**
 
-**Current development: v0.3.49 — Automatic configuration restore points**
+**Current development: v0.3.50 — Advanced Diagnostics PDF Report**
 
-**Next release after v0.3.48: v0.3.49 — Automatic configuration restore points**
+**Next release after v0.3.49: v0.3.50 — Advanced Diagnostics PDF Report**
 
-**Future scheduled sequence: v0.3.49 through v0.3.56**
+**Future scheduled sequence: v0.3.50 through v0.3.59**
 
-**Most recently completed: v0.3.48 — Settings Version Visibility and Setup Clarity**
+**Most recently completed: v0.3.49 — Receipt Image Sharing**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -89,10 +89,11 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.46 | Released | Accessibility and keyboard usability |
 | v0.3.47 | Released | Five-Day Promotional Trial Experience |
 | v0.3.48 | Released | Settings Version Visibility and Setup Clarity |
+| v0.3.49 | Released | Receipt Image Sharing |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49-v0.3.54 improve recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.55 delivers receipt comparison and automated validation; and v0.3.56 makes public update awareness available to every license and maintenance state.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49 provides direct receipt-image sharing; v0.3.50-v0.3.51 deliver the reusable advanced and standard diagnostic-report engine; v0.3.52-v0.3.57 improve recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.58 delivers receipt comparison and automated validation; and v0.3.59 makes public update awareness available to every license and maintenance state.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -741,7 +742,78 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Settings screenshots clearly show v0.3.48 from every section, evaluation customers are not asked for a key, the verification action reaches the Customer Portal, and setup creates the desktop shortcut unless the customer clears the option.
 
-### v0.3.49 — Automatic configuration restore points
+### v0.3.49 — Receipt Image Sharing
+
+**Status:** Released — 2026-07-24
+
+**Purpose:** Let customers share or document the rendered receipt without capturing the surrounding application window.
+
+**Released scope:**
+
+- Add an **Image** action menu beside Text, Raw, Capture, Replay, and Print / PDF in Expert Mode.
+- Copy the complete receipt to the Windows clipboard as an opaque PNG, including off-screen receipt content, text formatting, stored logos, raster graphics, barcodes, and QR codes.
+- Save the same complete receipt through a native Save As dialog with a descriptive job-and-time filename and overwrite confirmation.
+- Exclude the Activity panel, toolbar, inspector, Settings, status bar, and other application interface elements.
+- Keep the output readable while bounding image dimensions and transfer size for unusually long receipts.
+- Confirm successful clipboard copies with **Receipt image copied to clipboard.** and return clear, non-destructive errors.
+- Enforce Lite, Pro, or Enterprise access through the local service API and desktop bridge rather than client-side visibility alone.
+- Validate the PNG signature before it reaches the clipboard or filesystem and write only action, job identifier, timestamp, and outcome to the privacy-safe audit log.
+
+**License availability:** Lite, Pro, and Enterprise. Trial cannot call the authorization endpoint even if the local HTML interface is modified.
+
+**Security and privacy:** Receipt contents remain local, no image is uploaded automatically, file paths are sanitized, large transfers are rejected, and logs never include pixels, receipt text, activation keys, credentials, or personal fields.
+
+**Verification:** The React production build, Windows desktop build, 184 C# tests, and release-version synchronization pass. The image menu was verified in both Light and Dark compatible styles against a receipt containing a logo, formatted text, and barcode, and the desktop clipboard/save bridge validates PNG input before use.
+
+**Complete when:** A long receipt can be copied and pasted into common Windows applications or saved as PNG with its full content and printed graphics intact, while Trial authorization is rejected and no surrounding application interface appears in the image.
+
+### v0.3.50 — Advanced Diagnostics PDF Report
+
+**Status:** Planned
+
+**GitHub:** [Issue #57 — Advanced Diagnostics PDF Report](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/57)
+
+**Purpose:** Give Enterprise customers and developers a single detailed, professional diagnostic document that explains a receipt problem without assembling screenshots and logs manually.
+
+**Planned scope:**
+
+- Generate a deterministic PDF with the POS Printer Emulator application logo, product name, report format version, report identifier, creation time, application version, license tier, and privacy classification.
+- Include customer-entered issue summary, expected and actual behavior, reproduction steps, selected listener and job identifiers, and report options.
+- Embed a readable receipt preview and comprehensive parsed-command analysis with offsets, byte summaries, supported and unsupported command totals, image/barcode/QR details, and parser warnings.
+- Include bounded raw-data excerpts, job metadata, profile and listener configuration, printer state, Windows/application environment, storage and performance measurements, relevant redacted logs, health results, and SHA-256 checksums.
+- Detect and mask likely personal, receipt, listener-address, and credential-like values by default; always exclude activation keys, passwords, tokens, API keys, cookies, private signing material, and provider credentials.
+- Present a review screen listing every included and excluded section and require explicit customer consent before saving.
+- Use one shared diagnostics document model and PDF renderer so the Standard report can reuse the same verified collection, redaction, branding, pagination, and export pipeline.
+
+**License availability:** Enterprise. Purchased access remains available if annual maintenance expires.
+
+**Security and privacy:** Collection and authorization are enforced by the local service, temporary files are bounded and cleaned, all included data is reviewed and redacted before generation, and no report is uploaded automatically.
+
+**Complete when:** A representative long receipt produces a readable, logo-branded, multi-page PDF whose sections, tables, page breaks, checksums, and redactions are correct; a modified UI cannot bypass Enterprise authorization; and rendered-page inspection plus automated tests pass.
+
+### v0.3.51 — Standard Diagnostics PDF Report
+
+**Status:** Planned
+
+**GitHub:** [Issue #58 — Standard Diagnostics PDF Report](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/58)
+
+**Purpose:** Provide a shorter Enterprise support document that communicates the most important health findings and next steps without the advanced report's full developer detail.
+
+**Planned scope:**
+
+- Reuse the v0.3.50 diagnostics collection, redaction, application-logo branding, report metadata, pagination, checksum, and secure export services.
+- Include a concise issue summary, application and Windows version, license tier, selected listener and job metadata, receipt thumbnail, listener and printer-state overview, high-priority parser warnings, health-check results, and recent redacted errors.
+- Summarize commands and raw data rather than including full developer tables, and clearly direct support staff to request the Advanced report only when deeper evidence is necessary.
+- Use the same review-and-consent screen with a simpler default section list and clear explanations of omitted advanced data.
+- Preserve maintenance-independent Enterprise feature access and never upload the PDF automatically.
+
+**License availability:** Enterprise. Purchased access remains available if annual maintenance expires.
+
+**Security and privacy:** The Standard report inherits the same denylist, masking, size limits, temporary-file cleanup, server-side authorization, and local-only export controls as the Advanced report.
+
+**Complete when:** The Standard report is materially shorter than the Advanced report, remains readable and branded, includes the minimum evidence needed for common support cases, contains no prohibited values, and passes the shared PDF rendering and redaction test suite.
+
+### v0.3.52 — Automatic configuration restore points
 
 **Status:** Planned
 
@@ -766,7 +838,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
 
-### v0.3.50 — Projects and testing sessions
+### v0.3.53 — Projects and testing sessions
 
 **Status:** Planned
 
@@ -787,11 +859,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
 
-**Why this order:** The restore-point foundation in v0.3.48 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
+**Why this order:** The restore-point foundation in v0.3.52 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
 
 **Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
 
-### v0.3.51 — Privacy-safe receipt masking
+### v0.3.54 — Privacy-safe receipt masking
 
 **Status:** Planned
 
@@ -816,7 +888,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
 
-### v0.3.52 — System tray health and notifications
+### v0.3.55 — System tray health and notifications
 
 **Status:** Planned
 
@@ -841,7 +913,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
 
-### v0.3.53 — Character and code-page assistant
+### v0.3.56 — Character and code-page assistant
 
 **Status:** Planned
 
@@ -866,7 +938,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** Known mojibake fixtures produce the correct diagnosis and preview, saved recommendations render deterministically, and original capture bytes remain unchanged.
 
-### v0.3.54 — Offline Enterprise update packages
+### v0.3.57 — Offline Enterprise update packages
 
 **Status:** Planned
 
@@ -891,7 +963,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** An offline Enterprise computer installs a valid package and rejects tampered, unsigned, downgraded, incompatible, or unentitled packages without damaging the current installation.
 
-### v0.3.55 — Receipt comparison and automated validation
+### v0.3.58 — Receipt comparison and automated validation
 
 **Status:** Planned
 
@@ -915,7 +987,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A known-good capture passes its baseline, an intentional command or layout change fails with a precise difference, ignored dynamic fields do not cause false failures, privacy-safe exports do not expose configured sensitive values, and the compiled installer consistently displays the official product branding at normal and high-DPI scaling.
 
-### v0.3.56 — Update Notifications for All License Types
+### v0.3.59 — Update Notifications for All License Types
 
 **Status:** Planned
 

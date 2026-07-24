@@ -605,6 +605,52 @@ function migrate_settings_version_visibility_schedule(): void
 
 migrate_settings_version_visibility_schedule();
 
+function migrate_receipt_image_and_diagnostic_pdf_schedule(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+        $claim->execute(['receipt-image-diagnostic-pdf-v0.3.49-v0.3.51']);
+        if ($claim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        // Reserve three consecutive releases for receipt image sharing and the
+        // shared Advanced/Standard diagnostic PDF foundation without dropping
+        // any already scheduled roadmap scope.
+        for ($old = 56; $old >= 49; $old--) {
+            $new = $old + 3;
+            $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.{$new}', version_label='v0.3.{$new}', priority_rank=3{$new} WHERE item_key='v0.3.{$old}' AND status='Planned'");
+        }
+
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release
+                     WHEN 'v0.3.49' THEN 'v0.3.52' WHEN 'v0.3.50' THEN 'v0.3.53'
+                     WHEN 'v0.3.51' THEN 'v0.3.54' WHEN 'v0.3.52' THEN 'v0.3.55'
+                     WHEN 'v0.3.53' THEN 'v0.3.56' WHEN 'v0.3.54' THEN 'v0.3.57'
+                     WHEN 'v0.3.55' THEN 'v0.3.58' WHEN 'v0.3.56' THEN 'v0.3.59'
+                     ELSE target_release END,
+                 fixed_version = CASE fixed_version
+                     WHEN 'v0.3.49' THEN 'v0.3.52' WHEN 'v0.3.50' THEN 'v0.3.53'
+                     WHEN 'v0.3.51' THEN 'v0.3.54' WHEN 'v0.3.52' THEN 'v0.3.55'
+                     WHEN 'v0.3.53' THEN 'v0.3.56' WHEN 'v0.3.54' THEN 'v0.3.57'
+                     WHEN 'v0.3.55' THEN 'v0.3.58' WHEN 'v0.3.56' THEN 'v0.3.59'
+                     ELSE fixed_version END
+             WHERE target_release BETWEEN 'v0.3.49' AND 'v0.3.56'
+                OR fixed_version BETWEEN 'v0.3.49' AND 'v0.3.56'"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
+    }
+}
+
+migrate_receipt_image_and_diagnostic_pdf_schedule();
+
 function mark_customer_crm_release_in_progress(): void
 {
     $pdo = database();
@@ -705,12 +751,12 @@ $releaseSync = database()->prepare(
          'Versioned and reopenable two-step welcome guide; wizard-first instruction; visible read-only included listener; local and LAN IPv4 endpoints; copyable RAW TCP details; and retained server-side mutation denial.',
          'The v0.3.37 guide could remain dismissed and hid the included listener behind an upgrade panel, leaving customers unsure how to connect.',
          'Fresh and upgraded Trial installations see and can reopen the guide, view one locked listener, copy exact connection details, and receive HTTP 403 for listener mutations.', UTC_TIMESTAMP(6)),
-        ('v0.3.56', 'v0.3.56', 'Release', 'Update Notifications for All License Types', 'Planned', 356,
+        ('v0.3.59', 'v0.3.59', 'Release', 'Update Notifications for All License Types', 'Planned', 359,
          'Notify every license tier about newer public desktop releases even when paid maintenance has expired.',
          'Public release notification checks for Trial, Lite, Pro, and Enterprise; installed and latest versions; eligible releases-behind count; concise update summary; accessible visual indicator; Trial manual-download action; active-maintenance guided update; expired-maintenance release and renewal guidance; offline cache; rate limiting; and trusted-link enforcement.',
          'Update awareness should be universal while in-app installation continues to honor maintenance entitlements.',
          'Every license state receives accurate non-blocking notifications, Trial opens the official download page, active-maintenance paid users can install in-app, expired-maintenance users cannot bypass renewal, and privacy, offline, counting, and trust tests pass.', NULL),
-        ('v0.3.55', 'v0.3.55', 'Release', 'Receipt comparison and automated validation', 'Planned', 355,
+        ('v0.3.58', 'v0.3.58', 'Release', 'Receipt comparison and automated validation', 'Planned', 358,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and privacy-safe HTML, PDF, and JSON results.',
          'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.',
@@ -765,32 +811,47 @@ $releaseSync = database()->prepare(
          'Persistent build-derived Settings version; clearly separated permanent-license entry; corrected Customer Portal verification action; and desktop shortcut selected by default during setup.',
          'Customers and support staff need to identify the installed release immediately, and evaluation customers must not be asked for an activation key.',
          'Every Settings section shows the running version, one-click evaluation remains keyless, verification opens the live Customer Portal, and setup creates a desktop shortcut unless the customer opts out.', UTC_TIMESTAMP(6)),
-        ('v0.3.49', 'v0.3.49', 'Release', 'Automatic configuration restore points', 'Planned', 349,
+        ('v0.3.49', 'v0.3.49', 'Release', 'Receipt Image Sharing', 'Released', 349,
+         'Let customers share or document the complete rendered receipt without capturing the surrounding application window.',
+         'Paid-tier Image menu; full off-screen receipt rendering; logos, raster graphics, barcodes, and QR codes; Windows clipboard PNG; native Save As with descriptive filename and overwrite confirmation; bounded dimensions and transfer size; server authorization; PNG signature validation; and privacy-safe action logging.',
+         'Direct image sharing is a contained, high-value workflow and provides the receipt-rendering artifact that later diagnostic reports can reuse.',
+         'Lite, Pro, and Enterprise customers copy or save a complete receipt-only PNG, Trial calls are denied server-side, and no application chrome or logged receipt content is included.', UTC_TIMESTAMP(6)),
+        ('v0.3.50', 'v0.3.50', 'Release', 'Advanced Diagnostics PDF Report', 'Planned', 350,
+         'Give Enterprise customers and developers one detailed, professional diagnostic document for receipt and listener problems.',
+         'Application-logo branding; format version and report ID; issue narrative; receipt preview; comprehensive command and bounded raw-data analysis; job, listener, profile, printer-state, environment, storage, performance, warning, health, redacted-log, and checksum sections; review and consent; server authorization; deterministic pagination; and shared document model.',
+         'The comprehensive report establishes the secure collection, redaction, branding, and PDF engine that the shorter Standard report can reuse.',
+         'A representative long receipt produces a readable, logo-branded, multi-page PDF with correct tables, page breaks, checksums, redactions, consent, and Enterprise enforcement.', NULL),
+        ('v0.3.51', 'v0.3.51', 'Release', 'Standard Diagnostics PDF Report', 'Planned', 351,
+         'Provide a shorter Enterprise support report with the most important findings and next actions.',
+         'Reuse the Advanced report collection, redaction, logo branding, report metadata, pagination, checksum, authorization, review, consent, and secure local export services; include concise issue, application, Windows, listener, job, receipt thumbnail, state, warning, health, and recent-error summaries.',
+         'Building the comprehensive engine first avoids duplicate security and rendering logic while allowing this release to focus on concise customer-support presentation.',
+         'The Standard report is materially shorter, readable, branded, complete for common support cases, free of prohibited data, and validated by the shared PDF and redaction tests.', NULL),
+        ('v0.3.52', 'v0.3.52', 'Release', 'Automatic configuration restore points', 'Planned', 352,
          'Protect customers from accidental configuration loss without requiring manual backups.',
          'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
          'Recovery protection should precede projects and additional customer configuration complexity.',
          'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
-        ('v0.3.50', 'v0.3.50', 'Release', 'Projects and testing sessions', 'Planned', 350,
+        ('v0.3.53', 'v0.3.53', 'Release', 'Projects and testing sessions', 'Planned', 353,
          'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
          'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
          'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.',
          'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
-        ('v0.3.51', 'v0.3.51', 'Release', 'Privacy-safe receipt masking', 'Planned', 351,
+        ('v0.3.54', 'v0.3.54', 'Release', 'Privacy-safe receipt masking', 'Planned', 354,
          'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
          'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.',
          'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
-        ('v0.3.52', 'v0.3.52', 'Release', 'System tray health and notifications', 'Planned', 352,
+        ('v0.3.55', 'v0.3.55', 'Release', 'System tray health and notifications', 'Planned', 355,
          'Keep customers informed about important listener events without leaving the main window open.',
          'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
          'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.',
          'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
-        ('v0.3.53', 'v0.3.53', 'Release', 'Character and code-page assistant', 'Planned', 353,
+        ('v0.3.56', 'v0.3.56', 'Release', 'Character and code-page assistant', 'Planned', 356,
          'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
          'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.',
          'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.',
          'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', NULL),
-        ('v0.3.54', 'v0.3.54', 'Release', 'Offline Enterprise update packages', 'Planned', 354,
+        ('v0.3.57', 'v0.3.57', 'Release', 'Offline Enterprise update packages', 'Planned', 357,
          'Support secure updates on restricted or air-gapped POS networks.',
          'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.',
          'This depends on guided updates, production signing, rollback, and entitlement foundations.',
@@ -940,14 +1001,17 @@ database()->prepare(
          WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'
          WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'
          WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.48'
-         WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
-         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
-         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
-         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
-         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
-         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
-         WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
+         WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.49'
+         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/57'
+         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/58'
+         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
+         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
+         WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
+         WHEN 'v0.3.57' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
+         WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.59' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -955,7 +1019,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

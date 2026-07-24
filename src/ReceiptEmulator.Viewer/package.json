@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "html-to-image": "1.11.13",
     "lucide-react": "latest",
     "qrcode.react": "^4.2.0",
     "react": "latest",

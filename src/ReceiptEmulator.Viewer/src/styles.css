@@ -330,7 +330,61 @@ button { color: inherit; }
 .rail-empty strong { color: #314157; font-size: 13px; }
 .rail-footer { display: grid; place-items: center; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
 
-.preview-toolbar { display: flex; align-items: center; gap: 6px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.preview-toolbar { position: relative; overflow: visible; display: flex; align-items: center; gap: 6px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.receipt-image-menu { position: relative; }
+.receipt-image-menu > summary {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.receipt-image-menu > summary::-webkit-details-marker { display: none; }
+.receipt-image-menu > summary:hover,
+.receipt-image-menu[open] > summary { background: var(--hover); }
+.receipt-image-menu > div {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 30;
+  width: 232px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 22%);
+}
+.receipt-image-menu > div button {
+  width: 100%;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
+}
+.receipt-image-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 9px 13px;
+  border: 1px solid;
+  border-radius: 7px;
+  transform: translateX(-50%);
+  box-shadow: 0 5px 18px rgb(0 0 0 / 18%);
+  font-size: 12px;
+}
+.receipt-image-notice.success { border-color: #238751; background: #eaf8f0; color: #116337; }
+.receipt-image-notice.error { border-color: #cc5d4d; background: #fff0ee; color: #9c2f24; }
+html[data-theme="dark"] .receipt-image-notice.success { background: #102e21; color: #7ae3a7; }
+html[data-theme="dark"] .receipt-image-notice.error { background: #381c1a; color: #ff9a90; }
 .zoom-group { height: 34px; display: flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .zoom-group button { width: 34px; padding: 0; border-radius: 0; }
 .zoom-group span { min-width: 52px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }

@@ -31,9 +31,12 @@ public sealed class PromotionEntitlementCodecTests
         Assert.Equal(subjectId, entitlement.SubjectId);
         Assert.Equal(LicenseTier.Enterprise, entitlement.GrantedTier);
 
-        var replacement = token[^1] == 'A' ? 'B' : 'A';
+        // Change a byte-bearing Base64URL character. Mutating the final character can
+        // change only unused padding bits and still decode to the identical signature.
+        var tamperIndex = token.Length / 2;
+        var replacement = token[tamperIndex] == 'A' ? 'B' : 'A';
         Assert.False(PromotionEntitlementCodec.TryValidateWithPublicKey(
-            token[..^1] + replacement,
+            token[..tamperIndex] + replacement + token[(tamperIndex + 1)..],
             key.ExportSubjectPublicKeyInfoPem(),
             out _,
             out _));

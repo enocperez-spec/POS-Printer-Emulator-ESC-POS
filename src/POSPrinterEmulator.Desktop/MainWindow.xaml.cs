@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using POSPrinterEmulator.Update;
@@ -128,6 +129,10 @@ public partial class MainWindow : Window
                 {
                     await RunFirewallRepairAsync();
                 }
+                else if (request?.Type == "receipt-image")
+                {
+                    HandleReceiptImage(request);
+                }
             }
             catch (Exception exception)
             {
@@ -152,7 +157,8 @@ public partial class MainWindow : Window
                 ".zip" => ("Save support package", "Compressed support package|*.zip|All files|*.*", "zip"),
                 ".txt" => ("Save text file", "Text file|*.txt|All files|*.*", "txt"),
                 ".bin" => ("Save raw receipt data", "Binary receipt data|*.bin|All files|*.*", "bin"),
-                _ => ("Save POS Printer Emulator file", "POS Printer Emulator files|*.ppebackup;*.ppeprofile;*.ppecapture;*.zip;*.txt;*.bin|All files|*.*", string.Empty)
+                ".png" => ("Save receipt image", "PNG image|*.png|All files|*.*", "png"),
+                _ => ("Save POS Printer Emulator file", "POS Printer Emulator files|*.ppebackup;*.ppeprofile;*.ppecapture;*.zip;*.txt;*.bin;*.png|All files|*.*", string.Empty)
             };
             var dialog = new SaveFileDialog
             {
@@ -445,6 +451,116 @@ public partial class MainWindow : Window
         result = new { success = false, message, technicalDetails = message }
     }, JsonOptions));
 
+    private void HandleReceiptImage(DesktopMessage request)
+    {
+        var action = request.Action?.Trim().ToLowerInvariant();
+        var success = false;
+        var message = action == "save"
+            ? "The receipt image could not be saved. Please try again."
+            : "The receipt image could not be copied. Please try again.";
+
+        try
+        {
+            if (action is not ("copy" or "save") || string.IsNullOrWhiteSpace(request.ImageBase64))
+                throw new InvalidDataException("The receipt image request was incomplete.");
+            if (request.ImageBase64.Length > 56 * 1024 * 1024)
+                throw new InvalidDataException("The receipt image transfer was too large.");
+
+            var imageBytes = Convert.FromBase64String(request.ImageBase64);
+            if (imageBytes.Length is 0 or > 40 * 1024 * 1024 || !HasPngSignature(imageBytes))
+                throw new InvalidDataException("The receipt image was not a valid PNG file.");
+
+            if (action == "copy")
+            {
+                using var stream = new MemoryStream(imageBytes, writable: false);
+                var decoder = new PngBitmapDecoder(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+                var frame = decoder.Frames[0];
+                frame.Freeze();
+                Clipboard.SetImage(frame);
+                message = "Receipt image copied to clipboard.";
+                success = true;
+            }
+            else
+            {
+                var suggestedName = SanitizePngFileName(request.SuggestedName);
+                var dialog = new SaveFileDialog
+                {
+                    Title = "Save Receipt as PNG",
+                    FileName = suggestedName,
+                    InitialDirectory = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        "Downloads"),
+                    AddExtension = true,
+                    DefaultExt = "png",
+                    OverwritePrompt = true,
+                    Filter = "PNG image|*.png|All files|*.*"
+                };
+
+                if (dialog.ShowDialog(this) == true)
+                {
+                    File.WriteAllBytes(dialog.FileName, imageBytes);
+                    message = "Receipt image saved.";
+                    success = true;
+                }
+                else
+                {
+                    message = "Receipt image save canceled.";
+                }
+            }
+        }
+        catch
+        {
+            // Keep the user-facing error privacy-safe. Technical content is not needed for this local operation.
+        }
+        finally
+        {
+            WriteReceiptImageAudit(action ?? "unknown", request.JobId, success);
+            Browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+            {
+                type = "receipt-image-result",
+                action,
+                success,
+                message
+            }, JsonOptions));
+        }
+    }
+
+    private static bool HasPngSignature(byte[] value) =>
+        value.Length >= 8 &&
+        value[0] == 0x89 && value[1] == 0x50 && value[2] == 0x4E && value[3] == 0x47 &&
+        value[4] == 0x0D && value[5] == 0x0A && value[6] == 0x1A && value[7] == 0x0A;
+
+    private static string SanitizePngFileName(string? value)
+    {
+        var fileName = Path.GetFileName(string.IsNullOrWhiteSpace(value) ? "Receipt.png" : value);
+        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+            fileName = fileName.Replace(invalidCharacter, '-');
+        if (!fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) fileName += ".png";
+        return fileName.Length <= 160 ? fileName : $"Receipt-{DateTime.Now:yyyyMMdd-HHmmss}.png";
+    }
+
+    private static void WriteReceiptImageAudit(string action, string? jobId, bool success)
+    {
+        try
+        {
+            var safeJobId = string.IsNullOrWhiteSpace(jobId)
+                ? "unknown"
+                : jobId.Replace('\r', '-').Replace('\n', '-').Replace('\t', '-');
+            if (safeJobId.Length > 80) safeJobId = safeJobId[..80];
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "POSPrinterEmulator");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(
+                Path.Combine(directory, "desktop-audit.log"),
+                $"{DateTimeOffset.UtcNow:O}\treceipt-image\t{action}\tjob={safeJobId}\tresult={(success ? "success" : "failure")}{Environment.NewLine}");
+        }
+        catch
+        {
+            // A diagnostic log failure must never prevent clipboard or file operations.
+        }
+    }
+
     private void ShowLoading(string message)
     {
         Browser.Visibility = Visibility.Hidden;
@@ -482,7 +598,17 @@ public partial class MainWindow : Window
         Process.Start(new ProcessStartInfo(ViewerUri.AbsoluteUri) { UseShellExecute = true });
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private sealed record DesktopMessage(string Type, string? Url, string? ChecksumUrl, string? Version, PrinterInstallRequest? Printer, string? PrinterName);
+    private sealed record DesktopMessage(
+        string Type,
+        string? Url,
+        string? ChecksumUrl,
+        string? Version,
+        PrinterInstallRequest? Printer,
+        string? PrinterName,
+        string? Action,
+        string? ImageBase64,
+        string? SuggestedName,
+        string? JobId);
     private sealed record UpdatePreparation(bool Prepared, string SafetySnapshotId);
     private sealed record ProblemDetailsResponse(string? Detail);
     private sealed record PrinterInstallRequest(string PrinterName, string IpAddress, int Port, bool SameComputer);

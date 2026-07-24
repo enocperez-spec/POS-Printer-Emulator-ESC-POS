@@ -910,6 +910,27 @@ app.MapGet("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
         : Results.Ok(JobResponse(job));
 });
 
+app.MapPost("/api/jobs/{id:guid}/receipt-image/authorize", (
+    Guid id,
+    ReceiptImageAuthorizationRequest request,
+    ReceiptStore store,
+    LicenseService license,
+    ILoggerFactory loggerFactory) =>
+{
+    if (!license.GetStatus().Features.ReceiptImages)
+        return Results.Problem("Receipt image sharing requires a Lite, Pro, or Enterprise License.", statusCode: 403);
+    if (store.Get(id) is null)
+        return Results.NotFound();
+
+    var action = request.Action?.Trim().ToLowerInvariant();
+    if (action is not ("copy" or "save"))
+        return Results.Problem("Choose copy or save for the receipt image action.", statusCode: 400);
+
+    loggerFactory.CreateLogger("ReceiptImageExport")
+        .LogInformation("Receipt image {ReceiptImageAction} authorized for job {JobId}", action, id);
+    return Results.Ok(new { Authorized = true });
+});
+
 app.MapDelete("/api/jobs/{id:guid}", (Guid id, ReceiptStore store) =>
 {
     try { return store.Delete(id) ? Results.NoContent() : Results.NotFound(); }

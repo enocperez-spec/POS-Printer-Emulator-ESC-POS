@@ -93,6 +93,8 @@ public sealed record JobSummary(
 
 public sealed record RegistrationInfo(string CustomerName, string EmailAddress);
 
+public sealed record ReceiptImageAuthorizationRequest(string Action);
+
 public sealed record FeatureStatus(
     bool History,
     bool Exports,
@@ -103,7 +105,8 @@ public sealed record FeatureStatus(
     bool PrinterProfiles,
     bool Updates,
     bool Support,
-    bool MultipleListeners = false);
+    bool MultipleListeners = false,
+    bool ReceiptImages = false);
 
 public sealed record MaintenanceStatus(
     bool IsApplicable,

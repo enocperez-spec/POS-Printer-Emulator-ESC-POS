@@ -15,6 +15,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 - The v0.3.39 release downloads and verifies updates in the background, creates an encrypted safety snapshot, drains active receipt work, closes file-locking processes, installs through a separate updater, restores the prior workspace view, and relaunches automatically.
 - The v0.3.41 release corrects the Windows installer artwork with a purpose-built tall banner that preserves the official product logo proportions.
 - The v0.3.48 release keeps the running build version visible throughout Settings, clarifies that the Five-Day Promotional Trial requires no activation key, and selects the desktop shortcut by default during setup.
+- The v0.3.49 release copies the complete rendered receipt directly to the Windows clipboard or saves it as a PNG without including the surrounding application interface.
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
@@ -31,7 +32,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.48 Settings Version Visibility and Setup Clarity is the current public release, released July 23, 2026.
+> **Release status:** v0.3.49 Receipt Image Sharing is the current public release, released July 24, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -39,7 +40,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.48-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.49-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -58,6 +59,8 @@ The v0.3.25 listener model gives Trial and Lite one total listener, Pro two tota
 Open **Settings → Stored Logos** when a receipt references an image saved inside the physical printer rather than sending its pixels. Import a PNG, JPEG, or WebP image, enter the two-character Epson storage key shown by the command inspector (for example, `00`), and matching receipts will render that local logo automatically.
 
 Lite, Pro, and Enterprise customers can use the **Import capture** button in Activity to open a raw `.bin` receipt or a portable `.ppecapture` package. Select any job and use **Capture** to export a checksum-protected package or **Replay** to run the exact saved bytes through the current parser and renderer. Imported and replayed jobs are labeled separately and remain local to the computer.
+
+Lite, Pro, and Enterprise customers can select a receipt in Expert Mode, open **Image**, and choose **Copy Receipt as Image** or **Save Receipt as PNG**. The exported PNG contains the complete receipt at readable resolution, including content outside the visible scroll area, logos, raster graphics, barcodes, and QR codes, but never includes the Activity list, toolbar, inspector, or other application chrome.
 
 > The current installer is not code-signed, so Windows SmartScreen may show a warning. A trusted Windows code-signing certificate remains planned for a future production-hardening release.
 
@@ -165,7 +168,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.48-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.49-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -274,14 +277,17 @@ The permanent status list for every completed, scheduled, and future release is 
 - **v0.3.45 — Consent-aware lifecycle communications and CRM analytics:** Integrate Brevo with a Free-plan-safe priority queue, protected API and webhook credentials, reliable scheduling and suppression, onboarding/renewal/support messages, minimal consented telemetry, segmentation, and Admin Portal performance dashboards.
 - **v0.3.46 — Accessibility and keyboard usability:** Add keyboard workflows, screen-reader semantics, scaling, high contrast, reduced motion, captions, accessibility regression checks, maximized first launch, and taskbar-safe remembered window placement.
 - **v0.3.47 — Five-Day Promotional Trial Experience:** Let an eligible registered customer select Lite, Pro, or Enterprise and activate one server-authorized five-day evaluation automatically, with a clear countdown, purchase path, safe expiration, and permanent repeat-trial prevention.
-- **v0.3.48 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
-- **v0.3.49 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
-- **v0.3.50 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
-- **v0.3.51 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
-- **v0.3.52 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
-- **v0.3.53 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
-- **v0.3.54 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
-- **v0.3.55 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
+- **Released in v0.3.49 — Receipt Image Sharing:** Copy the complete rendered receipt to the Windows clipboard or save it as a standalone PNG without application chrome.
+- **v0.3.50 — Advanced Diagnostics PDF Report:** Generate a detailed Enterprise diagnostic PDF with the application logo, report metadata, receipt rendering, command analysis, listener and environment state, checksums, and privacy review.
+- **v0.3.51 — Standard Diagnostics PDF Report:** Reuse the verified report engine to create a shorter Enterprise support PDF with the most useful findings, redacted configuration, and clear next actions.
+- **v0.3.52 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
+- **v0.3.53 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
+- **v0.3.54 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
+- **v0.3.55 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
+- **v0.3.56 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
+- **v0.3.57 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
+- **v0.3.58 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.
+- **v0.3.59 — Update Notifications for All License Types:** Notify Trial, Lite, Pro, and Enterprise users about newer public releases even after maintenance expires, show installed/latest versions and releases behind, and route each license state to the correct download, guided-update, or renewal action.
 
 Following these feature releases, planned production work includes service-to-viewer authentication and installer repair, advanced SQLite maintenance and retention controls, online license transfer and revocation, hardened thermal rendering, PNG export, deterministic PDF generation, and production code-signing.
 

@@ -4,6 +4,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.49 — 2026-07-24
+
+- Adds **Image → Copy Receipt as Image** for Lite, Pro, and Enterprise customers.
+- Copies the complete receipt preview to the Windows clipboard as PNG, including content outside the visible scroll area, stored logos, raster graphics, barcodes, and QR codes.
+- Adds **Save Receipt as PNG** with a descriptive receipt/job/timestamp filename, native Save As dialog, and overwrite confirmation.
+- Exports only the receipt paper on an opaque white background; the Activity list, preview controls, inspector, settings, and other application interface elements are excluded.
+- Enforces eligibility through the local service API so Trial customers cannot unlock receipt-image export by manipulating the HTML interface.
+- Validates PNG signatures and transfer size in the desktop host and records privacy-safe action results without logging receipt content.
+
 ## v0.3.48 — 2026-07-23
 
 - Displays the complete application version persistently at the bottom-left of Settings, regardless of the selected section.
