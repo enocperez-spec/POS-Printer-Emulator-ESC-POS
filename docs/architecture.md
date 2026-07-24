@@ -93,7 +93,7 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 29. **v0.3.49 — Receipt Image Sharing.** Authorize paid-tier receipt-image actions in the local service, render the complete receipt DOM to bounded PNG, and transfer only validated PNG bytes through the desktop clipboard/save bridge.
 30. **v0.3.50 — Advanced Diagnostics PDF Report.** Build a shared, Enterprise-authorized diagnostic document model and deterministic logo-branded PDF renderer with comprehensive receipt, command, listener, environment, health, redaction, consent, and checksum evidence.
 31. **v0.3.51 — Standard Diagnostics PDF Report.** Reuse the advanced report's collection, redaction, branding, pagination, and export pipeline for a shorter support-focused document.
-32. **v0.3.52 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
+32. **v0.3.52 — Updater Download File-Lock Correction.** Dispose download streams before promoting verified packages, reject incomplete payloads, and remove abandoned partial files.
 33. **v0.3.53 — Projects and testing sessions.** Isolate customer and store work into named project aggregates without changing listener routing or leaking exported data between projects.
 34. **v0.3.54 — Privacy-safe receipt masking.** Build display and export transformations that mask configured sensitive content while retaining immutable authorized originals.
 35. **v0.3.55 — System tray health and notifications.** Add a native desktop companion surface for background service health, rate-limited local alerts, and privacy-safe quick actions.
@@ -101,6 +101,7 @@ Detailed scope, completion criteria, priority reasons, and current status are ma
 37. **v0.3.57 — Offline Enterprise update packages.** Extend the external updater with signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.
 38. **v0.3.58 — Receipt comparison and automated validation.** Compare raw bytes, parsed commands, and deterministic render output with saved baselines and machine-readable pass/fail results.
 39. **v0.3.59 — Update Notifications for All License Types.** Notify every license and maintenance state about public releases while preserving the correct manual-download, guided-update, and renewal boundaries.
+40. **v0.3.60 — Automatic configuration restore points.** Reuse authenticated encrypted backups for protected pre-change and scheduled local recovery with bounded retention and transactional rollback.
 35. Service-to-viewer authentication and installer repair mode.
 36. Advanced SQLite maintenance, configurable retention, repair, backup, and restore.
 37. Optional online activation revocation and license transfer workflow.

@@ -233,9 +233,9 @@ public partial class MainWindow : Window
 
             PostUpdateState("downloading", "Downloading the verified update…", 0);
             using var updateClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-            await DownloadFileAsync(updateClient, updateUri, installerPath, percent =>
+            await UpdatePackageSecurity.DownloadToFileAsync(updateClient, updateUri, installerPath, percent =>
                 PostUpdateState("downloading", $"Downloading update… {percent}%", percent));
-            await DownloadFileAsync(updateClient, checksumUri, checksumPath, null);
+            await UpdatePackageSecurity.DownloadToFileAsync(updateClient, checksumUri, checksumPath);
 
             var expected = UpdatePackageSecurity.ParseSha256(
                 await File.ReadAllTextAsync(checksumPath), Path.GetFileName(installerPath));
@@ -306,33 +306,6 @@ public partial class MainWindow : Window
         {
             _updateGate.Release();
         }
-    }
-
-    private static async Task DownloadFileAsync(HttpClient client, Uri uri, string destination, Action<int>? progress)
-    {
-        var partial = destination + ".download";
-        using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-        var total = response.Content.Headers.ContentLength;
-        await using var input = await response.Content.ReadAsStreamAsync();
-        await using var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None,
-            128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        var buffer = new byte[128 * 1024];
-        long written = 0;
-        var reported = -1;
-        int read;
-        while ((read = await input.ReadAsync(buffer)) > 0)
-        {
-            await output.WriteAsync(buffer.AsMemory(0, read));
-            written += read;
-            if (total is > 0)
-            {
-                var percent = (int)Math.Min(100, written * 100 / total.Value);
-                if (percent != reported) { reported = percent; progress?.Invoke(percent); }
-            }
-        }
-        await output.FlushAsync();
-        File.Move(partial, destination, true);
     }
 
     private async Task ResumeListenersAsync()
