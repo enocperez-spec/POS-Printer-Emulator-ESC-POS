@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ReceiptEmulator</RootNamespace>
     <AssemblyName>ReceiptEmulator</AssemblyName>
-    <Version>0.3.46</Version>
+    <Version>0.3.47</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 

@@ -1,4 +1,4 @@
-import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionEntitlementRequest, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionEntitlementRequest, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -115,6 +115,12 @@ export const api = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
+  }),
+  promotionOffer: () => json<PromotionOfferStatus>('/api/license/promotion/offer'),
+  startPromotion: (grantedTier: 'Lite' | 'Pro' | 'Enterprise') => json<PromotionStartResult>('/api/license/promotion/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grantedTier }),
   }),
   refreshMaintenance: () => json<MaintenanceRefreshResult>('/api/license/maintenance/refresh', { method: 'POST' }),
   runConnectionDiagnostics: () => json<ConnectionDiagnosticsResponse>('/api/support/connection-diagnostics', { method: 'POST' }),

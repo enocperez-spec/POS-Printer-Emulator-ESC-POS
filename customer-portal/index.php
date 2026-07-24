@@ -12,10 +12,16 @@ $notice = (string)($_SESSION['portal_notice'] ?? '');
 unset($_SESSION['portal_notice']);
 $email = portal_normalize_email((string)($_POST['email'] ?? ''));
 $mfaPending = !empty($_SESSION['mfa_pending']);
+$activePanel = 'sign-in';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     portal_require_csrf();
     $action = (string)($_POST['action'] ?? '');
+    $activePanel = match ($action) {
+        'enroll' => 'verify',
+        'reset' => 'reset',
+        default => 'sign-in',
+    };
     try {
         if ($action === 'login') {
             if ($email === '') {
@@ -59,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title>Sign in | POS Printer Emulator Customer Portal</title>
   <link rel="icon" href="/assets/favicon.png" type="image/png">
   <link rel="stylesheet" href="/assets/portal.css">
+  <script src="/assets/portal-auth.js" defer></script>
 </head>
 <body class="auth-page">
 <main class="auth-shell">
@@ -75,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <a class="brand-help" href="https://www.posprinteremulator.com/how-to-submit-a-support-request">Need help? Visit Support</a>
   </aside>
 
-  <section class="auth-content" aria-labelledby="auth-title">
+  <section class="auth-content" aria-labelledby="auth-title" data-auth-root data-initial-panel="<?= portal_e($activePanel) ?>">
     <?php if ($mfaPending): ?>
       <div class="auth-form-wrap compact">
         <h1 id="auth-title">Two-step sign-in</h1>
@@ -93,14 +100,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     <?php else: ?>
       <nav class="auth-tabs" aria-label="Account access">
-        <a href="#sign-in">Sign in</a>
-        <a href="#verify">Verify your email</a>
-        <a href="#reset">Reset your password</a>
+        <a href="#sign-in" data-auth-mode="sign-in" aria-controls="sign-in">Sign in</a>
+        <a href="#verify" data-auth-mode="verify" aria-controls="verify">Verify your email</a>
+        <a href="#reset" data-auth-mode="reset" aria-controls="reset">Reset your password</a>
       </nav>
       <?php if ($error !== ''): ?><div class="alert error" role="alert"><?= portal_e($error) ?></div><?php endif; ?>
       <?php if ($notice !== ''): ?><div class="alert success" role="status"><?= portal_e($notice) ?></div><?php endif; ?>
       <div class="auth-columns">
-        <section id="sign-in" class="auth-primary">
+        <section id="sign-in" class="auth-primary" data-auth-panel="sign-in">
           <h1 id="auth-title">Sign in to your account</h1>
           <form method="post" class="form-stack">
             <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
@@ -113,25 +120,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </label>
             <button class="button primary" type="submit">Sign in</button>
           </form>
-          <a class="inline-link" href="#reset">Forgot password?</a>
-          <p class="new-account">New here? <a href="#verify">Verify your email</a> to create an account.</p>
+          <a class="inline-link" href="#reset" data-auth-mode="reset">Forgot password?</a>
+          <p class="new-account">New here? <a href="#verify" data-auth-mode="verify">Verify your email</a> to create an account.</p>
           <p class="security-note">Your activation key is never used as a password.</p>
         </section>
         <div class="auth-secondary">
-          <section id="verify">
+          <section id="verify" data-auth-panel="verify">
             <h2>Verify your customer record</h2>
             <p>Enter your email to receive a protected verification link.</p>
-            <form method="post" class="form-stack small">
+            <form method="post" action="/index.php#verify" class="form-stack small">
               <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
               <input type="hidden" name="action" value="enroll">
               <label>Email address<input type="email" name="email" maxlength="254" autocomplete="email" required></label>
               <button class="button secondary" type="submit">Send verification link</button>
             </form>
           </section>
-          <section id="reset">
+          <section id="reset" data-auth-panel="reset">
             <h2>Reset your password</h2>
             <p>We use the same private response whether or not a record matches.</p>
-            <form method="post" class="form-stack small">
+            <form method="post" action="/index.php#reset" class="form-stack small">
               <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
               <input type="hidden" name="action" value="reset">
               <label>Email address<input type="email" name="email" maxlength="254" autocomplete="email" required></label>

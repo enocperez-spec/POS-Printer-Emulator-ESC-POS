@@ -602,6 +602,7 @@ public sealed class LicenseService
             State: "None",
             PreviousTier: null,
             GrantedTier: null,
+            StartsAt: null,
             ExpiresAt: null,
             Message: permanentTier == LicenseTier.Enterprise
                 ? "Enterprise already includes all product features."
@@ -649,6 +650,7 @@ public sealed class LicenseService
                 State = "ClockRollback",
                 PreviousTier = entitlement.PreviousTier.ToString(),
                 GrantedTier = entitlement.GrantedTier.ToString(),
+                StartsAt = entitlement.IssuedAt,
                 ExpiresAt = entitlement.ExpiresAt,
                 Message = "Promotional access was paused because the system clock moved backward. Restore the correct time and reopen the application."
             });
@@ -665,6 +667,7 @@ public sealed class LicenseService
                 State = "Expired",
                 PreviousTier = entitlement.PreviousTier.ToString(),
                 GrantedTier = entitlement.GrantedTier.ToString(),
+                StartsAt = entitlement.IssuedAt,
                 ExpiresAt = entitlement.ExpiresAt,
                 Message = $"The five-day promotion ended. The {permanentTier} License was restored automatically."
             });
@@ -675,6 +678,7 @@ public sealed class LicenseService
             State: "Active",
             PreviousTier: entitlement.PreviousTier.ToString(),
             GrantedTier: entitlement.GrantedTier.ToString(),
+            StartsAt: entitlement.IssuedAt,
             ExpiresAt: entitlement.ExpiresAt,
             Message: $"{entitlement.GrantedTier} promotional access is active until {entitlement.ExpiresAt:u}."));
     }

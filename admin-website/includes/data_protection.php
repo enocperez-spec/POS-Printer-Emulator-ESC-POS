@@ -56,3 +56,54 @@ function reveal_activation_key(array $record): string
     }
     return (string)($record['activation_key'] ?? '');
 }
+
+function protect_promotion_token(string $token): array
+{
+    $key = activation_key_data_protection_key();
+    if ($key === null || !function_exists('openssl_encrypt')) {
+        throw new RuntimeException('The server cannot protect promotional entitlements.');
+    }
+    $nonce = random_bytes(12);
+    $tag = '';
+    $ciphertext = openssl_encrypt(
+        $token,
+        'aes-256-gcm',
+        $key,
+        OPENSSL_RAW_DATA,
+        $nonce,
+        $tag,
+        'ppe-promotion-token-v1',
+        16
+    );
+    if ($ciphertext === false || strlen($tag) !== 16) {
+        throw new RuntimeException('The promotional entitlement could not be protected.');
+    }
+    return ['ciphertext' => $ciphertext, 'nonce' => $nonce, 'tag' => $tag];
+}
+
+function reveal_promotion_token(array $record): string
+{
+    $key = activation_key_data_protection_key();
+    $ciphertext = $record['entitlement_token_ciphertext'] ?? null;
+    $nonce = $record['entitlement_token_nonce'] ?? null;
+    $tag = $record['entitlement_token_tag'] ?? null;
+    if ($key === null || !function_exists('openssl_decrypt') ||
+        !is_string($ciphertext) || $ciphertext === '' ||
+        !is_string($nonce) || strlen($nonce) !== 12 ||
+        !is_string($tag) || strlen($tag) !== 16) {
+        throw new RuntimeException('Protected promotional entitlement material is unavailable.');
+    }
+    $token = openssl_decrypt(
+        $ciphertext,
+        'aes-256-gcm',
+        $key,
+        OPENSSL_RAW_DATA,
+        $nonce,
+        $tag,
+        'ppe-promotion-token-v1'
+    );
+    if ($token === false) {
+        throw new RuntimeException('The promotional entitlement failed integrity verification.');
+    }
+    return $token;
+}

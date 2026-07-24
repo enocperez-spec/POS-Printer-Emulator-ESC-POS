@@ -4,6 +4,17 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.47 — 2026-07-23
+
+- Replaces manual promotional-key entry with a one-click, server-authorized Five-Day Promotional Trial.
+- Lets eligible verified customers evaluate Lite, Pro, or Enterprise from the License screen.
+- Authenticates requests with the existing protected installation identity and never places signing credentials in the desktop application.
+- Activates the returned signed entitlement automatically without exposing or requiring a promotional key.
+- Shows the evaluated edition, activation and expiration date and time, a live days-hours-minutes countdown, and a direct purchase action.
+- Stores permanent server-side customer, account, license, and installation claims so reinstalling, deleting local files, changing editions, or using another device cannot create a second trial.
+- Uses idempotent request identifiers and encrypted server-side entitlement recovery so network retries cannot consume the promotion without delivering it.
+- Preserves the prior permanent tier and restores it automatically when the five consecutive days end.
+
 ## v0.3.46 — 2026-07-23
 
 - Launches the desktop application maximized on first use without covering the Windows taskbar.
