@@ -219,7 +219,7 @@ function portal_request_enrollment(string $email): void
         return;
     }
     $query = portal_database()->prepare(
-        "SELECT c.customer_id,c.canonical_email
+        "SELECT c.customer_id,c.canonical_email,c.display_name
          FROM customers c
          LEFT JOIN portal_accounts a ON a.customer_id=c.customer_id
          WHERE c.email_hash=UNHEX(SHA2(:email,256)) AND c.status='Active' AND a.customer_id IS NULL

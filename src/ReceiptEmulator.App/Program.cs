@@ -48,7 +48,14 @@ builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTeleme
     services.GetRequiredService<IHostEnvironment>(),
     services.GetRequiredService<ILogger<UsageTelemetryService>>()));
 builder.Services.AddSingleton<IUsageTelemetry>(services => services.GetRequiredService<UsageTelemetryService>());
+builder.Services.AddSingleton<IInstallationCredentialsProvider>(services => services.GetRequiredService<UsageTelemetryService>());
 builder.Services.AddHostedService(services => services.GetRequiredService<UsageTelemetryService>());
+builder.Services.AddHttpClient<PromotionAccessService>(client =>
+{
+    client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddHttpClient<UpdateService>(client =>
 {
     client.BaseAddress = new Uri("https://api.github.com/repos/enocperez-spec/POS-Printer-Emulator-ESC-POS/");
@@ -847,6 +854,35 @@ app.MapPost("/api/license/promotion/apply", (
         return Results.Problem(
             "The promotional access key could not be saved on this computer. Download Activation Diagnostics and try again.",
             statusCode: 500);
+    }
+});
+
+app.MapGet("/api/license/promotion/offer", async (
+    PromotionAccessService promotion,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await promotion.GetOfferAsync(cancellationToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 409);
+    }
+});
+
+app.MapPost("/api/license/promotion/start", async (
+    StartPromotionRequest request,
+    PromotionAccessService promotion,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await promotion.StartAsync(request.GrantedTier, cancellationToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 409);
     }
 });
 

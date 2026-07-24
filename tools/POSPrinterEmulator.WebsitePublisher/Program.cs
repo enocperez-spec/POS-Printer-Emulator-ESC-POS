@@ -21,7 +21,6 @@ const string BingVerificationVariable = "PPE_BING_SITE_AUTH_TOKEN";
 const string PortalBaseUrlVariable = "PPE_PORTAL_BASE_URL";
 const string PortalMailTransportVariable = "PPE_PORTAL_MAIL_TRANSPORT";
 const string PortalMailFromVariable = "PPE_PORTAL_MAIL_FROM";
-const string PortalMailReplyToVariable = "PPE_PORTAL_MAIL_REPLY_TO";
 const string BuyBaseUrlVariable = "PPE_BUY_BASE_URL";
 const string BrevoApiKeyVariable = "PPE_BREVO_API_KEY";
 const string BrevoSenderEmailVariable = "PPE_BREVO_SENDER_EMAIL";
@@ -742,9 +741,7 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
         throw new InvalidOperationException($"{PortalMailTransportVariable} must be php_mail or outbox.");
     }
     var mailFrom = Environment.GetEnvironmentVariable(PortalMailFromVariable) ?? "support@posprinteremulator.com";
-    var mailReplyTo = Environment.GetEnvironmentVariable(PortalMailReplyToVariable) ?? mailFrom;
-    if (!System.Net.Mail.MailAddress.TryCreate(mailFrom, out _) ||
-        !System.Net.Mail.MailAddress.TryCreate(mailReplyTo, out _))
+    if (!System.Net.Mail.MailAddress.TryCreate(mailFrom, out _))
     {
         throw new InvalidOperationException("Customer Portal sender addresses are invalid.");
     }
@@ -774,10 +771,10 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
                 'encryption_key' => {PhpString(encryptionKey)},
                 'mail_transport' => {PhpString(mailTransport)},
                 'mail_from' => {PhpString(mailFrom)},
-                'mail_reply_to' => {PhpString(mailReplyTo)},
                 'support_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
                 'support_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-support.php',
                 'support_backend_token' => {PhpString(serviceToken)},
+                'communications_worker_url' => 'https://admin.posprinteremulator.com/api/v1/communications-worker.php?max=5',
                 'promotion_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-promotion.php',
                 'buy_base_url' => {PhpString(buyUri.GetLeftPart(UriPartial.Path).TrimEnd('/'))},
             ],

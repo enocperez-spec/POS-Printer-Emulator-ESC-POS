@@ -67,7 +67,7 @@ try {
     $accountQuery = $pdo->prepare(
         "SELECT a.customer_id,c.email_verified_at,c.status
          FROM portal_accounts a INNER JOIN customers c ON c.customer_id=a.customer_id
-         WHERE a.customer_id=:customer_id AND a.account_status='Active' FOR UPDATE"
+         WHERE a.customer_id=:customer_id FOR UPDATE"
     );
     $accountQuery->execute(['customer_id' => $customerId]);
     $account = $accountQuery->fetch();

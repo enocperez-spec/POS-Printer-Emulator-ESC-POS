@@ -23,4 +23,25 @@
     await navigator.clipboard.writeText(value);
     copyPromotion.textContent = 'Copied';
   });
+
+  const mfaQr = document.querySelector('[data-mfa-qr]');
+  if (mfaQr) {
+    const provisioningUri = mfaQr.dataset.provisioningUri || '';
+    const error = document.querySelector('[data-mfa-qr-error]');
+    try {
+      if (!provisioningUri || typeof window.QRCode !== 'function') {
+        throw new Error('QR generator unavailable');
+      }
+      new window.QRCode(mfaQr, {
+        text: provisioningUri,
+        width: 200,
+        height: 200,
+        colorDark: '#07172d',
+        colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.M,
+      });
+    } catch {
+      if (error) error.hidden = false;
+    }
+  }
 })();

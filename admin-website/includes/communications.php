@@ -17,6 +17,32 @@ const COMMUNICATION_PARAMETER_KEYS = [
     'installed_version', 'latest_version', 'versions_behind', 'maintenance_end',
     'renewal_url', 'portal_url', 'download_url', 'support_reference',
     'support_url', 'verification_url', 'reset_url', 'release_summary',
+    'setup_url', 'troubleshooting_url', 'contact_support_url', 'event_label',
+    'feature_summary', 'preview_text', 'documentation_url', 'help_center_url',
+    'support_request_url', 'no_reply_notice',
+];
+const COMMUNICATION_FORBIDDEN_REPLY_LANGUAGE = [
+    'reply to this email',
+    'reply directly to this email',
+    'contact us by email',
+    'email us for help',
+    'respond to this email',
+];
+const COMMUNICATION_TEMPLATE_TAGS = [
+    'welcome' => ['label' => 'Welcome', 'color' => '#06b6d4', 'description' => 'Customer onboarding and first-use guidance.'],
+    'trial' => ['label' => 'Trial', 'color' => '#8b5cf6', 'description' => 'Trial-license communication.'],
+    'lite' => ['label' => 'Lite', 'color' => '#3b82f6', 'description' => 'Lite-license communication.'],
+    'pro' => ['label' => 'Pro', 'color' => '#14b8a6', 'description' => 'Pro-license communication.'],
+    'enterprise' => ['label' => 'Enterprise', 'color' => '#f59e0b', 'description' => 'Enterprise-license communication.'],
+    'inactive-user' => ['label' => 'Inactive User', 'color' => '#f97316', 'description' => 'Assistance after an inactivity interval.'],
+    'troubleshooting' => ['label' => 'Troubleshooting', 'color' => '#ef4444', 'description' => 'Configuration and troubleshooting help.'],
+    'setup' => ['label' => 'Setup', 'color' => '#22c55e', 'description' => 'Installation and initial configuration.'],
+    'purchase' => ['label' => 'Purchase', 'color' => '#eab308', 'description' => 'Purchase and paid-license onboarding.'],
+    'upgrade' => ['label' => 'Upgrade', 'color' => '#a855f7', 'description' => 'License upgrade onboarding.'],
+    'marketing' => ['label' => 'Marketing', 'color' => '#ec4899', 'description' => 'Optional communication requiring marketing consent.'],
+    'service' => ['label' => 'Service', 'color' => '#0284c7', 'description' => 'Operational customer service communication.'],
+    'essential' => ['label' => 'Essential', 'color' => '#dc2626', 'description' => 'Security or transaction-critical communication.'],
+    'it' => ['label' => 'IT', 'color' => '#64748b', 'description' => 'Technical or account-management communication.'],
 ];
 
 /**
@@ -36,6 +62,7 @@ function communication_config(): array
         'sender_name' => 'POS Printer Emulator',
         'reply_to_email' => '',
         'reply_to_name' => 'POS Printer Emulator Support',
+        'inbox_monitored' => false,
         'provider_daily_limit' => 300,
         'automated_daily_limit' => 290,
         'service_reserve' => 50,
@@ -99,10 +126,43 @@ function ensure_communication_schema(PDO $pdo): void
                 enabled TINYINT(1) NOT NULL DEFAULT 0,
                 frequency_cap_hours SMALLINT UNSIGNED NOT NULL DEFAULT 24,
                 description VARCHAR(500) NOT NULL,
+                preview_brevo_template_id BIGINT UNSIGNED NULL,
+                preview_verified_at DATETIME(6) NULL,
+                preview_warnings_json TEXT NULL,
                 updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
                 updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
                 PRIMARY KEY (template_key),
                 KEY ix_communication_templates_enabled (enabled, message_class)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS preview_brevo_template_id BIGINT UNSIGNED NULL AFTER description");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS preview_verified_at DATETIME(6) NULL AFTER preview_brevo_template_id");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS preview_warnings_json TEXT NULL AFTER preview_verified_at");
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS communication_tags (
+                tag_key VARCHAR(32) NOT NULL,
+                display_name VARCHAR(64) NOT NULL,
+                color_hex CHAR(7) NOT NULL,
+                description VARCHAR(240) NOT NULL,
+                is_system TINYINT(1) NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
+                updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+                PRIMARY KEY (tag_key),
+                UNIQUE KEY uq_communication_tags_name (display_name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS communication_template_tags (
+                template_key VARCHAR(64) NOT NULL,
+                tag_key VARCHAR(32) NOT NULL,
+                created_by VARCHAR(80) NOT NULL DEFAULT 'system',
+                created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                PRIMARY KEY (template_key,tag_key),
+                KEY ix_communication_template_tags_tag (tag_key,template_key),
+                CONSTRAINT fk_communication_template_tags_template
+                    FOREIGN KEY (template_key) REFERENCES communication_templates(template_key)
+                    ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $pdo->exec(
@@ -206,6 +266,8 @@ function ensure_communication_schema(PDO $pdo): void
         );
 
         communication_seed_templates($pdo);
+        communication_seed_tags($pdo);
+        communication_seed_managed_lifecycle_mappings($pdo);
         $pdo->exec(
             "INSERT IGNORE INTO communication_settings(setting_key,setting_value,updated_by) VALUES
                 ('emergency_stop','1','system'),
@@ -213,33 +275,200 @@ function ensure_communication_schema(PDO $pdo): void
                 ('provider_timezone','America/New_York','system'),
                 ('provider_daily_limit','300','system'),
                 ('automated_daily_limit','290','system'),
-                ('service_reserve','50','system')"
+                ('service_reserve','50','system'),
+                ('documentation_url','https://www.posprinteremulator.com/documentation','system'),
+                ('help_center_url','https://www.posprinteremulator.com/documentation','system'),
+                ('support_request_url','https://www.posprinteremulator.com/how-to-submit-a-support-request','system'),
+                ('no_reply_notice','Please do not reply to this email. This inbox is not monitored.','system')"
         );
+        communication_seed_template_tags($pdo);
         $ready = true;
     } finally {
         $pdo->query("SELECT RELEASE_LOCK('ppe_communication_schema_v1')")->fetchColumn();
     }
 }
 
+function communication_seed_template_tags(PDO $pdo): void
+{
+    $seeded = communication_setting($pdo, 'template_tags_seeded', '0') === '1';
+    $version = (int)communication_setting($pdo, 'template_tag_seed_version', '0');
+    if ($seeded && $version >= 2) {
+        return;
+    }
+
+    $insert = $pdo->prepare(
+        'INSERT IGNORE INTO communication_template_tags(template_key,tag_key,created_by)
+         VALUES(:template_key,:tag_key,:created_by)'
+    );
+    if (!$seeded) {
+        $templates = $pdo->query(
+            'SELECT template_key,message_class,essential FROM communication_templates'
+        )->fetchAll();
+        foreach ($templates as $template) {
+            $tags = [strtolower((string)$template['message_class'])];
+            if ((int)$template['essential'] === 1) {
+                $tags[] = 'essential';
+            }
+            if (in_array((string)$template['template_key'], [
+                'email_verification', 'password_recovery', 'support_confirmation',
+                'release_announcement', 'inactivity_help',
+            ], true)) {
+                $tags[] = 'it';
+            }
+            foreach (array_unique($tags) as $tag) {
+                $insert->execute([
+                    'template_key' => (string)$template['template_key'],
+                    'tag_key' => $tag,
+                    'created_by' => 'system',
+                ]);
+            }
+        }
+    }
+
+    $newAssignments = [
+        'we_want_to_help' => ['marketing', 'inactive-user', 'troubleshooting'],
+        'welcome_trial_start' => ['service', 'welcome', 'trial', 'setup'],
+        'welcome_lite_purchase' => ['service', 'welcome', 'lite', 'setup', 'purchase'],
+        'welcome_pro_purchase' => ['service', 'welcome', 'pro', 'setup', 'purchase'],
+        'welcome_enterprise_purchase' => ['service', 'welcome', 'enterprise', 'setup', 'purchase'],
+        'welcome_lite_upgrade' => ['service', 'welcome', 'lite', 'setup', 'upgrade'],
+        'welcome_pro_upgrade' => ['service', 'welcome', 'pro', 'setup', 'upgrade'],
+        'welcome_enterprise_upgrade' => ['service', 'welcome', 'enterprise', 'setup', 'upgrade'],
+    ];
+    foreach ($newAssignments as $templateKey => $tags) {
+        foreach ($tags as $tag) {
+            $insert->execute([
+                'template_key' => $templateKey,
+                'tag_key' => $tag,
+                'created_by' => 'system',
+            ]);
+        }
+    }
+
+    $setting = $pdo->prepare(
+        "INSERT INTO communication_settings(setting_key,setting_value,updated_by) VALUES
+           ('template_tags_seeded','1','system'),
+           ('template_tag_seed_version','2','system')
+         ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by='system'"
+    );
+    $setting->execute();
+}
+
+function communication_seed_tags(PDO $pdo): void
+{
+    $insert = $pdo->prepare(
+        'INSERT INTO communication_tags(tag_key,display_name,color_hex,description,is_system,updated_by)
+         VALUES(:key,:name,:color,:description,1,\'system\')
+         ON DUPLICATE KEY UPDATE
+           display_name=IF(is_system=1,VALUES(display_name),display_name),
+           color_hex=IF(is_system=1,VALUES(color_hex),color_hex),
+           description=IF(is_system=1,VALUES(description),description)'
+    );
+    foreach (COMMUNICATION_TEMPLATE_TAGS as $key => $tag) {
+        $insert->execute([
+            'key' => $key,
+            'name' => $tag['label'],
+            'color' => $tag['color'],
+            'description' => $tag['description'],
+        ]);
+    }
+}
+
+function communication_tag_catalog(PDO $pdo): array
+{
+    ensure_communication_schema($pdo);
+    $rows = $pdo->query(
+        'SELECT tag_key,display_name,color_hex,description,is_system
+         FROM communication_tags WHERE active=1 ORDER BY display_name'
+    )->fetchAll();
+    $catalog = [];
+    foreach ($rows as $row) {
+        $catalog[(string)$row['tag_key']] = [
+            'label' => (string)$row['display_name'],
+            'color' => (string)$row['color_hex'],
+            'description' => (string)$row['description'],
+            'system' => (int)$row['is_system'] === 1,
+        ];
+    }
+    return $catalog;
+}
+
+function communication_seed_managed_lifecycle_mappings(PDO $pdo): void
+{
+    if ((int)communication_setting($pdo, 'managed_lifecycle_mapping_version', '0') >= 1) {
+        return;
+    }
+    // These non-secret IDs belong to the production Brevo account. Each
+    // provider template was content-verified before this migration was added.
+    $mappings = [
+        'we_want_to_help' => 17,
+        'welcome_trial_start' => 18,
+        'welcome_lite_purchase' => 19,
+        'welcome_pro_purchase' => 20,
+        'welcome_enterprise_purchase' => 21,
+        'welcome_lite_upgrade' => 22,
+        'welcome_pro_upgrade' => 23,
+        'welcome_enterprise_upgrade' => 24,
+    ];
+    $statement = $pdo->prepare(
+        "UPDATE communication_templates
+         SET brevo_template_id=:template_id,enabled=1,
+             preview_brevo_template_id=:preview_id,preview_verified_at=UTC_TIMESTAMP(6),
+             preview_warnings_json='[]',updated_by='managed-migration'
+         WHERE template_key=:template_key"
+    );
+    foreach ($mappings as $templateKey => $templateId) {
+        $statement->execute([
+            'template_id' => $templateId,
+            'preview_id' => $templateId,
+            'template_key' => $templateKey,
+        ]);
+    }
+    $pdo->exec(
+        "UPDATE communication_templates SET enabled=0,updated_by='managed-migration'
+         WHERE template_key IN ('welcome_setup','trial_guidance','inactivity_help')"
+    );
+    $setting = $pdo->prepare(
+        "INSERT INTO communication_settings(setting_key,setting_value,updated_by) VALUES
+           ('managed_lifecycle_mapping_version','1','managed-migration'),
+           ('inactivity_followup_days','','managed-migration')
+         ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)"
+    );
+    $setting->execute();
+}
+
 function communication_seed_templates(PDO $pdo): void
 {
     $templates = [
-        ['email_verification', 'Email verification', 'Service', 1, 1, 'Verify a customer-controlled email address.'],
-        ['password_recovery', 'Password recovery', 'Service', 1, 1, 'Recover access to the Customer Portal.'],
-        ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 1, 'Confirm a completed purchase without including an activation key.'],
-        ['activation_ready', 'Activation ready', 'Service', 1, 1, 'Direct the customer to the secure portal for activation delivery.'],
-        ['support_confirmation', 'Support request confirmation', 'Service', 1, 1, 'Confirm a submitted support request and reference number.'],
-        ['maintenance_reminder', 'Maintenance reminder', 'Service', 0, 168, 'Remind an eligible customer before maintenance coverage ends.'],
-        ['welcome_setup', 'Welcome and setup guidance', 'Service', 0, 72, 'Help a newly registered customer complete setup.'],
-        ['release_announcement', 'Release announcement', 'Marketing', 0, 168, 'Announce an available product release to opted-in customers.'],
-        ['trial_guidance', 'Trial guidance', 'Marketing', 0, 168, 'Offer setup guidance to opted-in Trial customers.'],
-        ['inactivity_help', 'Inactivity help', 'Marketing', 0, 720, 'Offer help to an opted-in customer after an inactivity interval.'],
-        ['promotion', 'Product promotion', 'Marketing', 0, 720, 'Send an owner-approved promotion to opted-in customers.'],
+        ['email_verification', 'Email verification', 'Service', 1, 1, 'Sends a secure, single-use link that confirms the customer controls the email address used for their Customer Portal account.'],
+        ['password_recovery', 'Password recovery', 'Service', 1, 1, 'Sends a secure, expiring password-reset link when a verified Customer Portal user requests account recovery.'],
+        ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 1, 'Confirms a completed purchase and directs the customer to the secure portal; it never includes an activation key in email.'],
+        ['activation_ready', 'Activation ready', 'Service', 1, 1, 'Notifies the customer that their approved license is ready and directs them to the secure portal for activation delivery.'],
+        ['support_confirmation', 'Support request confirmation', 'Service', 1, 1, 'Acknowledges a submitted support request and provides its reference number and secure tracking link.'],
+        ['maintenance_reminder', 'Maintenance reminder', 'Service', 0, 168, 'Reminds an eligible paid customer before maintenance coverage ends and links to optional renewal without implying the permanent license expires.'],
+        ['welcome_setup', 'Welcome and setup guidance', 'Service', 0, 72, 'Welcomes a newly registered customer and links to the quick-start guide, TCP/IP port 9100 setup, documentation, and FAQ.'],
+        ['release_announcement', 'Release announcement', 'Marketing', 0, 168, 'Introduces an available product release to customers who opted in to product updates, with release notes and download links.'],
+        ['trial_guidance', 'Trial guidance', 'Marketing', 0, 168, 'Offers setup help and Trial-use guidance to Trial customers who explicitly opted in to marketing communication.'],
+        ['inactivity_help', 'Inactivity help', 'Marketing', 0, 720, 'Offers troubleshooting and setup assistance to an opted-in customer after a defined period without product activity.'],
+        ['promotion', 'Product promotion', 'Marketing', 0, 720, 'Shares an owner-approved offer or upgrade opportunity only with customers who explicitly opted in to promotional email.'],
+        ['we_want_to_help', 'We Want to Help', 'Marketing', 0, 720, 'Offers tier-aware setup and troubleshooting help after more than 30 days without product activity.'],
+        ['welcome_trial_start', 'Trial welcome and setup', 'Service', 0, 72, 'Welcomes a new Trial customer and explains the five-job daily allowance, receipt preview, and first-time setup.'],
+        ['welcome_lite_purchase', 'Lite purchase welcome and setup', 'Service', 0, 72, 'Thanks a new Lite customer and explains single-listener setup and included features.'],
+        ['welcome_pro_purchase', 'Pro purchase welcome and setup', 'Service', 0, 72, 'Thanks a new Pro customer and explains two-listener setup and included features.'],
+        ['welcome_enterprise_purchase', 'Enterprise purchase welcome and setup', 'Service', 0, 72, 'Thanks a new Enterprise customer and explains multi-listener setup and included features.'],
+        ['welcome_lite_upgrade', 'Lite upgrade welcome and setup', 'Service', 0, 72, 'Confirms an upgrade to Lite and explains the newly available features and setup steps.'],
+        ['welcome_pro_upgrade', 'Pro upgrade welcome and setup', 'Service', 0, 72, 'Confirms an upgrade to Pro and explains the newly available features and setup steps.'],
+        ['welcome_enterprise_upgrade', 'Enterprise upgrade welcome and setup', 'Service', 0, 72, 'Confirms an upgrade to Enterprise and explains the newly available features and setup steps.'],
     ];
     $insert = $pdo->prepare(
-        'INSERT IGNORE INTO communication_templates
+        'INSERT INTO communication_templates
             (template_key,display_name,message_class,essential,enabled,frequency_cap_hours,description)
-         VALUES(:key,:name,:class,:essential,0,:cap,:description)'
+         VALUES(:key,:name,:class,:essential,0,:cap,:description)
+         ON DUPLICATE KEY UPDATE
+            display_name=VALUES(display_name),
+            message_class=VALUES(message_class),
+            essential=VALUES(essential),
+            description=VALUES(description)'
     );
     foreach ($templates as [$key, $name, $class, $essential, $cap, $description]) {
         $insert->execute([
@@ -264,13 +493,156 @@ function communication_template_priority(string $templateKey): int
         'purchase_confirmation', 'activation_ready' => 20,
         'support_confirmation' => 30,
         'maintenance_reminder' => 40,
-        'welcome_setup' => 50,
+        'welcome_setup', 'welcome_trial_start', 'welcome_lite_purchase',
+        'welcome_pro_purchase', 'welcome_enterprise_purchase',
+        'welcome_lite_upgrade', 'welcome_pro_upgrade', 'welcome_enterprise_upgrade' => 50,
         'trial_guidance' => 60,
         'release_announcement' => 70,
-        'inactivity_help' => 80,
+        'inactivity_help', 'we_want_to_help' => 80,
         'promotion' => 90,
         default => 100,
     };
+}
+
+function communication_template_trigger_flow(string $templateKey): string
+{
+    return match ($templateKey) {
+        'email_verification' =>
+            'Customer selects Verify your email → one eligible customer record is found → a single-use 30-minute link is sent → the customer creates a portal password and verifies ownership.',
+        'password_recovery' =>
+            'Existing portal user requests a reset → a single-use 30-minute link is sent → the customer chooses a new password → existing portal sessions are revoked.',
+        'purchase_confirmation' =>
+            'Verified payment is captured and fulfilled → the purchase is recorded → confirmation is queued with a secure Customer Portal link. Activation keys are never emailed.',
+        'activation_ready' =>
+            'A new paid license or upgrade is fulfilled → the license entitlement is ready → the customer is directed to the secure Customer Portal to retrieve activation information.',
+        'support_confirmation' =>
+            'A support request is successfully submitted → a private reference is created → confirmation is queued with the reference and tracking destination.',
+        'maintenance_reminder' =>
+            'Daily scheduler finds eligible paid licenses at configured dates before or after maintenance ends → a renewal reminder is queued without implying that the permanent license expires.',
+        'welcome_setup' =>
+            'Legacy general onboarding flow → a newly registered customer becomes eligible → general setup, TCP/IP port 9100, documentation, and FAQ guidance is queued.',
+        'release_announcement' =>
+            'Daily scheduler identifies the latest release → opted-in customers running an older version and active within 120 days are selected → one announcement is queued per customer and release.',
+        'trial_guidance' =>
+            'Legacy Trial marketing flow → an opted-in Trial customer is selected by an approved campaign or controlled send → setup and Trial-use guidance is queued.',
+        'inactivity_help' =>
+            'Legacy inactivity flow → an opted-in customer reaches the configured inactivity period → troubleshooting and setup assistance is queued.',
+        'promotion' =>
+            'An administrator approves an offer or upgrade campaign → eligible marketing-opted-in customers are selected → frequency, pause, suppression, and quota rules are applied before delivery.',
+        'we_want_to_help' =>
+            'Daily scheduler detects more than 30 days without application activity → tier-aware setup and troubleshooting help is queued → delivery is cancelled if activity resumes first.',
+        'welcome_trial_start' =>
+            'A new Trial installation reports its first use → the next-day lifecycle scheduler selects the customer → Trial limits, features, and first-time setup guidance are queued.',
+        'welcome_lite_purchase' =>
+            'A new Lite purchase is captured and fulfilled → the Lite onboarding template is selected → included features and single-listener setup guidance are queued.',
+        'welcome_pro_purchase' =>
+            'A new Pro purchase is captured and fulfilled → the Pro onboarding template is selected → included features and two-listener setup guidance are queued.',
+        'welcome_enterprise_purchase' =>
+            'A new Enterprise purchase is captured and fulfilled → the Enterprise onboarding template is selected → multi-listener setup and Enterprise capabilities are queued.',
+        'welcome_lite_upgrade' =>
+            'An existing customer completes an upgrade to Lite → the new entitlement is fulfilled → newly available Lite features and setup guidance are queued.',
+        'welcome_pro_upgrade' =>
+            'An existing customer completes an upgrade to Pro → the new entitlement is fulfilled → newly available Pro features and setup guidance are queued.',
+        'welcome_enterprise_upgrade' =>
+            'An existing customer completes an upgrade to Enterprise → the new entitlement is fulfilled → newly available Enterprise features and setup guidance are queued.',
+        default =>
+            'An approved application or administrator action selects this template → customer eligibility and communication policy checks run → the message is queued for protected delivery.',
+    };
+}
+
+function communication_global_parameters(PDO $pdo): array
+{
+    return [
+        'documentation_url' => (string)communication_setting(
+            $pdo,
+            'documentation_url',
+            'https://www.posprinteremulator.com/documentation'
+        ),
+        'help_center_url' => (string)communication_setting(
+            $pdo,
+            'help_center_url',
+            'https://www.posprinteremulator.com/documentation'
+        ),
+        'support_request_url' => (string)communication_setting(
+            $pdo,
+            'support_request_url',
+            'https://www.posprinteremulator.com/how-to-submit-a-support-request'
+        ),
+        'no_reply_notice' => (string)communication_setting(
+            $pdo,
+            'no_reply_notice',
+            'Please do not reply to this email. This inbox is not monitored.'
+        ),
+    ];
+}
+
+function communication_template_language_warnings(
+    string $subject,
+    string $html,
+    bool $inboxMonitored,
+    ?string $templateSource = null
+): array {
+    $plain = strtolower(html_entity_decode(
+        trim($subject . ' ' . preg_replace('/\s+/', ' ', strip_tags($html))),
+        ENT_QUOTES | ENT_HTML5,
+        'UTF-8'
+    ));
+    $requiredNotice = 'please do not reply to this email. this inbox is not monitored.';
+    $replyLanguage = str_replace($requiredNotice, '', $plain);
+    $warnings = [];
+    foreach (COMMUNICATION_FORBIDDEN_REPLY_LANGUAGE as $phrase) {
+        if (str_contains($replyLanguage, $phrase)) {
+            $warnings[] = 'Reply-oriented language is prohibited: ' . $phrase;
+        }
+    }
+    if (str_contains(strtolower($html), 'mailto:')) {
+        $warnings[] = 'Email templates cannot contain mailto links.';
+    }
+    if (!$inboxMonitored &&
+        !str_contains($plain, $requiredNotice)) {
+        $warnings[] = 'The required unmonitored-inbox notice is missing.';
+    }
+    if (!preg_match(
+        '/{{\s*params\.(documentation_url|help_center_url|support_request_url)\s*}}/i',
+        $templateSource ?? $html
+    )) {
+        $warnings[] = 'Use a global documentation, Help Center, or support-request URL.';
+    }
+    if (!preg_match('/(view documentation|visit the help center|submit a support request)/i', strip_tags($html))) {
+        $warnings[] = 'Add a standard documentation or support call to action.';
+    }
+    return $warnings;
+}
+
+function communication_onboarding_template(string $licenseTier, string $event): string
+{
+    $tier = strtolower(trim($licenseTier));
+    $event = strtolower(trim($event));
+    if ($tier === 'trial' && $event === 'start') {
+        return 'welcome_trial_start';
+    }
+    if (in_array($tier, ['lite', 'pro', 'enterprise'], true) &&
+        in_array($event, ['purchase', 'upgrade'], true)) {
+        return 'welcome_' . $tier . '_' . $event;
+    }
+    throw new InvalidArgumentException('No approved onboarding template exists for this license event.');
+}
+
+function communication_tier_features(string $licenseTier): string
+{
+    return match (strtolower(trim($licenseTier))) {
+        'trial' => 'Up to five emulated print jobs per day, live receipt preview, and core ESC/POS testing.',
+        'lite' => 'Unlimited jobs, one printer listener, receipt history, and no Trial watermark.',
+        'pro' => 'Unlimited jobs, up to two printer listeners, full history, capture and replay, and advanced troubleshooting.',
+        'enterprise' => 'Unlimited jobs, up to fifteen printer listeners, full history, capture and replay, and all enterprise capabilities.',
+        default => 'POS receipt emulation, preview, and troubleshooting tools.',
+    };
+}
+
+function communication_setup_url(string $licenseTier): string
+{
+    $tier = strtolower(trim($licenseTier));
+    return 'https://www.posprinteremulator.com/documentation?license=' . rawurlencode($tier);
 }
 
 function communication_test_parameters(string $templateKey, string $customerName): array
@@ -291,10 +663,32 @@ function communication_test_parameters(string $templateKey, string $customerName
         ],
         'release_announcement' => [
             'customer_name' => $customerName, 'installed_version' => '0.3.44',
-            'latest_version' => 'v0.3.46', 'release_summary' => 'Maximized startup and taskbar-safe window placement',
+            'latest_version' => 'v0.3.47', 'release_summary' => 'One-click server-authorized Five-Day Promotional Trial',
             'download_url' => 'https://www.posprinteremulator.com/download',
         ],
-        'inactivity_help' => ['customer_name' => $customerName, 'support_url' => $portal],
+        'inactivity_help', 'we_want_to_help' => [
+            'customer_name' => $customerName,
+            'license_tier' => 'Pro',
+            'feature_summary' => communication_tier_features('Pro'),
+            'setup_url' => communication_setup_url('Pro'),
+            'troubleshooting_url' => 'https://www.posprinteremulator.com/esc-pos-troubleshooting',
+            'contact_support_url' => $portal,
+        ],
+        'welcome_trial_start', 'welcome_lite_purchase', 'welcome_pro_purchase',
+        'welcome_enterprise_purchase', 'welcome_lite_upgrade',
+        'welcome_pro_upgrade', 'welcome_enterprise_upgrade' => (static function () use ($templateKey, $customerName, $portal): array {
+            preg_match('/welcome_(trial|lite|pro|enterprise)_(start|purchase|upgrade)/', $templateKey, $match);
+            $tier = ucfirst((string)($match[1] ?? 'trial'));
+            $event = ucfirst((string)($match[2] ?? 'start'));
+            return [
+                'customer_name' => $customerName,
+                'license_tier' => $tier,
+                'event_label' => $event,
+                'feature_summary' => communication_tier_features($tier),
+                'setup_url' => communication_setup_url($tier),
+                'contact_support_url' => $portal,
+            ];
+        })(),
         default => ['customer_name' => $customerName, 'portal_url' => $portal],
     };
 }
@@ -451,6 +845,7 @@ function communication_enqueue(
         }
     }
 
+    $parameters = array_replace($parameters, communication_global_parameters($pdo));
     $clean = communication_validate_parameters($parameters);
     $idempotencyKey = trim($idempotencyKey);
     if ($idempotencyKey === '' || strlen($idempotencyKey) > 160) {
@@ -599,7 +994,8 @@ function communication_claim_next(PDO $pdo): ?array
              WHERE state='Processing' AND locked_at < DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 15 MINUTE)"
         );
         $row = $pdo->query(
-            "SELECT o.*,t.brevo_template_id,c.canonical_email,c.email_verified_at,c.status AS customer_status
+            "SELECT o.*,t.brevo_template_id,t.preview_brevo_template_id,t.preview_verified_at,
+                    t.preview_warnings_json,c.canonical_email,c.email_verified_at,c.status AS customer_status
              FROM communication_outbox o
              JOIN communication_templates t ON t.template_key=o.template_key
              JOIN customers c ON c.customer_id=o.customer_id
@@ -632,6 +1028,27 @@ function communication_worker_process_one(PDO $pdo): array
 
     $messageId = (string)$message['message_id'];
     try {
+        if ($message['template_key'] === 'we_want_to_help') {
+            $returned = $pdo->prepare(
+                'SELECT 1 FROM installations
+                 WHERE customer_id=:customer_id AND portal_deactivated_at IS NULL
+                   AND last_seen_at>:queued_at LIMIT 1'
+            );
+            $returned->execute([
+                'customer_id' => $message['customer_id'],
+                'queued_at' => $message['created_at'],
+            ]);
+            if ($returned->fetchColumn()) {
+                communication_finish_message(
+                    $pdo,
+                    $messageId,
+                    'Cancelled',
+                    'CUSTOMER_RETURNED',
+                    'Customer activity resumed after the inactivity message was queued.'
+                );
+                return ['status' => 'cancelled', 'message_id' => $messageId];
+            }
+        }
         $policy = communication_policy_decision(
             (string)$message['message_class'],
             communication_latest_consent($pdo, (string)$message['customer_id'], 'Marketing'),
@@ -650,6 +1067,21 @@ function communication_worker_process_one(PDO $pdo): array
 
         if (communication_setting($pdo, 'emergency_stop', '1') === '1') {
             communication_defer_message($pdo, $messageId, 'EMERGENCY_STOP', 'Communications are paused.', 900);
+            return ['status' => 'deferred', 'message_id' => $messageId];
+        }
+        $previewWarnings = json_decode((string)($message['preview_warnings_json'] ?? ''), true);
+        $previewValid = (int)($message['preview_brevo_template_id'] ?? 0) === (int)($message['brevo_template_id'] ?? 0)
+            && !empty($message['preview_verified_at'])
+            && is_array($previewWarnings)
+            && count($previewWarnings) === 0;
+        if (!$previewValid) {
+            communication_defer_message(
+                $pdo,
+                $messageId,
+                'TEMPLATE_PREVIEW_REQUIRED',
+                'The mapped template must pass Admin preview validation before delivery.',
+                900
+            );
             return ['status' => 'deferred', 'message_id' => $messageId];
         }
         if ($message['message_class'] === 'Marketing' && communication_setting($pdo, 'marketing_pause', '1') === '1') {
@@ -720,7 +1152,7 @@ function communication_send_brevo(array $message, string $email, array $config):
         'tags' => ['ppe', strtolower((string)$message['message_class'])],
         'headers' => ['X-PPE-Message-ID' => (string)$message['message_id']],
     ];
-    if (trim((string)$config['reply_to_email']) !== '') {
+    if ((bool)($config['inbox_monitored'] ?? false) && trim((string)$config['reply_to_email']) !== '') {
         $payload['replyTo'] = ['email' => $config['reply_to_email'], 'name' => $config['reply_to_name']];
     }
     $ch = curl_init(rtrim((string)$config['brevo_api_base'], '/') . '/smtp/email');
@@ -929,68 +1361,67 @@ function communication_schedule_lifecycle(PDO $pdo): array
     ensure_communication_schema($pdo);
     $results = ['maintenance' => communication_schedule_maintenance($pdo)];
 
-    $welcome = $pdo->query(
-        "SELECT customer_id,display_name FROM customers
-         WHERE status='Active' AND email_verified_at IS NOT NULL
-           AND DATE(created_at)=DATE_SUB(UTC_DATE(),INTERVAL 1 DAY)
-         ORDER BY created_at LIMIT 500"
-    )->fetchAll();
-    $results['welcome'] = communication_schedule_candidates(
-        $pdo,
-        $welcome,
-        'welcome_setup',
-        static fn(array $row): array => [
-            'customer_name' => (string)$row['display_name'],
-            'portal_url' => 'https://userportal.posprinteremulator.com/',
-        ],
-        static fn(array $row): string => 'welcome:' . $row['customer_id']
-    );
-
     $trial = $pdo->query(
         "SELECT c.customer_id,c.display_name,MIN(i.first_seen_at) AS first_seen_at
          FROM customers c JOIN installations i ON i.customer_id=c.customer_id
          WHERE c.status='Active' AND c.email_verified_at IS NOT NULL
            AND i.license_mode='Trial' AND i.portal_deactivated_at IS NULL
          GROUP BY c.customer_id,c.display_name
-         HAVING DATE(MIN(i.first_seen_at)) IN (
-           DATE_SUB(UTC_DATE(),INTERVAL 1 DAY),
-           DATE_SUB(UTC_DATE(),INTERVAL 3 DAY),
-           DATE_SUB(UTC_DATE(),INTERVAL 5 DAY)
-         )
+         HAVING DATE(MIN(i.first_seen_at))=DATE_SUB(UTC_DATE(),INTERVAL 1 DAY)
          ORDER BY MIN(i.first_seen_at) LIMIT 500"
     )->fetchAll();
-    $results['trial_guidance'] = communication_schedule_candidates(
+    $results['welcome_trial'] = communication_schedule_candidates(
         $pdo,
         $trial,
-        'trial_guidance',
+        'welcome_trial_start',
         static fn(array $row): array => [
             'customer_name' => (string)$row['display_name'],
-            'portal_url' => 'https://userportal.posprinteremulator.com/',
+            'license_tier' => 'Trial',
+            'event_label' => 'Starting a Trial',
+            'feature_summary' => communication_tier_features('Trial'),
+            'setup_url' => communication_setup_url('Trial'),
+            'contact_support_url' => 'https://userportal.posprinteremulator.com/',
         ],
-        static fn(array $row): string => 'trial-guidance:' . $row['customer_id'] . ':' . substr((string)$row['first_seen_at'], 0, 10)
+        static fn(array $row): string => 'welcome-trial:' . $row['customer_id'] . ':' . substr((string)$row['first_seen_at'], 0, 10)
     );
 
+    $followupDays = array_values(array_filter(array_map(
+        static fn(string $day): int => max(0, min(365, (int)trim($day))),
+        explode(',', (string)communication_setting($pdo, 'inactivity_followup_days', ''))
+    ), static fn(int $day): bool => $day > 31));
+    $inactiveDays = array_values(array_unique(array_merge([31], $followupDays)));
+    $inactiveDates = implode(',', array_map(
+        static fn(int $days): string => 'DATE_SUB(UTC_DATE(),INTERVAL ' . $days . ' DAY)',
+        $inactiveDays
+    ));
     $inactive = $pdo->query(
-        "SELECT c.customer_id,c.display_name,MAX(i.last_seen_at) AS last_seen_at
+        "SELECT c.customer_id,c.display_name,MAX(i.last_seen_at) AS last_seen_at,
+                COALESCE(
+                  (SELECT l.license_tier FROM issued_licenses l
+                   WHERE l.customer_id=c.customer_id AND l.control_state='Enabled'
+                   ORDER BY FIELD(l.license_tier,'Enterprise','Pro','Lite','Trial'),l.issued_at DESC LIMIT 1),
+                  'Trial'
+                ) AS license_tier
          FROM customers c JOIN installations i ON i.customer_id=c.customer_id
          WHERE c.status='Active' AND c.email_verified_at IS NOT NULL
            AND i.portal_deactivated_at IS NULL
          GROUP BY c.customer_id,c.display_name
-         HAVING DATE(MAX(i.last_seen_at)) IN (
-           DATE_SUB(UTC_DATE(),INTERVAL 30 DAY),
-           DATE_SUB(UTC_DATE(),INTERVAL 90 DAY)
-         )
+         HAVING DATE(MAX(i.last_seen_at)) IN (" . $inactiveDates . ")
          ORDER BY MAX(i.last_seen_at) LIMIT 500"
     )->fetchAll();
     $results['inactivity'] = communication_schedule_candidates(
         $pdo,
         $inactive,
-        'inactivity_help',
+        'we_want_to_help',
         static fn(array $row): array => [
             'customer_name' => (string)$row['display_name'],
-            'support_url' => 'https://userportal.posprinteremulator.com/',
+            'license_tier' => (string)$row['license_tier'],
+            'feature_summary' => communication_tier_features((string)$row['license_tier']),
+            'setup_url' => communication_setup_url((string)$row['license_tier']),
+            'troubleshooting_url' => 'https://www.posprinteremulator.com/esc-pos-troubleshooting',
+            'contact_support_url' => 'https://userportal.posprinteremulator.com/',
         ],
-        static fn(array $row): string => 'inactivity:' . $row['customer_id'] . ':' . substr((string)$row['last_seen_at'], 0, 10)
+        static fn(array $row): string => 'we-want-to-help:' . $row['customer_id'] . ':' . substr((string)$row['last_seen_at'], 0, 10)
     );
 
     $latestRelease = $pdo->query(

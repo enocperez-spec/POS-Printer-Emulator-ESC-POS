@@ -525,6 +525,16 @@ button { color: inherit; }
 .maintenance-success { padding: 9px 11px; border: 1px solid #a9dbba; border-radius: 7px; color: var(--green); background: #effaf3; font-size: 10px; }
 .maintenance-message { padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface); font-size: 10px; line-height: 1.45; }
 .maintenance-error { padding: 9px 11px; border: 1px solid #edbe8a; border-radius: 7px; color: #8c4100; background: var(--amber-soft); font-size: 10px; line-height: 1.45; }
+.promotion-card { gap: 15px; }
+.promotion-tier-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.promotion-tier-grid button { min-width: 0; display: grid; gap: 5px; padding: 13px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; }
+.promotion-tier-grid button:hover { border-color: color-mix(in srgb, var(--blue) 55%, var(--border)); }
+.promotion-tier-grid button.selected { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 8%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 16%, transparent); }
+.promotion-tier-grid strong { font-size: 13px; }
+.promotion-tier-grid span { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.promotion-action-row { display: grid; gap: 8px; }
+.promotion-primary { width: fit-content; min-height: 39px; display: inline-flex; align-items: center; gap: 8px; padding: 0 15px; border: 1px solid var(--blue); border-radius: 7px; color: #fff; background: var(--blue); font-size: 11px; font-weight: 800; cursor: pointer; }
+.promotion-primary:disabled { opacity: .62; cursor: wait; }
 .settings-status-card { display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-muted); }
 .settings-status-card.update-available { border-color: #9bc4ed; background: #eff7ff; }
 .settings-status-card.is-current { border-color: #a9dbba; background: #effaf3; }
@@ -846,6 +856,7 @@ html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; b
   .onboarding-footer { align-items: flex-start; flex-direction: column; }
   .license-summary { grid-template-columns: 1fr; margin-inline: -18px; }
   .maintenance-card dl { grid-template-columns: 1fr; }
+  .promotion-tier-grid { grid-template-columns: 1fr; }
   .support-detail-grid { grid-template-columns: 1fr; }
   .stored-graphic-fields { grid-template-columns: 1fr; }
   .stored-graphic-card { grid-template-columns: 62px minmax(0, 1fr); }

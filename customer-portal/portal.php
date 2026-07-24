@@ -512,6 +512,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $snapshot = portal_customer_snapshot($customerId);
 $licenses = $snapshot['licenses'];
 $primaryLicense = $licenses[0] ?? null;
+$maintenanceReminder = portal_maintenance_reminder(
+    is_array($primaryLicense) ? (string)($primaryLicense['maintenance_expires_at'] ?? '') : null
+);
 $installations = $snapshot['installations'];
 $consentMap = [];
 foreach ($snapshot['consents'] as $consent) {
@@ -519,6 +522,15 @@ foreach ($snapshot['consents'] as $consent) {
 }
 $recoveryCodes = $_SESSION['new_recovery_codes'] ?? [];
 unset($_SESSION['new_recovery_codes']);
+$pendingMfaSecret = (string)($_SESSION['pending_mfa_secret'] ?? '');
+$mfaProvisioningUri = $pendingMfaSecret === '' ? '' :
+    'otpauth://totp/' . rawurlencode('POS Printer Emulator:' . (string)$account['canonical_email'])
+    . '?secret=' . rawurlencode($pendingMfaSecret)
+    . '&issuer=' . rawurlencode('POS Printer Emulator')
+    . '&algorithm=SHA1&digits=6&period=30';
+$portalCssVersion = (string)(filemtime(__DIR__ . '/assets/portal.css') ?: 1);
+$portalScriptVersion = (string)(filemtime(__DIR__ . '/assets/portal.js') ?: 1);
+$qrScriptVersion = (string)(filemtime(__DIR__ . '/assets/vendor/qrcodejs/qrcode.min.js') ?: 1);
 $promotionDelivery = $_SESSION['promotion_delivery'] ?? null;
 unset($_SESSION['promotion_delivery']);
 
@@ -543,8 +555,9 @@ function portal_nav_icon(string $name): string
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?= portal_e(ucfirst($page)) ?> | POS Printer Emulator Customer Portal</title>
   <link rel="icon" href="/assets/favicon.png" type="image/png">
-  <link rel="stylesheet" href="/assets/portal.css">
-  <script src="/assets/portal.js" defer></script>
+  <link rel="stylesheet" href="/assets/portal.css?v=<?= portal_e($portalCssVersion) ?>">
+  <script src="/assets/vendor/qrcodejs/qrcode.min.js?v=<?= portal_e($qrScriptVersion) ?>" defer></script>
+  <script src="/assets/portal.js?v=<?= portal_e($portalScriptVersion) ?>" defer></script>
 </head>
 <body class="portal-page">
 <header class="portal-header">
@@ -565,18 +578,35 @@ function portal_nav_icon(string $name): string
   <?php if ($notice !== ''): ?><div class="alert success" role="status"><?= portal_e($notice) ?></div><?php endif; ?>
 
   <?php if ($page === 'overview'): ?>
-    <h1>Welcome back, <?= portal_e(explode(' ', trim((string)$account['display_name']))[0] ?: 'customer') ?></h1>
+    <h1>Welcome back, <?= portal_e(portal_customer_display_name((string)($account['display_name'] ?? ''))) ?></h1>
     <?php if (is_array($primaryLicense)): ?>
       <section class="license-hero">
-        <div><span class="hero-symbol" aria-hidden="true">✓</span><div><h2><?= portal_e((string)$primaryLicense['license_tier']) ?> License</h2><p class="status active">● <?= portal_e((string)$primaryLicense['control_state']) ?></p><p>Updates &amp; support through <strong><?= portal_e(portal_date($primaryLicense['maintenance_expires_at'])) ?></strong></p></div></div>
+        <div><span class="hero-symbol" aria-hidden="true">✓</span><div><h2><?= portal_e((string)$primaryLicense['license_tier']) ?> License</h2><p class="status active">● <?= portal_e(portal_license_status_label((string)$primaryLicense['control_state'])) ?></p><p><span class="maintenance-label">Maintenance and Support Until:</span> <strong><?= portal_e(portal_long_date($primaryLicense['maintenance_expires_at'])) ?></strong></p></div></div>
         <a class="button primary" href="/portal.php?page=downloads">Download latest version</a>
       </section>
     <?php else: ?>
       <section class="license-hero trial"><div><span class="hero-symbol">T</span><div><h2>Trial License</h2><p>Install the latest version and activate when you are ready.</p></div></div><a class="button primary" href="/portal.php?page=downloads">View downloads</a></section>
     <?php endif; ?>
+    <?php if ($maintenanceReminder['state'] === 'expiring'): ?>
+      <section class="maintenance-reminder expiring" role="status" aria-labelledby="maintenance-reminder-title">
+        <div>
+          <h2 id="maintenance-reminder-title">Maintenance and Support renewal reminder</h2>
+          <p>Your Maintenance and Support coverage expires on <strong><?= portal_e($maintenanceReminder['expirationDate']) ?></strong>. You have <strong><?= (int)$maintenanceReminder['daysRemaining'] ?> <?= (int)$maintenanceReminder['daysRemaining'] === 1 ? 'day' : 'days' ?> remaining</strong>. Renew now to continue receiving software updates and technical support.</p>
+        </div>
+        <a class="button primary" href="/portal.php?page=plans#maintenance-renewal">Renew Maintenance and Support</a>
+      </section>
+    <?php elseif ($maintenanceReminder['state'] === 'expired'): ?>
+      <section class="maintenance-reminder expired" role="alert" aria-labelledby="maintenance-expired-title">
+        <div>
+          <h2 id="maintenance-expired-title">Maintenance and Support expired</h2>
+          <p>Your Maintenance and Support coverage expired on <strong><?= portal_e($maintenanceReminder['expirationDate']) ?></strong>. Renew to restore access to software updates and technical support.</p>
+        </div>
+        <a class="button primary" href="/portal.php?page=plans#maintenance-renewal">Renew Maintenance and Support</a>
+      </section>
+    <?php endif; ?>
     <div class="overview-grid">
       <div class="main-column">
-        <section class="data-section"><header><h2>Licenses</h2><a href="/portal.php?page=licenses">View details</a></header><div class="table-wrap"><table><thead><tr><th>License</th><th>Status</th><th>Tier</th><th>Listener allowance</th><th>Maintenance</th></tr></thead><tbody><?php foreach (array_slice($licenses, 0, 3) as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><span class="status-dot"></span><?= portal_e((string)$license['control_state']) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><?= portal_e(portal_date($license['maintenance_expires_at'])) ?></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="5">No paid licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
+        <section class="data-section"><header><h2>Licenses</h2><a href="/portal.php?page=licenses">View details</a></header><div class="table-wrap"><table><thead><tr><th>License</th><th>Status</th><th>Tier</th><th>Listener allowance</th><th>Maintenance and Support Until</th></tr></thead><tbody><?php foreach (array_slice($licenses, 0, 3) as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><span class="status-dot"></span><?= portal_e(portal_license_status_label((string)$license['control_state'])) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="5">No paid licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
         <section class="data-section"><header><h2>Installed computers</h2><a href="/portal.php?page=computers">Manage computers</a></header><div class="table-wrap"><table><thead><tr><th>Computer</th><th>Windows</th><th>App version</th><th>Last seen</th><th>Status</th></tr></thead><tbody><?php foreach (array_slice($installations, 0, 5) as $installation): ?><tr><td><?= portal_e((string)($installation['device_label'] ?: 'Computer ' . substr((string)$installation['installation_uuid'], -6))) ?></td><td><?= portal_e((string)($installation['windows_version'] ?: 'Windows device')) ?></td><td><?= portal_e((string)$installation['app_version']) ?></td><td><?= portal_e(portal_datetime($installation['last_seen_at'])) ?></td><td><?= $installation['portal_deactivated_at'] ? 'Deactivated' : 'Active' ?></td></tr><?php endforeach; ?><?php if ($installations === []): ?><tr><td colspan="5">No computers have checked in yet.</td></tr><?php endif; ?></tbody></table></div></section>
         <section class="data-section"><header><h2>Recent support requests</h2><a href="/portal.php?page=support">View all</a></header><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Subject</th><th>Status</th><th>Created</th></tr></thead><tbody><?php foreach (array_slice($snapshot['support'], 0, 4) as $request): ?><tr><td><code><?= portal_e((string)$request['reference_code']) ?></code></td><td><?= portal_e((string)$request['subject']) ?></td><td><?= portal_e((string)$request['state']) ?></td><td><?= portal_e(portal_date($request['created_at'])) ?></td></tr><?php endforeach; ?><?php if ($snapshot['support'] === []): ?><tr><td colspan="4">No support requests yet.</td></tr><?php endif; ?></tbody></table></div></section>
       </div>
@@ -591,13 +621,13 @@ function portal_nav_icon(string $name): string
     <section class="data-section"><div class="table-wrap"><table><thead><tr><th>Masked key</th><th>Tier</th><th>Status</th><th>Issued</th><th>Maintenance through</th><th>Listeners</th></tr></thead><tbody><?php foreach ($licenses as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e((string)$license['control_state']) ?></td><td><?= portal_e(portal_date($license['issued_at'])) ?></td><td><?= portal_e(portal_date($license['maintenance_expires_at'])) ?></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td></tr><?php endforeach; ?></tbody></table></div></section>
     <section class="info-band"><h2>Permanent license, optional annual maintenance</h2><p>Your purchased version keeps working when maintenance expires. Use Plans &amp; maintenance to renew coverage or move to a higher listener level. No subscription is created.</p></section>
   <?php elseif ($page === 'plans'): ?>
-    <div class="page-heading"><div><p class="eyebrow">Permanent licenses</p><h1>Plans &amp; maintenance</h1><p>Compare listener capacity, upgrade an owned license, or renew optional annual coverage.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow">Licenses</p><h1>Plans &amp; maintenance</h1><p>Compare listener capacity, upgrade an owned license, or renew optional annual coverage.</p></div></div>
     <section class="reauth-panel commerce-reauth"><h2>Confirm before purchasing</h2><p>Enter your Customer Portal password. Confirmation remains valid for five minutes and is required before creating a secure PayPal checkout.</p><form method="post" class="inline-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="reauthenticate"><label><span class="sr-only">Password</span><input type="password" name="password" autocomplete="current-password" placeholder="Portal password" required></label><button class="button secondary" type="submit">Confirm password</button></form></section>
     <?php $rank = ['Trial' => 0, 'Lite' => 1, 'Pro' => 2, 'Enterprise' => 3]; $currentTier = is_array($primaryLicense) ? (string)$primaryLicense['license_tier'] : 'Trial'; ?>
     <div class="plan-grid">
       <?php foreach (['Lite' => '1 printer listener', 'Pro' => 'Up to 2 printer listeners', 'Enterprise' => 'Multiple listeners · 15 recommended maximum'] as $tier => $capacity): ?>
-        <article class="plan-card <?= $tier === 'Enterprise' ? 'featured' : '' ?>">
-          <div><span class="plan-kicker"><?= $tier === 'Enterprise' ? 'Maximum flexibility' : 'Permanent license' ?></span><h2><?= portal_e($tier) ?></h2><p><?= portal_e($capacity) ?></p></div>
+        <article class="plan-card <?= $tier === 'Enterprise' ? 'featured' : '' ?> <?= $tier === $currentTier ? 'current-license' : '' ?>">
+          <div><span class="plan-kicker"><?= $tier === $currentTier ? 'Your current license' : ($tier === 'Enterprise' ? 'Maximum flexibility' : 'License') ?></span><h2><?= portal_e($tier) ?></h2><p><?= portal_e($capacity) ?></p></div>
           <ul><li>Unlimited emulated print jobs</li><li>Receipt history and paid tools</li><li>One year of updates and support included</li></ul>
           <?php if ($rank[$tier] > $rank[$currentTier]): ?>
             <form method="post">
@@ -605,13 +635,13 @@ function portal_nav_icon(string $name): string
               <?php if (is_array($primaryLicense)): ?><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><?php else: ?><?php $trial = array_values(array_filter($installations, static fn(array $row): bool => $row['license_mode'] === 'Trial' && empty($row['portal_deactivated_at'])))[0] ?? null; ?><?php if (is_array($trial)): ?><input type="hidden" name="installation_id" value="<?= (int)$trial['id'] ?>"><?php endif; ?><?php endif; ?>
               <button class="button <?= $tier === 'Enterprise' ? 'primary' : 'secondary' ?>" type="submit" <?= !is_array($primaryLicense) && !isset($trial) ? 'disabled' : '' ?>>Upgrade to <?= portal_e($tier) ?></button>
             </form>
-          <?php else: ?><span class="current-plan"><?= $tier === $currentTier ? 'Current permanent tier' : 'Included below your current tier' ?></span><?php endif; ?>
+          <?php else: ?><span class="current-plan"><?= $tier === $currentTier ? '✓ Current license' : 'Included below your current license' ?></span><?php endif; ?>
         </article>
       <?php endforeach; ?>
     </div>
-    <section class="maintenance-panel">
+    <section class="maintenance-panel" id="maintenance-renewal">
       <div><span class="plan-kicker">Optional annual coverage</span><h2>Application Maintenance &amp; Support</h2><p>Renewing adds one year of updates and technical support. The software and purchased features remain permanent if coverage expires.</p></div>
-      <?php if (is_array($primaryLicense)): ?><div class="maintenance-action"><span>Current coverage through <strong><?= portal_e(portal_date($primaryLicense['maintenance_expires_at'])) ?></strong></span><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="prepare-checkout"><input type="hidden" name="order_type" value="MAINTENANCE"><input type="hidden" name="target_tier" value="<?= portal_e((string)$primaryLicense['license_tier']) ?>"><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><button class="button primary" type="submit">Renew maintenance</button></form></div><?php else: ?><p>Maintenance is included when you purchase a permanent license.</p><?php endif; ?>
+      <?php if (is_array($primaryLicense)): ?><div class="maintenance-action"><span>Maintenance and Support Until: <strong><?= portal_e(portal_long_date($primaryLicense['maintenance_expires_at'])) ?></strong></span><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="prepare-checkout"><input type="hidden" name="order_type" value="MAINTENANCE"><input type="hidden" name="target_tier" value="<?= portal_e((string)$primaryLicense['license_tier']) ?>"><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><button class="button primary" type="submit">Renew Maintenance and Support</button></form></div><?php else: ?><p>Maintenance is included when you purchase a license.</p><?php endif; ?>
     </section>
     <?php if (is_array($promotionDelivery)): ?>
       <section class="promotion-delivery" role="status">
@@ -621,15 +651,9 @@ function portal_nav_icon(string $name): string
       </section>
     <?php endif; ?>
     <section class="promotion-panel">
-      <div><span class="plan-kicker">Try before upgrading</span><h2>Five-day paid-edition promotion</h2><p>One free promotion per verified customer. No payment method is required. Your current permanent tier is restored automatically when the promotion ends.</p></div>
-      <?php $trialPromotion = array_values(array_filter($installations, static fn(array $row): bool => $row['license_mode'] === 'Trial' && empty($row['portal_deactivated_at'])))[0] ?? null; ?>
+      <div><span class="plan-kicker">Try before upgrading</span><h2>Five-Day Promotional Trial</h2><p>Choose Lite, Pro, or Enterprise inside the installed application. The licensing server checks eligibility and activates the selected edition automatically—there is no key to copy or paste.</p></div>
       <?php if ($currentTier === 'Enterprise'): ?><span class="current-plan">Enterprise already includes every feature</span>
-      <?php elseif (is_array($primaryLicense) || is_array($trialPromotion)): ?>
-        <form method="post">
-          <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="start-promotion"><input type="hidden" name="target_tier" value="Enterprise">
-          <?php if (is_array($primaryLicense)): ?><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><?php else: ?><input type="hidden" name="installation_id" value="<?= (int)$trialPromotion['id'] ?>"><?php endif; ?>
-          <button class="button secondary" type="submit">Start five-day Enterprise promotion</button>
-        </form>
+      <?php elseif ($installations !== []): ?><div class="maintenance-action"><span>Open <strong>Settings → License</strong> in POS Printer Emulator.</span><a class="button secondary" href="https://www.posprinteremulator.com/documentation#license">View trial instructions</a></div>
       <?php else: ?><button class="button secondary disabled" type="button" disabled>Add an active installation first</button><?php endif; ?>
     </section>
   <?php elseif ($page === 'computers'): ?>
@@ -637,8 +661,8 @@ function portal_nav_icon(string $name): string
     <section class="reauth-panel"><h2>Confirm sensitive actions</h2><p>Enter your Customer Portal password. Confirmation remains valid for five minutes.</p><form method="post" class="inline-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="reauthenticate"><label><span class="sr-only">Password</span><input type="password" name="password" autocomplete="current-password" placeholder="Portal password" required></label><button class="button secondary" type="submit">Confirm password</button></form></section>
     <section class="data-section"><div class="table-wrap"><table><thead><tr><th>Computer</th><th>Version</th><th>First seen</th><th>Last seen</th><th>Action</th></tr></thead><tbody><?php foreach ($installations as $installation): ?><tr><td><?= portal_e((string)($installation['device_label'] ?: 'Computer ' . substr((string)$installation['installation_uuid'], -6))) ?><small class="block"><?= portal_e((string)($installation['windows_version'] ?: 'Windows device')) ?></small></td><td><?= portal_e((string)$installation['app_version']) ?></td><td><?= portal_e(portal_date($installation['first_seen_at'])) ?></td><td><?= portal_e(portal_datetime($installation['last_seen_at'])) ?></td><td><?php if ($installation['portal_deactivated_at']): ?><span>Deactivated <?= portal_e(portal_date($installation['portal_deactivated_at'])) ?></span><?php else: ?><form method="post" class="device-action" data-confirm="Deactivate this computer? The application on it may lose server access."><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="deactivate-device"><input type="hidden" name="installation_id" value="<?= (int)$installation['id'] ?>"><label><span class="sr-only">Reason</span><input name="reason" maxlength="300" placeholder="Reason for transfer" required></label><button class="danger-link" type="submit">Deactivate</button></form><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div></section>
   <?php elseif ($page === 'downloads'): ?>
-    <div class="page-heading"><div><h1>Downloads</h1><p>Download only the official signed-by-checksum GitHub release.</p></div></div>
-    <section class="download-panel"><div><h2>POS Printer Emulator v0.3.45</h2><p>Windows 11 Pro · x64 · self-contained installer</p></div><a class="button primary" href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.45/POSPrinterEmulatorSetup-0.3.45-win-x64.exe" rel="noopener">Download installer</a><a href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.45/POSPrinterEmulatorSetup-0.3.45-win-x64.exe.sha256">SHA-256 checksum</a></section>
+    <div class="page-heading"><div><h1>Downloads</h1><p>Download the official POS Printer Emulator release from GitHub.</p></div></div>
+    <section class="download-panel"><div><h2>POS Printer Emulator v0.3.45</h2><p>Windows 11 Pro · x64 · self-contained installer</p></div><a class="button primary" href="https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/v0.3.45/POSPrinterEmulatorSetup-0.3.45-win-x64.exe" rel="noopener">Download installer</a></section>
     <section class="info-band"><h2>Update eligibility</h2><p>All customers can see when a newer version exists. Paid update downloads and assisted support follow the maintenance date shown on the Licenses page.</p></section>
   <?php elseif ($page === 'support'): ?>
     <div class="page-heading"><div><h1>Support</h1><p>Submit a private support request without exposing receipt data or activation keys.</p></div></div>
@@ -650,9 +674,49 @@ function portal_nav_icon(string $name): string
       <section class="form-panel"><h2>Account details</h2><form method="post" class="form-grid"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="profile"><label>Customer or company name<input name="display_name" maxlength="160" value="<?= portal_e((string)$account['display_name']) ?>" required></label><label>Verified email address<input value="<?= portal_e((string)$account['canonical_email']) ?>" disabled></label><div class="wide form-actions"><button class="button primary" type="submit">Save account details</button></div></form></section>
       <section class="form-panel"><h2>Communication &amp; privacy</h2><form method="post" class="choice-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="preferences"><label><input type="checkbox" name="marketing" <?= ($consentMap['Marketing'] ?? '') === 'Granted' ? 'checked' : '' ?>><span><strong>Product news and offers</strong><small>Optional email about new features and offers.</small></span></label><label><input type="checkbox" name="analytics" <?= ($consentMap['Product Analytics'] ?? '') === 'Granted' ? 'checked' : '' ?>><span><strong>Privacy-safe product analytics</strong><small>Aggregate usage only. Never receipt text, raw bytes, screenshots, or private IP addresses.</small></span></label><button class="button primary" type="submit">Save preferences</button></form></section>
       <section class="data-section"><header><h2>Consent history</h2></header><div class="table-wrap"><table><thead><tr><th>Preference</th><th>Decision</th><th>Policy</th><th>Source</th><th>Recorded</th></tr></thead><tbody><?php foreach ($snapshot['consentHistory'] as $consent): ?><tr><td><?= portal_e((string)$consent['consent_type']) ?></td><td><?= portal_e((string)$consent['consent_state']) ?></td><td><?= portal_e((string)$consent['policy_version']) ?></td><td><?= portal_e((string)$consent['source']) ?></td><td><?= portal_e(portal_datetime($consent['recorded_at'])) ?></td></tr><?php endforeach; ?><?php if ($snapshot['consentHistory'] === []): ?><tr><td colspan="5">No preference decisions have been recorded yet.</td></tr><?php endif; ?></tbody></table></div></section>
-      <section class="form-panel" id="mfa"><h2>Two-step verification</h2><?php if (!empty($account['mfa_enabled'])): ?><p class="status active">● Enabled</p><p>Your authenticator app is required after password sign-in.</p><?php else: ?><?php if (empty($_SESSION['pending_mfa_secret'])): ?><p>Add an authenticator app for stronger protection.</p><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="start-mfa"><button class="button secondary" type="submit">Start two-step setup</button></form><?php else: ?><p>Enter this setup key in your authenticator app:</p><code class="setup-key"><?= portal_e((string)$_SESSION['pending_mfa_secret']) ?></code><form method="post" class="inline-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="confirm-mfa"><label>Six-digit code<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label><button class="button primary" type="submit">Verify and enable</button></form><?php endif; ?><?php endif; ?><?php if (is_array($recoveryCodes) && $recoveryCodes !== []): ?><div class="recovery-codes" role="status"><h3>Save these one-time recovery codes</h3><ul><?php foreach ($recoveryCodes as $code): ?><li><code><?= portal_e((string)$code) ?></code></li><?php endforeach; ?></ul></div><?php endif; ?></section>
+      <section class="form-panel" id="mfa">
+        <h2>Two-step verification</h2>
+        <?php if (!empty($account['mfa_enabled'])): ?>
+          <p class="status active">● Enabled</p>
+          <p>Your authenticator app is required after password sign-in.</p>
+        <?php elseif ($pendingMfaSecret === ''): ?>
+          <p>Add an authenticator app for stronger protection.</p>
+          <form method="post">
+            <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
+            <input type="hidden" name="action" value="start-mfa">
+            <button class="button secondary" type="submit">Start two-step setup</button>
+          </form>
+        <?php else: ?>
+          <div class="mfa-setup-grid">
+            <div class="mfa-qr-card">
+              <h3>Scan with your authenticator app</h3>
+              <div class="mfa-qr-code" data-mfa-qr data-provisioning-uri="<?= portal_e($mfaProvisioningUri) ?>" role="img" aria-label="Authenticator setup QR code"></div>
+              <p>Open your authenticator app, add an account, and scan this QR code.</p>
+              <p class="mfa-qr-error" data-mfa-qr-error hidden>The QR code could not be displayed. Use the setup key instead.</p>
+              <noscript><p>JavaScript is required to display the QR code. Use the setup key instead.</p></noscript>
+            </div>
+            <div class="mfa-manual-setup">
+              <h3>Or enter the setup key</h3>
+              <p>Use this key if your authenticator app cannot scan the QR code:</p>
+              <code class="setup-key"><?= portal_e($pendingMfaSecret) ?></code>
+              <form method="post" class="mfa-confirm-form">
+                <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
+                <input type="hidden" name="action" value="confirm-mfa">
+                <label>Six-digit code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
+                <button class="button primary" type="submit">Verify and enable</button>
+              </form>
+            </div>
+          </div>
+        <?php endif; ?>
+        <?php if (is_array($recoveryCodes) && $recoveryCodes !== []): ?>
+          <div class="recovery-codes" role="status">
+            <h3>Save these one-time recovery codes</h3>
+            <ul><?php foreach ($recoveryCodes as $code): ?><li><code><?= portal_e((string)$code) ?></code></li><?php endforeach; ?></ul>
+          </div>
+        <?php endif; ?>
+      </section>
       <section class="reauth-panel"><h2>Confirm sensitive actions</h2><p>Enter your Customer Portal password before closing portal access. Confirmation remains valid for five minutes.</p><form method="post" class="inline-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="reauthenticate"><label><span class="sr-only">Password</span><input type="password" name="password" autocomplete="current-password" placeholder="Portal password" required></label><button class="button secondary" type="submit">Confirm password</button></form></section>
-      <section class="danger-zone"><h2>Privacy actions</h2><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="export"><button class="button secondary" type="submit">Download my account data</button></form><p>Closing portal access does not cancel or delete a permanent software license or required transaction records.</p><form method="post" data-confirm="Close Customer Portal access? Your permanent software license will remain, but you will be signed out."><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="close-account"><label>Type CLOSE after confirming your password<input name="confirmation" autocomplete="off" required></label><button class="button danger" type="submit">Close portal account</button></form></section>
+      <section class="danger-zone"><h2>Privacy actions</h2><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="export"><button class="button secondary" type="submit">Download my account data</button></form><p>Closing portal access does not cancel or delete a permanent software license or required transaction records.</p><form method="post" class="close-account-form" data-confirm="Close Customer Portal access? Your permanent software license will remain, but you will be signed out."><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="close-account"><label>Type CLOSE after confirming your password<input name="confirmation" autocomplete="off" required></label><button class="button danger" type="submit">Close portal account</button></form></section>
     </div>
   <?php endif; ?>
 </main>

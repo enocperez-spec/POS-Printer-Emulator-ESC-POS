@@ -12,7 +12,14 @@ public interface IUsageTelemetry
     void RecordActivation();
 }
 
-public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
+public sealed record InstallationCredentials(Guid InstallationId, string Token);
+
+public interface IInstallationCredentialsProvider
+{
+    Task<InstallationCredentials> GetCredentialsAsync(CancellationToken cancellationToken);
+}
+
+public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry, IInstallationCredentialsProvider
 {
     private readonly HttpClient _httpClient;
     private readonly LicenseService _license;
@@ -22,6 +29,8 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
     private readonly Uri? _endpoint;
     private readonly bool _enabled;
     private readonly TimeSpan _retryDelay;
+    private readonly SemaphoreSlim _registrationGate = new(1, 1);
+    private readonly object _stateSync = new();
     private TelemetryState _state;
 
     public UsageTelemetryService(
@@ -66,6 +75,25 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         if (_enabled)
         {
             _events.Writer.TryWrite(TelemetryEvent.Activation);
+        }
+    }
+
+    public async Task<InstallationCredentials> GetCredentialsAsync(CancellationToken cancellationToken)
+    {
+        if (!_enabled || _endpoint is null)
+        {
+            throw new InvalidOperationException("The secure installation service is unavailable.");
+        }
+        if (!await EnsureRegisteredAsync(cancellationToken))
+        {
+            throw new InvalidOperationException(
+                "The application could not verify this installation. Check the internet connection and try again.");
+        }
+        lock (_stateSync)
+        {
+            return new InstallationCredentials(
+                _state.InstallationId,
+                _state.Token ?? throw new InvalidOperationException("The installation registration is incomplete."));
         }
     }
 
@@ -153,52 +181,76 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
 
     private async Task<bool> EnsureRegisteredAsync(CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(_state.Token))
+        await _registrationGate.WaitAsync(cancellationToken);
+        try
         {
-            return true;
-        }
+            lock (_stateSync)
+            {
+                if (!string.IsNullOrWhiteSpace(_state.Token))
+                {
+                    return true;
+                }
+            }
 
-        for (var attempt = 0; attempt < 2; attempt++)
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                var status = _license.GetStatus();
+                var payload = CreatePayload("register", null, 1, status);
+                try
+                {
+                    using var response = await _httpClient.PostAsJsonAsync(_endpoint, payload, cancellationToken);
+                    if (response.StatusCode == HttpStatusCode.Conflict)
+                    {
+                        lock (_stateSync)
+                        {
+                            _state = new TelemetryState(Guid.NewGuid(), null);
+                            _license.BindInstallationId(_state.InstallationId);
+                            SaveState();
+                        }
+                        continue;
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    var registration = await response.Content.ReadFromJsonAsync<RegistrationResponse>(cancellationToken: cancellationToken);
+                    if (string.IsNullOrWhiteSpace(registration?.Token))
+                    {
+                        throw new InvalidDataException("Telemetry registration did not return an installation token.");
+                    }
+
+                    lock (_stateSync)
+                    {
+                        _state = _state with { Token = registration.Token };
+                        SaveState();
+                    }
+                    return true;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(exception, "Usage reporting is unavailable; receipt emulation will continue normally");
+                    return false;
+                }
+            }
+
+            return false;
+        }
+        finally
         {
-            var status = _license.GetStatus();
-            var payload = CreatePayload("register", null, 1, status);
-            try
-            {
-                using var response = await _httpClient.PostAsJsonAsync(_endpoint, payload, cancellationToken);
-                if (response.StatusCode == HttpStatusCode.Conflict)
-                {
-                    _state = new TelemetryState(Guid.NewGuid(), null);
-                    continue;
-                }
-
-                response.EnsureSuccessStatusCode();
-                var registration = await response.Content.ReadFromJsonAsync<RegistrationResponse>(cancellationToken: cancellationToken);
-                if (string.IsNullOrWhiteSpace(registration?.Token))
-                {
-                    throw new InvalidDataException("Telemetry registration did not return an installation token.");
-                }
-
-                _state = _state with { Token = registration.Token };
-                SaveState();
-                return true;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogWarning(exception, "Usage reporting is unavailable; receipt emulation will continue normally");
-                return false;
-            }
+            _registrationGate.Release();
         }
-
-        return false;
     }
 
     private async Task<bool> SendEventAsync(string eventName, int count, CancellationToken cancellationToken)
     {
-        if (_endpoint is null || string.IsNullOrWhiteSpace(_state.Token))
+        TelemetryState state;
+        lock (_stateSync)
+        {
+            state = _state;
+        }
+        if (_endpoint is null || string.IsNullOrWhiteSpace(state.Token))
         {
             return false;
         }
@@ -210,12 +262,16 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
             {
                 Content = JsonContent.Create(CreatePayload("event", eventName, Math.Clamp(count, 1, 1000), status))
             };
-            request.Headers.Add("X-Installation-Token", _state.Token);
+            request.Headers.Add("X-Installation-Token", state.Token);
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                _state = new TelemetryState(Guid.NewGuid(), null);
-                SaveState();
+                lock (_stateSync)
+                {
+                    _state = new TelemetryState(Guid.NewGuid(), null);
+                    _license.BindInstallationId(_state.InstallationId);
+                    SaveState();
+                }
                 return false;
             }
             response.EnsureSuccessStatusCode();
@@ -232,10 +288,17 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         }
     }
 
-    private object CreatePayload(string action, string? eventName, int count, LicenseStatus status) => new
+    private object CreatePayload(string action, string? eventName, int count, LicenseStatus status)
     {
+        Guid installationId;
+        lock (_stateSync)
+        {
+            installationId = _state.InstallationId;
+        }
+        return new
+        {
         action,
-        installationId = _state.InstallationId,
+        installationId,
         @event = eventName,
         count,
         customerName = status.CustomerName,
@@ -247,7 +310,8 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry
         licenseId = status.LicenseId,
         maintenanceStatus = status.Maintenance.State,
         maintenanceExpiresAt = status.Maintenance.ExpiresAt
-    };
+        };
+    }
 
     private TelemetryState? LoadState()
     {

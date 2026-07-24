@@ -296,10 +296,38 @@ CREATE TABLE IF NOT EXISTS communication_templates (
     enabled TINYINT(1) NOT NULL DEFAULT 0,
     frequency_cap_hours SMALLINT UNSIGNED NOT NULL DEFAULT 24,
     description VARCHAR(500) NOT NULL,
+    preview_brevo_template_id BIGINT UNSIGNED NULL,
+    preview_verified_at DATETIME(6) NULL,
+    preview_warnings_json TEXT NULL,
     updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (template_key),
     KEY ix_communication_templates_enabled (enabled, message_class)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_tags (
+    tag_key VARCHAR(32) NOT NULL,
+    display_name VARCHAR(64) NOT NULL,
+    color_hex CHAR(7) NOT NULL,
+    description VARCHAR(240) NOT NULL,
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (tag_key),
+    UNIQUE KEY uq_communication_tags_name (display_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS communication_template_tags (
+    template_key VARCHAR(64) NOT NULL,
+    tag_key VARCHAR(32) NOT NULL,
+    created_by VARCHAR(80) NOT NULL DEFAULT 'system',
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (template_key,tag_key),
+    KEY ix_communication_template_tags_tag (tag_key,template_key),
+    CONSTRAINT fk_communication_template_tags_template
+        FOREIGN KEY (template_key) REFERENCES communication_templates(template_key)
+        ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS communication_campaigns (
@@ -401,7 +429,28 @@ INSERT IGNORE INTO communication_settings(setting_key,setting_value,updated_by) 
     ('provider_timezone','America/New_York','system'),
     ('provider_daily_limit','300','system'),
     ('automated_daily_limit','290','system'),
-    ('service_reserve','50','system');
+    ('service_reserve','50','system'),
+    ('inactivity_followup_days','','system'),
+    ('documentation_url','https://www.posprinteremulator.com/documentation','system'),
+    ('help_center_url','https://www.posprinteremulator.com/documentation','system'),
+    ('support_request_url','https://www.posprinteremulator.com/how-to-submit-a-support-request','system'),
+    ('no_reply_notice','Please do not reply to this email. This inbox is not monitored.','system');
+
+INSERT IGNORE INTO communication_tags(tag_key,display_name,color_hex,description,is_system,updated_by) VALUES
+    ('welcome','Welcome','#06b6d4','Customer onboarding and first-use guidance.',1,'system'),
+    ('trial','Trial','#8b5cf6','Trial-license communication.',1,'system'),
+    ('lite','Lite','#3b82f6','Lite-license communication.',1,'system'),
+    ('pro','Pro','#14b8a6','Pro-license communication.',1,'system'),
+    ('enterprise','Enterprise','#f59e0b','Enterprise-license communication.',1,'system'),
+    ('inactive-user','Inactive User','#f97316','Assistance after an inactivity interval.',1,'system'),
+    ('troubleshooting','Troubleshooting','#ef4444','Configuration and troubleshooting help.',1,'system'),
+    ('setup','Setup','#22c55e','Installation and initial configuration.',1,'system'),
+    ('purchase','Purchase','#eab308','Purchase and paid-license onboarding.',1,'system'),
+    ('upgrade','Upgrade','#a855f7','License upgrade onboarding.',1,'system'),
+    ('marketing','Marketing','#ec4899','Optional communication requiring marketing consent.',1,'system'),
+    ('service','Service','#0284c7','Operational customer service communication.',1,'system'),
+    ('essential','Essential','#dc2626','Security or transaction-critical communication.',1,'system'),
+    ('it','IT','#64748b','Technical or account-management communication.',1,'system');
 
 INSERT IGNORE INTO communication_templates
     (template_key,display_name,message_class,essential,enabled,frequency_cap_hours,description)
@@ -416,7 +465,101 @@ VALUES
     ('release_announcement','Release announcement','Marketing',0,0,168,'Announce an available product release to opted-in customers.'),
     ('trial_guidance','Trial guidance','Marketing',0,0,168,'Offer setup guidance to opted-in Trial customers.'),
     ('inactivity_help','Inactivity help','Marketing',0,0,720,'Offer help to an opted-in customer after an inactivity interval.'),
-    ('promotion','Product promotion','Marketing',0,0,720,'Send an owner-approved promotion to opted-in customers.');
+    ('promotion','Product promotion','Marketing',0,0,720,'Send an owner-approved promotion to opted-in customers.'),
+    ('we_want_to_help','We Want to Help','Marketing',0,0,720,'Offer tier-aware setup and troubleshooting help after more than 30 days without product activity.'),
+    ('welcome_trial_start','Trial welcome and setup','Service',0,0,72,'Welcome a new Trial customer and provide setup guidance.'),
+    ('welcome_lite_purchase','Lite purchase welcome and setup','Service',0,0,72,'Thank a new Lite customer and provide setup guidance.'),
+    ('welcome_pro_purchase','Pro purchase welcome and setup','Service',0,0,72,'Thank a new Pro customer and provide setup guidance.'),
+    ('welcome_enterprise_purchase','Enterprise purchase welcome and setup','Service',0,0,72,'Thank a new Enterprise customer and provide setup guidance.'),
+    ('welcome_lite_upgrade','Lite upgrade welcome and setup','Service',0,0,72,'Confirm a Lite upgrade and provide setup guidance.'),
+    ('welcome_pro_upgrade','Pro upgrade welcome and setup','Service',0,0,72,'Confirm a Pro upgrade and provide setup guidance.'),
+    ('welcome_enterprise_upgrade','Enterprise upgrade welcome and setup','Service',0,0,72,'Confirm an Enterprise upgrade and provide setup guidance.');
+
+UPDATE communication_templates SET
+    brevo_template_id=CASE template_key
+      WHEN 'we_want_to_help' THEN 17 WHEN 'welcome_trial_start' THEN 18
+      WHEN 'welcome_lite_purchase' THEN 19 WHEN 'welcome_pro_purchase' THEN 20
+      WHEN 'welcome_enterprise_purchase' THEN 21 WHEN 'welcome_lite_upgrade' THEN 22
+      WHEN 'welcome_pro_upgrade' THEN 23 WHEN 'welcome_enterprise_upgrade' THEN 24 END,
+    enabled=1,
+    preview_brevo_template_id=CASE template_key
+      WHEN 'we_want_to_help' THEN 17 WHEN 'welcome_trial_start' THEN 18
+      WHEN 'welcome_lite_purchase' THEN 19 WHEN 'welcome_pro_purchase' THEN 20
+      WHEN 'welcome_enterprise_purchase' THEN 21 WHEN 'welcome_lite_upgrade' THEN 22
+      WHEN 'welcome_pro_upgrade' THEN 23 WHEN 'welcome_enterprise_upgrade' THEN 24 END,
+    preview_verified_at=UTC_TIMESTAMP(6),preview_warnings_json='[]',updated_by='managed-migration'
+WHERE template_key IN ('we_want_to_help','welcome_trial_start','welcome_lite_purchase',
+    'welcome_pro_purchase','welcome_enterprise_purchase','welcome_lite_upgrade',
+    'welcome_pro_upgrade','welcome_enterprise_upgrade');
+UPDATE communication_templates SET enabled=0
+WHERE template_key IN ('welcome_setup','trial_guidance','inactivity_help');
+
+INSERT IGNORE INTO communication_template_tags(template_key,tag_key,created_by) VALUES
+    ('email_verification','service','system'),
+    ('email_verification','essential','system'),
+    ('email_verification','it','system'),
+    ('password_recovery','service','system'),
+    ('password_recovery','essential','system'),
+    ('password_recovery','it','system'),
+    ('purchase_confirmation','service','system'),
+    ('purchase_confirmation','essential','system'),
+    ('activation_ready','service','system'),
+    ('activation_ready','essential','system'),
+    ('support_confirmation','service','system'),
+    ('support_confirmation','essential','system'),
+    ('support_confirmation','it','system'),
+    ('maintenance_reminder','service','system'),
+    ('welcome_setup','service','system'),
+    ('release_announcement','marketing','system'),
+    ('release_announcement','it','system'),
+    ('trial_guidance','marketing','system'),
+    ('inactivity_help','marketing','system'),
+    ('inactivity_help','it','system'),
+    ('promotion','marketing','system'),
+    ('we_want_to_help','marketing','system'),
+    ('we_want_to_help','inactive-user','system'),
+    ('we_want_to_help','troubleshooting','system'),
+    ('welcome_trial_start','service','system'),
+    ('welcome_trial_start','welcome','system'),
+    ('welcome_trial_start','trial','system'),
+    ('welcome_trial_start','setup','system'),
+    ('welcome_lite_purchase','service','system'),
+    ('welcome_lite_purchase','welcome','system'),
+    ('welcome_lite_purchase','lite','system'),
+    ('welcome_lite_purchase','setup','system'),
+    ('welcome_lite_purchase','purchase','system'),
+    ('welcome_pro_purchase','service','system'),
+    ('welcome_pro_purchase','welcome','system'),
+    ('welcome_pro_purchase','pro','system'),
+    ('welcome_pro_purchase','setup','system'),
+    ('welcome_pro_purchase','purchase','system'),
+    ('welcome_enterprise_purchase','service','system'),
+    ('welcome_enterprise_purchase','welcome','system'),
+    ('welcome_enterprise_purchase','enterprise','system'),
+    ('welcome_enterprise_purchase','setup','system'),
+    ('welcome_enterprise_purchase','purchase','system'),
+    ('welcome_lite_upgrade','service','system'),
+    ('welcome_lite_upgrade','welcome','system'),
+    ('welcome_lite_upgrade','lite','system'),
+    ('welcome_lite_upgrade','setup','system'),
+    ('welcome_lite_upgrade','upgrade','system'),
+    ('welcome_pro_upgrade','service','system'),
+    ('welcome_pro_upgrade','welcome','system'),
+    ('welcome_pro_upgrade','pro','system'),
+    ('welcome_pro_upgrade','setup','system'),
+    ('welcome_pro_upgrade','upgrade','system'),
+    ('welcome_enterprise_upgrade','service','system'),
+    ('welcome_enterprise_upgrade','welcome','system'),
+    ('welcome_enterprise_upgrade','enterprise','system'),
+    ('welcome_enterprise_upgrade','setup','system'),
+    ('welcome_enterprise_upgrade','upgrade','system');
+
+INSERT INTO communication_settings(setting_key,setting_value,updated_by)
+VALUES('template_tags_seeded','1','system')
+ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by);
+INSERT INTO communication_settings(setting_key,setting_value,updated_by)
+VALUES('template_tag_seed_version','2','system')
+ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by);
 
 CREATE TABLE IF NOT EXISTS portal_accounts (
     customer_id CHAR(36) NOT NULL,
@@ -605,6 +748,9 @@ CREATE TABLE IF NOT EXISTS portal_promotions (
     granted_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
     state ENUM('Active','Expired','Canceled','Superseded') NOT NULL DEFAULT 'Active',
     entitlement_token_hash BINARY(32) NOT NULL,
+    entitlement_token_ciphertext VARBINARY(768) NULL,
+    entitlement_token_nonce BINARY(12) NULL,
+    entitlement_token_tag BINARY(16) NULL,
     starts_at DATETIME(6) NOT NULL,
     expires_at DATETIME(6) NOT NULL,
     ended_at DATETIME(6) NULL,
@@ -786,7 +932,7 @@ VALUES
     ('v0.3.44', 'v0.3.44', 'Release', 'Self-service renewals, upgrades, and promotional trials', 'Released', 344, 'Provide auditable self-service commercial workflows without turning permanent licenses into subscriptions.', 'PayPal maintenance renewal, tier upgrades, refunds, idempotent fulfillment, and one five-day promotional paid-edition trial.', 'Commercial workflows require the secure portal and canonical ownership records.', 'Payments and temporary entitlements are idempotent, auditable, and restore prior permanent access correctly.', '2026-07-23 00:00:00.000000'),
     ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released', 345, 'Deliver useful lifecycle messages through Brevo while honoring consent and provider limits.', 'Protected Brevo integration, durable priority outbox, quota deferral, templates, authenticated webhooks, suppression, minimal telemetry, segmentation, and Admin dashboards.', 'Communication automation must follow the consent and commercial foundations.', 'Eligible messages send exactly once, opt-outs and suppressions are honored, quotas do not lose mail, and prohibited data never reaches Brevo.', '2026-07-23 00:00:00.000000'),
     ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released', 346, 'Make primary workflows usable with keyboard and assistive technology.', 'Maximized first launch, taskbar-safe remembered placement, focus order, semantics, scaling, high contrast, reduced motion, captions, and WCAG regression checks.', 'Accessibility should be established before additional interface growth.', 'Window placement behaves safely and primary workflows pass keyboard, Narrator, scaling, contrast, and automated checks.', '2026-07-23 00:00:00.000000'),
-    ('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Planned', 347, 'Replace manual promotional-key entry with a one-click server-authorized evaluation.', 'Lite, Pro, and Enterprise selection, verified-customer eligibility, signed automatic activation, exact countdown, purchase actions, safe expiry restoration, and permanent anti-repeat controls.', 'The existing customer and promotional entitlement foundations should become a clear desktop workflow before additional configuration screens are added.', 'Each edition activates correctly without key entry and reinstall, deletion, clock, concurrency, retry, or cross-edition attempts cannot create or extend a second promotion.', NULL),
+    ('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released', 347, 'Replace manual promotional-key entry with a one-click server-authorized evaluation.', 'Lite, Pro, and Enterprise selection, verified-customer eligibility, signed automatic activation, exact countdown, purchase actions, safe expiry restoration, and permanent anti-repeat controls.', 'The existing customer and promotional entitlement foundations should become a clear desktop workflow before additional configuration screens are added.', 'Each edition activates correctly without key entry and reinstall, deletion, clock, concurrency, retry, or cross-edition attempts cannot create or extend a second promotion.', '2026-07-23 00:00:00.000000'),
     ('v0.3.48', 'v0.3.48', 'Release', 'Automatic configuration restore points', 'Planned', 348, 'Protect customers from accidental configuration loss.', 'Encrypted pre-change and scheduled restore points, bounded retention, previews, transactional restore, and rollback.', 'Recovery protection precedes greater configuration complexity.', 'Customers restore a previous configuration without partial state, secret exposure, or license loss.', NULL),
     ('v0.3.49', 'v0.3.49', 'Release', 'Projects and testing sessions', 'Planned', 349, 'Organize receipt testing into isolated customer projects.', 'Projects, sessions, notes, tags, profiles, captures, baselines, reports, safe export, and integrity validation.', 'Projects establish clean boundaries for later comparison suites.', 'Projects remain isolated and export without leaking unrelated data.', NULL),
     ('v0.3.50', 'v0.3.50', 'Release', 'Privacy-safe receipt masking', 'Planned', 350, 'Reduce sensitive data exposure when receipts are shared.', 'Privacy View, configurable masking, safe screenshots, exports, reports, and support attachments with original preservation.', 'Sharing workflows require explicit privacy controls.', 'Privacy-safe artifacts contain no configured sensitive values.', NULL),

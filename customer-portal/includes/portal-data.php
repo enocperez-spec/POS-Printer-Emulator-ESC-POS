@@ -116,6 +116,57 @@ function portal_date(?string $value, string $empty = 'Not available'): string
     return $time === false ? $empty : gmdate('M j, Y', $time);
 }
 
+function portal_long_date(?string $value, string $empty = 'Not available'): string
+{
+    if ($value === null || trim($value) === '') {
+        return $empty;
+    }
+    $time = strtotime($value);
+    return $time === false ? $empty : gmdate('F j, Y', $time);
+}
+
+function portal_customer_display_name(?string $displayName): string
+{
+    $name = trim((string)preg_replace('/\s+/', ' ', (string)$displayName));
+    return $name !== '' ? $name : 'Customer';
+}
+
+function portal_license_status_label(?string $status): string
+{
+    $label = trim((string)$status);
+    return strcasecmp($label, 'Enabled') === 0 ? 'Active' : ($label !== '' ? $label : 'Not available');
+}
+
+/**
+ * @return array{state:string,daysRemaining:?int,expirationDate:string}
+ */
+function portal_maintenance_reminder(?string $expiresAt, ?DateTimeImmutable $today = null): array
+{
+    $empty = ['state' => 'unavailable', 'daysRemaining' => null, 'expirationDate' => 'Not available'];
+    if ($expiresAt === null || trim($expiresAt) === '') {
+        return $empty;
+    }
+
+    try {
+        $utc = new DateTimeZone('UTC');
+        $expiration = (new DateTimeImmutable($expiresAt, $utc))->setTimezone($utc)->setTime(0, 0);
+        $current = ($today ?? new DateTimeImmutable('now', $utc))->setTimezone($utc)->setTime(0, 0);
+    } catch (Throwable) {
+        return $empty;
+    }
+
+    $daysRemaining = (int)$current->diff($expiration)->format('%r%a');
+    $state = $daysRemaining < 0
+        ? 'expired'
+        : ($current >= $expiration->modify('-3 months') ? 'expiring' : 'current');
+
+    return [
+        'state' => $state,
+        'daysRemaining' => $daysRemaining,
+        'expirationDate' => $expiration->format('F j, Y'),
+    ];
+}
+
 function portal_datetime(?string $value, string $empty = 'Never'): string
 {
     if ($value === null || trim($value) === '') {

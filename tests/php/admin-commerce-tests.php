@@ -169,8 +169,10 @@ $expectContains("WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.45 as released.');
 $expectContains("('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released'", $schema, 'Fresh database schema must identify v0.3.45 as released.');
 $expectContains("WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'", $devSupport, 'Admin Dev Support is missing the v0.3.45 GitHub release link.');
+$expectContains("('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.47 as released.');
+$expectContains("('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released'", $schema, 'Fresh database schema must identify v0.3.47 as released.');
+$expectContains("WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'", $devSupport, 'Admin Dev Support is missing the v0.3.47 GitHub release link.');
 $futureReleases = [
-    'v0.3.47' => ['Five-Day Promotional Trial Experience', 52],
     'v0.3.48' => ['Automatic configuration restore points', 32],
     'v0.3.49' => ['Projects and testing sessions', 33],
     'v0.3.50' => ['Privacy-safe receipt masking', 34],

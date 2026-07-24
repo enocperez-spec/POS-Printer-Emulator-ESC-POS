@@ -26,6 +26,7 @@ function portal_queue_mail(
         $templateParameters,
         hash('sha256', $type . '|' . $customerId . '|' . $body)
     )) {
+        portal_kick_communication_worker();
         return;
     }
     $insert = $pdo->prepare(
@@ -46,13 +47,12 @@ function portal_queue_mail(
     }
     $mailId = (int)$pdo->lastInsertId();
     $from = portal_normalize_email((string)(portal_config()['portal']['mail_from'] ?? ''));
-    $reply = portal_normalize_email((string)(portal_config()['portal']['mail_reply_to'] ?? $from));
-    if ($from === '' || $reply === '') {
+    if ($from === '') {
         return;
     }
+    $body = rtrim($body) . portal_mail_support_footer($pdo);
     $headers = [
         'From: POS Printer Emulator <' . $from . '>',
-        'Reply-To: ' . $reply,
         'Content-Type: text/plain; charset=UTF-8',
         'X-Auto-Response-Suppress: All',
     ];
@@ -66,6 +66,45 @@ function portal_queue_mail(
     $update->execute(['state' => $sent ? 'Sent' : 'Failed', 'sent' => $sent ? 1 : 0, 'id' => $mailId]);
 }
 
+function portal_kick_communication_worker(): bool
+{
+    if (!function_exists('curl_init')) {
+        return false;
+    }
+    $portal = portal_config()['portal'] ?? [];
+    $url = trim((string)($portal['communications_worker_url'] ?? ''));
+    $token = trim((string)($portal['support_backend_token'] ?? ''));
+    $parts = parse_url($url);
+    if (!is_array($parts) ||
+        ($parts['scheme'] ?? '') !== 'https' ||
+        strtolower((string)($parts['host'] ?? '')) !== 'admin.posprinteremulator.com' ||
+        strlen($token) < 43) {
+        return false;
+    }
+
+    $ch = curl_init($url);
+    if ($ch === false) {
+        return false;
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_TIMEOUT => 8,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $token,
+        ],
+    ]);
+    $response = curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return is_string($response) && $status >= 200 && $status < 300;
+}
+
 function portal_try_communication_outbox(
     PDO $pdo,
     string $customerId,
@@ -74,13 +113,26 @@ function portal_try_communication_outbox(
     array $parameters,
     string $idempotencyDigest
 ): bool {
-    $allowedKeys = ['customer_name', 'verification_url', 'reset_url'];
+    $parameters = array_replace($parameters, portal_mail_global_parameters($pdo));
+    $allowedKeys = [
+        'customer_name', 'verification_url', 'reset_url', 'documentation_url',
+        'help_center_url', 'support_request_url', 'no_reply_notice',
+    ];
     $clean = [];
     foreach ($parameters as $key => $value) {
         if (!in_array((string)$key, $allowedKeys, true) || !is_string($value) || strlen($value) > 500) {
             return false;
         }
-        $clean[(string)$key] = trim($value);
+        $key = (string)$key;
+        $value = trim($value);
+        if (str_ends_with($key, '_url') && !portal_mail_url_is_allowed($value)) {
+            return false;
+        }
+        if ($key === 'no_reply_notice' &&
+            $value !== 'Please do not reply to this email. This inbox is not monitored.') {
+            return false;
+        }
+        $clean[$key] = $value;
     }
     try {
         $template = $pdo->prepare(
@@ -115,6 +167,62 @@ function portal_try_communication_outbox(
         if (in_array((string)$exception->getCode(), ['42S02', '42S22'], true)) return false;
         throw $exception;
     }
+}
+
+function portal_mail_global_parameters(PDO $pdo): array
+{
+    $settings = [
+        'documentation_url' => 'https://www.posprinteremulator.com/documentation',
+        'help_center_url' => 'https://www.posprinteremulator.com/documentation',
+        'support_request_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
+        'no_reply_notice' => 'Please do not reply to this email. This inbox is not monitored.',
+    ];
+    try {
+        $query = $pdo->prepare(
+            "SELECT setting_key,setting_value
+             FROM communication_settings
+             WHERE setting_key IN
+               ('documentation_url','help_center_url','support_request_url','no_reply_notice')"
+        );
+        $query->execute();
+        foreach ($query->fetchAll() as $row) {
+            $key = (string)$row['setting_key'];
+            $value = trim((string)$row['setting_value']);
+            if (str_ends_with($key, '_url') && portal_mail_url_is_allowed($value)) {
+                $settings[$key] = $value;
+            } elseif ($key === 'no_reply_notice' &&
+                $value === 'Please do not reply to this email. This inbox is not monitored.') {
+                $settings[$key] = $value;
+            }
+        }
+    } catch (PDOException $exception) {
+        if ((string)$exception->getCode() !== '42S02') {
+            throw $exception;
+        }
+    }
+    return $settings;
+}
+
+function portal_mail_support_footer(PDO $pdo): string
+{
+    $settings = portal_mail_global_parameters($pdo);
+    return "\n\nNeed help with POS Printer Emulator? Our complete documentation and troubleshooting guides are available online."
+        . "\nView Documentation: " . $settings['documentation_url']
+        . "\nSubmit a Support Request: " . $settings['support_request_url']
+        . "\n\n" . $settings['no_reply_notice'];
+}
+
+function portal_mail_url_is_allowed(string $url): bool
+{
+    $parts = parse_url($url);
+    return is_array($parts)
+        && strtolower((string)($parts['scheme'] ?? '')) === 'https'
+        && in_array(strtolower((string)($parts['host'] ?? '')), [
+            'www.posprinteremulator.com',
+            'userportal.posprinteremulator.com',
+        ], true)
+        && !isset($parts['user'])
+        && !isset($parts['pass']);
 }
 
 function portal_mail_uuid(): string

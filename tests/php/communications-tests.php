@@ -81,6 +81,15 @@ $atNoon = new DateTimeImmutable('2026-07-23 12:00:00', new DateTimeZone('America
 $expect(communication_quiet_hours_delay($quietConfig, false, $atNight) > 0, 'Nonessential delivery must defer during quiet hours.');
 $expect(communication_quiet_hours_delay($quietConfig, false, $atNoon) === 0, 'Daytime delivery should not be delayed.');
 $expect(communication_quiet_hours_delay($quietConfig, true, $atNight) === 0, 'Essential service delivery may bypass quiet hours.');
+$compliantTemplate = '<p>Need help? Our guides are online.</p><a href="{{ params.documentation_url }}">View Documentation</a><p>Please do not reply to this email. This inbox is not monitored.</p>';
+$expect(
+    communication_template_language_warnings('Account update', $compliantTemplate, false) === [],
+    'The required no-reply notice and global documentation link should pass template policy.'
+);
+$expect(
+    communication_template_language_warnings('Account update', '<p>Reply to this email for help.</p>', false) !== [],
+    'Reply-oriented language must block template approval.'
+);
 
 $communications = file_get_contents($root . '/admin-website/includes/communications.php') ?: '';
 $admin = file_get_contents($root . '/admin-website/communications.php') ?: '';
@@ -89,6 +98,8 @@ $bootstrap = file_get_contents($root . '/admin-website/includes/bootstrap.php') 
 $worker = file_get_contents($root . '/admin-website/api/v1/communications-worker.php') ?: '';
 $webhook = file_get_contents($root . '/admin-website/api/v1/brevo-webhook.php') ?: '';
 $scheduler = file_get_contents($root . '/admin-website/api/v1/communications-scheduler.php') ?: '';
+$preview = file_get_contents($root . '/admin-website/api/v1/template-preview.php') ?: '';
+$communicationsJs = file_get_contents($root . '/admin-website/assets/communications.js') ?: '';
 $portalMailer = file_get_contents($root . '/customer-portal/includes/mailer.php') ?: '';
 $schema = file_get_contents($root . '/database/schema.sql') ?: '';
 $telemetry = file_get_contents($root . '/website/api/v1/telemetry.php') ?: '';
@@ -113,6 +124,9 @@ $contains('communication_schedule_lifecycle', $scheduler, 'The authenticated sch
 $contains('communication_enqueue(', $communications, 'Lifecycle schedules must use the same policy-aware queue.');
 $contains('portal_try_communication_outbox', $portalMailer, 'Customer Portal security messages must use the new outbox when approved templates are enabled.');
 $contains('portal_mail_uuid', $portalMailer, 'Customer Portal mail intents need an entry-point-independent UUID generator.');
+$contains('portal_mail_global_parameters', $portalMailer, 'Customer Portal security messages must receive the centrally managed help links and no-reply notice.');
+$contains('portal_mail_support_footer', $portalMailer, 'The PHP mail fallback must direct customers to documentation and the support-request process.');
+$expect(!str_contains($portalMailer, 'Reply-To:'), 'The Customer Portal must not add a reply header for an unmonitored inbox.');
 $contains("'email_verification'", $portalMailer, 'Customer Portal enrollment must map to the approved verification template.');
 $contains("'password_recovery'", $portalMailer, 'Customer Portal recovery must map to the approved password template.');
 $contains('communication_outbox', $schema, 'Fresh databases are missing the durable communications outbox.');
@@ -123,6 +137,40 @@ $contains('does not send receipt content', $privacy, 'The privacy notice must di
 $contains('configure-communications', $publisher, 'The C# publisher must configure provider secrets without PowerShell.');
 $contains('require_recent_admin_authentication', $admin, 'Communication mutations and exports must require recent administrator authentication.');
 $contains('Opened · approximate', $admin, 'Open and click analytics must be clearly labeled as approximate.');
+$contains('communication_template_tags', $communications, 'Approved templates need normalized multi-tag storage.');
+$contains('data-template-tag-filter', $admin, 'The template registry is missing tag filters.');
+$contains('data-template-status-filter', $admin, 'The template registry is missing enabled and disabled filters.');
+$contains('data-template-tag-input', $admin, 'Authorized users need editable multi-tag controls.');
+$contains('/smtp/templates/', $preview, 'Template previews must load the mapped provider source and metadata.');
+$contains('communication_service_authorized', $preview, 'Protected service diagnostics must be able to validate template previews without an Admin browser session.');
+$contains('set_exception_handler', $preview, 'Template preview failures must always return a structured JSON error.');
+$contains('mapped_template_id', $preview, 'Native prepared statements must use distinct names for repeated template-ID values.');
+$contains("'update_profile'", $preview, 'Preview samples must safely resolve Brevo profile-management placeholders.');
+$contains('$templateSource ?? $html', $communications, 'Preview validation must inspect placeholders before sample substitution.');
+$contains('preview_brevo_template_id', $communications, 'Template activation requires a preview tied to the exact provider mapping.');
+$contains('preview_warnings_json', $admin, 'Template approval must reject previews with unresolved warnings.');
+$contains('Missing sample data for placeholder', $preview, 'Preview validation must report unresolved placeholders.');
+$contains('Invalid or unapproved link', $preview, 'Preview validation must report invalid links.');
+$contains("'we_want_to_help'", $communications, 'The 30-day inactivity workflow needs its own approved template.');
+$contains('CUSTOMER_RETURNED', $communications, 'Inactive-user mail must stop when customer activity resumes.');
+$contains('communication_onboarding_template', $communications, 'License events need deterministic tier-aware template routing.');
+$contains('welcome_enterprise_upgrade', $communications, 'The onboarding registry is missing an Enterprise upgrade variation.');
+$contains('Validating sender, placeholders, links, and responsive content', $communicationsJs, 'The iframe loading state must explain preview validation.');
+$contains('response.text()', $communicationsJs, 'Preview refresh must inspect the response before parsing JSON.');
+$contains('empty response', $communicationsJs, 'Preview refresh must explain empty server responses.');
+$contains('data-preview-viewport', $admin, 'The preview dialog needs desktop and mobile layout controls.');
+$contains('template-preview-refresh', $admin, 'Administrators need an explicit preview refresh control.');
+$contains('communication_template_trigger_flow', $admin, 'Every registry template must expose its trigger flow.');
+$contains('data-template-trigger', $admin, 'Template cards must carry their trigger flow into hover and dialog views.');
+$contains('template-dialog-trigger', $communicationsJs, 'The template editor must render the selected trigger flow.');
+$contains('communication_tags', $communications, 'The registry needs an editable color-tag catalog.');
+$contains('tag_delete', $admin, 'Authorized administrators need tag removal controls.');
+$contains('communication_global_parameters', $communications, 'Every message must receive centrally managed documentation and support URLs.');
+$contains('COMMUNICATION_FORBIDDEN_REPLY_LANGUAGE', $communications, 'Future templates need a permanent reply-language policy.');
+$contains("'inbox_monitored'", $communications, 'Reply-to headers must depend on an explicit monitored-inbox setting.');
+$contains("'support_request_url'", $schema, 'Fresh databases need the global support-request URL.');
+$contains('activeTags', $communicationsJs, 'The registry needs combined tag filtering.');
+$contains('statusFilter', $communicationsJs, 'The registry needs combined status filtering.');
 $expect(!str_contains($publisher, 'smtp_sasl_password_maps'), 'SMTP credential material must never appear in source.');
 
 if ($failures !== []) {

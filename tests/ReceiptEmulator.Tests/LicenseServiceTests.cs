@@ -645,6 +645,7 @@ public sealed class LicenseServiceTests
 
         Assert.Equal("Enterprise", promoted.Mode);
         Assert.True(promoted.Promotion.IsActive);
+        Assert.Equal(now, promoted.Promotion.StartsAt);
         Assert.True(promoted.Features.History);
         Assert.Equal(15, promoted.MaximumListeners);
 
@@ -655,6 +656,36 @@ public sealed class LicenseServiceTests
         Assert.Equal("Expired", restored.Promotion.State);
         Assert.False(restored.Features.History);
         Assert.Equal(1, restored.MaximumListeners);
+    }
+
+    [Fact]
+    public void PromotionPausesWhenTheSystemClockMovesBackward()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var initial = new DateTimeOffset(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
+        var now = initial;
+        var installationId = Guid.NewGuid();
+        var service = new LicenseService(new TestEnvironment(), Configuration(NewRoot(), vendorKey), () => now);
+        service.BindInstallationId(installationId);
+        service.InstallPromotionEntitlement(PromotionEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            Guid.NewGuid(),
+            PromotionSubjectType.Installation,
+            installationId,
+            initial,
+            initial.AddDays(5),
+            LicenseTier.Trial,
+            LicenseTier.Pro));
+
+        now = initial.AddDays(1);
+        Assert.True(service.GetStatus().Promotion.IsActive);
+        now = initial;
+
+        var rolledBack = service.GetStatus();
+
+        Assert.Equal("Trial", rolledBack.Mode);
+        Assert.Equal("ClockRollback", rolledBack.Promotion.State);
+        Assert.False(rolledBack.Promotion.IsActive);
     }
 
     [Fact]

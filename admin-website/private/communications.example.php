@@ -14,6 +14,7 @@ return [
         'sender_name' => 'POS Printer Emulator',
         'reply_to_email' => 'support@posprinteremulator.com',
         'reply_to_name' => 'POS Printer Emulator Support',
+        'inbox_monitored' => false,
         'provider_daily_limit' => 300,
         'automated_daily_limit' => 290,
         'service_reserve' => 50,

@@ -8,6 +8,7 @@ require_admin_capability('communications.read');
 
 $pdo = database();
 ensure_communication_schema($pdo);
+$tagCatalog = communication_tag_catalog($pdo);
 $actor = trim((string)($_SESSION['admin_username'] ?? 'owner')) ?: 'owner';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -54,22 +55,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $templateId = $templateIdText === '' ? null : filter_var($templateIdText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             $cap = filter_var($_POST['frequency_cap_hours'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 8760]]);
             $enabled = (string)($_POST['enabled'] ?? '') === '1';
+            $submittedTags = $_POST['tags'] ?? [];
+            if (!is_array($submittedTags)) {
+                throw new InvalidArgumentException('The selected template tags are invalid.');
+            }
+            $tags = array_values(array_unique(array_map(
+                static fn($tag): string => strtolower(trim((string)$tag)),
+                $submittedTags
+            )));
+            if (array_diff($tags, array_keys($tagCatalog))) {
+                throw new InvalidArgumentException('One or more selected template tags are not approved.');
+            }
             if (!preg_match('/^[a-z0-9_]{3,64}$/', $key) || $templateId === false || $cap === false || ($enabled && $templateId === null)) {
                 throw new InvalidArgumentException('Enter a valid provider template ID and frequency cap before enabling this template.');
             }
+            $exists = $pdo->prepare(
+                'SELECT brevo_template_id,preview_brevo_template_id,preview_verified_at,preview_warnings_json
+                 FROM communication_templates WHERE template_key=:key'
+            );
+            $exists->execute(['key' => $key]);
+            $currentTemplate = $exists->fetch();
+            if (!is_array($currentTemplate)) {
+                throw new InvalidArgumentException('The selected template was not found.');
+            }
+            $previewWarnings = json_decode((string)($currentTemplate['preview_warnings_json'] ?? ''), true);
+            $previewIsValid = $templateId !== null
+                && (int)($currentTemplate['preview_brevo_template_id'] ?? 0) === $templateId
+                && !empty($currentTemplate['preview_verified_at'])
+                && is_array($previewWarnings)
+                && count($previewWarnings) === 0;
+            if ($enabled && !$previewIsValid) {
+                throw new DomainException('Generate a successful preview for this exact Brevo template before enabling it.');
+            }
+            $pdo->beginTransaction();
             $update = $pdo->prepare(
-                'UPDATE communication_templates SET brevo_template_id=:template_id,enabled=:enabled,
-                 frequency_cap_hours=:cap,updated_by=:actor WHERE template_key=:key'
+                'UPDATE communication_templates SET
+                 preview_brevo_template_id=IF(COALESCE(brevo_template_id,0)=COALESCE(:template_id_check,0),preview_brevo_template_id,NULL),
+                 preview_verified_at=IF(COALESCE(brevo_template_id,0)=COALESCE(:template_id_check2,0),preview_verified_at,NULL),
+                 preview_warnings_json=IF(COALESCE(brevo_template_id,0)=COALESCE(:template_id_check3,0),preview_warnings_json,NULL),
+                 brevo_template_id=:template_id,enabled=:enabled,
+                 frequency_cap_hours=:cap,updated_by=:actor
+                 WHERE template_key=:key'
             );
             $update->bindValue(':template_id', $templateId, $templateId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            $update->bindValue(':template_id_check', $templateId, $templateId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            $update->bindValue(':template_id_check2', $templateId, $templateId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            $update->bindValue(':template_id_check3', $templateId, $templateId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
             $update->bindValue(':enabled', $enabled ? 1 : 0, PDO::PARAM_INT);
             $update->bindValue(':cap', $cap, PDO::PARAM_INT);
             $update->bindValue(':actor', $actor);
             $update->bindValue(':key', $key);
             $update->execute();
-            if ($update->rowCount() !== 1) throw new InvalidArgumentException('The selected template was not found.');
+            $deleteTags = $pdo->prepare('DELETE FROM communication_template_tags WHERE template_key=:key');
+            $deleteTags->execute(['key' => $key]);
+            $insertTag = $pdo->prepare(
+                'INSERT INTO communication_template_tags(template_key,tag_key,created_by)
+                 VALUES(:key,:tag,:actor)'
+            );
+            foreach ($tags as $tag) {
+                $insertTag->execute(['key' => $key, 'tag' => $tag, 'actor' => $actor]);
+            }
+            $pdo->commit();
             crm_record_admin_audit($pdo, null, 'COMMUNICATION_TEMPLATE_UPDATED', $actor, 'Communication Template', $key, $reason);
-            $_SESSION['communications_flash'] = ['type' => 'success', 'message' => 'The approved template mapping was updated.'];
+            $_SESSION['communications_flash'] = ['type' => 'success', 'message' => 'The approved template mapping and tags were updated.'];
+        } elseif ($action === 'tag_save') {
+            $existingKey = strtolower(trim((string)($_POST['existing_tag_key'] ?? '')));
+            $name = trim((string)($_POST['tag_name'] ?? ''));
+            $color = strtolower(trim((string)($_POST['tag_color'] ?? '')));
+            $description = trim((string)($_POST['tag_description'] ?? ''));
+            $key = $existingKey !== '' ? $existingKey : strtolower(trim((string)preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
+            if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $key) ||
+                mb_strlen($name) < 2 || mb_strlen($name) > 64 ||
+                !preg_match('/^#[0-9a-f]{6}$/', $color) ||
+                mb_strlen($description) < 4 || mb_strlen($description) > 240) {
+                throw new InvalidArgumentException('Enter a valid tag name, six-digit color, and short description.');
+            }
+            $statement = $pdo->prepare(
+                'INSERT INTO communication_tags(tag_key,display_name,color_hex,description,is_system,updated_by)
+                 VALUES(:key,:name,:color,:description,0,:actor)
+                 ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),color_hex=VALUES(color_hex),
+                   description=VALUES(description),active=1,updated_by=VALUES(updated_by)'
+            );
+            $statement->execute([
+                'key' => $key, 'name' => $name, 'color' => $color,
+                'description' => $description, 'actor' => $actor,
+            ]);
+            crm_record_admin_audit($pdo, null, 'COMMUNICATION_TAG_SAVED', $actor, 'Communication Tag', $key, $reason);
+            $_SESSION['communications_flash'] = ['type' => 'success', 'message' => 'The template tag was saved.'];
+        } elseif ($action === 'tag_delete') {
+            $key = strtolower(trim((string)($_POST['tag_key'] ?? '')));
+            if (!isset($tagCatalog[$key])) throw new InvalidArgumentException('The selected tag was not found.');
+            $pdo->beginTransaction();
+            $deleteAssignments = $pdo->prepare('DELETE FROM communication_template_tags WHERE tag_key=:key');
+            $deleteAssignments->execute(['key' => $key]);
+            $deleteTag = $pdo->prepare('DELETE FROM communication_tags WHERE tag_key=:key');
+            $deleteTag->execute(['key' => $key]);
+            $pdo->commit();
+            crm_record_admin_audit($pdo, null, 'COMMUNICATION_TAG_DELETED', $actor, 'Communication Tag', $key, $reason);
+            $_SESSION['communications_flash'] = ['type' => 'success', 'message' => 'The tag and its template assignments were removed.'];
         } elseif ($action === 'queue_test') {
             $customerId = strtolower(trim((string)($_POST['customer_id'] ?? '')));
             $templateKey = strtolower(trim((string)($_POST['template_key'] ?? '')));
@@ -115,8 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new InvalidArgumentException('Unsupported communications action.');
         }
     } catch (InvalidArgumentException|DomainException $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         $_SESSION['communications_flash'] = ['type' => 'error', 'message' => $exception->getMessage()];
     } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('POS Printer Emulator communications admin action failed: ' . get_class($exception));
         $_SESSION['communications_flash'] = ['type' => 'error', 'message' => 'The action could not be completed safely.'];
     }
@@ -144,7 +229,13 @@ if ((string)($_GET['export'] ?? '') === 'queue') {
 $flash = is_array($_SESSION['communications_flash'] ?? null) ? $_SESSION['communications_flash'] : null;
 unset($_SESSION['communications_flash']);
 $summary = communication_dashboard_summary($pdo);
-$templates = $pdo->query('SELECT * FROM communication_templates ORDER BY message_class,essential DESC,display_name')->fetchAll();
+$templates = $pdo->query(
+    "SELECT t.*,
+       COALESCE((SELECT GROUP_CONCAT(tt.tag_key ORDER BY tt.tag_key SEPARATOR ',')
+                 FROM communication_template_tags tt WHERE tt.template_key=t.template_key),'') AS tag_keys
+     FROM communication_templates t
+     ORDER BY t.message_class,t.essential DESC,t.display_name"
+)->fetchAll();
 $queue = $pdo->query(
     'SELECT o.message_id,o.customer_id,o.template_key,o.message_class,o.essential,o.state,o.attempts,
             o.last_error_code,o.created_at,o.sent_at,c.display_name
@@ -185,7 +276,7 @@ $lifecycle = $pdo->query(
             AND CONCAT('v',i.app_version)<>(SELECT version_label FROM development_roadmap WHERE item_type='Release' AND status='Released' ORDER BY priority_rank DESC LIMIT 1)) AS outdated_customers"
 )->fetch() ?: [];
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Communications | POS Printer Emulator Admin Portal</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/communications.css?v=20260723-1"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Communications | POS Printer Emulator Admin Portal</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/communications.css?v=20260723-4"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"><script defer src="assets/communications.js?v=20260723-3"></script></head>
 <body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator <small>Admin Portal</small></span></a><form method="post" action="/logout.php" class="logout-form"><span><?=e(ucfirst(admin_role()))?> account</span><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><button>Log out</button></form></header>
 <aside class="sidebar"><nav><a href="/"><span>▥</span>Dashboard</a><a href="/customers.php"><span>◎</span>Customers</a><a href="/licenses.php"><span>◇</span>License Manager</a><a href="/orders.php"><span>▤</span>Purchase Orders</a><a href="/pricing.php"><span>$</span>Purchase Pricing</a><a class="active" href="/communications.php"><span>✉</span>Communications</a><a href="/dev-support.php"><span>⌁</span>Dev Support</a></nav><p>Consent, suppressions, frequency caps, and quota rules are checked again at delivery time.</p></aside>
 <main class="communications-main"><div class="page-heading"><div><span class="eyebrow">v0.3.45</span><h1>Customer communications</h1><p>Protected lifecycle email with consent evidence, durable delivery, and a reserved service-message quota.</p></div><?php if(admin_can('communications.export')):?><a class="secondary" href="?export=queue">Export privacy-safe queue CSV</a><?php endif;?></div>
@@ -220,7 +311,35 @@ $lifecycle = $pdo->query(
     ['Complaints',(int)($delivery['complaints']??0)],
     ['Unsubscribed',(int)($delivery['unsubscribed']??0)],
 ] as [$label,$value]):?><article><span><?=e((string)$label)?></span><strong><?=e((string)$value)?></strong></article><?php endforeach;?></section></section>
-<section class="panel"><header><div><h2>Approved template registry</h2><p>Templates remain disabled until an owner maps an approved Brevo template ID.</p></div></header><div class="template-grid"><?php foreach($templates as $template):?><?php $readOnly=!admin_can('communications.manage'); ?><form method="post" class="template-card"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="template"><input type="hidden" name="template_key" value="<?=e((string)$template['template_key'])?>"><input type="hidden" name="confirmed" value="yes"><div><span class="pill <?=strtolower((string)$template['message_class'])?>"><?=e((string)$template['message_class'])?></span><?php if($template['essential']):?><span class="pill essential">Essential</span><?php endif;?></div><h3><?=e((string)$template['display_name'])?></h3><p><?=e((string)$template['description'])?></p><label>Brevo template ID<input name="brevo_template_id" inputmode="numeric" value="<?=e((string)($template['brevo_template_id']??''))?>" <?=$readOnly?'disabled':''?>></label><label>Frequency cap (hours)<input name="frequency_cap_hours" type="number" min="1" max="8760" value="<?= (int)$template['frequency_cap_hours'] ?>" <?=$readOnly?'disabled':''?>></label><label class="check"><input type="checkbox" name="enabled" value="1" <?=$template['enabled']?'checked':''?> <?=$readOnly?'disabled':''?>> Enabled</label><label>Reason<input name="reason" minlength="8" maxlength="500" value="Approved template configuration" required <?=$readOnly?'disabled':''?>></label><button <?=$readOnly?'disabled':''?>>Save mapping</button></form><?php endforeach;?></div></section>
+<?php $templateReadOnly=!admin_can('communications.manage'); ?>
+<section class="panel template-registry"><header><div><h2>Approved template registry</h2><p>Hover or focus a template to preview it. Select a template to review and edit its approved Brevo mapping.</p></div><span class="registry-count"><?=count($templates)?> templates</span></header>
+<div class="registry-filters" aria-label="Template filters"><div class="filter-set"><span>Tags</span><?php foreach($tagCatalog as $tagKey=>$tag):?><button type="button" data-template-tag-filter="<?=e($tagKey)?>" aria-pressed="false" style="--tag-color:<?=e($tag['color'])?>" title="<?=e($tag['description'])?>"><?=e($tag['label'])?></button><?php endforeach;?></div><div class="filter-set"><span>Status</span><button type="button" data-template-status-filter="all" aria-pressed="true">All templates</button><button type="button" data-template-status-filter="enabled" aria-pressed="false">Enabled</button><button type="button" data-template-status-filter="disabled" aria-pressed="false">Disabled</button><button type="button" data-template-status-filter="not-mapped" aria-pressed="false">Not mapped</button></div><button type="button" class="clear-filters" data-template-clear-filters>Clear filters</button><span class="filter-results" id="template-filter-results"><?=count($templates)?> shown</span></div>
+<details class="tag-legend"><summary>Tag legend and management</summary><div class="tag-legend-grid"><?php foreach($tagCatalog as $tagKey=>$tag):?><article><span class="template-tag" style="--tag-color:<?=e($tag['color'])?>"><?=e($tag['label'])?></span><p><?=e($tag['description'])?></p><?php if(!$templateReadOnly):?><form method="post" class="tag-edit-form"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="tag_save"><input type="hidden" name="existing_tag_key" value="<?=e($tagKey)?>"><input type="hidden" name="confirmed" value="yes"><input type="hidden" name="reason" value="Approved tag registry update"><label>Name<input name="tag_name" value="<?=e($tag['label'])?>" required></label><label>Color<input name="tag_color" type="color" value="<?=e($tag['color'])?>" required></label><label>Description<input name="tag_description" value="<?=e($tag['description'])?>" required></label><button>Save</button></form><form method="post" class="tag-delete-form" onsubmit="return confirm('Remove this tag from every template?')"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="tag_delete"><input type="hidden" name="tag_key" value="<?=e($tagKey)?>"><input type="hidden" name="confirmed" value="yes"><input type="hidden" name="reason" value="Approved tag registry removal"><button>Remove</button></form><?php endif;?></article><?php endforeach;?></div><?php if(!$templateReadOnly):?><form method="post" class="tag-create-form"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="tag_save"><input type="hidden" name="confirmed" value="yes"><input type="hidden" name="reason" value="Approved new registry tag"><label>New tag name<input name="tag_name" minlength="2" maxlength="64" required></label><label>Color<input name="tag_color" type="color" value="#06b6d4" required></label><label>Description<input name="tag_description" minlength="4" maxlength="240" required></label><button>Add tag</button></form><?php endif;?></details>
+<div class="registry-layout"><div class="template-grid" aria-label="Approved email templates"><?php foreach($templates as $template):?><?php $mapped=(int)($template['brevo_template_id']??0)>0; $tagKeys=array_values(array_filter(explode(',',(string)($template['tag_keys']??'')))); $templateStatus=!$mapped?'not-mapped':($template['enabled']?'enabled':'disabled'); $previewWarnings=json_decode((string)($template['preview_warnings_json']??''),true); $previewValid=$mapped&&(int)($template['preview_brevo_template_id']??0)===(int)$template['brevo_template_id']&&!empty($template['preview_verified_at'])&&is_array($previewWarnings)&&count($previewWarnings)===0; $triggerFlow=communication_template_trigger_flow((string)$template['template_key']); ?>
+<button type="button" class="template-tile" aria-haspopup="dialog"
+ data-template-key="<?=e((string)$template['template_key'])?>"
+ data-template-name="<?=e((string)$template['display_name'])?>"
+ data-template-class="<?=e((string)$template['message_class'])?>"
+ data-template-essential="<?=$template['essential']?'1':'0'?>"
+ data-template-description="<?=e((string)$template['description'])?>"
+ data-template-trigger="<?=e($triggerFlow)?>"
+ data-template-id="<?=$mapped?(int)$template['brevo_template_id']:''?>"
+ data-template-cap="<?= (int)$template['frequency_cap_hours'] ?>"
+ data-template-tags="<?=e(implode(',',$tagKeys))?>"
+ data-template-status="<?=e($templateStatus)?>"
+ data-template-preview-valid="<?=$previewValid?'1':'0'?>"
+ data-template-enabled="<?=$template['enabled']?'1':'0'?>">
+<span class="template-tile-name"><span class="template-status-dot <?=e($templateStatus)?>" aria-hidden="true"></span><?=e((string)$template['display_name'])?></span>
+<span class="template-tile-trigger"><strong>Trigger</strong><?=e($triggerFlow)?></span>
+<span class="template-tag-list"><?php if(!$tagKeys):?><span class="template-tag empty">No tags</span><?php endif;?><?php foreach($tagKeys as $tagKey):?><?php $tag=$tagCatalog[$tagKey]??['label'=>ucfirst($tagKey),'color'=>'#64748b','description'=>''];?><span class="template-tag" style="--tag-color:<?=e($tag['color'])?>" title="<?=e($tag['description'])?>"><?=e($tag['label'])?></span><?php endforeach;?></span>
+<span class="template-tile-meta"><span><?=$mapped?'Brevo ID '.(int)$template['brevo_template_id']:'Not mapped'?></span><span class="template-tile-status <?=e($templateStatus)?>"><?=e($templateStatus==='not-mapped'?'Not mapped':ucfirst($templateStatus))?></span></span>
+</button><?php endforeach;?></div>
+<aside class="template-hover-preview" aria-live="polite"><div class="preview-heading"><div><span class="preview-kicker">Email preview</span><strong id="template-preview-name">Select a template</strong></div><span class="preview-state" id="template-preview-state">Ready</span></div><p id="template-preview-description">Hover over a template to see its approved email design.</p><div class="template-trigger-flow"><span>Trigger flow</span><p id="template-preview-trigger">Select a template to review when and why it is sent.</p></div><div class="email-preview-frame-wrap"><div class="preview-loading" id="template-preview-loading">Choose a mapped template to load its Brevo preview.</div><iframe id="template-preview-frame" title="Selected email template preview" sandbox referrerpolicy="no-referrer"></iframe></div></aside>
+</div></section>
+<dialog class="template-dialog" id="template-dialog" aria-labelledby="template-dialog-title"><form method="post" class="template-editor-form"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="template"><input type="hidden" name="template_key" id="template-dialog-key"><input type="hidden" name="confirmed" value="yes">
+<header><div><span class="preview-kicker" id="template-dialog-class">Email template</span><h2 id="template-dialog-title">Edit template</h2><p id="template-dialog-description"></p><div class="template-trigger-flow dialog-trigger"><span>Trigger flow</span><p id="template-dialog-trigger"></p></div></div><button type="button" class="dialog-close" data-template-close aria-label="Close template editor">×</button></header>
+<div class="template-dialog-grid"><div class="template-fields"><label>Brevo template ID<input name="brevo_template_id" id="template-dialog-id" inputmode="numeric" <?=$templateReadOnly?'disabled':''?>></label><label>Frequency cap (hours)<input name="frequency_cap_hours" id="template-dialog-cap" type="number" min="1" max="8760" <?=$templateReadOnly?'disabled':''?>></label><label class="check template-enabled"><input type="checkbox" name="enabled" id="template-dialog-enabled" value="1" <?=$templateReadOnly?'disabled':''?>> Enabled</label><p class="preview-approval-note" id="template-preview-approval-note">A successful preview is required before activation.</p><fieldset class="template-tag-editor"><legend>Tags</legend><?php foreach($tagCatalog as $tagKey=>$tag):?><label class="check"><input type="checkbox" name="tags[]" value="<?=e($tagKey)?>" data-template-tag-input="<?=e($tagKey)?>" <?=$templateReadOnly?'disabled':''?>> <span class="template-tag" style="--tag-color:<?=e($tag['color'])?>"><?=e($tag['label'])?></span></label><?php endforeach;?></fieldset><label>Business reason<input name="reason" minlength="8" maxlength="500" value="Approved template configuration" required <?=$templateReadOnly?'disabled':''?>></label><p class="template-help">Saving updates the approved mapping and tags. The email design itself remains managed in Brevo.</p></div><div class="dialog-email-preview"><div class="preview-heading"><div><span class="preview-kicker">Live email preview</span><strong id="template-dialog-preview-name">Template preview</strong></div><div class="preview-actions"><button type="button" class="viewport-button active" data-preview-viewport="desktop">Desktop</button><button type="button" class="viewport-button" data-preview-viewport="mobile">Mobile</button><button type="button" class="refresh-preview" id="template-preview-refresh">Refresh</button><span class="preview-state" id="template-dialog-state">Ready</span></div></div><dl class="preview-envelope"><div><dt>From</dt><dd id="template-preview-from">—</dd></div><div><dt>To</dt><dd id="template-preview-to">Alex Morgan &lt;alex.morgan@example.com&gt;</dd></div><div><dt>Subject</dt><dd id="template-preview-subject">—</dd></div><div><dt>Preview text</dt><dd id="template-preview-text">—</dd></div></dl><div class="preview-warnings" id="template-preview-warnings" hidden></div><div class="email-preview-frame-wrap" id="template-dialog-frame-wrap"><div class="preview-loading" id="template-dialog-loading">Loading preview…</div><iframe id="template-dialog-frame" title="Email template preview" sandbox referrerpolicy="no-referrer"></iframe></div></div></div>
+<footer><button type="button" class="secondary-button" data-template-close>Cancel</button><button type="submit" <?=$templateReadOnly?'disabled':''?>>Save mapping</button></footer></form></dialog>
 <?php if(admin_can('communications.manage')):?><section class="panel test-panel"><div><h2>Queue a controlled test</h2><p>The recipient must be an active, verified customer. Test mode also requires the address in the protected server allowlist.</p></div><form method="post"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="queue_test"><input type="hidden" name="confirmed" value="yes"><label>Customer ID<input name="customer_id" pattern="[0-9a-fA-F-]{36}" required></label><label>Template<select name="template_key"><?php foreach($templates as $template):?><option value="<?=e((string)$template['template_key'])?>"><?=e((string)$template['display_name'])?></option><?php endforeach;?></select></label><label>Reason<input name="reason" minlength="8" maxlength="500" value="Controlled provider verification" required></label><button>Queue test</button></form></section><?php endif;?>
 <section class="panel"><header><div><h2>Recent delivery queue</h2><p>No email address, message body, receipt data, activation key, or diagnostic log is shown or exported. DeliveryUnknown items must be reconciled in Brevo before any manual resolution and cannot be retried blindly.</p></div></header><div class="table-wrap"><table><thead><tr><th>Created UTC</th><th>Customer</th><th>Template</th><th>Class</th><th>Status</th><th>Attempts</th><th>Review</th></tr></thead><tbody><?php if(!$queue):?><tr><td colspan="7">No messages are queued.</td></tr><?php endif;?><?php foreach($queue as $message):?><tr><td><?=e((string)$message['created_at'])?></td><td><strong><?=e((string)$message['display_name'])?></strong><small><?=e((string)$message['customer_id'])?></small></td><td><?=e((string)$message['template_key'])?></td><td><?=e((string)$message['message_class'])?></td><td><span class="state <?=strtolower((string)$message['state'])?>"><?=e((string)$message['state'])?></span><?php if($message['last_error_code']):?><small><?=e((string)$message['last_error_code'])?></small><?php endif;?></td><td><?= (int)$message['attempts'] ?></td><td><?php if(admin_can('communications.manage')&&in_array($message['state'],['Failed','Cancelled'],true)):?><form method="post" class="row-action"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="retry"><input type="hidden" name="message_id" value="<?=e((string)$message['message_id'])?>"><input type="hidden" name="confirmed" value="yes"><input type="hidden" name="reason" value="Reviewed manual queue retry"><button>Retry</button></form><?php elseif(admin_can('communications.manage')&&in_array($message['state'],['Pending','Deferred'],true)):?><form method="post" class="row-action"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="cancel"><input type="hidden" name="message_id" value="<?=e((string)$message['message_id'])?>"><input type="hidden" name="confirmed" value="yes"><input type="hidden" name="reason" value="Reviewed queue cancellation"><button>Cancel</button></form><?php else:?>—<?php endif;?></td></tr><?php endforeach;?></tbody></table></div></section>
 </main></div></body></html>

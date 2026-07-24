@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.46 — released 2026-07-23**
+**Current public release: v0.3.47 — released 2026-07-23**
 
-**Current development: v0.3.47 — Five-Day Promotional Trial Experience**
+**Current development: v0.3.48 — Automatic configuration restore points**
 
-**Next release after v0.3.46: v0.3.47 — Five-Day Promotional Trial Experience**
+**Next release after v0.3.47: v0.3.48 — Automatic configuration restore points**
 
-**Future scheduled sequence: v0.3.47 through v0.3.55**
+**Future scheduled sequence: v0.3.48 through v0.3.55**
 
-**Most recently completed: v0.3.46 — Accessibility and keyboard usability**
+**Most recently completed: v0.3.47 — Five-Day Promotional Trial Experience**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -693,16 +693,16 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.47 — Five-Day Promotional Trial Experience
 
-**Status:** Planned
+**Status:** Released
 
-**GitHub:** [Issue #52 — Five-Day Promotional Trial Experience](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/52)
+**GitHub:** [v0.3.47 release](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47)
 
 **Purpose:** Replace the manual promotional-key entry area with a polished, one-click, server-authorized evaluation of Lite, Pro, or Enterprise.
 
 **Planned scope:**
 
 - Present accessible Lite, Pro, and Enterprise edition choices with plain-language feature and printer-listener differences, then provide one prominent **Start Five-Day Trial** action.
-- Send the selected edition, canonical customer or registration ID, and a privacy-preserving stable installation/device fingerprint to the licensing backend over TLS.
+- Send the selected edition and the existing protected installation identity to the licensing backend over TLS, where it is resolved to the canonical customer, Customer Portal account, and permanent license.
 - Let the server verify eligibility, atomically record the one promotion allowed across all editions, create a signed five-day entitlement, and return it to the application.
 - Activate and securely store the returned entitlement automatically without exposing a promotional key field or requiring copying and pasting.
 - Show distinct eligible, activating, active, expired, already-used, offline, and temporary-service-failure states that match the rest of the License screen.
@@ -714,9 +714,11 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **License availability:** Eligible registered customers may evaluate Lite, Pro, or Enterprise once in total. Eligibility is determined by the licensing server, not by the current local license tier or local files.
 
-**Security and privacy:** Keep the entitlement-signing private key on the protected server and only the verification key in the desktop application. Use a canonical customer record, server-side transaction and uniqueness constraints, idempotency keys, rate limits, generic non-enumerating failures, and an HMAC-derived device fingerprint instead of storing raw hardware identifiers. Do not display or log activation keys, credentials, receipt data, or raw device identifiers. A new promotion cannot start offline.
+**Security and privacy:** Keep the entitlement-signing private key on the protected server and only the verification key in the desktop application. Use the existing random installation credential, a canonical customer record, Customer Portal ownership, server-side transactions and uniqueness constraints, idempotency keys, encrypted entitlement recovery, rate limits, and generic failures. Do not collect raw hardware identifiers or display or log activation keys, credentials, or receipt data. A new promotion cannot start offline.
 
 **Why this order:** v0.3.42-v0.3.44 already provide verified customer identity, Customer Portal ownership, and server-side promotional entitlement foundations. This release closes the confusing desktop workflow before more configuration screens are added.
+
+**Completion verification:** The production viewer and responsive License screen passed desktop and narrow-window review with accessible edition selection and no manual key field. All 184 desktop tests and all eight PHP contract suites pass; all 82 PHP files pass syntax validation; eleven NuGet projects and both JavaScript dependency trees report no known vulnerable packages. The C# release pipeline rebuilt the service, desktop host, updater, license utilities, bundled SQLite runtime, and self-contained Windows installer with zero compilation warnings or errors. The 121,124,652-byte installer reports v0.3.47 and its generated SHA-256 matches the independent value `58725b802998a80788fac17fee39951c8174942581fd5360b657a930f56f1508`. The protected production endpoint and additive schema migration are deployed, and the installer plus checksum are published through the official GitHub release and HTTPS website download.
 
 **Complete when:** Lite, Pro, and Enterprise selections each receive the correct signed entitlement without manual key entry; the countdown and lifecycle states are accurate and accessible; duplicate, concurrent, cross-edition, reinstall, deleted-state, alternate-installation, and clock-rollback attempts cannot create or extend a promotion; expiration safely restores the prior license state; offline activation fails without losing customer data; the exact already-used message appears; logs contain no prohibited data; and backend, migration, concurrency, desktop, UI, expiry, privacy, and security tests pass.
 

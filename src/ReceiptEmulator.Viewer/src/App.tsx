@@ -49,7 +49,7 @@ import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
 import { BackupRestoreSettings } from './BackupRestoreSettings'
 import { TrialOnboarding } from './TrialOnboarding'
-import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, PromotionOfferStatus, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 const trialOnboardingStorageKey = 'pos-printer-emulator-trial-onboarding-v2'
@@ -58,7 +58,7 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.40',
+  version: '0.3.47',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -85,6 +85,21 @@ function formatTime(value: string) {
 
 function formatMaintenanceDate(value?: string) {
   return value ? new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(value)) : 'Not applicable'
+}
+
+function formatTrialDateTime(value?: string) {
+  return value ? new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  }).format(new Date(value)) : 'Not available'
+}
+
+function formatTrialRemaining(expiresAt: string | undefined, now: number) {
+  if (!expiresAt) return 'Not available'
+  const remaining = Math.max(0, new Date(expiresAt).getTime() - now)
+  const days = Math.floor(remaining / 86_400_000)
+  const hours = Math.floor((remaining % 86_400_000) / 3_600_000)
+  const minutes = Math.floor((remaining % 3_600_000) / 60_000)
+  return remaining === 0 ? 'Expired' : `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'}, ${minutes} min remaining`
 }
 
 function saveDownload(blob: Blob, fileName: string) {
@@ -1013,9 +1028,12 @@ function LicenseSettings({ status, onActivated }: {
   const [maintenanceRefreshBusy, setMaintenanceRefreshBusy] = useState(false)
   const [maintenanceMessage, setMaintenanceMessage] = useState<string>()
   const [maintenanceMessageKind, setMaintenanceMessageKind] = useState<'success' | 'info' | 'error'>('info')
-  const [promotionKey, setPromotionKey] = useState('')
+  const [promotionOffer, setPromotionOffer] = useState<PromotionOfferStatus>()
+  const [promotionOfferLoading, setPromotionOfferLoading] = useState(false)
+  const [selectedPromotionTier, setSelectedPromotionTier] = useState<'Lite' | 'Pro' | 'Enterprise'>()
   const [promotionBusy, setPromotionBusy] = useState(false)
   const [promotionMessage, setPromotionMessage] = useState<string>()
+  const [countdownNow, setCountdownNow] = useState(Date.now())
   const showActivationForm = !status.license.isPaid || changingLicense
   const upgradeGuidance = status.license.mode === 'Lite'
     ? 'Upgrade to Pro for up to 2 printer listeners, or Enterprise for up to 15.'
@@ -1024,6 +1042,32 @@ function LicenseSettings({ status, onActivated }: {
       : status.license.mode === 'Enterprise'
         ? 'Enter a replacement Enterprise key whenever this installation is reissued.'
         : 'Lite unlocks all paid features with one listener; Pro supports 2 and Enterprise supports up to 15.'
+
+  useEffect(() => {
+    if (status.license.promotion.isActive || !status.license.promotion.isApplicable) return
+    let cancelled = false
+    setPromotionOfferLoading(true)
+    api.promotionOffer()
+      .then(offer => {
+        if (cancelled) return
+        setPromotionOffer(offer)
+        setSelectedPromotionTier(current =>
+          current && offer.eligibleTiers.includes(current) ? current : offer.eligibleTiers[0])
+      })
+      .catch(cause => {
+        if (!cancelled) setPromotionMessage(cause instanceof Error ? cause.message : 'Promotional-trial eligibility could not be checked.')
+      })
+      .finally(() => {
+        if (!cancelled) setPromotionOfferLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [status.license.promotion.isActive, status.license.promotion.isApplicable, status.license.promotion.state])
+
+  useEffect(() => {
+    if (!status.license.promotion.isActive) return
+    const timer = window.setInterval(() => setCountdownNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [status.license.promotion.isActive])
 
   async function activate(event: FormEvent) {
     event.preventDefault()
@@ -1075,17 +1119,16 @@ function LicenseSettings({ status, onActivated }: {
     }
   }
 
-  async function applyPromotion(event: FormEvent) {
-    event.preventDefault()
+  async function startPromotion() {
+    if (!selectedPromotionTier) return
     setPromotionBusy(true)
     setPromotionMessage(undefined)
     try {
-      const license = await api.applyPromotion({ entitlementToken: promotionKey })
-      setPromotionKey('')
-      setPromotionMessage('Promotional access was applied successfully.')
-      onActivated(license)
+      const result = await api.startPromotion(selectedPromotionTier)
+      setPromotionMessage(result.message)
+      onActivated(result.license)
     } catch (cause) {
-      setPromotionMessage(cause instanceof Error ? cause.message : 'The promotional access key could not be validated.')
+      setPromotionMessage(cause instanceof Error ? cause.message : 'The Five-Day Promotional Trial could not be started.')
     } finally {
       setPromotionBusy(false)
     }
@@ -1096,39 +1139,73 @@ function LicenseSettings({ status, onActivated }: {
       <div className={`license-hero ${status.license.isPaid ? 'is-paid' : ''} ${status.license.isEnterprise ? 'is-enterprise' : ''}`}>
         <div className="license-hero-icon">{status.license.isPaid ? <CheckCircle2 size={27} /> : <KeyRound size={27} />}</div>
         <div>
-          <h2>{status.license.isPaid ? `${status.license.mode} License activated` : 'Trial License'}</h2>
-          <p>{status.license.isPaid
+          <h2>{status.license.promotion.isActive
+            ? `${status.license.promotion.grantedTier} Five-Day Trial`
+            : status.license.isPaid ? `${status.license.mode} License activated` : 'Trial License'}</h2>
+          <p>{status.license.promotion.isActive
+            ? `Temporary ${status.license.promotion.grantedTier} access is active. ${status.license.promotion.previousTier === 'Trial' ? 'Your normal Trial access' : `Your permanent ${status.license.promotion.previousTier} License`} will return automatically at expiration.`
+            : status.license.isPaid
             ? `${status.license.mode} features are unlocked, including unlimited receipt jobs, saved history, and exports.`
             : `${status.license.remaining} of ${status.license.dailyLimit} complete Trial POS print jobs remain today. Built-in Test Receipts are unlimited.`}</p>
         </div>
       </div>
 
       <div className="license-summary">
-        <div><span>Status</span><strong>{status.license.isPaid ? `Activated · ${status.license.mode} License` : 'Trial License'}</strong></div>
-        <div><span>Activation key</span><strong>{status.license.isPaid ? 'Validated and stored securely' : 'No activation key installed'}</strong></div>
+        <div><span>Status</span><strong>{status.license.promotion.isActive ? `Five-Day Trial Active · ${status.license.promotion.grantedTier}` : status.license.isPaid ? `Activated · ${status.license.mode} License` : 'Trial License'}</strong></div>
+        <div><span>Permanent activation key</span><strong>{status.license.promotion.isActive && status.license.promotion.previousTier === 'Trial' ? 'No permanent key installed' : status.license.isPaid ? 'Validated and stored securely' : 'No activation key installed'}</strong></div>
         <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
       </div>
 
       {(status.license.promotion.isApplicable || status.license.promotion.state !== 'None') && (
-        <section className={`maintenance-card ${status.license.promotion.isActive ? 'is-active' : ''}`}>
+        <section className={`maintenance-card promotion-card ${status.license.promotion.isActive ? 'is-active' : status.license.promotion.state === 'Expired' ? 'is-expired' : ''}`}>
           <div className="maintenance-heading">
-            <div><FlaskConical size={18} /><strong>Five-day promotional access</strong></div>
-            <span>{status.license.promotion.isActive ? 'Active' : status.license.promotion.state}</span>
+            <div><FlaskConical size={18} /><strong>Five-Day Promotional Trial</strong></div>
+            <span>{status.license.promotion.isActive ? 'Five-Day Trial Active' : promotionOffer?.state ?? status.license.promotion.state}</span>
           </div>
-          <p>{status.license.promotion.message}</p>
+          <p>{status.license.promotion.isActive
+            ? `You are evaluating the ${status.license.promotion.grantedTier} edition. Every included feature is available until the time shown below.`
+            : promotionOffer?.message ?? status.license.promotion.message}</p>
           {status.license.promotion.expiresAt && (
             <dl>
-              <div><dt>Promotional tier</dt><dd>{status.license.promotion.grantedTier}</dd></div>
-              <div><dt>Ends</dt><dd>{formatMaintenanceDate(status.license.promotion.expiresAt)}</dd></div>
+              <div><dt>Edition being evaluated</dt><dd>{status.license.promotion.grantedTier}</dd></div>
+              <div><dt>Started</dt><dd>{formatTrialDateTime(status.license.promotion.startsAt)}</dd></div>
+              <div><dt>Expires</dt><dd>{formatTrialDateTime(status.license.promotion.expiresAt)}</dd></div>
+              <div><dt>Time remaining</dt><dd>{formatTrialRemaining(status.license.promotion.expiresAt, countdownNow)}</dd></div>
             </dl>
           )}
-          {!status.license.promotion.isActive && status.license.promotion.isApplicable && (
-            <form onSubmit={applyPromotion}>
-              <label>Promotional access key<textarea required rows={3} value={promotionKey} onChange={event => setPromotionKey(event.target.value)} placeholder="PPEP1-…" spellCheck={false} /></label>
-              {promotionMessage && <div className="maintenance-message" role="status">{promotionMessage}</div>}
-              <button className="secondary-action" type="submit" disabled={promotionBusy}><FlaskConical size={16} /> {promotionBusy ? 'Applying…' : 'Start promotional access'}</button>
-            </form>
+          {!status.license.promotion.isActive && promotionOffer?.state === 'Eligible' && (
+            <>
+              <div className="promotion-tier-grid" role="radiogroup" aria-label="Edition to evaluate">
+                {promotionOffer.eligibleTiers.map(tier => (
+                  <button key={tier} type="button" role="radio" aria-checked={selectedPromotionTier === tier}
+                    className={selectedPromotionTier === tier ? 'selected' : ''} onClick={() => setSelectedPromotionTier(tier)}>
+                    <strong>{tier}</strong>
+                    <span>{tier === 'Lite' ? 'All paid features · 1 listener' : tier === 'Pro' ? 'All paid features · 2 listeners' : 'All features · up to 15 listeners'}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="promotion-action-row">
+                <button className="promotion-primary" type="button" disabled={promotionBusy || !selectedPromotionTier} onClick={startPromotion}>
+                  <FlaskConical size={16} /> {promotionBusy ? 'Starting securely…' : `Start Five-Day ${selectedPromotionTier ?? ''} Trial`}
+                </button>
+                <small>No key entry is required. Eligibility and expiration are verified securely by the licensing server.</small>
+              </div>
+            </>
+          )}
+          {promotionOfferLoading && <div className="maintenance-message"><RefreshCw className="spin" size={14} /> Checking trial eligibility…</div>}
+          {promotionMessage && <div className="maintenance-message" role="status">{promotionMessage}</div>}
+          {(status.license.promotion.isActive || promotionOffer?.state === 'Used') && (
+            <div className="maintenance-actions">
+              <a href={promotionOffer?.purchaseUrl ?? `https://buy.posprinteremulator.com/?tier=${status.license.promotion.grantedTier ?? ''}`} target="_blank" rel="noreferrer">
+                <ExternalLink size={15} /> Purchase {status.license.promotion.grantedTier ?? 'a license edition'}
+              </a>
+            </div>
+          )}
+          {promotionOffer?.state === 'VerificationRequired' && promotionOffer.verificationUrl && (
+            <div className="maintenance-actions">
+              <a href={promotionOffer.verificationUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Verify customer email</a>
+            </div>
           )}
         </section>
       )}

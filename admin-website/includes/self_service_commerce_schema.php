@@ -134,6 +134,15 @@ function ensure_self_service_commerce_schema(PDO $pdo): void
         foreach ($statements as $statement) {
             $pdo->exec($statement);
         }
+        $promotionColumns = crm_table_columns($pdo, 'portal_promotions');
+        if (!isset($promotionColumns['entitlement_token_ciphertext'])) {
+            $pdo->exec(
+                'ALTER TABLE portal_promotions
+                 ADD COLUMN entitlement_token_ciphertext VARBINARY(768) NULL AFTER entitlement_token_hash,
+                 ADD COLUMN entitlement_token_nonce BINARY(12) NULL AFTER entitlement_token_ciphertext,
+                 ADD COLUMN entitlement_token_tag BINARY(16) NULL AFTER entitlement_token_nonce'
+            );
+        }
         $ready = true;
     } finally {
         $pdo->query("SELECT RELEASE_LOCK('ppe_self_service_commerce_v1')")->fetchColumn();

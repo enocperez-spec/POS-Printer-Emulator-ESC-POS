@@ -432,6 +432,25 @@ try {
                     'purchase:' . $sourceReference
                 );
                 if ((string)$intent['order_type'] !== 'MAINTENANCE') {
+                    $onboardingEvent = (string)$intent['order_type'] === 'UPGRADE' ? 'upgrade' : 'purchase';
+                    $onboardingTemplate = communication_onboarding_template(
+                        (string)$intent['target_tier'],
+                        $onboardingEvent
+                    );
+                    communication_enqueue(
+                        $pdo,
+                        (string)$intent['customer_id'],
+                        $onboardingTemplate,
+                        [
+                            'customer_name' => $displayName,
+                            'license_tier' => (string)$intent['target_tier'],
+                            'event_label' => ucfirst($onboardingEvent),
+                            'feature_summary' => communication_tier_features((string)$intent['target_tier']),
+                            'setup_url' => communication_setup_url((string)$intent['target_tier']),
+                            'contact_support_url' => 'https://userportal.posprinteremulator.com/',
+                        ],
+                        'onboarding:' . $sourceReference
+                    );
                     communication_enqueue(
                         $pdo,
                         (string)$intent['customer_id'],

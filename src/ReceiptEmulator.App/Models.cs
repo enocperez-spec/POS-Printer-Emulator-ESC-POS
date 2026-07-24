@@ -120,6 +120,28 @@ public sealed record PromotionStatus(
     string State,
     string? PreviousTier,
     string? GrantedTier,
+    DateTimeOffset? StartsAt,
+    DateTimeOffset? ExpiresAt,
+    string Message);
+
+public sealed record PromotionOfferStatus(
+    string State,
+    string[] EligibleTiers,
+    string? PreviousTier,
+    string? GrantedTier,
+    DateTimeOffset? StartsAt,
+    DateTimeOffset? ExpiresAt,
+    string? PurchaseUrl,
+    string? VerificationUrl,
+    string Message);
+
+public sealed record StartPromotionRequest(string GrantedTier);
+
+public sealed record PromotionStartResult(
+    LicenseStatus License,
+    Guid PromotionId,
+    string GrantedTier,
+    DateTimeOffset? StartsAt,
     DateTimeOffset? ExpiresAt,
     string Message);
 

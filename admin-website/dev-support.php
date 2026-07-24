@@ -710,11 +710,11 @@ $releaseSync = database()->prepare(
          'Maximized first launch; taskbar-safe remembered placement; disconnected-monitor recovery; focus order and visibility; semantic names and landmarks; screen-reader announcements; keyboard shortcuts; text and display scaling; high contrast; reduced motion; WCAG 2.2 AA checks; captions; and automated plus manual accessibility tests.',
          'Accessibility should be established before additional desktop screens and controls increase remediation cost.',
          'Window placement behaves safely and primary workflows pass keyboard-only, Narrator, 200 percent scaling, high-contrast, and automated accessibility verification.', UTC_TIMESTAMP(6)),
-        ('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Planned', 347,
+        ('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released', 347,
          'Replace manual promotional-key entry with a one-click server-authorized Lite, Pro, or Enterprise evaluation.',
          'Edition selection; verified-customer eligibility; privacy-preserving installation identity; signed automatic activation; eligible, activating, active, expired, used, and offline states; exact five-day countdown; purchase actions; safe prior-license restoration; and server-side idempotency, uniqueness, and anti-repeat controls.',
          'The verified customer and promotional entitlement foundations should become a clear desktop workflow before more configuration screens are added.',
-         'Each edition activates correctly without key entry, the active and expired states are accurate, prior ownership is restored, and reinstall, deletion, clock rollback, retries, concurrency, alternate installations, or cross-edition requests cannot create or extend another promotion.', NULL),
+         'Each edition activates correctly without key entry, the active and expired states are accurate, prior ownership is restored, and reinstall, deletion, clock rollback, retries, concurrency, alternate installations, or cross-edition requests cannot create or extend another promotion.', UTC_TIMESTAMP(6)),
         ('v0.3.48', 'v0.3.48', 'Release', 'Automatic configuration restore points', 'Planned', 348,
          'Protect customers from accidental configuration loss without requiring manual backups.',
          'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
@@ -838,7 +838,7 @@ database()->prepare(
          WHEN 'v0.3.44' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.44'
          WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'
          WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'
-         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/52'
+         WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'
          WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
          WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'

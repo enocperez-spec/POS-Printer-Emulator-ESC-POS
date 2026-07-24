@@ -46,6 +46,7 @@ export type LicenseStatus = {
     state: 'None' | 'Active' | 'Expired' | 'Invalid' | 'Mismatch' | 'ClockRollback'
     previousTier?: string
     grantedTier?: string
+    startsAt?: string
     expiresAt?: string
     message: string
   }
@@ -124,6 +125,27 @@ export type MaintenanceEntitlementRequest = {
 
 export type PromotionEntitlementRequest = {
   entitlementToken: string
+}
+
+export type PromotionOfferStatus = {
+  state: 'Eligible' | 'Active' | 'Used' | 'VerificationRequired' | 'NotApplicable' | 'Unavailable'
+  eligibleTiers: ('Lite' | 'Pro' | 'Enterprise')[]
+  previousTier?: string
+  grantedTier?: string
+  startsAt?: string
+  expiresAt?: string
+  purchaseUrl?: string
+  verificationUrl?: string
+  message: string
+}
+
+export type PromotionStartResult = {
+  license: LicenseStatus
+  promotionId: string
+  grantedTier: string
+  startsAt?: string
+  expiresAt?: string
+  message: string
 }
 
 export type MaintenanceRefreshResult = {
