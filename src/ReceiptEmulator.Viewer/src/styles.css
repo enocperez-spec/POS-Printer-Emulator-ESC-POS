@@ -482,13 +482,16 @@ button { color: inherit; }
 .settings-dialog-header p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
 .settings-dialog-header .dialog-close { position: static; }
 .settings-layout { min-height: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr); }
-.settings-nav { padding: 14px 10px; border-right: 1px solid var(--border); background: var(--surface-muted); }
+.settings-nav { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; padding: 14px 10px 0; border-right: 1px solid var(--border); background: var(--surface-muted); }
+.settings-nav-items { min-height: 0; overflow-y: auto; }
 .settings-nav button { width: 100%; min-height: 46px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 0 11px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
 .settings-nav button:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 75%, transparent); }
 .settings-nav button.active { color: var(--blue); background: var(--surface); box-shadow: 0 1px 5px rgb(20 44 75 / 10%); font-weight: 700; }
 .settings-nav button:disabled { cursor: not-allowed; opacity: .62; }
 .settings-nav button:disabled:hover { color: var(--muted); background: transparent; }
 .settings-nav .pro-lock { display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 3px 4px; border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 5px; font-size: 9px; font-weight: 800; line-height: 1; }
+.settings-version { display: flex; align-items: baseline; gap: 6px; margin: 10px -10px 0; padding: 13px 20px 14px; border-top: 1px solid var(--border); color: var(--muted); background: color-mix(in srgb, var(--surface-muted) 82%, var(--surface)); font-size: 11px; line-height: 1; }
+.settings-version strong { color: var(--text); font: 750 11px "Cascadia Mono", Consolas, monospace; }
 .settings-content { min-width: 0; overflow: auto; }
 .settings-panel { min-height: 100%; padding: 26px 28px; }
 .settings-panel .license-hero { margin: -26px -28px 0; }
@@ -497,6 +500,11 @@ button { color: inherit; }
 .license-summary span { color: var(--muted); }
 .license-summary strong { overflow-wrap: anywhere; }
 .settings-panel .activation-form { margin: 0 -28px -26px; }
+.permanent-activation-disclosure { margin: 0 -28px -26px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, var(--panel)); }
+.permanent-activation-disclosure > summary { padding: 18px 28px; color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; list-style-position: inside; }
+.permanent-activation-disclosure > summary:hover { color: var(--blue); }
+.permanent-activation-disclosure > p { margin: 0; padding: 0 28px 18px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.permanent-activation-disclosure .activation-form { margin: 0; padding-top: 4px; }
 .settings-panel .registered-details { padding-inline: 0; }
 .maintenance-card { display: grid; gap: 13px; margin: 20px 0 4px; padding: 17px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
 .maintenance-card.is-active { border-color: #a9dbba; background: #effaf3; }
@@ -843,9 +851,14 @@ html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; b
   .settings-nav { padding-inline: 6px; }
   .settings-nav button { grid-template-columns: 1fr; justify-items: center; padding: 0; }
   .settings-nav button span, .settings-nav button svg:last-child { display: none; }
+  .settings-version { display: grid; justify-items: center; gap: 3px; margin-inline: -6px; padding: 9px 2px 10px; font-size: 6px; letter-spacing: .03em; text-transform: uppercase; }
+  .settings-version strong { font-size: 7px; letter-spacing: -.04em; }
   .settings-panel { padding: 20px 18px; }
   .settings-panel .license-hero { margin: -20px -18px 0; }
   .settings-panel .activation-form { margin: 0 -18px -20px; }
+  .permanent-activation-disclosure { margin: 0 -18px -20px; }
+  .permanent-activation-disclosure > summary { padding-inline: 18px; }
+  .permanent-activation-disclosure > p { padding-inline: 18px; }
   .onboarding-dialog { padding: 28px 20px 22px; }
   .onboarding-hero { align-items: flex-start; }
   .onboarding-icon { width: 50px; height: 50px; border-radius: 12px; }

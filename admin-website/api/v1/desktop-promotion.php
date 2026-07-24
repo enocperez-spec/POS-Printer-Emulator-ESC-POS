@@ -88,7 +88,7 @@ function desktop_promotion_offer(
             'state' => 'VerificationRequired',
             'eligibleTiers' => $eligibleTiers,
             'previousTier' => $previousTier,
-            'verificationUrl' => 'https://portal.posprinteremulator.com/',
+            'verificationUrl' => 'https://userportal.posprinteremulator.com/',
             'purchaseUrl' => $purchaseUrl,
             'message' => 'Verify your customer email in the Customer Portal before starting the Five-Day Promotional Trial.',
         ];

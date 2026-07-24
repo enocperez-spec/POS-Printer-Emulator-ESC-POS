@@ -4,6 +4,14 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.48 — 2026-07-23
+
+- Displays the complete application version persistently at the bottom-left of Settings, regardless of the selected section.
+- Reads the displayed version from the running application build instead of hard-coding it in the viewer.
+- Separates the one-click Five-Day Promotional Trial from permanent-license activation so evaluation customers are not prompted for an activation key.
+- Corrects the promotional verification action to open the live Customer Portal.
+- Selects **Create a desktop shortcut** by default in the Windows installer while still allowing customers to opt out.
+
 ## v0.3.47 — 2026-07-23
 
 - Replaces manual promotional-key entry with a one-click, server-authorized Five-Day Promotional Trial.
