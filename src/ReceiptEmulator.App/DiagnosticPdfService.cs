@@ -39,6 +39,17 @@ public sealed partial class DiagnosticPdfService(
         "SHA-256 integrity information",
         "Privacy and redaction manifest"
     ];
+    private static readonly string[] StandardSections =
+    [
+        "Report summary and customer-provided issue details",
+        "Rendered receipt preview or privacy-safe omission notice",
+        "Application, job, listener, and printer-profile summary",
+        "High-priority warnings and unsupported-command summary",
+        "Recent relevant redacted errors",
+        "Recommended next actions",
+        "SHA-256 integrity information",
+        "Privacy and redaction manifest"
+    ];
     private static readonly string[] AlwaysExcluded =
     [
         "activation, maintenance, and promotional license keys",
@@ -121,6 +132,87 @@ public sealed partial class DiagnosticPdfService(
             Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
     }
 
+    public DiagnosticPdfPreview PreviewStandard(DiagnosticPdfRequest request)
+    {
+        EnsureEnterprise();
+        var job = GetJob(request.JobId);
+        var standardRequest = request with
+        {
+            IncludeRawDataPreview = false,
+            IncludeSourceIp = false,
+            RedactSensitiveData = true
+        };
+        var findings = DetectSensitiveData(job);
+        var receiptTreatment = ReceiptImageTreatment(standardRequest, findings);
+        var excluded = new List<string>
+        {
+            "Raw print-data preview and complete command table",
+            "Source and bind IP addresses",
+            "Detailed performance and environment tables",
+            "Unredacted export mode"
+        };
+        if (!standardRequest.IncludeReceiptImage ||
+            receiptTreatment.StartsWith("Omitted", StringComparison.Ordinal))
+            excluded.Add("Rendered receipt image");
+
+        return new DiagnosticPdfPreview(
+            DiagnosticPdfKinds.Standard,
+            CreateReportId(),
+            job.Id,
+            JobLabel(job),
+            StandardSections,
+            excluded,
+            AlwaysExcluded,
+            findings,
+            true,
+            true,
+            receiptTreatment,
+            "Raw print data is excluded. Only byte counts and a SHA-256 integrity value are included.",
+            Math.Max(110_000, EstimateSize(job, standardRequest) / 3));
+    }
+
+    public DiagnosticPdfFile CreateStandard(DiagnosticPdfRequest request)
+    {
+        EnsureEnterprise();
+        if (!request.ConsentToCreate)
+            throw new InvalidOperationException("Review the diagnostic report contents and provide consent before creating the PDF.");
+
+        var standardRequest = request with
+        {
+            IncludeRawDataPreview = false,
+            IncludeSourceIp = false,
+            RedactSensitiveData = true
+        };
+        var job = GetJob(standardRequest.JobId);
+        var findings = DetectSensitiveData(job);
+        var reportId = CreateReportId();
+        byte[]? receiptImage = null;
+        var receiptTreatment = ReceiptImageTreatment(standardRequest, findings);
+        if (standardRequest.IncludeReceiptImage &&
+            !receiptTreatment.StartsWith("Omitted", StringComparison.Ordinal) &&
+            !string.IsNullOrWhiteSpace(standardRequest.ReceiptImageBase64))
+        {
+            receiptImage = DecodeReceiptImage(standardRequest.ReceiptImageBase64);
+        }
+
+        var started = Stopwatch.StartNew();
+        var document = BuildStandardDocument(
+            reportId, standardRequest, job, findings, receiptImage, receiptTreatment);
+        var bytes = Render(document);
+        started.Stop();
+        logger.LogInformation(
+            "Created redacted standard diagnostic PDF {ReportId} for job {JobId} in {ElapsedMilliseconds} ms; bytes {Size}",
+            reportId,
+            job.Id,
+            started.ElapsedMilliseconds,
+            bytes.Length);
+        return new DiagnosticPdfFile(
+            bytes,
+            $"POS-Printer-Emulator-Standard-Diagnostics-{reportId}.pdf",
+            reportId,
+            Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+    }
+
     private Document BuildAdvancedDocument(
         string reportId,
         DiagnosticPdfRequest request,
@@ -133,7 +225,7 @@ public sealed partial class DiagnosticPdfService(
         var status = license.GetStatus();
         var listener = listeners.GetStatus().Listeners.FirstOrDefault(candidate =>
             candidate.Configuration.Id.Equals(job.ListenerId, StringComparison.OrdinalIgnoreCase));
-        var document = CreateDocument(reportId);
+        var document = CreateDocument(reportId, DiagnosticPdfKinds.Advanced);
         var section = document.AddSection();
         ConfigureSection(section, reportId);
         AddReportHeader(section, "Advanced Diagnostics Report", reportId);
@@ -332,13 +424,143 @@ public sealed partial class DiagnosticPdfService(
         return document;
     }
 
-    private static Document CreateDocument(string reportId)
+    private Document BuildStandardDocument(
+        string reportId,
+        DiagnosticPdfRequest request,
+        ReceiptJob job,
+        IReadOnlyList<DiagnosticSensitiveFinding> findings,
+        byte[]? receiptImage,
+        string receiptTreatment)
+    {
+        EnsureFontResolver();
+        var status = license.GetStatus();
+        var listener = listeners.GetStatus().Listeners.FirstOrDefault(candidate =>
+            candidate.Configuration.Id.Equals(job.ListenerId, StringComparison.OrdinalIgnoreCase));
+        var document = CreateDocument(reportId, DiagnosticPdfKinds.Standard);
+        var section = document.AddSection();
+        ConfigureSection(section, reportId);
+        AddReportHeader(section, "Standard Diagnostics Report", reportId);
+        AddNotice(section,
+            "Privacy protection is always enabled in the Standard report. Sensitive values are masked, raw bytes are excluded, and credential material is never collected.",
+            "#E8F7F1",
+            "#087A55");
+
+        AddHeading(section, "1. Report summary", 1);
+        AddKeyValueTable(section,
+        [
+            ("Report ID", reportId),
+            ("Diagnostic report format", ReportFormatVersion),
+            ("Created", DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss zzz")),
+            ("Application", $"POS Printer Emulator {ProductInfo.Version}"),
+            ("License tier", status.Mode),
+            ("Maintenance", status.Maintenance.State),
+            ("Print-job ID", job.Id.ToString()),
+            ("Job received", job.ReceivedAt.ToString("yyyy-MM-dd HH:mm:ss zzz")),
+            ("Overall result", DiagnosticStatus(job)),
+            ("Privacy mode", "Standard - redaction required"),
+            ("Support ticket", Safe(request.SupportTicketNumber, true))
+        ]);
+
+        AddHeading(section, "2. What the customer observed", 1);
+        AddIssueBlock(section, "Issue title", request.IssueTitle, true);
+        AddIssueBlock(section, "Problem description", request.ProblemDescription, true);
+        AddIssueBlock(section, "Expected behavior", request.ExpectedBehavior, true);
+        AddIssueBlock(section, "Actual behavior", request.ActualBehavior, true);
+        AddIssueBlock(section, "Reproduction steps", request.ReproductionSteps, true);
+
+        AddHeading(section, "3. Receipt preview", 1);
+        section.AddParagraph(receiptTreatment).Format.Font.Color = Color.Parse("#52647A");
+        if (receiptImage is not null)
+        {
+            var image = section.AddImage(ToBase64Image(receiptImage));
+            image.LockAspectRatio = true;
+            image.Width = Unit.FromInch(2.75);
+            image.Interpolate = false;
+            AddCaption(section, $"Privacy-reviewed receipt preview; {receiptImage.Length:N0} bytes.");
+        }
+        else
+        {
+            AddNotice(section,
+                "No receipt pixels are present in this report. The original local print job was not changed.",
+                "#F4F7FA",
+                "#52647A");
+        }
+
+        section.AddPageBreak();
+        AddHeading(section, "4. Application and printer summary", 1);
+        AddKeyValueTable(section,
+        [
+            ("Application version", ProductInfo.Version),
+            ("Windows", RuntimeInformation.OSDescription),
+            ("Job status", job.Status),
+            ("Payload", $"{job.RawPayload.Length:N0} bytes"),
+            ("Parsed commands", job.Receipt.Commands.Count.ToString("N0")),
+            ("Unsupported commands", job.UnsupportedCount.ToString("N0")),
+            ("Printer listener", string.IsNullOrWhiteSpace(job.ListenerName) ? "Not captured" : job.ListenerName),
+            ("Listener state", listener?.State ?? "Not available"),
+            ("Listener port", job.ListenerPort.ToString()),
+            ("Network addresses", "Excluded from the Standard report"),
+            ("Printer profile", job.ProfileName),
+            ("Paper width", $"{job.ProfilePaperWidthMm} mm"),
+            ("Renderer", job.RendererVersion)
+        ]);
+
+        AddHeading(section, "5. Important warnings and errors", 1);
+        AddWarningTable(section, job);
+
+        AddHeading(section, "6. Recent relevant errors", 1);
+        var relatedLogs = RelevantLogs(job, true);
+        var recentLogLines = relatedLogs
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+            .TakeLast(4);
+        var conciseLogs = string.Join(Environment.NewLine, recentLogLines);
+        AddCodeBlock(section, relatedLogs.Length == 0
+            ? "No job-specific error entries were found. Unrelated logs were excluded."
+            : Limit(conciseLogs, 3_000));
+
+        AddHeading(section, "7. Recommended next actions", 1);
+        var recommendations = new List<string>();
+        if (job.UnsupportedCount > 0)
+            recommendations.Add("Review the selected Printer Profile and provide the Advanced Diagnostics PDF if command-level investigation is required.");
+        if (!string.IsNullOrWhiteSpace(job.Error))
+            recommendations.Add("Run Connection Diagnostics, retry the print job, and submit a Support Request if the error repeats.");
+        if (listener is null || !listener.State.Equals("Running", StringComparison.OrdinalIgnoreCase))
+            recommendations.Add("Open Printer Listeners and confirm that the selected listener is running.");
+        if (recommendations.Count == 0)
+            recommendations.Add("The selected job completed without a recorded error. Compare the receipt result with the expected output and include that difference in a Support Request.");
+        recommendations.Add("Share this PDF only through the official Support Request process or another trusted private channel.");
+        AddBullets(section, recommendations);
+
+        AddHeading(section, "8. Integrity and privacy", 1);
+        AddKeyValueTable(section,
+        [
+            ("Original payload SHA-256", Convert.ToHexString(SHA256.HashData(job.RawPayload)).ToLowerInvariant()),
+            ("Original byte count", job.RawPayload.Length.ToString("N0")),
+            ("Report format", ReportFormatVersion),
+            ("Raw print data included", "No"),
+            ("Network addresses included", "No"),
+            ("Redaction", "Always enabled"),
+            ("Original local job modified", "No")
+        ]);
+        section.AddParagraph("Detected categories (values are never displayed):");
+        if (findings.Count == 0)
+            section.AddParagraph("No common sensitive-data patterns were detected. Manual review is still recommended.");
+        else
+            section.AddParagraph(string.Join("; ", findings.Select(finding =>
+                $"{finding.Category} ({finding.Count})")) + ". Detected values are masked or omitted.");
+        section.AddParagraph(
+            "Always excluded: license keys, credentials, registration details, Windows identity, other receipt jobs, and unrelated logs.");
+
+        return document;
+    }
+
+    private static Document CreateDocument(string reportId, string reportKind)
     {
         var document = new Document
         {
             Info =
             {
-                Title = $"POS Printer Emulator Advanced Diagnostics - {reportId}",
+                Title = $"POS Printer Emulator {reportKind} Diagnostics - {reportId}",
                 Subject = "Privacy-reviewed diagnostic report for one selected receipt job",
                 Author = $"POS Printer Emulator {ProductInfo.Version}"
             }

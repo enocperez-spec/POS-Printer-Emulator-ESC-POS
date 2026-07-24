@@ -4,6 +4,16 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.51 — 2026-07-24
+
+- Adds an Enterprise-only Standard Diagnostics PDF alongside the Advanced report under Settings > Support.
+- Reuses the v0.3.50 authorization, application-logo branding, embedded Poppins fonts, report identity, consent, redaction, pagination, integrity, and secure local-export services.
+- Produces a concise two-page report with the customer-observed issue, optional privacy-reviewed receipt preview, application and printer summary, important warnings, recent relevant errors, recommended next actions, payload checksum, and privacy manifest.
+- Always enables redaction and excludes reconstructable raw print bytes and network addresses; unlike the Advanced report, customers cannot disable these Standard safeguards.
+- Shows included, excluded, and masked information before creation and requires explicit customer consent.
+- Keeps the original receipt job unchanged and never uploads a report automatically.
+- Enforces Enterprise access through the local service so modifying the viewer cannot bypass the license boundary.
+
 ## v0.3.50 — 2026-07-24
 
 - Adds an Enterprise-only Advanced Diagnostics PDF report under Settings > Support.

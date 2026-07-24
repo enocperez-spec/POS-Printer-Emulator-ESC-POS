@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.50 — released 2026-07-24**
+**Current public release: v0.3.51 — released 2026-07-24**
 
-**Current development: v0.3.51 — Standard Diagnostics PDF Report**
+**Current development: v0.3.52 — Automatic configuration restore points**
 
-**Next release after v0.3.50: v0.3.51 — Standard Diagnostics PDF Report**
+**Next release after v0.3.51: v0.3.52 — Automatic configuration restore points**
 
 **Future scheduled sequence: v0.3.50 through v0.3.59**
 
-**Most recently completed: v0.3.50 — Advanced Diagnostics PDF Report**
+**Most recently completed: v0.3.51 — Standard Diagnostics PDF Report**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -91,6 +91,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.48 | Released | Settings Version Visibility and Setup Clarity |
 | v0.3.49 | Released | Receipt Image Sharing |
 | v0.3.50 | Released | Advanced Diagnostics PDF Report |
+| v0.3.51 | Released | Standard Diagnostics PDF Report |
 
 ## Scheduled releases
 
@@ -796,13 +797,13 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.51 — Standard Diagnostics PDF Report
 
-**Status:** Planned
+**Status:** Released — 2026-07-24
 
 **GitHub:** [Issue #58 — Standard Diagnostics PDF Report](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/58)
 
 **Purpose:** Provide a shorter Enterprise support document that communicates the most important health findings and next steps without the advanced report's full developer detail.
 
-**Planned scope:**
+**Released scope:**
 
 - Reuse the v0.3.50 diagnostics collection, redaction, application-logo branding, report metadata, pagination, checksum, and secure export services.
 - Include a concise issue summary, application and Windows version, license tier, selected listener and job metadata, receipt thumbnail, listener and printer-state overview, high-priority parser warnings, health-check results, and recent redacted errors.
@@ -815,6 +816,8 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Security and privacy:** The Standard report inherits the same denylist, masking, size limits, temporary-file cleanup, server-side authorization, and local-only export controls as the Advanced report.
 
 **Complete when:** The Standard report is materially shorter than the Advanced report, remains readable and branded, includes the minimum evidence needed for common support cases, contains no prohibited values, and passes the shared PDF rendering and redaction test suite.
+
+**Verification:** The report is two pages versus the Advanced sample's six, includes the correct application logo and version, and passes PDF metadata, rendered-page, prohibited-value extraction, shared redaction, Enterprise authorization, production build, dependency audit, and automated test checks.
 
 ### v0.3.52 — Automatic configuration restore points
 

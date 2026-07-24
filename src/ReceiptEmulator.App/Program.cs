@@ -710,6 +710,39 @@ app.MapPost("/api/support/diagnostic-pdf/advanced", (
     }
 });
 
+app.MapPost("/api/support/diagnostic-pdf/standard/preview", (
+    DiagnosticPdfRequest request,
+    DiagnosticPdfService reports) =>
+{
+    try { return Results.Ok(reports.PreviewStandard(request)); }
+    catch (UnauthorizedAccessException exception) { return Results.Problem(exception.Message, statusCode: 403); }
+    catch (KeyNotFoundException exception) { return Results.Problem(exception.Message, statusCode: 404); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/support/diagnostic-pdf/standard", (
+    DiagnosticPdfRequest request,
+    DiagnosticPdfService reports,
+    ILoggerFactory loggerFactory) =>
+{
+    try
+    {
+        var report = reports.CreateStandard(request);
+        return Results.File(report.Content, "application/pdf", report.FileName);
+    }
+    catch (UnauthorizedAccessException exception) { return Results.Problem(exception.Message, statusCode: 403); }
+    catch (KeyNotFoundException exception) { return Results.Problem(exception.Message, statusCode: 404); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (Exception exception)
+    {
+        loggerFactory.CreateLogger("DiagnosticPdf")
+            .LogError(exception, "Standard diagnostic PDF generation failed for job {JobId}", request.JobId);
+        return Results.Problem(
+            "The Standard Diagnostics PDF could not be created. Run Connection Diagnostics and try again.",
+            statusCode: 500);
+    }
+});
+
 app.MapPost("/api/support/connection-diagnostics", async (
     ConnectionDiagnosticsService diagnostics,
     CancellationToken cancellationToken) =>

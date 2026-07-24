@@ -27,6 +27,8 @@ public sealed class DiagnosticPdfServiceTests
 
         Assert.Throws<UnauthorizedAccessException>(() => service.PreviewAdvanced(request));
         Assert.Throws<UnauthorizedAccessException>(() => service.CreateAdvanced(request with { ConsentToCreate = true }));
+        Assert.Throws<UnauthorizedAccessException>(() => service.PreviewStandard(request));
+        Assert.Throws<UnauthorizedAccessException>(() => service.CreateStandard(request with { ConsentToCreate = true }));
     }
 
     [Fact]
@@ -65,6 +67,31 @@ public sealed class DiagnosticPdfServiceTests
         Assert.True(pdf.PageCount >= 2);
         Assert.Contains("POS Printer Emulator Advanced Diagnostics", pdf.Info.Title);
         Assert.Equal($"POS Printer Emulator {ProductInfo.Version}", pdf.Info.Author);
+
+        var standardPreview = service.PreviewStandard(new DiagnosticPdfRequest(
+            job.Id,
+            IssueTitle: "Receipt emailed to guest@example.com",
+            ProblemDescription: "Card 4111 1111 1111 1111 was visible.",
+            RedactSensitiveData: false,
+            IncludeRawDataPreview: true,
+            IncludeSourceIp: true));
+        var standard = service.CreateStandard(new DiagnosticPdfRequest(
+            job.Id,
+            IssueTitle: "Receipt emailed to guest@example.com",
+            ProblemDescription: "Card 4111 1111 1111 1111 was visible.",
+            RedactSensitiveData: false,
+            IncludeRawDataPreview: true,
+            IncludeSourceIp: true,
+            ConsentToCreate: true));
+        Assert.Equal(DiagnosticPdfKinds.Standard, standardPreview.ReportKind);
+        Assert.True(standardPreview.RedactionEnabled);
+        Assert.Contains(standardPreview.ExcludedSections, section => section.Contains("Raw print-data", StringComparison.Ordinal));
+        Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(standard.Content, 0, 5));
+        using var standardPdf = PdfReader.Open(new MemoryStream(standard.Content), PdfDocumentOpenMode.Import);
+        Assert.True(standardPdf.PageCount >= 1);
+        Assert.True(standardPdf.PageCount < pdf.PageCount);
+        Assert.Contains("POS Printer Emulator Standard Diagnostics", standardPdf.Info.Title);
+        Assert.True(standard.Content.Length < report.Content.Length);
     }
 
     [Fact]

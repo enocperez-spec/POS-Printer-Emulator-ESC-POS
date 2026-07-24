@@ -134,6 +134,12 @@ export const api = {
   createAdvancedDiagnosticPdf: (input: DiagnosticPdfRequest) => download('/api/support/diagnostic-pdf/advanced', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   }),
+  previewStandardDiagnosticPdf: (input: DiagnosticPdfRequest) => json<DiagnosticPdfPreview>('/api/support/diagnostic-pdf/standard/preview', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
+  createStandardDiagnosticPdf: (input: DiagnosticPdfRequest) => download('/api/support/diagnostic-pdf/standard', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
   restartDiagnosticListener: (id: string) => json<PrinterListener>(`/api/support/connection-diagnostics/listeners/${encodeURIComponent(id)}/restart`, { method: 'POST' }),
   previewSupportRequest: (input: SupportRequestInput) => json<SupportRequestPreview>('/api/support/requests/preview', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),

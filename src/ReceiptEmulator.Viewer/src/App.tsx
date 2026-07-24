@@ -59,7 +59,7 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.50',
+  version: '0.3.51',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -1505,6 +1505,7 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
   const [diagnosticMessage, setDiagnosticMessage] = useState<string>()
   const diagnosticReportsAllowed = status.license.features.diagnosticReports === true
   const [showAdvancedPdf, setShowAdvancedPdf] = useState(false)
+  const [showStandardPdf, setShowStandardPdf] = useState(false)
   const [pdfRequest, setPdfRequest] = useState<DiagnosticPdfRequest>({
     jobId: selectedJobId ?? '',
     issueTitle: '',
@@ -1617,32 +1618,39 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
     return blobToBase64(blob)
   }
 
-  async function reviewAdvancedPdf(event: FormEvent) {
+  async function reviewDiagnosticPdf(event: FormEvent, reportKind: 'Advanced' | 'Standard') {
     event.preventDefault()
-    if (!diagnosticReportsAllowed) { setPdfMessage('Advanced Diagnostic PDF Reports require an Enterprise License.'); return }
+    if (!diagnosticReportsAllowed) { setPdfMessage('Diagnostic PDF Reports require an Enterprise License.'); return }
     if (!pdfRequest.jobId) { setPdfMessage('Select a receipt job on the main page before creating a diagnostic report.'); return }
     setPdfBusy(true); setPdfMessage(undefined)
     try {
       const receiptImageBase64 = pdfRequest.includeReceiptImage ? await receiptPreviewBase64() : undefined
-      const candidate = { ...pdfRequest, receiptImageBase64, consentToCreate: false }
+      const candidate = reportKind === 'Standard'
+        ? { ...pdfRequest, receiptImageBase64, includeRawDataPreview: false, includeSourceIp: false, redactSensitiveData: true, consentToCreate: false }
+        : { ...pdfRequest, receiptImageBase64, consentToCreate: false }
       setPdfRequest(candidate)
-      setPdfPreview(await api.previewAdvancedDiagnosticPdf(candidate))
+      setPdfPreview(reportKind === 'Advanced'
+        ? await api.previewAdvancedDiagnosticPdf(candidate)
+        : await api.previewStandardDiagnosticPdf(candidate))
     } catch (error) {
       setPdfMessage(error instanceof Error ? error.message : 'The diagnostic report could not be reviewed.')
     } finally { setPdfBusy(false) }
   }
 
-  async function createAdvancedPdf() {
+  async function createDiagnosticPdf() {
     if (!pdfPreview || !pdfRequest.consentToCreate) return
     setPdfBusy(true); setPdfMessage(undefined)
     try {
-      const blob = await api.createAdvancedDiagnosticPdf({ ...pdfRequest, consentToCreate: true })
-      saveDownload(blob, `POS-Printer-Emulator-Advanced-Diagnostics-${pdfPreview.reportId}.pdf`)
-      setPdfMessage('Advanced Diagnostics PDF created. Review the saved report before sharing it.')
+      const blob = pdfPreview.reportKind === 'Advanced'
+        ? await api.createAdvancedDiagnosticPdf({ ...pdfRequest, consentToCreate: true })
+        : await api.createStandardDiagnosticPdf({ ...pdfRequest, consentToCreate: true })
+      saveDownload(blob, `POS-Printer-Emulator-${pdfPreview.reportKind}-Diagnostics-${pdfPreview.reportId}.pdf`)
+      setPdfMessage(`${pdfPreview.reportKind} Diagnostics PDF created. Review the saved report before sharing it.`)
       setPdfPreview(undefined)
       setShowAdvancedPdf(false)
+      setShowStandardPdf(false)
     } catch (error) {
-      setPdfMessage(error instanceof Error ? error.message : 'The Advanced Diagnostics PDF could not be created.')
+      setPdfMessage(error instanceof Error ? error.message : 'The Diagnostics PDF could not be created.')
     } finally { setPdfBusy(false) }
   }
 
@@ -1698,21 +1706,23 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
           <article className={diagnosticReportsAllowed ? 'available' : 'locked'}>
             <FileText size={21} />
             <div><strong>Advanced Diagnostics PDF</strong><p>Deep command analysis, optional raw preview, listener details, environment, logs, performance data, and SHA-256 integrity.</p></div>
-            <button type="button" disabled={!diagnosticReportsAllowed || !selectedJobId} onClick={() => { setShowAdvancedPdf(value => !value); setPdfPreview(undefined); setPdfMessage(undefined) }}>
+            <button type="button" disabled={!diagnosticReportsAllowed || !selectedJobId} onClick={() => { setShowAdvancedPdf(value => !value); setShowStandardPdf(false); setPdfPreview(undefined); setPdfMessage(undefined) }}>
               {showAdvancedPdf ? 'Close' : 'Create report'}
             </button>
           </article>
-          <article className="planned">
+          <article className={diagnosticReportsAllowed ? 'available' : 'locked'}>
             <FileText size={21} />
-            <div><strong>Standard Diagnostics PDF</strong><p>A shorter customer-friendly report built from the same privacy and rendering foundation.</p></div>
-            <span>Planned v0.3.51</span>
+            <div><strong>Standard Diagnostics PDF</strong><p>A shorter customer-friendly report with the essential issue, receipt, listener, warning, error, next-step, privacy, and integrity details.</p></div>
+            <button type="button" disabled={!diagnosticReportsAllowed || !selectedJobId} onClick={() => { setShowStandardPdf(value => !value); setShowAdvancedPdf(false); setPdfPreview(undefined); setPdfMessage(undefined) }}>
+              {showStandardPdf ? 'Close' : 'Create report'}
+            </button>
           </article>
         </div>
         {!diagnosticReportsAllowed && <div className="enterprise-feature-message"><strong>Enterprise Feature</strong><p>Diagnostic PDF Reports expose detailed receipt, ESC/POS, configuration, and log information only after server-side license authorization.</p><a href="https://www.posprinteremulator.com/pricing.html" target="_blank" rel="noreferrer">View Enterprise features <ExternalLink size={13} /></a></div>}
         {diagnosticReportsAllowed && !selectedJobId && <div className="diagnostic-message">Close Settings, select a receipt in Activity, then return here to create a report for that job.</div>}
         {pdfMessage && <div className="diagnostic-message" role="status">{pdfMessage}</div>}
-        {showAdvancedPdf && diagnosticReportsAllowed && selectedJobId && !pdfPreview && <form className="diagnostic-pdf-form" onSubmit={reviewAdvancedPdf}>
-          <div className="diagnostic-pdf-form-heading"><div><span>Advanced report</span><h4>Describe the issue</h4><p>Optional fields appear near the front of the PDF. Empty fields are shown as “Not provided.”</p></div><code>{selectedJobId}</code></div>
+        {(showAdvancedPdf || showStandardPdf) && diagnosticReportsAllowed && selectedJobId && !pdfPreview && <form className="diagnostic-pdf-form" onSubmit={event => reviewDiagnosticPdf(event, showAdvancedPdf ? 'Advanced' : 'Standard')}>
+          <div className="diagnostic-pdf-form-heading"><div><span>{showAdvancedPdf ? 'Advanced' : 'Standard'} report</span><h4>Describe the issue</h4><p>Optional fields appear near the front of the PDF. Empty fields are shown as “Not provided.”</p></div><code>{selectedJobId}</code></div>
           <label className="wide">Issue title<input maxLength={160} value={pdfRequest.issueTitle} onChange={event => updatePdf('issueTitle', event.target.value)} placeholder="Example: Receipt logo is missing" /></label>
           <label className="wide">Problem description<textarea rows={4} maxLength={8000} value={pdfRequest.problemDescription} onChange={event => updatePdf('problemDescription', event.target.value)} /></label>
           <label>Expected behavior<textarea rows={3} maxLength={4000} value={pdfRequest.expectedBehavior} onChange={event => updatePdf('expectedBehavior', event.target.value)} /></label>
@@ -1722,12 +1732,14 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
           <label>Additional notes<textarea rows={3} maxLength={4000} value={pdfRequest.additionalNotes} onChange={event => updatePdf('additionalNotes', event.target.value)} /></label>
           <div className="diagnostic-pdf-options wide">
             <label><input type="checkbox" checked={pdfRequest.includeReceiptImage} onChange={event => updatePdf('includeReceiptImage', event.target.checked)} /><span><strong>Include rendered receipt image</strong><small>Automatically omitted when sensitive data is detected while redaction is enabled.</small></span></label>
-            <label><input type="checkbox" checked={pdfRequest.includeRawDataPreview} onChange={event => updatePdf('includeRawDataPreview', event.target.checked)} /><span><strong>Include shortened raw-data preview</strong><small>With redaction enabled, the report includes only a masked decoded preview—not reconstructable bytes.</small></span></label>
-            <label><input type="checkbox" checked={pdfRequest.includeSourceIp} onChange={event => updatePdf('includeSourceIp', event.target.checked)} /><span><strong>Include source network address</strong><small>Non-local addresses remain masked when redaction is enabled.</small></span></label>
-            <label className={pdfRequest.redactSensitiveData ? 'recommended' : 'danger'}><input type="checkbox" checked={pdfRequest.redactSensitiveData} onChange={event => updatePdf('redactSensitiveData', event.target.checked)} /><span><strong>Redact sensitive data</strong><small>{pdfRequest.redactSensitiveData ? 'Recommended and enabled by default.' : 'Warning: the report may contain private receipt or network information.'}</small></span></label>
+            {showAdvancedPdf && <label><input type="checkbox" checked={pdfRequest.includeRawDataPreview} onChange={event => updatePdf('includeRawDataPreview', event.target.checked)} /><span><strong>Include shortened raw-data preview</strong><small>With redaction enabled, the report includes only a masked decoded preview—not reconstructable bytes.</small></span></label>}
+            {showAdvancedPdf && <label><input type="checkbox" checked={pdfRequest.includeSourceIp} onChange={event => updatePdf('includeSourceIp', event.target.checked)} /><span><strong>Include source network address</strong><small>Non-local addresses remain masked when redaction is enabled.</small></span></label>}
+            {showAdvancedPdf
+              ? <label className={pdfRequest.redactSensitiveData ? 'recommended' : 'danger'}><input type="checkbox" checked={pdfRequest.redactSensitiveData} onChange={event => updatePdf('redactSensitiveData', event.target.checked)} /><span><strong>Redact sensitive data</strong><small>{pdfRequest.redactSensitiveData ? 'Recommended and enabled by default.' : 'Warning: the report may contain private receipt or network information.'}</small></span></label>
+              : <div className="privacy-callout"><LockKeyhole size={17} /><p>Standard reports always mask sensitive information and exclude raw print bytes and network addresses.</p></div>}
           </div>
           <div className="privacy-callout wide"><LockKeyhole size={17} /><p>Activation keys, passwords, API keys, tokens, cookies, customer registration details, Windows identity, and unrelated receipt jobs are always excluded.</p></div>
-          <div className="support-form-actions wide"><button type="button" onClick={() => setShowAdvancedPdf(false)}>Cancel</button><button className="primary-action" type="submit" disabled={pdfBusy}>{pdfBusy ? 'Analyzing…' : 'Review report contents'}</button></div>
+          <div className="support-form-actions wide"><button type="button" onClick={() => { setShowAdvancedPdf(false); setShowStandardPdf(false) }}>Cancel</button><button className="primary-action" type="submit" disabled={pdfBusy}>{pdfBusy ? 'Analyzing…' : 'Review report contents'}</button></div>
         </form>}
         {pdfPreview && <section className="diagnostic-pdf-preview">
           <div className="diagnostic-pdf-form-heading"><div><span>Consent required</span><h4>Review before creating the PDF</h4><p>No information is uploaded. The PDF is generated locally and saved only where you choose.</p></div><code>{pdfPreview.reportId}</code></div>
@@ -1744,7 +1756,7 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
           <div className="sensitive-findings"><strong>Sensitive-data scan</strong>{pdfPreview.sensitiveFindings.length === 0 ? <p>No common patterns were detected. Manual review is still required.</p> : pdfPreview.sensitiveFindings.map(finding => <article key={`${finding.category}-${finding.location}`}><span>{finding.count}</span><div><strong>{finding.category}</strong><p>{finding.location} · {finding.treatment}</p></div></article>)}</div>
           {!pdfPreview.redactionEnabled && <div className="diagnostic-pdf-warning"><AlertTriangle size={17} /><p>Redaction is disabled. The exported report may expose receipt contents or network information. Share it only through a trusted private channel.</p></div>}
           <label className="support-consent"><input type="checkbox" checked={pdfRequest.consentToCreate} onChange={event => setPdfRequest(current => ({ ...current, consentToCreate: event.target.checked }))} /><span>I reviewed the included and excluded information and consent to create this local diagnostic PDF.</span></label>
-          <div className="support-form-actions"><button type="button" onClick={() => { setPdfPreview(undefined); setPdfRequest(current => ({ ...current, consentToCreate: false })) }}>Back</button><button className="primary-action" type="button" disabled={pdfBusy || !pdfRequest.consentToCreate} onClick={createAdvancedPdf}><Download size={15} /> {pdfBusy ? 'Creating PDF…' : 'Create Advanced PDF'}</button></div>
+          <div className="support-form-actions"><button type="button" onClick={() => { setPdfPreview(undefined); setPdfRequest(current => ({ ...current, consentToCreate: false })) }}>Back</button><button className="primary-action" type="button" disabled={pdfBusy || !pdfRequest.consentToCreate} onClick={createDiagnosticPdf}><Download size={15} /> {pdfBusy ? 'Creating PDF…' : `Create ${pdfPreview.reportKind} PDF`}</button></div>
         </section>}
       </section>
       <div className="settings-actions support-actions">

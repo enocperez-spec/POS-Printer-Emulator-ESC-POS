@@ -10,6 +10,7 @@ using ReceiptEmulator;
 var output = args.Length > 0
     ? Path.GetFullPath(args[0])
     : Path.GetFullPath(Path.Combine("output", "pdf", "POS-Printer-Emulator-Advanced-Diagnostics-Sample.pdf"));
+var standard = args.Length > 1 && args[1].Equals("standard", StringComparison.OrdinalIgnoreCase);
 Directory.CreateDirectory(Path.GetDirectoryName(output)!);
 var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator", "DiagnosticReportSample", Guid.NewGuid().ToString("N"));
 using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -58,18 +59,19 @@ var reports = new DiagnosticPdfService(
     listenerManager,
     new SupportLogProvider(),
     NullLogger<DiagnosticPdfService>.Instance);
-var report = reports.CreateAdvanced(new DiagnosticPdfRequest(
+var request = new DiagnosticPdfRequest(
     job.Id,
     IssueTitle: "Receipt content and command validation",
     ProblemDescription: "The receipt includes private fields and an unsupported command that must be reviewed safely.",
     ExpectedBehavior: "The developer receives a branded, organized, privacy-reviewed report.",
     ActualBehavior: "The receipt rendered with one command warning.",
-    ReproductionSteps: "1. Send the sample ESC/POS payload.\n2. Select the job.\n3. Export Advanced Diagnostics PDF.",
+    ReproductionSteps: $"1. Send the sample ESC/POS payload.\n2. Select the job.\n3. Export {(standard ? "Standard" : "Advanced")} Diagnostics PDF.",
     AdditionalNotes: "This sample intentionally contains an email address, a card-like number, and a private IP address.",
     SupportTicketNumber: "PPE-SAMPLE-1001",
     IncludeRawDataPreview: true,
     IncludeSourceIp: true,
-    ConsentToCreate: true));
+    ConsentToCreate: true);
+var report = standard ? reports.CreateStandard(request) : reports.CreateAdvanced(request);
 await File.WriteAllBytesAsync(output, report.Content);
 Console.WriteLine(output);
 Console.WriteLine($"SHA-256: {report.Sha256}");

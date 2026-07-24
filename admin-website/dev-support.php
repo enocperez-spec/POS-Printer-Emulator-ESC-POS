@@ -821,11 +821,11 @@ $releaseSync = database()->prepare(
          'Application-logo branding; format version and report ID; issue narrative; receipt preview; comprehensive command and bounded raw-data analysis; job, listener, profile, printer-state, environment, storage, performance, warning, health, redacted-log, and checksum sections; review and consent; server authorization; deterministic pagination; and shared document model.',
          'The comprehensive report establishes the secure collection, redaction, branding, and PDF engine that the shorter Standard report can reuse.',
          'A representative long receipt produces a readable, logo-branded, multi-page PDF with correct tables, page breaks, checksums, redactions, consent, and Enterprise enforcement.', UTC_TIMESTAMP(6)),
-        ('v0.3.51', 'v0.3.51', 'Release', 'Standard Diagnostics PDF Report', 'Planned', 351,
+        ('v0.3.51', 'v0.3.51', 'Release', 'Standard Diagnostics PDF Report', 'Released', 351,
          'Provide a shorter Enterprise support report with the most important findings and next actions.',
          'Reuse the Advanced report collection, redaction, logo branding, report metadata, pagination, checksum, authorization, review, consent, and secure local export services; include concise issue, application, Windows, listener, job, receipt thumbnail, state, warning, health, and recent-error summaries.',
          'Building the comprehensive engine first avoids duplicate security and rendering logic while allowing this release to focus on concise customer-support presentation.',
-         'The Standard report is materially shorter, readable, branded, complete for common support cases, free of prohibited data, and validated by the shared PDF and redaction tests.', NULL),
+         'The Standard report is materially shorter, readable, branded, complete for common support cases, free of prohibited data, and validated by the shared PDF and redaction tests.', UTC_TIMESTAMP(6)),
         ('v0.3.52', 'v0.3.52', 'Release', 'Automatic configuration restore points', 'Planned', 352,
          'Protect customers from accidental configuration loss without requiring manual backups.',
          'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
@@ -1003,7 +1003,7 @@ database()->prepare(
          WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.48'
          WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.49'
          WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.50'
-         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/58'
+         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.51'
          WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
          WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
