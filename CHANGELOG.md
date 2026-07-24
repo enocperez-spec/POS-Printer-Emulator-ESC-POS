@@ -4,6 +4,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.52 — 2026-07-24
+
+- Fixes the Windows in-app updater failing after a completed download with “The process cannot access the file because it is being used by another process.”
+- Disposes the temporary download stream before promoting the verified installer into place.
+- Moves update downloading into the shared update-security component so the installer and checksum use the same safe file lifecycle.
+- Rejects incomplete downloads whose byte count does not match the server-provided content length.
+- Removes partial `.download` files when a download fails.
+- Adds a Windows file-lock regression test that verifies the completed installer can be opened exclusively after download.
+
 ## v0.3.51 — 2026-07-24
 
 - Adds an Enterprise-only Standard Diagnostics PDF alongside the Advanced report under Settings > Support.

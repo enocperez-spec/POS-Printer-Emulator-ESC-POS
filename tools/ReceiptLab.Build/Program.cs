@@ -416,9 +416,22 @@ internal static class ReceiptLabBuild
         if (!checkOnly)
         {
             var manifestPath = Path.Combine(Root, "website", "release.json");
+            var releaseDate = installer?.LastWriteTimeUtc.ToString(
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture) ?? DateTime.UtcNow.ToString(
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture);
             File.WriteAllText(
                 manifestPath,
-                JsonSerializer.Serialize(new { currentVersion = displayVersion }, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        currentVersion = displayVersion,
+                        releaseDate,
+                        releaseNotesUrl = $"https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v{displayVersion}",
+                        downloadUrl = $"https://www.posprinteremulator.com/downloads/POSPrinterEmulatorSetup-{displayVersion}-win-x64.exe",
+                    },
+                    new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);
         }
 
         Console.WriteLine(changed.Count == 0

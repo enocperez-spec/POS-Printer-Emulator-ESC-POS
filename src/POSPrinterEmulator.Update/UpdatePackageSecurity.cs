@@ -44,6 +44,66 @@ public static partial class UpdatePackageSecurity
             throw new InvalidDataException("The downloaded installer failed SHA-256 verification and was not opened.");
     }
 
+    public static async Task DownloadToFileAsync(
+        HttpClient client,
+        Uri uri,
+        string destination,
+        Action<int>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var partial = destination + ".download";
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(destination))!);
+        try
+        {
+            using var response = await client.GetAsync(
+                uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var total = response.Content.Headers.ContentLength;
+            long written = 0;
+            var reported = -1;
+
+            await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
+            await using (var output = new FileStream(
+                             partial,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             128 * 1024,
+                             FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                var buffer = new byte[128 * 1024];
+                int read;
+                while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+                {
+                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    written += read;
+                    if (total is > 0)
+                    {
+                        var percent = (int)Math.Min(100, written * 100 / total.Value);
+                        if (percent != reported)
+                        {
+                            reported = percent;
+                            progress?.Invoke(percent);
+                        }
+                    }
+                }
+                await output.FlushAsync(cancellationToken);
+            }
+
+            if (total is > 0 && written != total.Value)
+                throw new EndOfStreamException(
+                    $"The update download ended early. Expected {total.Value:N0} bytes but received {written:N0}.");
+
+            // FileShare.None prevents the rename until the output stream is disposed.
+            File.Move(partial, destination, true);
+        }
+        catch
+        {
+            try { File.Delete(partial); } catch { }
+            throw;
+        }
+    }
+
     public static string ResultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "POSPrinterEmulator", "Updates", "last-update-result.json");

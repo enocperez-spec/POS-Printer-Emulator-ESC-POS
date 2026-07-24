@@ -826,11 +826,11 @@ $releaseSync = database()->prepare(
          'Reuse the Advanced report collection, redaction, logo branding, report metadata, pagination, checksum, authorization, review, consent, and secure local export services; include concise issue, application, Windows, listener, job, receipt thumbnail, state, warning, health, and recent-error summaries.',
          'Building the comprehensive engine first avoids duplicate security and rendering logic while allowing this release to focus on concise customer-support presentation.',
          'The Standard report is materially shorter, readable, branded, complete for common support cases, free of prohibited data, and validated by the shared PDF and redaction tests.', UTC_TIMESTAMP(6)),
-        ('v0.3.52', 'v0.3.52', 'Release', 'Automatic configuration restore points', 'Planned', 352,
-         'Protect customers from accidental configuration loss without requiring manual backups.',
-         'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
-         'Recovery protection should precede projects and additional customer configuration complexity.',
-         'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
+        ('v0.3.52', 'v0.3.52', 'Release', 'Updater Download File-Lock Correction', 'Released', 352,
+         'Restore reliable in-app updating after Windows reported that the completed installer download was still in use.',
+         'Shared secure download service; stream disposal before file promotion; content-length validation; partial-file cleanup; trusted-host and SHA-256 preservation; and a Windows exclusive-file regression test.',
+         'Customers on older releases cannot install a verified update when the updater keeps its temporary output stream open.',
+         'The downloaded installer is promoted without a sharing violation, incomplete transfers are rejected, partial files are removed, and automated updater tests pass.', UTC_TIMESTAMP(6)),
         ('v0.3.53', 'v0.3.53', 'Release', 'Projects and testing sessions', 'Planned', 353,
          'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
          'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
@@ -856,6 +856,11 @@ $releaseSync = database()->prepare(
          'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.',
          'This depends on guided updates, production signing, rollback, and entitlement foundations.',
          'A valid offline package installs successfully while tampered, unsigned, downgraded, incompatible, or unentitled packages leave the current installation unchanged.', NULL),
+        ('v0.3.60', 'v0.3.60', 'Release', 'Automatic configuration restore points', 'Planned', 360,
+         'Protect customers from accidental configuration loss without requiring manual backups.',
+         'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
+         'The emergency updater correction used v0.3.52, so the recovery feature remains scheduled after the existing customer-experience sequence.',
+         'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
         ('v0.3.30', 'v0.3.30', 'Release', 'Security remediation (Phase 1)', 'Released', 330,
          'Resolve the actionable security findings from the completed deep review before adding more externally reachable functionality.',
          'Credential rotation and separation; HTTPS, cookie, CSRF, authorization, input-validation, and rate-limit hardening; encrypted and redacted sensitive desktop data; license-boundary enforcement; signed update and installer verification; dependency, secret, and package-integrity checks; security regression coverage.',
@@ -1004,7 +1009,7 @@ database()->prepare(
          WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.49'
          WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.50'
          WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.51'
-         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.52'
          WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
          WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
          WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
@@ -1012,6 +1017,7 @@ database()->prepare(
          WHEN 'v0.3.57' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
          WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
          WHEN 'v0.3.59' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
+         WHEN 'v0.3.60' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -1019,7 +1025,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
