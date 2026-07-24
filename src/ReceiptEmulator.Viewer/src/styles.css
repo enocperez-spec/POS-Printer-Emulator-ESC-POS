@@ -1063,6 +1063,56 @@ html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; b
 .diagnostic-check details { margin-top: 6px; }
 .diagnostic-check summary { color: var(--blue); font-size: 8px; cursor: pointer; }
 .diagnostic-check pre { max-height: 160px; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: 5px; color: var(--muted); background: var(--surface-muted); font: 8px/1.45 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diagnostic-pdf { display: grid; gap: 13px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
+.diagnostic-pdf > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.diagnostic-pdf > header > div { max-width: 650px; }
+.diagnostic-pdf > header span:not(.enterprise-badge), .diagnostic-pdf-form-heading span { color: var(--blue); font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.diagnostic-pdf > header h3, .diagnostic-pdf-form-heading h4 { margin: 4px 0 5px; font-size: 16px; }
+.diagnostic-pdf > header p, .diagnostic-pdf-form-heading p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.enterprise-badge { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid #8f78d8; border-radius: 999px; color: #c7b8ff; background: rgba(89, 61, 164, .18); font-size: 8px; font-weight: 900; text-transform: uppercase; }
+.diagnostic-pdf-editions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.diagnostic-pdf-editions article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.diagnostic-pdf-editions article > svg { color: var(--blue); }
+.diagnostic-pdf-editions article strong { font-size: 10px; }
+.diagnostic-pdf-editions article p { margin: 3px 0 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.diagnostic-pdf-editions article button { min-height: 32px; padding: 0 10px; border: 1px solid var(--blue); border-radius: 6px; color: #fff; background: var(--blue); font-size: 8px; font-weight: 800; cursor: pointer; }
+.diagnostic-pdf-editions article button:disabled { border-color: var(--border); color: var(--muted); background: var(--surface-muted); cursor: not-allowed; }
+.diagnostic-pdf-editions article > span { color: var(--muted); font-size: 8px; font-weight: 800; white-space: nowrap; }
+.diagnostic-pdf-editions .planned { opacity: .75; }
+.enterprise-feature-message { padding: 11px 12px; border: 1px solid #8f78d8; border-radius: 8px; background: rgba(89, 61, 164, .12); }
+.enterprise-feature-message strong { color: #c7b8ff; font-size: 10px; }
+.enterprise-feature-message p { margin: 4px 0 7px; color: var(--muted); font-size: 8px; }
+.enterprise-feature-message a { display: inline-flex; align-items: center; gap: 5px; color: var(--blue); font-size: 8px; font-weight: 800; text-decoration: none; }
+.diagnostic-pdf-form, .diagnostic-pdf-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; padding: 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.diagnostic-pdf-form-heading { grid-column: 1 / -1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
+.diagnostic-pdf-form-heading code { max-width: 280px; overflow: hidden; color: var(--muted); font: 8px/1.4 "Cascadia Mono", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-pdf-form label { display: grid; gap: 5px; color: var(--text); font-size: 8px; font-weight: 800; }
+.diagnostic-pdf-form .wide { grid-column: 1 / -1; }
+.diagnostic-pdf-form input:not([type="checkbox"]), .diagnostic-pdf-form textarea { width: 100%; min-height: 34px; padding: 8px 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface-muted); font: inherit; font-weight: 500; resize: vertical; }
+.diagnostic-pdf-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.diagnostic-pdf-options label { grid-template-columns: auto 1fr; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-muted); }
+.diagnostic-pdf-options label.recommended { border-color: rgba(28, 181, 122, .55); }
+.diagnostic-pdf-options label.danger { border-color: var(--danger); background: rgba(213, 65, 65, .08); }
+.diagnostic-pdf-options input { margin-top: 2px; }
+.diagnostic-pdf-options span { display: grid; gap: 3px; }
+.diagnostic-pdf-options small { color: var(--muted); font-size: 7px; font-weight: 500; line-height: 1.4; }
+.diagnostic-pdf-preview > * { grid-column: 1 / -1; }
+.diagnostic-pdf-preview dl { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--border); }
+.diagnostic-pdf-preview dl div { padding: 9px; background: var(--surface-muted); }
+.diagnostic-pdf-preview dt { color: var(--muted); font-size: 7px; }
+.diagnostic-pdf-preview dd { margin: 3px 0 0; font-size: 8px; line-height: 1.45; }
+.diagnostic-pdf-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.diagnostic-pdf-review-grid > div { padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-muted); }
+.diagnostic-pdf-review-grid strong, .sensitive-findings > strong { font-size: 9px; }
+.diagnostic-pdf-review-grid ul { margin: 7px 0 0; padding-left: 15px; color: var(--muted); font-size: 7px; line-height: 1.55; }
+.sensitive-findings { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-muted); }
+.sensitive-findings > p { margin: 0; color: var(--muted); font-size: 8px; }
+.sensitive-findings article { display: flex; gap: 8px; align-items: flex-start; }
+.sensitive-findings article > span { display: grid; width: 21px; height: 21px; place-items: center; border-radius: 50%; color: #fff; background: var(--amber); font-size: 8px; font-weight: 900; }
+.sensitive-findings article div { flex: 1; }
+.sensitive-findings article p { margin: 2px 0 0; color: var(--muted); font-size: 7px; line-height: 1.4; }
+.diagnostic-pdf-warning { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--danger); border-radius: 7px; color: var(--danger); background: rgba(213, 65, 65, .08); }
+.diagnostic-pdf-warning p { margin: 0; font-size: 8px; line-height: 1.45; }
 .support-package-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .support-package-actions a { min-height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface); font-size: 8px; font-weight: 800; text-decoration: none; }
 .support-package-actions a.primary-action { color: #fff; border-color: var(--blue); background: var(--blue); }
@@ -1137,6 +1187,9 @@ html[data-theme="dark"] .printer-state-hero.has-fault { border-color: #705529; b
   .connection-diagnostics > header { display: grid; }
   .connection-diagnostics > header .primary-action { justify-self: start; }
   .diagnostic-metrics { grid-template-columns: 1fr 1fr; }
+  .diagnostic-pdf > header, .diagnostic-pdf-form-heading { display: grid; }
+  .diagnostic-pdf-editions, .diagnostic-pdf-form, .diagnostic-pdf-options, .diagnostic-pdf-preview dl, .diagnostic-pdf-review-grid { grid-template-columns: 1fr; }
+  .diagnostic-pdf-form label, .diagnostic-pdf-form .wide { grid-column: 1; }
   .connection-guidance article { grid-template-columns: 1fr auto; }
   .connection-guidance article > div { grid-column: 1 / -1; }
   .diagnostic-check { grid-template-columns: 1fr; }

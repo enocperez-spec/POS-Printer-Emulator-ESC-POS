@@ -139,7 +139,8 @@ public sealed class LicenseService
                     Updates: maintenance.IsActive,
                     Support: maintenance.IsActive,
                     MultipleListeners: maximumListeners > 1,
-                    ReceiptImages: isPaid));
+                    ReceiptImages: isPaid,
+                    DiagnosticReports: isEnterprise));
         }
     }
 

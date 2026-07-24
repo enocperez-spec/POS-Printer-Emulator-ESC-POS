@@ -106,7 +106,8 @@ public sealed record FeatureStatus(
     bool Updates,
     bool Support,
     bool MultipleListeners = false,
-    bool ReceiptImages = false);
+    bool ReceiptImages = false,
+    bool DiagnosticReports = false);
 
 public sealed record MaintenanceStatus(
     bool IsApplicable,

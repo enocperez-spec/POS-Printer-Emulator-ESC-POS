@@ -35,6 +35,7 @@ public sealed class LicenseServiceTests
         Assert.False(status.Features.Support);
         Assert.False(status.Features.MultipleListeners);
         Assert.False(status.Features.ReceiptImages);
+        Assert.False(status.Features.DiagnosticReports);
         Assert.False(service.HasEnterpriseAccess);
         Assert.False(status.IsPaid);
         Assert.False(service.HasPaidAccess);
@@ -82,6 +83,7 @@ public sealed class LicenseServiceTests
         Assert.True(status.Features.Updates);
         Assert.True(status.Features.Support);
         Assert.True(status.Features.ReceiptImages);
+        Assert.Equal(tier == LicenseTier.Enterprise, status.Features.DiagnosticReports);
         Assert.True(status.Maintenance.IsActive);
         Assert.NotNull(status.Maintenance.ExpiresAt);
         Assert.Equal(-1, status.Remaining);

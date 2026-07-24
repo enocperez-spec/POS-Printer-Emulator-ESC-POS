@@ -36,6 +36,7 @@ builder.Services.AddSingleton<PrinterListenerConfigurationService>();
 builder.Services.AddSingleton<PrinterListenerManager>();
 builder.Services.AddSingleton<StoredGraphicService>();
 builder.Services.AddSingleton<ConnectionDiagnosticsService>();
+builder.Services.AddSingleton<DiagnosticPdfService>();
 builder.Services.AddSingleton<ConfigurationBackupService>();
 builder.Services.AddSingleton(supportLogs);
 builder.Services.Configure<FormOptions>(options =>
@@ -674,6 +675,39 @@ app.MapGet("/api/support/activation-diagnostics", (LicenseService license) =>
         .AppendLine("This report does not contain the activation key, customer registration data, or receipt contents.")
         .ToString();
     return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Activation-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+});
+
+app.MapPost("/api/support/diagnostic-pdf/advanced/preview", (
+    DiagnosticPdfRequest request,
+    DiagnosticPdfService reports) =>
+{
+    try { return Results.Ok(reports.PreviewAdvanced(request)); }
+    catch (UnauthorizedAccessException exception) { return Results.Problem(exception.Message, statusCode: 403); }
+    catch (KeyNotFoundException exception) { return Results.Problem(exception.Message, statusCode: 404); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+});
+
+app.MapPost("/api/support/diagnostic-pdf/advanced", (
+    DiagnosticPdfRequest request,
+    DiagnosticPdfService reports,
+    ILoggerFactory loggerFactory) =>
+{
+    try
+    {
+        var report = reports.CreateAdvanced(request);
+        return Results.File(report.Content, "application/pdf", report.FileName);
+    }
+    catch (UnauthorizedAccessException exception) { return Results.Problem(exception.Message, statusCode: 403); }
+    catch (KeyNotFoundException exception) { return Results.Problem(exception.Message, statusCode: 404); }
+    catch (InvalidOperationException exception) { return Results.Problem(exception.Message, statusCode: 400); }
+    catch (Exception exception)
+    {
+        loggerFactory.CreateLogger("DiagnosticPdf")
+            .LogError(exception, "Advanced diagnostic PDF generation failed for job {JobId}", request.JobId);
+        return Results.Problem(
+            "The Advanced Diagnostics PDF could not be created. Run Connection Diagnostics and try again.",
+            statusCode: 500);
+    }
 });
 
 app.MapPost("/api/support/connection-diagnostics", async (

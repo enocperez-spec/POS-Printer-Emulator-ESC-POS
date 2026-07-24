@@ -5,11 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ReceiptEmulator</RootNamespace>
     <AssemblyName>ReceiptEmulator</AssemblyName>
-    <Version>0.3.49</Version>
+    <Version>0.3.50</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
     <ProjectReference Include="..\POSPrinterEmulator.Licensing\POSPrinterEmulator.Licensing.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.29" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
@@ -26,6 +27,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\assets\receipt\test-receipt-logo.escpos" LogicalName="ReceiptEmulator.TestReceiptLogo" />
+    <EmbeddedResource Include="..\..\assets\branding\pos-printer-emulator-logo.png" LogicalName="ReceiptEmulator.DiagnosticLogo" />
+    <EmbeddedResource Include="..\..\assets\fonts\poppins\Poppins-Regular.ttf" LogicalName="ReceiptEmulator.PoppinsRegular" />
+    <EmbeddedResource Include="..\..\assets\fonts\poppins\Poppins-SemiBold.ttf" LogicalName="ReceiptEmulator.PoppinsSemiBold" />
     <Content Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\fonts\poppins\OFL.txt" Link="licenses\Poppins-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

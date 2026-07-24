@@ -816,11 +816,11 @@ $releaseSync = database()->prepare(
          'Paid-tier Image menu; full off-screen receipt rendering; logos, raster graphics, barcodes, and QR codes; Windows clipboard PNG; native Save As with descriptive filename and overwrite confirmation; bounded dimensions and transfer size; server authorization; PNG signature validation; and privacy-safe action logging.',
          'Direct image sharing is a contained, high-value workflow and provides the receipt-rendering artifact that later diagnostic reports can reuse.',
          'Lite, Pro, and Enterprise customers copy or save a complete receipt-only PNG, Trial calls are denied server-side, and no application chrome or logged receipt content is included.', UTC_TIMESTAMP(6)),
-        ('v0.3.50', 'v0.3.50', 'Release', 'Advanced Diagnostics PDF Report', 'Planned', 350,
+        ('v0.3.50', 'v0.3.50', 'Release', 'Advanced Diagnostics PDF Report', 'Released', 350,
          'Give Enterprise customers and developers one detailed, professional diagnostic document for receipt and listener problems.',
          'Application-logo branding; format version and report ID; issue narrative; receipt preview; comprehensive command and bounded raw-data analysis; job, listener, profile, printer-state, environment, storage, performance, warning, health, redacted-log, and checksum sections; review and consent; server authorization; deterministic pagination; and shared document model.',
          'The comprehensive report establishes the secure collection, redaction, branding, and PDF engine that the shorter Standard report can reuse.',
-         'A representative long receipt produces a readable, logo-branded, multi-page PDF with correct tables, page breaks, checksums, redactions, consent, and Enterprise enforcement.', NULL),
+         'A representative long receipt produces a readable, logo-branded, multi-page PDF with correct tables, page breaks, checksums, redactions, consent, and Enterprise enforcement.', UTC_TIMESTAMP(6)),
         ('v0.3.51', 'v0.3.51', 'Release', 'Standard Diagnostics PDF Report', 'Planned', 351,
          'Provide a shorter Enterprise support report with the most important findings and next actions.',
          'Reuse the Advanced report collection, redaction, logo branding, report metadata, pagination, checksum, authorization, review, consent, and secure local export services; include concise issue, application, Windows, listener, job, receipt thumbnail, state, warning, health, and recent-error summaries.',
@@ -1002,7 +1002,7 @@ database()->prepare(
          WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'
          WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.48'
          WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.49'
-         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/57'
+         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.50'
          WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/58'
          WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'

@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.49 — released 2026-07-24**
+**Current public release: v0.3.50 — released 2026-07-24**
 
-**Current development: v0.3.50 — Advanced Diagnostics PDF Report**
+**Current development: v0.3.51 — Standard Diagnostics PDF Report**
 
-**Next release after v0.3.49: v0.3.50 — Advanced Diagnostics PDF Report**
+**Next release after v0.3.50: v0.3.51 — Standard Diagnostics PDF Report**
 
 **Future scheduled sequence: v0.3.50 through v0.3.59**
 
-**Most recently completed: v0.3.49 — Receipt Image Sharing**
+**Most recently completed: v0.3.50 — Advanced Diagnostics PDF Report**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -90,6 +90,7 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.47 | Released | Five-Day Promotional Trial Experience |
 | v0.3.48 | Released | Settings Version Visibility and Setup Clarity |
 | v0.3.49 | Released | Receipt Image Sharing |
+| v0.3.50 | Released | Advanced Diagnostics PDF Report |
 
 ## Scheduled releases
 
@@ -769,13 +770,13 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 ### v0.3.50 — Advanced Diagnostics PDF Report
 
-**Status:** Planned
+**Status:** Released — 2026-07-24
 
 **GitHub:** [Issue #57 — Advanced Diagnostics PDF Report](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/57)
 
 **Purpose:** Give Enterprise customers and developers a single detailed, professional diagnostic document that explains a receipt problem without assembling screenshots and logs manually.
 
-**Planned scope:**
+**Released scope:**
 
 - Generate a deterministic PDF with the POS Printer Emulator application logo, product name, report format version, report identifier, creation time, application version, license tier, and privacy classification.
 - Include customer-entered issue summary, expected and actual behavior, reproduction steps, selected listener and job identifiers, and report options.
@@ -790,6 +791,8 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Security and privacy:** Collection and authorization are enforced by the local service, temporary files are bounded and cleaned, all included data is reviewed and redacted before generation, and no report is uploaded automatically.
 
 **Complete when:** A representative long receipt produces a readable, logo-branded, multi-page PDF whose sections, tables, page breaks, checksums, and redactions are correct; a modified UI cannot bypass Enterprise authorization; and rendered-page inspection plus automated tests pass.
+
+**Verification:** The React production build, Windows desktop build, complete C# test suite, dependency audit, release-version synchronization, PDF metadata inspection, sensitive-value text extraction, and rendered-page visual inspection pass. A representative multi-page report includes the application logo, embedded Poppins fonts, correct pagination and tables, and no unmasked test credentials or personal fields.
 
 ### v0.3.51 — Standard Diagnostics PDF Report
 

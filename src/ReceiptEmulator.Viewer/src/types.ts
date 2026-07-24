@@ -10,6 +10,7 @@ export type FeatureStatus = {
   support: boolean
   multipleListeners?: boolean
   receiptImages: boolean
+  diagnosticReports: boolean
 }
 
 export type ListenerSummary = {
@@ -249,6 +250,46 @@ export type SupportPackagePreview = {
 export type ConnectionDiagnosticsResponse = {
   report: ConnectionDiagnosticReport
   packagePreview: SupportPackagePreview
+}
+
+export type DiagnosticPdfRequest = {
+  jobId: string
+  issueTitle?: string
+  problemDescription?: string
+  expectedBehavior?: string
+  actualBehavior?: string
+  reproductionSteps?: string
+  additionalNotes?: string
+  supportTicketNumber?: string
+  includeReceiptImage: boolean
+  receiptImageBase64?: string
+  includeRawDataPreview: boolean
+  includeSourceIp: boolean
+  redactSensitiveData: boolean
+  consentToCreate: boolean
+}
+
+export type DiagnosticSensitiveFinding = {
+  category: string
+  location: string
+  count: number
+  treatment: string
+}
+
+export type DiagnosticPdfPreview = {
+  reportKind: 'Advanced' | 'Standard'
+  reportId: string
+  jobId: string
+  jobLabel: string
+  includedSections: string[]
+  excludedSections: string[]
+  alwaysExcluded: string[]
+  sensitiveFindings: DiagnosticSensitiveFinding[]
+  redactionEnabled: boolean
+  requiresConsent: boolean
+  receiptImageTreatment: string
+  rawDataTreatment: string
+  estimatedSizeBytes: number
 }
 
 export type BackupPreferences = {

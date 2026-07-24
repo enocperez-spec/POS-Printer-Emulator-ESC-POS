@@ -50,7 +50,7 @@ import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
 import { BackupRestoreSettings } from './BackupRestoreSettings'
 import { TrialOnboarding } from './TrialOnboarding'
-import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, JobSummary, PrinterListener, PromotionOfferStatus, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, PrinterListener, PromotionOfferStatus, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 const trialOnboardingStorageKey = 'pos-printer-emulator-trial-onboarding-v2'
@@ -59,13 +59,13 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.49',
+  version: '0.3.50',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
     maintenance: { isApplicable: false, isActive: false, isGrandfathered: false, state: 'NotApplicable', message: 'Annual maintenance is included for one year with a paid license purchase.' },
     promotion: { isApplicable: true, isActive: false, state: 'None', message: 'No promotional access is installed.' },
-    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false, receiptImages: false },
+    features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false, receiptImages: false, diagnosticReports: false },
   },
 }
 
@@ -521,6 +521,7 @@ function App() {
           onListenersChanged={setListeners}
           preferences={{ theme, activityCollapsed, inspectorCollapsed }}
           onPreferencesRestored={applyRestoredPreferences}
+          selectedJobId={selectedId}
           onClose={() => setSettingsSection(undefined)}
           onActivated={license => {
             setStatus(current => ({ ...current, license }))
@@ -1095,7 +1096,7 @@ function ReceiptPaper({ lines, watermark, storedGraphics, paperWidthMm, articleR
   )
 }
 
-function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, listeners, onStoredGraphicsChanged, onListenersChanged, preferences, onPreferencesRestored, onClose, onActivated }: {
+function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, storedGraphics, listeners, onStoredGraphicsChanged, onListenersChanged, preferences, onPreferencesRestored, selectedJobId, onClose, onActivated }: {
   status: ServiceStatus
   initialSection: SettingsSection
   updateStatus?: UpdateStatus
@@ -1106,6 +1107,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   onListenersChanged: (listeners: PrinterListener[]) => void
   preferences: BackupPreferences
   onPreferencesRestored: (preferences: BackupPreferences) => Promise<void>
+  selectedJobId?: string
   onClose: () => void
   onActivated: (license: ServiceStatus['license']) => void
 }) {
@@ -1162,7 +1164,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
             {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}
             {section === 'backup' && <BackupRestoreSettings license={status.license} preferences={preferences} onRestored={onPreferencesRestored} />}
             {section === 'updates' && features.updates && <UpdatesSettings status={status} updateStatus={updateStatus} onCheckUpdates={onCheckUpdates} />}
-            {section === 'support' && <SupportSettings status={status} onOpenPrinterWizard={() => setSection('printer')} />}
+            {section === 'support' && <SupportSettings status={status} selectedJobId={selectedJobId} onOpenPrinterWizard={() => setSection('printer')} />}
           </div>
         </div>
       </section>
@@ -1484,7 +1486,7 @@ function UpdatesSettings({ status, updateStatus, onCheckUpdates }: {
   )
 }
 
-function SupportSettings({ status, onOpenPrinterWizard }: { status: ServiceStatus; onOpenPrinterWizard: () => void }) {
+function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { status: ServiceStatus; selectedJobId?: string; onOpenPrinterWizard: () => void }) {
   const maintenance = status.license.maintenance
   const assistedSupport = maintenance.isActive
   const [showForm, setShowForm] = useState(false)
@@ -1501,8 +1503,31 @@ function SupportSettings({ status, onOpenPrinterWizard }: { status: ServiceStatu
   const [packagePreview, setPackagePreview] = useState<SupportPackagePreview>()
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false)
   const [diagnosticMessage, setDiagnosticMessage] = useState<string>()
+  const diagnosticReportsAllowed = status.license.features.diagnosticReports === true
+  const [showAdvancedPdf, setShowAdvancedPdf] = useState(false)
+  const [pdfRequest, setPdfRequest] = useState<DiagnosticPdfRequest>({
+    jobId: selectedJobId ?? '',
+    issueTitle: '',
+    problemDescription: '',
+    expectedBehavior: '',
+    actualBehavior: '',
+    reproductionSteps: '',
+    additionalNotes: '',
+    supportTicketNumber: '',
+    includeReceiptImage: true,
+    includeRawDataPreview: false,
+    includeSourceIp: false,
+    redactSensitiveData: true,
+    consentToCreate: false,
+  })
+  const [pdfPreview, setPdfPreview] = useState<DiagnosticPdfPreview>()
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfMessage, setPdfMessage] = useState<string>()
 
   useEffect(() => { api.supportRequestDrafts().then(setDrafts).catch(() => undefined) }, [])
+  useEffect(() => {
+    setPdfRequest(current => current.jobId || !selectedJobId ? current : { ...current, jobId: selectedJobId })
+  }, [selectedJobId])
 
   async function reviewRequest(event: FormEvent) {
     event.preventDefault(); setBusy(true); setMessage(undefined)
@@ -1568,6 +1593,59 @@ function SupportSettings({ status, onOpenPrinterWizard }: { status: ServiceStatu
     await navigator.clipboard.writeText(summary); setDiagnosticMessage('The support summary was copied.')
   }
 
+  function updatePdf<K extends keyof DiagnosticPdfRequest>(key: K, value: DiagnosticPdfRequest[K]) {
+    setPdfRequest(current => ({ ...current, [key]: value, consentToCreate: false }))
+    setPdfPreview(undefined)
+    setPdfMessage(undefined)
+  }
+
+  async function receiptPreviewBase64() {
+    const receipt = document.querySelector<HTMLElement>('.receipt-paper')
+    if (!receipt) return undefined
+    const width = Math.ceil(receipt.scrollWidth)
+    const height = Math.ceil(receipt.scrollHeight)
+    if (width <= 0 || height <= 0 || width > 16_000 || height > 16_000 || width * height > 24_000_000)
+      throw new Error('The selected receipt is too large to include in a diagnostic PDF.')
+    const blob = await toBlob(receipt, {
+      backgroundColor: '#ffffff',
+      width,
+      height,
+      pixelRatio: Math.min(2, window.devicePixelRatio || 1),
+      cacheBust: true,
+    })
+    if (!blob) throw new Error('The selected receipt preview could not be rendered.')
+    return blobToBase64(blob)
+  }
+
+  async function reviewAdvancedPdf(event: FormEvent) {
+    event.preventDefault()
+    if (!diagnosticReportsAllowed) { setPdfMessage('Advanced Diagnostic PDF Reports require an Enterprise License.'); return }
+    if (!pdfRequest.jobId) { setPdfMessage('Select a receipt job on the main page before creating a diagnostic report.'); return }
+    setPdfBusy(true); setPdfMessage(undefined)
+    try {
+      const receiptImageBase64 = pdfRequest.includeReceiptImage ? await receiptPreviewBase64() : undefined
+      const candidate = { ...pdfRequest, receiptImageBase64, consentToCreate: false }
+      setPdfRequest(candidate)
+      setPdfPreview(await api.previewAdvancedDiagnosticPdf(candidate))
+    } catch (error) {
+      setPdfMessage(error instanceof Error ? error.message : 'The diagnostic report could not be reviewed.')
+    } finally { setPdfBusy(false) }
+  }
+
+  async function createAdvancedPdf() {
+    if (!pdfPreview || !pdfRequest.consentToCreate) return
+    setPdfBusy(true); setPdfMessage(undefined)
+    try {
+      const blob = await api.createAdvancedDiagnosticPdf({ ...pdfRequest, consentToCreate: true })
+      saveDownload(blob, `POS-Printer-Emulator-Advanced-Diagnostics-${pdfPreview.reportId}.pdf`)
+      setPdfMessage('Advanced Diagnostics PDF created. Review the saved report before sharing it.')
+      setPdfPreview(undefined)
+      setShowAdvancedPdf(false)
+    } catch (error) {
+      setPdfMessage(error instanceof Error ? error.message : 'The Advanced Diagnostics PDF could not be created.')
+    } finally { setPdfBusy(false) }
+  }
+
   async function addAttachments(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? [])
     event.target.value = ''
@@ -1610,6 +1688,64 @@ function SupportSettings({ status, onOpenPrinterWizard }: { status: ServiceStatu
           <div className="support-package-actions"><button type="button" onClick={copySupportSummary}>Copy Support Summary</button><a className="primary-action" href={`/api/support/connection-diagnostics/package/${encodeURIComponent(diagnostics.packageId)}`} download><Download size={16} /> Save Support Package</a><a href="/api/support/diagnostics" download>Download legacy text log</a></div>
           {packagePreview && <details className="support-package-preview"><summary>Preview Support Package contents</summary><p><strong>Package ID:</strong> {packagePreview.packageId}</p><h4>Files</h4><ul>{packagePreview.files.map(file => <li key={file.fileName}><code>{file.fileName}</code><span>{file.description}</span></li>)}</ul><h4>Excluded by default</h4><p>{packagePreview.excludedCategories.join(', ')}.</p></details>}
         </>}
+      </section>
+      <section className="diagnostic-pdf">
+        <header>
+          <div><span>Enterprise receipt analysis</span><h3>Diagnostic PDF Reports</h3><p>Create a privacy-reviewed PDF for one selected receipt job. The application logo, report ID, version, command analysis, configuration, warnings, integrity checks, and redaction manifest are included.</p></div>
+          <span className="enterprise-badge"><LockKeyhole size={12} /> Enterprise</span>
+        </header>
+        <div className="diagnostic-pdf-editions">
+          <article className={diagnosticReportsAllowed ? 'available' : 'locked'}>
+            <FileText size={21} />
+            <div><strong>Advanced Diagnostics PDF</strong><p>Deep command analysis, optional raw preview, listener details, environment, logs, performance data, and SHA-256 integrity.</p></div>
+            <button type="button" disabled={!diagnosticReportsAllowed || !selectedJobId} onClick={() => { setShowAdvancedPdf(value => !value); setPdfPreview(undefined); setPdfMessage(undefined) }}>
+              {showAdvancedPdf ? 'Close' : 'Create report'}
+            </button>
+          </article>
+          <article className="planned">
+            <FileText size={21} />
+            <div><strong>Standard Diagnostics PDF</strong><p>A shorter customer-friendly report built from the same privacy and rendering foundation.</p></div>
+            <span>Planned v0.3.51</span>
+          </article>
+        </div>
+        {!diagnosticReportsAllowed && <div className="enterprise-feature-message"><strong>Enterprise Feature</strong><p>Diagnostic PDF Reports expose detailed receipt, ESC/POS, configuration, and log information only after server-side license authorization.</p><a href="https://www.posprinteremulator.com/pricing.html" target="_blank" rel="noreferrer">View Enterprise features <ExternalLink size={13} /></a></div>}
+        {diagnosticReportsAllowed && !selectedJobId && <div className="diagnostic-message">Close Settings, select a receipt in Activity, then return here to create a report for that job.</div>}
+        {pdfMessage && <div className="diagnostic-message" role="status">{pdfMessage}</div>}
+        {showAdvancedPdf && diagnosticReportsAllowed && selectedJobId && !pdfPreview && <form className="diagnostic-pdf-form" onSubmit={reviewAdvancedPdf}>
+          <div className="diagnostic-pdf-form-heading"><div><span>Advanced report</span><h4>Describe the issue</h4><p>Optional fields appear near the front of the PDF. Empty fields are shown as “Not provided.”</p></div><code>{selectedJobId}</code></div>
+          <label className="wide">Issue title<input maxLength={160} value={pdfRequest.issueTitle} onChange={event => updatePdf('issueTitle', event.target.value)} placeholder="Example: Receipt logo is missing" /></label>
+          <label className="wide">Problem description<textarea rows={4} maxLength={8000} value={pdfRequest.problemDescription} onChange={event => updatePdf('problemDescription', event.target.value)} /></label>
+          <label>Expected behavior<textarea rows={3} maxLength={4000} value={pdfRequest.expectedBehavior} onChange={event => updatePdf('expectedBehavior', event.target.value)} /></label>
+          <label>Actual behavior<textarea rows={3} maxLength={4000} value={pdfRequest.actualBehavior} onChange={event => updatePdf('actualBehavior', event.target.value)} /></label>
+          <label className="wide">Reproduction steps<textarea rows={3} maxLength={6000} value={pdfRequest.reproductionSteps} onChange={event => updatePdf('reproductionSteps', event.target.value)} /></label>
+          <label>Support ticket number<input maxLength={80} value={pdfRequest.supportTicketNumber} onChange={event => updatePdf('supportTicketNumber', event.target.value)} /></label>
+          <label>Additional notes<textarea rows={3} maxLength={4000} value={pdfRequest.additionalNotes} onChange={event => updatePdf('additionalNotes', event.target.value)} /></label>
+          <div className="diagnostic-pdf-options wide">
+            <label><input type="checkbox" checked={pdfRequest.includeReceiptImage} onChange={event => updatePdf('includeReceiptImage', event.target.checked)} /><span><strong>Include rendered receipt image</strong><small>Automatically omitted when sensitive data is detected while redaction is enabled.</small></span></label>
+            <label><input type="checkbox" checked={pdfRequest.includeRawDataPreview} onChange={event => updatePdf('includeRawDataPreview', event.target.checked)} /><span><strong>Include shortened raw-data preview</strong><small>With redaction enabled, the report includes only a masked decoded preview—not reconstructable bytes.</small></span></label>
+            <label><input type="checkbox" checked={pdfRequest.includeSourceIp} onChange={event => updatePdf('includeSourceIp', event.target.checked)} /><span><strong>Include source network address</strong><small>Non-local addresses remain masked when redaction is enabled.</small></span></label>
+            <label className={pdfRequest.redactSensitiveData ? 'recommended' : 'danger'}><input type="checkbox" checked={pdfRequest.redactSensitiveData} onChange={event => updatePdf('redactSensitiveData', event.target.checked)} /><span><strong>Redact sensitive data</strong><small>{pdfRequest.redactSensitiveData ? 'Recommended and enabled by default.' : 'Warning: the report may contain private receipt or network information.'}</small></span></label>
+          </div>
+          <div className="privacy-callout wide"><LockKeyhole size={17} /><p>Activation keys, passwords, API keys, tokens, cookies, customer registration details, Windows identity, and unrelated receipt jobs are always excluded.</p></div>
+          <div className="support-form-actions wide"><button type="button" onClick={() => setShowAdvancedPdf(false)}>Cancel</button><button className="primary-action" type="submit" disabled={pdfBusy}>{pdfBusy ? 'Analyzing…' : 'Review report contents'}</button></div>
+        </form>}
+        {pdfPreview && <section className="diagnostic-pdf-preview">
+          <div className="diagnostic-pdf-form-heading"><div><span>Consent required</span><h4>Review before creating the PDF</h4><p>No information is uploaded. The PDF is generated locally and saved only where you choose.</p></div><code>{pdfPreview.reportId}</code></div>
+          <dl>
+            <div><dt>Selected job</dt><dd>{pdfPreview.jobLabel}</dd></div>
+            <div><dt>Estimated size</dt><dd>{formatBytes(pdfPreview.estimatedSizeBytes)}</dd></div>
+            <div><dt>Receipt image</dt><dd>{pdfPreview.receiptImageTreatment}</dd></div>
+            <div><dt>Raw data</dt><dd>{pdfPreview.rawDataTreatment}</dd></div>
+          </dl>
+          <div className="diagnostic-pdf-review-grid">
+            <div><strong>Included sections</strong><ul>{pdfPreview.includedSections.map(item => <li key={item}>{item}</li>)}</ul></div>
+            <div><strong>Excluded or masked</strong><ul>{[...pdfPreview.excludedSections, ...pdfPreview.alwaysExcluded].map(item => <li key={item}>{item}</li>)}</ul></div>
+          </div>
+          <div className="sensitive-findings"><strong>Sensitive-data scan</strong>{pdfPreview.sensitiveFindings.length === 0 ? <p>No common patterns were detected. Manual review is still required.</p> : pdfPreview.sensitiveFindings.map(finding => <article key={`${finding.category}-${finding.location}`}><span>{finding.count}</span><div><strong>{finding.category}</strong><p>{finding.location} · {finding.treatment}</p></div></article>)}</div>
+          {!pdfPreview.redactionEnabled && <div className="diagnostic-pdf-warning"><AlertTriangle size={17} /><p>Redaction is disabled. The exported report may expose receipt contents or network information. Share it only through a trusted private channel.</p></div>}
+          <label className="support-consent"><input type="checkbox" checked={pdfRequest.consentToCreate} onChange={event => setPdfRequest(current => ({ ...current, consentToCreate: event.target.checked }))} /><span>I reviewed the included and excluded information and consent to create this local diagnostic PDF.</span></label>
+          <div className="support-form-actions"><button type="button" onClick={() => { setPdfPreview(undefined); setPdfRequest(current => ({ ...current, consentToCreate: false })) }}>Back</button><button className="primary-action" type="button" disabled={pdfBusy || !pdfRequest.consentToCreate} onClick={createAdvancedPdf}><Download size={15} /> {pdfBusy ? 'Creating PDF…' : 'Create Advanced PDF'}</button></div>
+        </section>}
       </section>
       <div className="settings-actions support-actions">
         <button className="primary-action" type="button" disabled={!assistedSupport} title={!assistedSupport ? 'Requires active Application Maintenance and Support' : undefined} onClick={() => setShowForm(value => !value)}><LifeBuoy size={16} /> Submit a Support Request</button>

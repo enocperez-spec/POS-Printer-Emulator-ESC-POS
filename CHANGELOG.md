@@ -4,6 +4,17 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.50 — 2026-07-24
+
+- Adds an Enterprise-only Advanced Diagnostics PDF report under Settings > Support.
+- Produces a professional, application-logo-branded report containing report identity, issue narrative, receipt preview, comprehensive parsed ESC/POS command analysis, bounded raw-data evidence, job and listener state, environment and performance details, warnings, relevant logs, privacy manifest, and SHA-256 integrity value.
+- Uses one shared diagnostics document and rendering pipeline designed for reuse by the shorter Standard report.
+- Shows exactly what will be included, excluded, or masked and requires explicit customer consent before a local PDF is created.
+- Masks common personal, payment-card, transaction, network, credential, username, and filesystem-path data by default while always excluding activation keys, passwords, tokens, cookies, provider credentials, and private signing material.
+- Omits receipt imagery automatically when the sensitive-data scan finds content that cannot be safely masked at the pixel level.
+- Enforces Enterprise authorization through the local service API, limits untrusted content and embedded image sizes, and never uploads a diagnostic report automatically.
+- Embeds the Poppins typeface and POS Printer Emulator logo for consistent, readable output without requiring separately installed fonts.
+
 ## v0.3.49 — 2026-07-24
 
 - Adds **Image → Copy Receipt as Image** for Lite, Pro, and Enterprise customers.

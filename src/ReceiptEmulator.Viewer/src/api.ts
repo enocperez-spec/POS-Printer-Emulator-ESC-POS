@@ -1,4 +1,4 @@
-import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionEntitlementRequest, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionEntitlementRequest, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -128,6 +128,12 @@ export const api = {
   }),
   refreshMaintenance: () => json<MaintenanceRefreshResult>('/api/license/maintenance/refresh', { method: 'POST' }),
   runConnectionDiagnostics: () => json<ConnectionDiagnosticsResponse>('/api/support/connection-diagnostics', { method: 'POST' }),
+  previewAdvancedDiagnosticPdf: (input: DiagnosticPdfRequest) => json<DiagnosticPdfPreview>('/api/support/diagnostic-pdf/advanced/preview', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
+  createAdvancedDiagnosticPdf: (input: DiagnosticPdfRequest) => download('/api/support/diagnostic-pdf/advanced', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  }),
   restartDiagnosticListener: (id: string) => json<PrinterListener>(`/api/support/connection-diagnostics/listeners/${encodeURIComponent(id)}/restart`, { method: 'POST' }),
   previewSupportRequest: (input: SupportRequestInput) => json<SupportRequestPreview>('/api/support/requests/preview', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
