@@ -976,6 +976,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
   const updatesLockedTitle = status.license.isPaid
     ? 'Renew Application Maintenance and Support to check for updates'
     : lockedTitle
+  const applicationVersion = status.version.startsWith('v') ? status.version : `v${status.version}`
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -986,15 +987,21 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
         </header>
         <div className="settings-layout">
           <nav className="settings-nav" aria-label="Settings sections">
-            <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
-            <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>{printerWizardLabel}</span><ChevronRight size={15} /></button>
-            <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{multipleListenersEnabled ? <ChevronRight size={15} /> : <span className="pro-lock">1 included</span>}</button>
-            <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
-            <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
-            <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
-            <button className={section === 'backup' ? 'active' : ''} onClick={() => setSection('backup')}><DatabaseBackup size={18} /><span>Backup &amp; Restore</span><ChevronRight size={15} /></button>
-            <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? updatesLockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />{status.license.isPaid ? 'Renew' : 'Lite'}</span>}</button>
-            <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
+            <div className="settings-nav-items">
+              <button className={section === 'license' ? 'active' : ''} onClick={() => setSection('license')}><KeyRound size={18} /><span>License</span><ChevronRight size={15} /></button>
+              <button className={section === 'printer' ? 'active' : ''} onClick={() => setSection('printer')}><Printer size={18} /><span>{printerWizardLabel}</span><ChevronRight size={15} /></button>
+              <button className={section === 'listeners' ? 'active' : ''} onClick={() => setSection('listeners')}><Network size={18} /><span>Printer Listeners</span>{multipleListenersEnabled ? <ChevronRight size={15} /> : <span className="pro-lock">1 included</span>}</button>
+              <button className={section === 'profiles' ? 'active' : ''} onClick={() => setSection('profiles')} disabled={!features.printerProfiles} title={!features.printerProfiles ? lockedTitle : undefined}><SlidersHorizontal size={18} /><span>Printer Profiles</span>{features.printerProfiles ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+              <button className={section === 'logos' ? 'active' : ''} onClick={() => setSection('logos')} disabled={!features.storedLogos} title={!features.storedLogos ? lockedTitle : undefined}><ImageIcon size={18} /><span>Stored Logos</span>{features.storedLogos ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+              <button className={section === 'state' ? 'active' : ''} onClick={() => setSection('state')} disabled={!features.printerState} title={!features.printerState ? lockedTitle : undefined}><Gauge size={18} /><span>Printer State</span>{features.printerState ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />Lite</span>}</button>
+              <button className={section === 'backup' ? 'active' : ''} onClick={() => setSection('backup')}><DatabaseBackup size={18} /><span>Backup &amp; Restore</span><ChevronRight size={15} /></button>
+              <button className={section === 'updates' ? 'active' : ''} onClick={() => setSection('updates')} disabled={!features.updates} title={!features.updates ? updatesLockedTitle : undefined}><RefreshCw size={18} /><span>Check for Updates</span>{features.updates ? <ChevronRight size={15} /> : <span className="pro-lock"><LockKeyhole size={12} />{status.license.isPaid ? 'Renew' : 'Lite'}</span>}</button>
+              <button className={section === 'support' ? 'active' : ''} onClick={() => setSection('support')}><LifeBuoy size={18} /><span>Support</span><ChevronRight size={15} /></button>
+            </div>
+            <div className="settings-version" aria-label={`Application version ${applicationVersion}`} title={`POS Printer Emulator ${applicationVersion}`}>
+              <span>Version</span>
+              <strong>{applicationVersion}</strong>
+            </div>
           </nav>
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
@@ -1248,18 +1255,22 @@ function LicenseSettings({ status, onActivated }: {
       ) : null}
 
       {showActivationForm ? (
-        <form className="activation-form" onSubmit={activate}>
-          <label>Customer or company name<input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" /></label>
-          <label>Email address<input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" /></label>
-          <label className="key-field">Activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
-          {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
-          {message && <a className="download-diagnostics activation-diagnostics" href="/api/support/activation-diagnostics" download><Download size={17} /> Download Activation Diagnostics</a>}
-          <div className="settings-actions">
-            <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : status.license.isPaid ? 'Validate replacement key' : 'Validate and activate'}</button>
-            {status.license.isPaid && <button type="button" disabled={busy} onClick={() => { setChangingLicense(false); setActivationKey(''); setMessage(undefined) }}>Cancel</button>}
-          </div>
-          <p className="activation-note">A Lite, Pro, or Enterprise activation key unlocks its license level immediately without reinstalling. Any replacement key must match the customer information entered above.</p>
-        </form>
+        <details className="permanent-activation-disclosure" open={status.license.isPaid}>
+          <summary>{status.license.isPaid ? 'Change or upgrade the permanent license' : 'Already purchased? Activate a permanent license'}</summary>
+          <p>The permanent-license form is separate from the Five-Day Promotional Trial. Starting an evaluation never requires an activation key.</p>
+          <form className="activation-form" onSubmit={activate}>
+            <label>Customer or company name<input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" /></label>
+            <label>Email address<input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" /></label>
+            <label className="key-field">Purchased activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
+            {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
+            {message && <a className="download-diagnostics activation-diagnostics" href="/api/support/activation-diagnostics" download><Download size={17} /> Download Activation Diagnostics</a>}
+            <div className="settings-actions">
+              <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : status.license.isPaid ? 'Validate replacement key' : 'Validate and activate purchased license'}</button>
+              {status.license.isPaid && <button type="button" disabled={busy} onClick={() => { setChangingLicense(false); setActivationKey(''); setMessage(undefined) }}>Cancel</button>}
+            </div>
+            <p className="activation-note">A purchased Lite, Pro, or Enterprise activation key unlocks its permanent license level immediately without reinstalling. Any replacement key must match the customer information entered above.</p>
+          </form>
+        </details>
       ) : null}
     </div>
   )

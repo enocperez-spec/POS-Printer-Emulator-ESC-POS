@@ -560,6 +560,51 @@ function migrate_five_day_promotional_trial_schedule(): void
 
 migrate_five_day_promotional_trial_schedule();
 
+function migrate_settings_version_visibility_schedule(): void
+{
+    $pdo = database();
+    $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (?)');
+        $claim->execute(['settings-version-visibility-v0.3.48']);
+        if ($claim->rowCount() === 0) {
+            $pdo->commit();
+            return;
+        }
+
+        // Reserve v0.3.48 for the customer-facing troubleshooting and setup
+        // clarity release without discarding any previously planned scope.
+        for ($old = 55; $old >= 48; $old--) {
+            $new = $old + 1;
+            $pdo->exec("UPDATE development_roadmap SET item_key='v0.3.{$new}', version_label='v0.3.{$new}', priority_rank=3{$new} WHERE item_key='v0.3.{$old}' AND status='Planned'");
+        }
+
+        $pdo->exec(
+            "UPDATE development_bugs
+             SET target_release = CASE target_release
+                     WHEN 'v0.3.48' THEN 'v0.3.49' WHEN 'v0.3.49' THEN 'v0.3.50'
+                     WHEN 'v0.3.50' THEN 'v0.3.51' WHEN 'v0.3.51' THEN 'v0.3.52'
+                     WHEN 'v0.3.52' THEN 'v0.3.53' WHEN 'v0.3.53' THEN 'v0.3.54'
+                     WHEN 'v0.3.54' THEN 'v0.3.55' WHEN 'v0.3.55' THEN 'v0.3.56'
+                     ELSE target_release END,
+                 fixed_version = CASE fixed_version
+                     WHEN 'v0.3.48' THEN 'v0.3.49' WHEN 'v0.3.49' THEN 'v0.3.50'
+                     WHEN 'v0.3.50' THEN 'v0.3.51' WHEN 'v0.3.51' THEN 'v0.3.52'
+                     WHEN 'v0.3.52' THEN 'v0.3.53' WHEN 'v0.3.53' THEN 'v0.3.54'
+                     WHEN 'v0.3.54' THEN 'v0.3.55' WHEN 'v0.3.55' THEN 'v0.3.56'
+                     ELSE fixed_version END
+             WHERE target_release BETWEEN 'v0.3.48' AND 'v0.3.55'
+                OR fixed_version BETWEEN 'v0.3.48' AND 'v0.3.55'"
+        );
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
+    }
+}
+
+migrate_settings_version_visibility_schedule();
+
 function mark_customer_crm_release_in_progress(): void
 {
     $pdo = database();
@@ -660,12 +705,12 @@ $releaseSync = database()->prepare(
          'Versioned and reopenable two-step welcome guide; wizard-first instruction; visible read-only included listener; local and LAN IPv4 endpoints; copyable RAW TCP details; and retained server-side mutation denial.',
          'The v0.3.37 guide could remain dismissed and hid the included listener behind an upgrade panel, leaving customers unsure how to connect.',
          'Fresh and upgraded Trial installations see and can reopen the guide, view one locked listener, copy exact connection details, and receive HTTP 403 for listener mutations.', UTC_TIMESTAMP(6)),
-        ('v0.3.55', 'v0.3.55', 'Release', 'Update Notifications for All License Types', 'Planned', 355,
+        ('v0.3.56', 'v0.3.56', 'Release', 'Update Notifications for All License Types', 'Planned', 356,
          'Notify every license tier about newer public desktop releases even when paid maintenance has expired.',
          'Public release notification checks for Trial, Lite, Pro, and Enterprise; installed and latest versions; eligible releases-behind count; concise update summary; accessible visual indicator; Trial manual-download action; active-maintenance guided update; expired-maintenance release and renewal guidance; offline cache; rate limiting; and trusted-link enforcement.',
          'Update awareness should be universal while in-app installation continues to honor maintenance entitlements.',
          'Every license state receives accurate non-blocking notifications, Trial opens the official download page, active-maintenance paid users can install in-app, expired-maintenance users cannot bypass renewal, and privacy, offline, counting, and trust tests pass.', NULL),
-        ('v0.3.54', 'v0.3.54', 'Release', 'Receipt comparison and automated validation', 'Planned', 354,
+        ('v0.3.55', 'v0.3.55', 'Release', 'Receipt comparison and automated validation', 'Planned', 355,
          'Provide repeatable compatibility and regression testing.',
          'Compare bytes, commands, text, warnings, and rendered output, with saved baselines, ignored dynamic fields, validation suites, and privacy-safe HTML, PDF, and JSON results.',
          'Projects, privacy masking, encoding diagnostics, and update recovery provide safer foundations for comparison suites.',
@@ -715,32 +760,37 @@ $releaseSync = database()->prepare(
          'Edition selection; verified-customer eligibility; privacy-preserving installation identity; signed automatic activation; eligible, activating, active, expired, used, and offline states; exact five-day countdown; purchase actions; safe prior-license restoration; and server-side idempotency, uniqueness, and anti-repeat controls.',
          'The verified customer and promotional entitlement foundations should become a clear desktop workflow before more configuration screens are added.',
          'Each edition activates correctly without key entry, the active and expired states are accurate, prior ownership is restored, and reinstall, deletion, clock rollback, retries, concurrency, alternate installations, or cross-edition requests cannot create or extend another promotion.', UTC_TIMESTAMP(6)),
-        ('v0.3.48', 'v0.3.48', 'Release', 'Automatic configuration restore points', 'Planned', 348,
+        ('v0.3.48', 'v0.3.48', 'Release', 'Settings Version Visibility and Setup Clarity', 'Released', 348,
+         'Make troubleshooting screenshots self-identifying and separate automatic evaluation from purchased-license activation.',
+         'Persistent build-derived Settings version; clearly separated permanent-license entry; corrected Customer Portal verification action; and desktop shortcut selected by default during setup.',
+         'Customers and support staff need to identify the installed release immediately, and evaluation customers must not be asked for an activation key.',
+         'Every Settings section shows the running version, one-click evaluation remains keyless, verification opens the live Customer Portal, and setup creates a desktop shortcut unless the customer opts out.', UTC_TIMESTAMP(6)),
+        ('v0.3.49', 'v0.3.49', 'Release', 'Automatic configuration restore points', 'Planned', 349,
          'Protect customers from accidental configuration loss without requiring manual backups.',
          'Encrypted restore points before material configuration changes; optional schedules; bounded retention; content and integrity preview; transactional restore; safety snapshots; rollback; storage controls; and protected local storage.',
          'Recovery protection should precede projects and additional customer configuration complexity.',
          'Customers recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or license loss.', NULL),
-        ('v0.3.49', 'v0.3.49', 'Release', 'Projects and testing sessions', 'Planned', 349,
+        ('v0.3.50', 'v0.3.50', 'Release', 'Projects and testing sessions', 'Planned', 350,
          'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
          'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
          'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.',
          'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
-        ('v0.3.50', 'v0.3.50', 'Release', 'Privacy-safe receipt masking', 'Planned', 350,
+        ('v0.3.51', 'v0.3.51', 'Release', 'Privacy-safe receipt masking', 'Planned', 351,
          'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
          'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.',
          'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
-        ('v0.3.51', 'v0.3.51', 'Release', 'System tray health and notifications', 'Planned', 351,
+        ('v0.3.52', 'v0.3.52', 'Release', 'System tray health and notifications', 'Planned', 352,
          'Keep customers informed about important listener events without leaving the main window open.',
          'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
          'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.',
          'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
-        ('v0.3.52', 'v0.3.52', 'Release', 'Character and code-page assistant', 'Planned', 352,
+        ('v0.3.53', 'v0.3.53', 'Release', 'Character and code-page assistant', 'Planned', 353,
          'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
          'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.',
          'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.',
          'Known mojibake fixtures produce the correct diagnosis and deterministic preview without modifying original capture bytes.', NULL),
-        ('v0.3.53', 'v0.3.53', 'Release', 'Offline Enterprise update packages', 'Planned', 353,
+        ('v0.3.54', 'v0.3.54', 'Release', 'Offline Enterprise update packages', 'Planned', 354,
          'Support secure updates on restricted or air-gapped POS networks.',
          'Portable installer package with manifest, architecture, checksums, trusted signature, and release metadata; removable-media import; full verification; downgrade and incompatibility rejection; guided updater reuse; offline entitlement guidance; and privacy-safe audit evidence.',
          'This depends on guided updates, production signing, rollback, and entitlement foundations.',
@@ -786,7 +836,57 @@ $backlogSync = database()->prepare(
          'Organize license administration into focused views without creating separate or conflicting admin areas.',
          'Add accessible tabs for Issued Licenses, Trial Installations, and Recent License Activity; keep key generation and license actions in Issued Licenses; preserve per-tab filters, counts, deleted-license view, scroll position, direct links, and browser navigation; retain Trial verification warnings and audit disclosures; support responsive layouts and regression tests.',
          'This is a contained usability enhancement to the completed License Manager foundation. It follows higher-risk security, listener, storage, signing, entitlement, export, and compatibility work, but can be pulled forward for a short Admin Portal release.',
-         'All three sections render as accessible tabs, the active tab survives refresh and Back/Forward navigation, existing confirmations work unchanged, filters and counts remain accurate, and desktop and mobile browser tests pass.', NULL)
+         'All three sections render as accessible tabs, the active tab survives refresh and Back/Forward navigation, existing confirmations work unchanged, filters and counts remain accurate, and desktop and mobile browser tests pass.', NULL),
+        ('UPE-123', NULL, 'Backlog', 'Device and Listener Health Dashboard', 'Planned', 1123,
+         'Give customers one clear view of the health of every registered computer and printer listener.',
+         'Show computer online status, installed version, listener names and ports, last successful print job, recent connection warnings, and Maintenance and Support eligibility.',
+         'User Portal Enhancement. This provides the highest immediate customer and support value by exposing operational health without opening the desktop application.',
+         'Customers can identify offline, outdated, or faulted computers and listeners from accurate, privacy-safe portal data.', NULL),
+        ('UPE-124', NULL, 'Backlog', 'Guided Setup Wizard', 'Planned', 1124,
+         'Guide customers from account login to a verified working POS connection.',
+         'Select a POS or generic ESC/POS profile, choose TCP/IP settings, test connectivity, send a test receipt, confirm rendering, and download a configuration summary.',
+         'User Portal Enhancement. Guided setup reduces configuration mistakes and shortens time to the first successful receipt.',
+         'A customer can complete the supported setup flow and verify a receipt without guessing listener or port settings.', NULL),
+        ('UPE-125', NULL, 'Backlog', 'Diagnostic Package and Support Integration', 'Planned', 1125,
+         'Let customers attach privacy-reviewed diagnostic evidence directly to a support request.',
+         'Collect application version, listener configuration, operating-system details, and relevant errors while excluding receipt contents, full activation keys, credentials, and unnecessary personal data.',
+         'User Portal Enhancement. Structured diagnostic packages reduce support time while preserving customer privacy.',
+         'Customers can preview and submit a redacted diagnostic package, and support staff can retrieve it only through authorized workflows.', NULL),
+        ('UPE-126', NULL, 'Backlog', 'Active Sessions and Security History', 'Planned', 1126,
+         'Give customers visibility and control over Customer Portal access.',
+         'List active and recent sessions with browser, approximate location, IP-derived security context, login time, idle time, and security events; allow remote sign-out without exposing session secrets.',
+         'User Portal Enhancement. Session visibility and revocation strengthen account security and help customers recognize unfamiliar access.',
+         'Customers can review account activity and terminate other sessions, with every security action recorded and notified appropriately.', NULL),
+        ('UPE-127', NULL, 'Backlog', 'License Transfer Wizard', 'Planned', 1127,
+         'Provide a controlled self-service process for moving a license to another computer.',
+         'Select the old computer, verify identity and eligibility, deactivate the installation, confirm the transfer, show installation instructions, and record the complete transfer history.',
+         'User Portal Enhancement. A guided transfer reduces manual support work without weakening activation limits.',
+         'Eligible customers can transfer a license once under enforced limits, while duplicate, unauthorized, or replayed transfers are rejected and audited.', NULL),
+        ('UPE-128', NULL, 'Backlog', 'Enterprise Team Management', 'Planned', 1128,
+         'Allow Enterprise organizations to share portal responsibilities safely.',
+         'Invite and remove users; assign Owner, Administrator, Technician, Billing, and Read Only roles; enforce least privilege, MFA policy, and organization-scoped audit history.',
+         'User Portal Enhancement. Enterprise customers need delegated access without sharing one account or exposing unrelated controls.',
+         'Each role can perform only its authorized actions, ownership transfers are protected, and organization access is fully auditable.', NULL),
+        ('UPE-129', NULL, 'Backlog', 'Customer Notification Center', 'Planned', 1129,
+         'Centralize important customer notices inside the portal.',
+         'Display software updates, maintenance reminders, security alerts, purchase confirmations, support responses, and license changes with read state, priority, expiration, and destination links.',
+         'User Portal Enhancement. An in-portal inbox reduces dependence on email delivery and keeps actionable notices discoverable.',
+         'Customers receive each eligible notification once, can mark it read, and can open the correct secure destination without exposing sensitive content.', NULL),
+        ('UPE-130', NULL, 'Backlog', 'Release and Update Center', 'Planned', 1130,
+         'Turn Downloads into a complete entitlement-aware software release center.',
+         'Show release notes, release date, installed and latest versions, known issues, eligible previous versions, Maintenance and Support eligibility, and trusted download or renewal actions.',
+         'User Portal Enhancement. A consistent update center helps customers understand what they can install and why.',
+         'The portal offers only entitled, integrity-verified installers and accurately explains current, available, behind, and renewal-required states.', NULL),
+        ('UPE-131', NULL, 'Backlog', 'Purchase and Billing History', 'Released', 1131,
+         'Give customers a complete financial record of their product ownership.',
+         'Show purchases, upgrades, maintenance renewals, payment status, license association, downloadable receipts, and transaction references without exposing sensitive payment credentials.',
+         'User Portal Enhancement. Clear billing history reduces purchase confusion and supports customer recordkeeping.',
+         'Customers can reconcile every completed or pending transaction with the correct license and download a consistent receipt.', '2026-07-24 00:00:00.000000'),
+        ('UPE-132', NULL, 'Backlog', 'Portal Activity Timeline', 'Planned', 1132,
+         'Present important account, license, device, purchase, support, and security events in one chronological view.',
+         'Provide filterable events for activations, transfers, downloads, purchases, renewals, support requests, password and MFA changes, and administrative actions visible to the customer.',
+         'User Portal Enhancement. A unified timeline makes account changes understandable and improves troubleshooting and trust.',
+         'Customers can filter and review accurate, privacy-safe events while protected secrets and internal-only administrative details remain hidden.', NULL)
      ON DUPLICATE KEY UPDATE
         version_label = VALUES(version_label), item_type = VALUES(item_type), title = VALUES(title),
         priority_rank = VALUES(priority_rank), purpose = VALUES(purpose),
@@ -839,14 +939,15 @@ database()->prepare(
          WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.45'
          WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'
          WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'
-         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
-         WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
-         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
-         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
-         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
-         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
-         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
-         WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
+         WHEN 'v0.3.48' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.48'
+         WHEN 'v0.3.49' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
+         WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
+         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
+         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
+         WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
+         WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -854,7 +955,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -1156,7 +1257,7 @@ function lines(string $value): array
 <?php endforeach; ?></div></section>
 <section class="tracker-section"><div class="section-heading"><div><span class="eyebrow backlog">Prioritized</span><h2>Future backlog</h2></div><p>Version numbers are assigned after the order is approved.</p></div><div class="roadmap-list backlog-list">
 <?php foreach ($roadmap as $item): if ($item['item_type'] !== 'Backlog') continue; ?>
-<article class="roadmap-card"><header><div><span class="item-key">Priority <?= (int)$item['priority_rank'] - 1000 ?></span><h3><?= e($item['title']) ?></h3></div><span class="tracker-status <?= e(strtolower(str_replace(' ', '-', $item['status']))) ?>"><?= e($item['status']) ?></span></header><p class="purpose"><?= e($item['purpose']) ?></p><details><summary>Detailed scope and priority reason</summary><h4>Proposed scope</h4><ul><?php foreach (lines($item['planned_scope']) as $line): ?><li><?= e($line) ?></li><?php endforeach; ?></ul><h4>Why this priority</h4><p><?= e($item['priority_reason']) ?></p><h4>Complete when</h4><p><?= e($item['completion_criteria']) ?></p></details><form method="post" class="status-form"><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="update-roadmap"><input type="hidden" name="id" value="<?= (int)$item['id'] ?>"><label>Status<select name="status"><?php foreach ($roadmapStatuses as $status): ?><option <?= $item['status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option><?php endforeach; ?></select></label><button type="submit">Save status</button></form></article>
+<article class="roadmap-card"><header><div><span class="item-key"><?= e((string)$item['item_key']) ?></span><?php if (str_starts_with((string)$item['item_key'], 'UPE-')): ?><span class="eyebrow backlog">User Portal Enhancement</span><?php else: ?><span class="eyebrow backlog">Priority <?= (int)$item['priority_rank'] - 1000 ?></span><?php endif; ?><h3><?= e($item['title']) ?></h3></div><span class="tracker-status <?= e(strtolower(str_replace(' ', '-', $item['status']))) ?>"><?= e($item['status']) ?></span></header><p class="purpose"><?= e($item['purpose']) ?></p><details><summary>Detailed scope and priority reason</summary><h4>Proposed scope</h4><ul><?php foreach (lines($item['planned_scope']) as $line): ?><li><?= e($line) ?></li><?php endforeach; ?></ul><h4>Why this priority</h4><p><?= e($item['priority_reason']) ?></p><h4>Complete when</h4><p><?= e($item['completion_criteria']) ?></p></details><form method="post" class="status-form"><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="update-roadmap"><input type="hidden" name="id" value="<?= (int)$item['id'] ?>"><label>Status<select name="status"><?php foreach ($roadmapStatuses as $status): ?><option <?= $item['status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option><?php endforeach; ?></select></label><button type="submit">Save status</button></form></article>
 <?php endforeach; ?></div></section>
 <section class="tracker-section completed-releases"><div class="section-heading"><div><span class="eyebrow released">History</span><h2>Completed releases</h2></div><p>Detailed public notes remain in CHANGELOG.md.</p></div><div class="release-history"><?php foreach (array_reverse($roadmap) as $item): if ($item['item_type'] !== 'Release' || $item['status'] !== 'Released') continue; ?><article><span><?= e((string)$item['version_label']) ?></span><div><strong><?= e($item['title']) ?></strong><p><?= e($item['planned_scope']) ?></p></div><b>Released</b></article><?php endforeach; ?></div></section>
 
