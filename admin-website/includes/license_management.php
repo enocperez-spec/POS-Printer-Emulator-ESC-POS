@@ -3,6 +3,18 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/data_protection.php';
 
+function license_table_columns(PDO $pdo, string $table): array
+{
+    if (!preg_match('/^[a-z0-9_]+$/i', $table)) {
+        throw new InvalidArgumentException('The requested database table is invalid.');
+    }
+    $columns = [];
+    foreach ($pdo->query("SHOW COLUMNS FROM `{$table}`")->fetchAll() as $column) {
+        $columns[(string)$column['Field']] = true;
+    }
+    return $columns;
+}
+
 function ensure_license_management_schema(PDO $pdo): void
 {
     static $ready = false;
