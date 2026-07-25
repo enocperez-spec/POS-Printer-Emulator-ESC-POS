@@ -562,6 +562,65 @@ public sealed class LicenseServiceTests
     }
 
     [Fact]
+    public void AccountLicenseReportsSynchronizationOfflineGraceAndUnlinkWithoutDeletingRegistration()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var now = new DateTimeOffset(2026, 7, 25, 12, 0, 0, TimeSpan.Zero);
+        var root = NewRoot();
+        var installationId = Guid.NewGuid();
+        var service = new LicenseService(new TestEnvironment(), Configuration(root, vendorKey), () => now);
+        service.BindInstallationId(installationId);
+        var token = DeviceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            installationId,
+            LicenseTier.Pro,
+            now,
+            now.AddYears(1),
+            revision: 1);
+
+        service.BeginSynchronization();
+        service.InstallDeviceEntitlement("Account Customer", "account@example.com", token);
+        var active = service.RecordSynchronizationSuccess();
+
+        Assert.Equal("Active", active.Synchronization.State);
+        Assert.True(active.IsPaid);
+        Assert.NotNull(active.Synchronization.LastSuccessfulAt);
+
+        now = now.AddHours(2);
+        var offline = service.RecordSynchronizationFailure("The service is temporarily unavailable.");
+        Assert.Equal("ConnectionError", offline.Synchronization.State);
+        Assert.True(offline.IsPaid);
+        Assert.NotNull(offline.Synchronization.OfflineGraceEndsAt);
+
+        service.RemoveDeviceEntitlement();
+        var unlinked = service.RecordAuthoritativeState("Unlinked", "This computer is unlinked.");
+        Assert.Equal("Unlinked", unlinked.Synchronization.State);
+        Assert.False(unlinked.IsPaid);
+        Assert.Equal("Account Customer", unlinked.CustomerName);
+        Assert.Equal("account@example.com", unlinked.EmailAddress);
+        Assert.True(File.Exists(Path.Combine(root, "registration.json")));
+    }
+
+    [Fact]
+    public void UnlinkedTrialReportsConnectionErrorWithoutClaimingOfflineGraceExpired()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var service = new LicenseService(
+            new TestEnvironment(),
+            Configuration(NewRoot(), vendorKey),
+            () => new DateTimeOffset(2026, 7, 25, 12, 0, 0, TimeSpan.Zero));
+
+        service.BeginSynchronization();
+        var status = service.RecordSynchronizationFailure("The licensing service is unavailable.");
+
+        Assert.Equal("ConnectionError", status.Synchronization.State);
+        Assert.Null(status.Synchronization.OfflineGraceEndsAt);
+        Assert.False(status.IsPaid);
+    }
+
+    [Fact]
     public void PromotionPausesWhenTheSystemClockMovesBackward()
     {
         using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);

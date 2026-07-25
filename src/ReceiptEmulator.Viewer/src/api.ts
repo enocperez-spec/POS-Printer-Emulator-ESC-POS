@@ -1,4 +1,4 @@
-import type { AccountLinkStartResult, AccountLinkStatusResult, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, LicenseStatus, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { AccountLinkStartResult, AccountLinkStatusResult, AccountUnlinkResult, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, LicenseStatus, LicenseSynchronizationResult, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -114,6 +114,12 @@ export const api = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ linkId, requestToken }),
+  }),
+  synchronizeLicense: () => json<LicenseSynchronizationResult>('/api/license/synchronize', { method: 'POST' }),
+  unlinkComputer: () => json<AccountUnlinkResult>('/api/account-link/unlink', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: true }),
   }),
   promotionOffer: () => json<PromotionOfferStatus>('/api/license/promotion/offer'),
   startPromotion: (grantedTier: 'Lite' | 'Pro' | 'Enterprise') => json<PromotionStartResult>('/api/license/promotion/start', {

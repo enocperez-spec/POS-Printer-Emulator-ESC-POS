@@ -59,10 +59,11 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.54',
+  version: '0.3.55',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
+    synchronization: { state: 'Unlinked', computerName: 'This computer', deviceIdentifier: 'Pending registration', message: 'Link this computer to a verified Customer Portal account.' },
     maintenance: { isApplicable: false, isActive: false, isGrandfathered: false, state: 'NotApplicable', message: 'Annual maintenance is included for one year with a paid license purchase.' },
     promotion: { isApplicable: true, isActive: false, state: 'None', message: 'No promotional access is installed.' },
     features: { history: false, exports: false, premiumFeatures: false, watermark: true, storedLogos: false, printerState: false, printerProfiles: false, updates: false, support: false, multipleListeners: false, receiptImages: false, diagnosticReports: false },
@@ -1188,6 +1189,10 @@ function LicenseSettings({ status, onActivated }: {
   const [accountLinkBusy, setAccountLinkBusy] = useState(false)
   const [accountLinkMessage, setAccountLinkMessage] = useState<string>()
   const [accountLinkState, setAccountLinkState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
+  const [licenseSyncBusy, setLicenseSyncBusy] = useState(false)
+  const [licenseActionMessage, setLicenseActionMessage] = useState<string>()
+  const [licenseActionError, setLicenseActionError] = useState(false)
+  const [unlinkBusy, setUnlinkBusy] = useState(false)
   const onActivatedRef = useRef(onActivated)
   const [countdownNow, setCountdownNow] = useState(Date.now())
   const upgradeGuidance = status.license.mode === 'Lite'
@@ -1217,6 +1222,31 @@ function LicenseSettings({ status, onActivated }: {
       })
     return () => { cancelled = true }
   }, [status.license.promotion.isActive, status.license.promotion.isApplicable, status.license.promotion.state])
+
+  useEffect(() => {
+    let cancelled = false
+    setLicenseSyncBusy(true)
+    api.synchronizeLicense()
+      .then(result => {
+        if (cancelled) return
+        setLicenseActionError(false)
+        setLicenseActionMessage(result.message)
+        onActivatedRef.current(result.license)
+      })
+      .catch(async cause => {
+        if (cancelled) return
+        setLicenseActionError(true)
+        setLicenseActionMessage(cause instanceof Error ? cause.message : 'The account license could not be synchronized.')
+        try {
+          const current = await api.status()
+          if (!cancelled) onActivatedRef.current(current.license)
+        } catch { }
+      })
+      .finally(() => {
+        if (!cancelled) setLicenseSyncBusy(false)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     onActivatedRef.current = onActivated
@@ -1299,6 +1329,46 @@ function LicenseSettings({ status, onActivated }: {
     }
   }
 
+  async function synchronizeLicense() {
+    if (licenseSyncBusy) return
+    setLicenseSyncBusy(true)
+    setLicenseActionMessage(undefined)
+    try {
+      const result = await api.synchronizeLicense()
+      setLicenseActionError(false)
+      setLicenseActionMessage(result.message)
+      onActivated(result.license)
+    } catch (cause) {
+      setLicenseActionError(true)
+      setLicenseActionMessage(cause instanceof Error ? cause.message : 'The account license could not be synchronized.')
+      try {
+        onActivated((await api.status()).license)
+      } catch { }
+    } finally {
+      setLicenseSyncBusy(false)
+    }
+  }
+
+  async function unlinkComputer() {
+    if (unlinkBusy || !window.confirm(
+      'Unlink this computer and release its license? Local receipts, settings, and saved data will be preserved.')) return
+    setUnlinkBusy(true)
+    setLicenseActionMessage(undefined)
+    try {
+      const result = await api.unlinkComputer()
+      setLicenseActionError(false)
+      setLicenseActionMessage(result.message)
+      setAccountLink(undefined)
+      setAccountLinkState('idle')
+      onActivated(result.license)
+    } catch (cause) {
+      setLicenseActionError(true)
+      setLicenseActionMessage(cause instanceof Error ? cause.message : 'This computer could not be unlinked.')
+    } finally {
+      setUnlinkBusy(false)
+    }
+  }
+
   async function startPromotion() {
     if (!selectedPromotionTier) return
     setPromotionBusy(true)
@@ -1332,12 +1402,39 @@ function LicenseSettings({ status, onActivated }: {
 
       <div className="license-summary">
         <div><span>Status</span><strong>{status.license.promotion.isActive ? `Five-Day Trial Active · ${status.license.promotion.grantedTier}` : status.license.isPaid ? `Activated · ${status.license.mode} License` : 'Trial License'}</strong></div>
-        <div><span>Computer status</span><strong>{status.license.isPaid ? 'Linked and licensed' : 'Not linked to a paid entitlement'}</strong></div>
+        <div><span>Computer status</span><strong>{status.license.synchronization.state}</strong></div>
+        <div><span>Computer</span><strong>{status.license.synchronization.computerName}</strong></div>
+        <div><span>Secure device ID</span><strong>{status.license.synchronization.deviceIdentifier}</strong></div>
         <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
+        <div><span>Last synchronized</span><strong>{status.license.synchronization.lastSuccessfulAt ? new Date(status.license.synchronization.lastSuccessfulAt).toLocaleString() : 'Not yet synchronized'}</strong></div>
       </div>
 
-      <section className={`account-link-card is-${accountLinkState}`}>
+      {status.license.isPaid ? (
+        <section className={`account-link-card ${status.license.synchronization.state === 'Active' ? 'is-success' : ''}`}>
+          <div className="account-link-heading">
+            <div><LockKeyhole size={19} /><strong>Account License</strong></div>
+            <span>{status.license.synchronization.state}</span>
+          </div>
+          <p>{status.license.synchronization.message}</p>
+          {status.license.synchronization.offlineGraceEndsAt && status.license.synchronization.state !== 'Active' && (
+            <small>Offline access is available through {new Date(status.license.synchronization.offlineGraceEndsAt).toLocaleString()}.</small>
+          )}
+          <div className="account-link-actions">
+            <button className="account-link-primary" type="button" onClick={() => void synchronizeLicense()} disabled={licenseSyncBusy}>
+              <RefreshCw className={licenseSyncBusy ? 'spin' : ''} size={16} /> {licenseSyncBusy ? 'Synchronizing…' : 'Refresh License'}
+            </button>
+            <button type="button" onClick={() => void unlinkComputer()} disabled={unlinkBusy}>
+              {unlinkBusy ? 'Unlinking…' : 'Unlink This Computer'}
+            </button>
+          </div>
+          {licenseActionMessage && (
+            <div className={licenseActionError ? 'account-link-error' : 'account-link-success'} role={licenseActionError ? 'alert' : 'status'}>
+              {licenseActionMessage}
+            </div>
+          )}
+        </section>
+      ) : <section className={`account-link-card is-${accountLinkState}`}>
         <div className="account-link-heading">
           <div><LockKeyhole size={19} /><strong>Link This Computer</strong></div>
           <span>{accountLinkState === 'success' ? 'Linked' : accountLinkState === 'pending' ? 'Waiting for approval' : 'Recommended'}</span>
@@ -1345,7 +1442,7 @@ function LicenseSettings({ status, onActivated }: {
         <p>Connect this installation to your verified Customer Portal account, approve the computer, and choose an eligible license. No name or email matching is required.</p>
         {!accountLink || accountLinkState === 'error' ? (
           <button className="account-link-primary" type="button" onClick={() => void startAccountLink()} disabled={accountLinkBusy}>
-            <LockKeyhole size={16} /> {accountLinkBusy ? 'Starting securely…' : accountLink ? 'Start a new link' : 'Link This Computer'}
+            <LockKeyhole size={16} /> {accountLinkBusy ? 'Linking and activating…' : accountLink ? 'Start a new link' : 'Link This Computer'}
           </button>
         ) : accountLinkState === 'pending' ? (
           <>
@@ -1366,9 +1463,9 @@ function LicenseSettings({ status, onActivated }: {
             {accountLinkMessage}
           </div>
         )}
-      </section>
+      </section>}
 
-      {(status.license.promotion.isApplicable || status.license.promotion.state !== 'None') && (
+      {!status.license.isPaid && (status.license.promotion.isApplicable || status.license.promotion.state !== 'None') && (
         <section className={`maintenance-card promotion-card ${status.license.promotion.isActive ? 'is-active' : status.license.promotion.state === 'Expired' ? 'is-expired' : ''}`}>
           <div className="maintenance-heading">
             <div><FlaskConical size={18} /><strong>Five-Day Promotional Trial</strong></div>

@@ -32,7 +32,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.54 Keyless Account and Device Licensing is the current public release, released July 25, 2026.
+> **Release status:** v0.3.55 Reliable Account License Synchronization is the current public release, released July 25, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -40,7 +40,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.51-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.55-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -276,8 +276,9 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.51 — Standard Diagnostics PDF Report:** Reuse the verified report engine to create a shorter Enterprise support PDF with the most useful findings, redacted configuration, and clear next actions.
 - **v0.3.52 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
 - **Released in v0.3.53 — Account-Based License Registration and Activation:** Link a computer through a verified Customer Portal account, approve an eligible entitlement, enforce device limits, and retain auditable account-linking and transfer history.
-- **v0.3.54 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
-- **v0.3.55 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
+- **Released in v0.3.54 — Keyless Account and Device Licensing:** Apply account-owned entitlements automatically without activation keys.
+- **Released in v0.3.55 — Reliable Account License Synchronization:** Synchronize licenses at startup and in the background, apply changes without restarting, provide offline grace, and support safe computer unlinking.
+- **v0.3.62 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
 - **v0.3.56 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.
 - **v0.3.57 — Offline Enterprise update packages:** Verify and install signed portable updates on restricted or air-gapped networks.
 - **v0.3.58 — Receipt comparison and automated validation:** Compare rendered receipts, raw bytes, and parsed commands, highlight differences, and support repeatable pass/fail validation.

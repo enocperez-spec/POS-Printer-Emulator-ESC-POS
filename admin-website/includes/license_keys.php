@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function activation_tier_value(string $licenseTier): int
+function entitlement_tier_value(string $licenseTier): int
 {
     return match ($licenseTier) {
         'Pro' => 1,
@@ -19,7 +19,7 @@ function issue_maintenance_token(
     ?string $privateKeyOverride = null
 ): string {
     $licenseId = canonical_license_uuid($licenseId);
-    $tierValue = activation_tier_value($licenseTier);
+    $tierValue = entitlement_tier_value($licenseTier);
     $issuedTimestamp ??= time();
     $expiration = normalize_maintenance_expiration($maintenanceExpiresAt, $issuedTimestamp);
     $payload = chr(1)
@@ -48,8 +48,8 @@ function issue_promotion_token(
         'Installation' => 2,
         default => throw new InvalidArgumentException('The promotion subject is invalid.'),
     };
-    $previousValue = $previousTier === 'Trial' ? 0 : activation_tier_value($previousTier);
-    $grantedValue = activation_tier_value($grantedTier);
+    $previousValue = $previousTier === 'Trial' ? 0 : entitlement_tier_value($previousTier);
+    $grantedValue = entitlement_tier_value($grantedTier);
     $rank = ['Trial'=>0,'Lite'=>1,'Pro'=>2,'Enterprise'=>3];
     if (!isset($rank[$previousTier],$rank[$grantedTier]) ||
         $rank[$grantedTier] <= $rank[$previousTier] ||
@@ -85,7 +85,7 @@ function create_license_entitlement(
     if (strlen($emailAddress) > 254 || filter_var($emailAddress, FILTER_VALIDATE_EMAIL) === false) {
         throw new InvalidArgumentException('A valid email address is required.');
     }
-    activation_tier_value($licenseTier);
+    entitlement_tier_value($licenseTier);
     $issuedAt = time();
     $maintenance = normalize_maintenance_expiration($maintenanceExpiresAt, $issuedAt, false);
     return [
@@ -111,7 +111,9 @@ function issue_device_entitlement(
         throw new InvalidArgumentException('The entitlement revision is invalid.');
     }
     $issuedAt = time();
-    $validUntil = $issuedAt + 86400;
+    // A signed seven-day token keeps permanent paid features available through
+    // short outages while the desktop still checks for revocation every 15 minutes.
+    $validUntil = $issuedAt + (7 * 86400);
     $maintenance = normalize_maintenance_expiration($maintenanceExpiresAt, $issuedAt, false);
     $payload = chr(2)
         . dotnet_guid_bytes(canonical_license_uuid($licenseId))
@@ -120,7 +122,7 @@ function issue_device_entitlement(
         . pack_unix_seconds($issuedAt)
         . pack_unix_seconds($validUntil)
         . pack_unix_seconds($maintenance->getTimestamp())
-        . chr(activation_tier_value($licenseTier))
+        . chr(entitlement_tier_value($licenseTier))
         . pack_unix_seconds($revision);
     if (strlen($payload) !== 82) {
         throw new RuntimeException('The device entitlement payload has an unexpected length.');

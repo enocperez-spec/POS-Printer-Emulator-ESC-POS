@@ -106,7 +106,7 @@ function ensure_self_service_commerce_schema(PDO $pdo): void
             "CREATE TABLE IF NOT EXISTS portal_promotion_claims (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 promotion_id CHAR(36) NOT NULL,
-                claim_type ENUM('Customer','Account','License','Installation') NOT NULL,
+                claim_type ENUM('Customer','Account','License','Installation','Device') NOT NULL,
                 claim_hash BINARY(32) NOT NULL,
                 created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 PRIMARY KEY (id),
@@ -134,6 +134,10 @@ function ensure_self_service_commerce_schema(PDO $pdo): void
         foreach ($statements as $statement) {
             $pdo->exec($statement);
         }
+        $pdo->exec(
+            "ALTER TABLE portal_promotion_claims
+             MODIFY claim_type ENUM('Customer','Account','License','Installation','Device') NOT NULL"
+        );
         $checkoutColumns = crm_table_columns($pdo, 'portal_checkout_intents');
         if (isset($checkoutColumns['order_type'])) {
             $pdo->exec(

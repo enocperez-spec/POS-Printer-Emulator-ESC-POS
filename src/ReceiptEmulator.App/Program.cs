@@ -83,7 +83,23 @@ builder.Services.AddHostedService<PeriodicUpdateChecker>();
 
 var app = builder.Build();
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        var path = context.Context.Request.Path.Value ?? string.Empty;
+        if (path.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith("/", StringComparison.Ordinal))
+        {
+            context.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            return;
+        }
+        if (path.Contains("/assets/", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+        }
+    },
+});
 
 app.MapGet("/api/status", (PrinterListenerManager listeners, LicenseService license) =>
 {
@@ -866,6 +882,53 @@ app.MapPost("/api/account-link/status", async (
     catch (InvalidOperationException exception)
     {
         return Results.Problem(exception.Message, statusCode: 400);
+    }
+});
+
+app.MapPost("/api/license/synchronize", async (
+    AccountLinkService accountLink,
+    ReceiptStore store,
+    PrinterListenerManager listeners,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var license = await accountLink.SynchronizeAsync(cancellationToken);
+        store.ReconcileLicenseAccess();
+        await listeners.ReconcileAsync(cancellationToken);
+        return Results.Ok(new LicenseSynchronizationResult(
+            license,
+            "The account license was synchronized and applied to this computer."));
+    }
+    catch (InvalidOperationException exception)
+    {
+        store.ReconcileLicenseAccess();
+        await listeners.ReconcileAsync(cancellationToken);
+        return Results.Problem(exception.Message, statusCode: 409);
+    }
+});
+
+app.MapPost("/api/account-link/unlink", async (
+    AccountUnlinkRequest request,
+    AccountLinkService accountLink,
+    ReceiptStore store,
+    PrinterListenerManager listeners,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Confirm)
+    {
+        return Results.Problem("Confirm that you want to unlink this computer.", statusCode: 400);
+    }
+    try
+    {
+        var result = await accountLink.UnlinkAsync(cancellationToken);
+        store.ReconcileLicenseAccess();
+        await listeners.ReconcileAsync(cancellationToken);
+        return Results.Ok(result);
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 409);
     }
 });
 

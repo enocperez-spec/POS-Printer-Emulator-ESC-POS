@@ -139,6 +139,9 @@ try {
     if(!isset($installationColumns['geo_updated_at'])){
         $pdo->exec('ALTER TABLE installations ADD COLUMN geo_updated_at DATETIME(6) NULL AFTER region_code');
     }
+    if(!isset($installationColumns['device_fingerprint_hash'])){
+        $pdo->exec('ALTER TABLE installations ADD COLUMN device_fingerprint_hash BINARY(32) NULL AFTER device_label');
+    }
     $installationIndexes=[];
     foreach($pdo->query('SHOW INDEX FROM installations')->fetchAll() as $index){
         $installationIndexes[(string)$index['Key_name']]=true;

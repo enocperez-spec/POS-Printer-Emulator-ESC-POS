@@ -178,9 +178,19 @@ $trialInstallations = $pdo->query(
      LIMIT 200"
 )->fetchAll();
 $licenseEvents = $pdo->query(
-    'SELECT license_id, customer_name, event_type, previous_state, new_state, previous_tier,
-            new_tier, replacement_license_id, reason, performed_by, created_at
-     FROM issued_license_events ORDER BY created_at DESC LIMIT 100'
+    "SELECT * FROM (
+        SELECT license_id,customer_name,event_type,previous_state,new_state,previous_tier,
+               new_tier,replacement_license_id,reason,performed_by,created_at
+        FROM issued_license_events
+        UNION ALL
+        SELECT a.license_id,COALESCE(c.display_name,'Unknown customer') customer_name,
+               a.event_type,NULL previous_state,a.outcome new_state,NULL previous_tier,
+               NULL new_tier,NULL replacement_license_id,a.event_summary reason,
+               a.activation_method performed_by,a.created_at
+        FROM license_activation_events a
+        LEFT JOIN customers c ON c.customer_id=a.customer_id
+    ) events
+     ORDER BY created_at DESC LIMIT 100"
 )->fetchAll();
 $maintenanceEvents = $pdo->query(
     'SELECT m.license_id, l.customer_name, m.event_type, m.previous_expires_at, m.new_expires_at,

@@ -109,11 +109,26 @@ try {
     $promotionToken = is_array($promotion) ? reveal_promotion_token($promotion) : null;
 
     if ($deviceToken === null && $promotionToken === null) {
+        $failedSync = $pdo->prepare(
+            "UPDATE installations
+             SET license_last_sync_at=UTC_TIMESTAMP(6),license_last_sync_status='Unlinked',
+                 license_last_sync_error='No active account license is assigned.'
+             WHERE id=:installation_id"
+        );
+        $failedSync->execute(['installation_id' => (int)$row['installation_id']]);
         device_entitlement_response([
             'error' => 'No active paid or promotional license is assigned to this computer.',
             'state' => 'Trial',
         ], 409);
     }
+
+    $successfulSync = $pdo->prepare(
+        "UPDATE installations
+         SET license_last_sync_at=UTC_TIMESTAMP(6),license_last_sync_status='Active',
+             license_last_sync_error=NULL
+         WHERE id=:installation_id"
+    );
+    $successfulSync->execute(['installation_id' => (int)$row['installation_id']]);
 
     device_entitlement_response([
         'state' => 'Active',
