@@ -36,6 +36,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher list [remote-directory]");
     Console.WriteLine("  website-publisher download <remote-file> <local-file>");
     Console.WriteLine("  website-publisher upload <local-file> <remote-file>");
+    Console.WriteLine("  website-publisher delete-file <remote-file>");
     Console.WriteLine("  website-publisher publish <local-directory> [remote-directory]");
     Console.WriteLine("  website-publisher configure <schema-file> [remote-directory]");
     Console.WriteLine("  website-publisher upload-schema <schema-file> [remote-directory]");
@@ -154,6 +155,13 @@ try
                 throw new ArgumentException("The upload command requires a local file and remote destination.");
             }
             UploadFile(client, Path.GetFullPath(args[1]), args[2]);
+            break;
+        case "delete-file":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The delete-file command requires one remote file.");
+            }
+            DeleteRemoteFile(client, args[1]);
             break;
         case "publish":
             if (args.Length < 2)
@@ -1160,6 +1168,31 @@ static void UploadFile(SftpClient client, string localPath, string remoteFile)
         throw new IOException($"Upload size verification failed for {resolvedFile}.");
     }
     Console.WriteLine($"Uploaded and size-verified {resolvedFile} ({input.Length:N0} bytes).");
+}
+
+static void DeleteRemoteFile(SftpClient client, string remoteFile)
+{
+    var resolvedFile = ResolveRemotePath(client, remoteFile);
+    if (resolvedFile is "/" or "." || resolvedFile.EndsWith('/'))
+    {
+        throw new ArgumentException("A specific remote file is required.");
+    }
+    if (!client.Exists(resolvedFile))
+    {
+        Console.WriteLine($"Remote file is already absent: {resolvedFile}");
+        return;
+    }
+    var attributes = client.GetAttributes(resolvedFile);
+    if (attributes.IsDirectory)
+    {
+        throw new InvalidOperationException("delete-file does not remove directories.");
+    }
+    client.DeleteFile(resolvedFile);
+    if (client.Exists(resolvedFile))
+    {
+        throw new IOException($"Remote file deletion could not be verified for {resolvedFile}.");
+    }
+    Console.WriteLine($"Deleted and verified remote file {resolvedFile}.");
 }
 
 static void SetCommunicationsTestAllowlist(SftpClient client, string email, string remoteDirectory)
