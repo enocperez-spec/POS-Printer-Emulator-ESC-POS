@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS portal_checkout_intents (
     license_id CHAR(36) NULL,
     installation_id BIGINT UNSIGNED NULL,
     checkout_token_hash BINARY(32) NOT NULL,
-    order_type ENUM('MAINTENANCE','UPGRADE') NOT NULL,
+    order_type ENUM('MAINTENANCE','UPGRADE','LICENSE') NOT NULL,
     current_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
     target_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
     state ENUM('Prepared','ProviderCreated','Captured','Fulfilled','Canceled','Expired','Refunded','ChargebackReview','Failed') NOT NULL DEFAULT 'Prepared',

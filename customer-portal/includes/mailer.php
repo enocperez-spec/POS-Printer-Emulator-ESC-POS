@@ -16,6 +16,8 @@ function portal_queue_mail(
     $templateKey = match ($type) {
         'Portal Enrollment' => 'email_verification',
         'Password Reset' => 'password_recovery',
+        'MFA Disabled' => 'mfa_disabled_notification',
+        'MFA Administrator Reset' => 'mfa_admin_reset_notification',
         default => null,
     };
     if ($templateKey !== null && portal_try_communication_outbox(
@@ -46,7 +48,7 @@ function portal_queue_mail(
         return;
     }
     $mailId = (int)$pdo->lastInsertId();
-    $from = portal_normalize_email((string)(portal_config()['portal']['mail_from'] ?? ''));
+    $from = 'info@buy.posprinteremulator.com';
     if ($from === '') {
         return;
     }
@@ -115,7 +117,7 @@ function portal_try_communication_outbox(
 ): bool {
     $parameters = array_replace($parameters, portal_mail_global_parameters($pdo));
     $allowedKeys = [
-        'customer_name', 'verification_url', 'reset_url', 'documentation_url',
+        'customer_name', 'verification_url', 'reset_url', 'portal_url', 'event_label', 'documentation_url',
         'help_center_url', 'support_request_url', 'no_reply_notice',
     ];
     $clean = [];
@@ -143,7 +145,10 @@ function portal_try_communication_outbox(
         $row = $template->fetch();
         if (!is_array($row) || (string)$row['message_class'] !== 'Service') return false;
         $messageId = portal_mail_uuid();
-        $priority = in_array($templateKey, ['email_verification', 'password_recovery'], true) ? 10 : 50;
+        $priority = in_array($templateKey, [
+            'email_verification', 'password_recovery',
+            'mfa_disabled_notification', 'mfa_admin_reset_notification',
+        ], true) ? 10 : 50;
         $insert = $pdo->prepare(
             'INSERT IGNORE INTO communication_outbox
                 (message_id,customer_id,template_key,message_class,essential,manual_send,priority,recipient_hash,
@@ -165,6 +170,28 @@ function portal_try_communication_outbox(
         return true;
     } catch (PDOException $exception) {
         if (in_array((string)$exception->getCode(), ['42S02', '42S22'], true)) return false;
+        throw $exception;
+    }
+}
+
+function portal_security_template_ready(PDO $pdo, string $templateKey): bool
+{
+    try {
+        $template = $pdo->prepare(
+            "SELECT 1 FROM communication_templates
+             WHERE template_key=:key AND message_class='Service' AND essential=1
+               AND enabled=1 AND brevo_template_id IS NOT NULL
+               AND preview_brevo_template_id=brevo_template_id
+               AND preview_verified_at IS NOT NULL
+               AND COALESCE(preview_warnings_json,'[]')='[]'
+             LIMIT 1"
+        );
+        $template->execute(['key' => $templateKey]);
+        return (bool)$template->fetchColumn();
+    } catch (PDOException $exception) {
+        if (in_array((string)$exception->getCode(), ['42S02', '42S22'], true)) {
+            return false;
+        }
         throw $exception;
     }
 }

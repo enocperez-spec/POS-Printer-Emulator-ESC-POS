@@ -151,6 +151,23 @@
         document.getElementById('template-dialog-id').value = tile.dataset.templateId || '';
         document.getElementById('template-dialog-cap').value = tile.dataset.templateCap || '';
         document.getElementById('template-dialog-enabled').checked = tile.dataset.templateEnabled === '1';
+        const mappingError = tile.dataset.templateMappingError || '';
+        const mappingErrorBox = document.getElementById('template-mapping-error');
+        mappingErrorBox.textContent = mappingError;
+        mappingErrorBox.hidden = mappingError === '';
+        const mapButton = document.getElementById('template-map-button');
+        const mappingReady = tile.dataset.templateMappingStatus === 'Mapped'
+            && tile.dataset.templateMappingTested === '1';
+        mapButton.hidden = mappingReady;
+        if (tile.dataset.templateId) {
+            mapButton.textContent = tile.dataset.templateMappingStatus === 'Failed'
+                ? 'Retry validation and test'
+                : 'Validate and test mapping';
+        } else {
+            mapButton.textContent = tile.dataset.templateMappingStatus === 'Failed'
+                ? 'Retry create, test, and map'
+                : 'Create, test, and map';
+        }
         const assignedTags = new Set((tile.dataset.templateTags || '').split(',').filter(Boolean));
         dialog.querySelectorAll('[data-template-tag-input]').forEach(input => {
             input.checked = assignedTags.has(input.dataset.templateTagInput || '');

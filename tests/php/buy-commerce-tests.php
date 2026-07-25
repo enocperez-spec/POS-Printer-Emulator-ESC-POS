@@ -103,6 +103,17 @@ $expectSame(true,str_contains($captureEndpoint,"['create_time']"),'Renewal cover
 $expectSame(true,str_contains($captureEndpoint,"paypal_request('GET',\$paypalPath)"),'A lost capture response must be reconcilable without charging again.');
 $configExample=file_get_contents(dirname(__DIR__,2).'/buy-website/private/config.example.php')?:'';
 $expectSame(true,str_contains($configExample,'REPLACE_WITH_DISTINCT_MAINTENANCE_SERVICE_TOKEN'),'The Buy-to-Admin maintenance credential must be explicitly distinct.');
+$buyBootstrap=file_get_contents(dirname(__DIR__,2).'/buy-website/includes/bootstrap.php')?:'';
+$expectSame(true,str_contains($buyBootstrap,"if (\$orderType === 'LICENSE')"),'The secure checkout must accept a distinct new-license order.');
+$expectSame(true,str_contains($buyBootstrap,'return license_offer($targetTier);'),'A new or additional license must use its full configured price.');
+$purchasePage=file_get_contents(dirname(__DIR__,2).'/buy-website/index.php')?:'';
+$successPage=file_get_contents(dirname(__DIR__,2).'/buy-website/success.php')?:'';
+$expectSame(true,str_contains($purchasePage,'Log In to Purchase'),'The public purchase page must send customers to portal authentication.');
+$expectSame(true,str_contains($purchasePage,'userportal.posprinteremulator.com'),'The purchase page must use the secure Customer Portal handoff.');
+$expectSame(false,str_contains(strtolower($purchasePage),'permanent desktop license'),'Legacy Permanent Desktop License wording must be removed.');
+$expectSame(false,str_contains($purchasePage,'paypal-button'),'The public purchase page must not accept payment directly.');
+$expectSame(true,str_contains($successPage,'userportal.posprinteremulator.com/index.php?return=billing'),'Completed purchases must return to account-bound Customer Portal billing history.');
+$expectSame(true,str_contains($successPage,'View Purchase &amp; Billing History'),'The payment confirmation must clearly label the Customer Portal destination.');
 
 if(function_exists('openssl_pkey_new')){
     $keyResource=openssl_pkey_new(['private_key_type'=>OPENSSL_KEYTYPE_EC,'curve_name'=>'prime256v1']);

@@ -26,6 +26,7 @@ if (!preg_match('/^[A-Za-z0-9_-]{43}$/', $token)) {
 $ready = is_array($session) && is_array($offer) && (float)$offer['price'] > 0 &&
     !str_starts_with((string)config('paypal.client_id'), 'REPLACE_');
 $maintenance = is_array($session) && strtoupper((string)$session['orderType']) === 'MAINTENANCE';
+$newLicense = is_array($session) && strtoupper((string)$session['orderType']) === 'LICENSE';
 $effective = 'Immediately after PayPal confirms payment';
 if ($maintenance) {
     $base = !empty($session['maintenanceExpiresAt']) && strtotime((string)$session['maintenanceExpiresAt']) > time()
@@ -39,7 +40,7 @@ if ($maintenance) {
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Review your POS Printer Emulator order</title>
-  <meta name="description" content="Review and pay for a verified POS Printer Emulator license upgrade or maintenance renewal.">
+  <meta name="description" content="Review and pay for a verified POS Printer Emulator License, license upgrade, or Maintenance and Support renewal.">
   <meta name="theme-color" content="#07172d">
   <link rel="icon" type="image/png" href="/assets/favicon.png">
   <link rel="stylesheet" href="/assets/site.css?v=4">
@@ -60,7 +61,7 @@ if ($maintenance) {
     <p class="eyebrow">Verified customer checkout</p>
     <h1>Review the change<br>before you pay.</h1>
     <p class="lede">The customer, license, and price below come from protected server records. PayPal handles the payment; card details never reach POS Printer Emulator.</p>
-    <ul class="trust"><li>Permanent license</li><li>No automatic billing</li><li>Server-verified fulfillment</li></ul>
+    <ul class="trust"><li>POS Printer Emulator License</li><li>No automatic billing</li><li>Server-verified fulfillment</li></ul>
   </section>
 
   <aside class="service-review" id="order-review">
@@ -68,18 +69,18 @@ if ($maintenance) {
       <div class="service-error" role="alert"><strong>Checkout unavailable</strong><p><?= htmlspecialchars($error) ?></p></div>
       <a class="service-button secondary" href="https://userportal.posprinteremulator.com/portal.php?page=plans">Return to Customer Portal</a>
     <?php else: ?>
-      <div class="review-label"><?= $maintenance ? 'Annual maintenance' : 'Permanent license upgrade' ?></div>
-      <h2><?= htmlspecialchars((string)$session['currentTier']) ?> <span aria-hidden="true">→</span> <?= htmlspecialchars((string)$session['targetTier']) ?></h2>
+      <div class="review-label"><?= $maintenance ? 'Annual Maintenance and Support' : ($newLicense ? 'POS Printer Emulator License' : 'POS Printer Emulator License upgrade') ?></div>
+      <h2><?= $newLicense ? 'New ' : htmlspecialchars((string)$session['currentTier']) . ' <span aria-hidden="true">→</span> ' ?><?= htmlspecialchars((string)$session['targetTier']) ?> License</h2>
       <div class="review-price"><strong><?= ($offer['currency'] ?? '') === 'USD' ? '$' : '' ?><?= htmlspecialchars(number_format((float)$offer['price'], 2)) ?></strong><span><?= htmlspecialchars((string)$offer['currency']) ?> · one-time</span></div>
       <dl class="review-facts">
         <div><dt>Customer</dt><dd><?= htmlspecialchars((string)$session['customerName']) ?></dd></div>
         <div><dt>Email</dt><dd><?= htmlspecialchars((string)$session['email']) ?></dd></div>
         <div><dt>Effective</dt><dd><?= htmlspecialchars($effective) ?></dd></div>
-        <div><dt>Maintenance effect</dt><dd><?= $maintenance ? 'Adds one year; your permanent license is unchanged.' : 'Existing coverage transfers to the replacement key.' ?></dd></div>
+        <div><dt>Maintenance effect</dt><dd><?= $maintenance ? 'Adds one year; your POS Printer Emulator License is unchanged.' : ($newLicense ? 'Includes one year of Maintenance and Support.' : 'Existing coverage transfers to the replacement key.') ?></dd></div>
       </dl>
       <div class="review-terms">
         <strong>Before payment</strong>
-        <p>License upgrades are fulfilled immediately after verified capture. Refunds and chargebacks require review and may revoke the replacement entitlement. Optional maintenance is not a subscription.</p>
+        <p>License purchases and upgrades are fulfilled immediately after verified capture. Refunds and chargebacks require review and may revoke the affected entitlement. Optional Maintenance and Support is not a subscription.</p>
       </div>
       <div id="form-error" class="error" role="alert" hidden></div>
       <?php if ($ready): ?>

@@ -42,7 +42,7 @@ function admin_role(): string
 function admin_can(string $capability): bool
 {
     $capabilities = [
-        'owner' => ['customers.read', 'customers.export', 'customers.consent', 'customers.audit', 'licenses.manage', 'pricing.manage', 'communications.read', 'communications.manage', 'communications.export'],
+        'owner' => ['customers.read', 'customers.export', 'customers.consent', 'customers.audit', 'customers.mfa.reset', 'licenses.manage', 'pricing.manage', 'communications.read', 'communications.manage', 'communications.export'],
         'support' => ['customers.read', 'communications.read'],
         'analyst' => ['communications.read'],
     ];

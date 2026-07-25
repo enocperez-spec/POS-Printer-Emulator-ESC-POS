@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "sourceOfTruth": {
+    "applicationVersion": "0.3.53",
+    "featureFlags": "src/ReceiptEmulator.App/LicenseService.cs",
+    "listenerLimits": "src/ReceiptEmulator.App/LicenseService.cs",
+    "diagnosticAuthorization": "src/ReceiptEmulator.App/DiagnosticPdfService.cs"
+  },
+  "trial": {
+    "name": "Trial",
+    "price": 0,
+    "listenerLimit": 1,
+    "externalJobsPerDay": 5,
+    "builtInTestReceipts": "Unlimited",
+    "history": "Current session only",
+    "watermark": true,
+    "defaultListener": {
+      "printerName": "POS Printer Emulator",
+      "localAddress": "127.0.0.1",
+      "startingPort": 9100,
+      "automaticNextPort": true
+    },
+    "promotionalEvaluationDays": 5,
+    "description": "The base Trial License remains available with five external POS jobs per local day. An eligible verified customer and installation may also claim one server-authorized five-day evaluation of Lite, Pro, or Enterprise features."
+  },
+  "maintenance": {
+    "includedMonths": 12,
+    "automaticRenewal": false,
+    "renewalPrices": {
+      "Lite": 9.99,
+      "Pro": 19.99,
+      "Enterprise": 59.99
+    },
+    "included": [
+      "Application updates",
+      "Version upgrades released during coverage",
+      "Eligible technical support",
+      "Applicable activation-key recovery services"
+    ]
+  },
+  "licenses": {
+    "Trial": {
+      "listenerLimit": 1,
+      "purchasePrice": 0,
+      "permanent": false
+    },
+    "Lite": {
+      "listenerLimit": 1,
+      "purchasePrice": 24.99,
+      "permanent": true
+    },
+    "Pro": {
+      "listenerLimit": 2,
+      "purchasePrice": null,
+      "permanent": true
+    },
+    "Enterprise": {
+      "listenerLimit": 15,
+      "purchasePrice": null,
+      "permanent": true
+    }
+  },
+  "features": [
+    {
+      "name": "External POS print jobs",
+      "Trial": "5 per local day",
+      "Lite": "Unlimited",
+      "Pro": "Unlimited",
+      "Enterprise": "Unlimited"
+    },
+    {
+      "name": "Built-in Test Receipts",
+      "Trial": "Unlimited; clearly identified; do not use the daily allowance",
+      "Lite": "Unlimited",
+      "Pro": "Unlimited",
+      "Enterprise": "Unlimited"
+    },
+    {
+      "name": "Printer listeners",
+      "Trial": "1",
+      "Lite": "1",
+      "Pro": "Up to 2",
+      "Enterprise": "Up to 15"
+    },
+    {
+      "name": "Live receipt preview",
+      "Trial": "Included with TRIAL watermark",
+      "Lite": "Included; no watermark",
+      "Pro": "Included; no watermark",
+      "Enterprise": "Included; no watermark"
+    },
+    {
+      "name": "Local print-job history",
+      "Trial": "Current session only",
+      "Lite": "Full local history",
+      "Pro": "Full local history",
+      "Enterprise": "Full local history"
+    },
+    {
+      "name": "Parsed ESC/POS commands, raw data, job details, and warnings",
+      "Trial": "Core on-screen inspection",
+      "Lite": "Included",
+      "Pro": "Included",
+      "Enterprise": "Included"
+    },
+    {
+      "name": "Text, raw, print/PDF, capture, import, replay, and applicable exports",
+      "Trial": "Unavailable",
+      "Lite": "Included",
+      "Pro": "Included",
+      "Enterprise": "Included"
+    },
+    {
+      "name": "Copy Receipt as Image and clipboard image support",
+      "Trial": "Unavailable",
+      "Lite": "Included",
+      "Pro": "Included",
+      "Enterprise": "Included"
+    },
+    {
+      "name": "Printer Profiles, Stored Logos, and Printer State",
+      "Trial": "Unavailable",
+      "Lite": "Included",
+      "Pro": "Included",
+      "Enterprise": "Included"
+    },
+    {
+      "name": "Standard Development Diagnostics Report",
+      "Trial": "Unavailable",
+      "Lite": "Unavailable",
+      "Pro": "Unavailable",
+      "Enterprise": "Enterprise only"
+    },
+    {
+      "name": "Advanced Diagnostics Package",
+      "Trial": "Unavailable",
+      "Lite": "Unavailable",
+      "Pro": "Unavailable",
+      "Enterprise": "Enterprise only"
+    },
+    {
+      "name": "Update notifications and version-behind information",
+      "Trial": "Unavailable",
+      "Lite": "With active Maintenance and Support",
+      "Pro": "With active Maintenance and Support",
+      "Enterprise": "With active Maintenance and Support"
+    },
+    {
+      "name": "Assisted technical support and activation-key recovery",
+      "Trial": "Self-service documentation",
+      "Lite": "With active Maintenance and Support",
+      "Pro": "With active Maintenance and Support",
+      "Enterprise": "With active Maintenance and Support"
+    },
+    {
+      "name": "Maintenance and Support included with purchase",
+      "Trial": "Not applicable",
+      "Lite": "1 year",
+      "Pro": "1 year",
+      "Enterprise": "1 year"
+    },
+    {
+      "name": "Optional annual Maintenance and Support renewal",
+      "Trial": "Not applicable",
+      "Lite": "$9.99",
+      "Pro": "$19.99",
+      "Enterprise": "$59.99"
+    }
+  ]
+}

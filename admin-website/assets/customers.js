@@ -17,3 +17,11 @@ document.querySelectorAll('dialog').forEach((dialog) => {
     if (event.target === dialog) dialog.close();
   });
 });
+
+document.querySelectorAll('form[data-confirm]').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    if (!window.confirm(form.dataset.confirm || 'Continue with this security-sensitive action?')) {
+      event.preventDefault();
+    }
+  });
+});

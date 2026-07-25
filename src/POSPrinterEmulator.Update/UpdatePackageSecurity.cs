@@ -94,7 +94,8 @@ public static partial class UpdatePackageSecurity
                 throw new EndOfStreamException(
                     $"The update download ended early. Expected {total.Value:N0} bytes but received {written:N0}.");
 
-            // FileShare.None prevents the rename until the output stream is disposed.
+            // The output stream must be disposed before this move. Windows denies
+            // the rename while the FileShare.None download stream is still open.
             File.Move(partial, destination, true);
         }
         catch

@@ -831,11 +831,11 @@ $releaseSync = database()->prepare(
          'Shared secure download service; stream disposal before file promotion; content-length validation; partial-file cleanup; trusted-host and SHA-256 preservation; and a Windows exclusive-file regression test.',
          'Customers on older releases cannot install a verified update when the updater keeps its temporary output stream open.',
          'The downloaded installer is promoted without a sharing violation, incomplete transfers are rejected, partial files are removed, and automated updater tests pass.', UTC_TIMESTAMP(6)),
-        ('v0.3.53', 'v0.3.53', 'Release', 'Projects and testing sessions', 'Planned', 353,
-         'Organize receipts and configuration by customer, store, migration, register, or support engagement.',
-         'Named projects and sessions; notes and tags; listener, profile, capture, baseline, and report references; default-project migration; recent and archived projects; safe copy, export, and import; state retention; and integrity validation.',
-         'Restore-point foundations make isolated project workflows safe and establish clean data boundaries for later comparison suites.',
-         'Two customer projects remain isolated and one can be exported without leaking data or configuration from the other.', NULL),
+        ('v0.3.53', 'v0.3.53', 'Release', 'Account-Based License Registration and Activation', 'Released', 353,
+         'Replace customer-name and email matching with verified account ownership and an explicit computer-link approval workflow.',
+         'Verified Customer Portal accounts; authenticated desktop link requests; expiring single-use registration codes; customer approval; account-owned license selection; one-computer device limits; deactivation and transfer history; backup activation-key claims; clear activation guidance; and privacy-safe audit events.',
+         'License ownership must be established through a verified customer account before additional self-service device and commercial workflows can be trusted.',
+         'A verified customer links a computer, selects an eligible account-owned license, activates it without reinstalling, and can later release the device while duplicate, expired, unauthorized, or replayed requests are rejected and audited.', UTC_TIMESTAMP(6)),
         ('v0.3.54', 'v0.3.54', 'Release', 'Privacy-safe receipt masking', 'Planned', 354,
          'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
@@ -923,11 +923,11 @@ $backlogSync = database()->prepare(
          'List active and recent sessions with browser, approximate location, IP-derived security context, login time, idle time, and security events; allow remote sign-out without exposing session secrets.',
          'User Portal Enhancement. Session visibility and revocation strengthen account security and help customers recognize unfamiliar access.',
          'Customers can review account activity and terminate other sessions, with every security action recorded and notified appropriately.', NULL),
-        ('UPE-127', NULL, 'Backlog', 'License Transfer Wizard', 'Planned', 1127,
+        ('UPE-127', 'v0.3.53', 'Backlog', 'Account-Based License Registration and Transfer', 'Released', 1127,
          'Provide a controlled self-service process for moving a license to another computer.',
          'Select the old computer, verify identity and eligibility, deactivate the installation, confirm the transfer, show installation instructions, and record the complete transfer history.',
          'User Portal Enhancement. A guided transfer reduces manual support work without weakening activation limits.',
-         'Eligible customers can transfer a license once under enforced limits, while duplicate, unauthorized, or replayed transfers are rejected and audited.', NULL),
+         'Eligible customers can link, activate, deactivate, and transfer a license under enforced limits, while duplicate, unauthorized, expired, or replayed requests are rejected and audited.', UTC_TIMESTAMP(6)),
         ('UPE-128', NULL, 'Backlog', 'Enterprise Team Management', 'Planned', 1128,
          'Allow Enterprise organizations to share portal responsibilities safely.',
          'Invite and remove users; assign Owner, Administrator, Technician, Billing, and Read Only roles; enforce least privilege, MFA policy, and organization-scoped audit history.',
@@ -1010,7 +1010,7 @@ database()->prepare(
          WHEN 'v0.3.50' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.50'
          WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.51'
          WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.52'
-         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33'
+         WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.53'
          WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
          WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
          WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'

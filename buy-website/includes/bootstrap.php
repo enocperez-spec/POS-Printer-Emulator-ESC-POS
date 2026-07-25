@@ -438,10 +438,14 @@ function portal_commerce_service_request(array $payload): array
 function self_service_offer(string $orderType, string $currentTier, string $targetTier): array
 {
     $targetTier = clean_license_tier($targetTier);
-    if (strtoupper($orderType) === 'MAINTENANCE') {
+    $orderType = strtoupper($orderType);
+    if ($orderType === 'MAINTENANCE') {
         return maintenance_offer($targetTier);
     }
-    if (strtoupper($orderType) !== 'UPGRADE') {
+    if ($orderType === 'LICENSE') {
+        return license_offer($targetTier);
+    }
+    if ($orderType !== 'UPGRADE') {
         throw new InvalidArgumentException('The checkout type is invalid.');
     }
     $target = license_offer($targetTier);

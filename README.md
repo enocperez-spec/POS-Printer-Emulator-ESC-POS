@@ -7,16 +7,15 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 ## Highlights
 
 - RAW TCP/IP listener on `0.0.0.0:9100` with cut-command and idle-timeout job framing.
-- Four-tier licensing in v0.3.25 provides total listener allowances of Trial 1, Lite 1, Pro 2, and Enterprise 15; managed listeners retain independent ports, profiles, state, buffers, counters, and Activity filtering.
-- Annual Application Maintenance and Support in v0.3.26 keeps paid licenses permanent, includes one year of updates and assisted support with new purchases, and offers later annual renewals as optional one-time purchases rather than subscriptions.
+- Trial, Lite, Pro, and Enterprise provide total listener allowances of 1, 1, 2, and 15; managed listeners retain independent ports, profiles, state, buffers, counters, and Activity filtering.
+- Annual Application Maintenance and Support keeps paid licenses permanent, includes one year of updates, applicable activation-key recovery, and assisted support with new purchases, and offers later annual renewals as optional one-time purchases rather than subscriptions.
 - Receipt preview with persistent Light and Dark viewing modes.
-- Trial Mode by default with five emulated print jobs per day, session-only jobs, a receipt watermark, and locked premium controls.
+- Trial Mode by default with five external POS print jobs per day, unlimited built-in Test Receipts, session-only jobs, a receipt watermark, and locked paid controls.
 - The v0.3.38 Trial onboarding correction provides a reopenable two-step setup guide, shows the included listener as read-only with exact local and LAN connection targets, and retains unlimited ephemeral built-in Test Receipts plus privacy-safe ten-line previews after the complete-job allowance is exhausted.
 - The v0.3.39 release downloads and verifies updates in the background, creates an encrypted safety snapshot, drains active receipt work, closes file-locking processes, installs through a separate updater, restores the prior workspace view, and relaunches automatically.
 - The v0.3.41 release corrects the Windows installer artwork with a purpose-built tall banner that preserves the official product logo proportions.
 - The v0.3.48 release keeps the running build version visible throughout Settings, clarifies that the Five-Day Promotional Trial requires no activation key, and selects the desktop shortcut by default during setup.
 - The v0.3.51 release adds a concise Standard Diagnostics PDF that reuses the privacy-reviewed, logo-branded Enterprise reporting engine.
-- The v0.3.52 release corrects a Windows file-lock regression so verified in-app update downloads can be promoted and installed successfully.
 - Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
@@ -33,7 +32,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.52 Updater Download File-Lock Correction is the current public release, released July 24, 2026.
+> **Release status:** v0.3.53 Account-Based License Registration and Activation is the current public release, released July 25, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -41,7 +40,7 @@ The public `posprinteremulator.com` marketing and download website is maintained
 
 POS Printer Emulator supports fully updated 64-bit Windows 11 Pro. Windows 10 and other Windows editions are outside the supported environment.
 
-1. Download `POSPrinterEmulatorSetup-0.3.52-win-x64.exe` from the repository's Releases page.
+1. Download `POSPrinterEmulatorSetup-0.3.51-win-x64.exe` from the repository's Releases page.
 2. Run the installer and approve the Windows administrator prompt.
 3. Enter the customer or company name and email address that will be used for licensing.
 4. Leave **Create a desktop shortcut** selected if desired.
@@ -169,7 +168,7 @@ Create the complete customer installer:
 dotnet run --project tools/ReceiptLab.Build -- installer
 ```
 
-Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.52-win-x64.exe`
+Output for the current release: `artifacts\installer\POSPrinterEmulatorSetup-0.3.51-win-x64.exe`
 
 The C# build utility compiles the viewer, builds the application, runs the automated tests, publishes the self-contained runtime, packages the installer, and sends sample ESC/POS traffic. The `artifacts` directory is excluded from Git source history. Creating an installer does not change the public website or its download links.
 
@@ -281,9 +280,8 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.49 — Receipt Image Sharing:** Copy the complete rendered receipt to the Windows clipboard or save it as a standalone PNG without application chrome.
 - **Released in v0.3.50 — Advanced Diagnostics PDF Report:** Generate a detailed Enterprise diagnostic PDF with the application logo, report metadata, receipt rendering, command analysis, listener and environment state, checksums, and privacy review.
 - **Released in v0.3.51 — Standard Diagnostics PDF Report:** Reuse the verified report engine to create a shorter Enterprise support PDF with the most useful findings, redacted configuration, and clear next actions.
-- **Released in v0.3.52 — Updater Download File-Lock Correction:** Dispose downloaded installer streams before file promotion so Windows can complete verified in-app updates.
-- **v0.3.60 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
-- **v0.3.53 — Projects and testing sessions:** Organize Pro and Enterprise receipts, captures, profiles, baselines, notes, and reports into isolated customer projects.
+- **v0.3.52 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
+- **Released in v0.3.53 — Account-Based License Registration and Activation:** Link a computer through a verified Customer Portal account, approve an eligible license, enforce device limits, claim a backup activation key securely, and retain auditable activation and transfer history.
 - **v0.3.54 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
 - **v0.3.55 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
 - **v0.3.56 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.

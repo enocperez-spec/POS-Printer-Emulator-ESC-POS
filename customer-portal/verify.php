@@ -3,6 +3,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/auth.php';
 
+$purchaseTier = portal_purchase_tier($_GET['purchase'] ?? $_POST['purchase'] ?? $_SESSION['purchase_tier'] ?? '');
+$portalReturn = portal_return_page($_GET['return'] ?? $_POST['return'] ?? $_SESSION['portal_return'] ?? '');
+$computerLinkCode = strtoupper(trim((string)($_GET['link'] ?? $_POST['link'] ?? $_SESSION['computer_link_code'] ?? '')));
+$computerLinkCode = preg_match('/^[A-Z0-9]{4}-[A-Z0-9]{4}$/', $computerLinkCode) ? $computerLinkCode : '';
+if ($purchaseTier !== '') {
+    $_SESSION['purchase_tier'] = $purchaseTier;
+    unset($_SESSION['portal_return']);
+} elseif ($portalReturn !== '') {
+    $_SESSION['portal_return'] = $portalReturn;
+    if ($portalReturn === 'computers' && $computerLinkCode !== '') {
+        $_SESSION['computer_link_code'] = $computerLinkCode;
+    }
+}
 $purpose = (string)($_GET['purpose'] ?? $_POST['purpose'] ?? '');
 $token = (string)($_GET['token'] ?? $_POST['token'] ?? '');
 $record = in_array($purpose, ['enroll', 'reset'], true) ? portal_verification_record($purpose, $token) : null;
@@ -22,7 +35,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['portal_notice'] = $purpose === 'enroll'
                     ? 'Your Customer Portal account is ready. Sign in with your new password.'
                     : 'Your password was reset. Sign in with your new password.';
-                portal_redirect('/index.php');
+                $destination = $purchaseTier !== ''
+                    ? '/index.php?purchase=' . rawurlencode($purchaseTier)
+                    : ($portalReturn !== ''
+                        ? '/index.php?return=' . rawurlencode($portalReturn) .
+                            ($computerLinkCode !== '' ? '&link=' . rawurlencode($computerLinkCode) : '')
+                        : '/index.php');
+                portal_redirect($destination);
             }
             $error = 'This link is invalid or has expired. Request a new link.';
         } catch (Throwable $exception) {
@@ -57,6 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
       <input type="hidden" name="purpose" value="<?= portal_e($purpose) ?>">
       <input type="hidden" name="token" value="<?= portal_e($token) ?>">
+      <?php if ($purchaseTier !== ''): ?><input type="hidden" name="purchase" value="<?= portal_e($purchaseTier) ?>"><?php endif; ?>
+      <?php if ($portalReturn !== ''): ?><input type="hidden" name="return" value="<?= portal_e($portalReturn) ?>"><?php endif; ?>
+      <?php if ($computerLinkCode !== ''): ?><input type="hidden" name="link" value="<?= portal_e($computerLinkCode) ?>"><?php endif; ?>
       <label>New password<input type="password" name="password" maxlength="200" autocomplete="new-password" required></label>
       <label>Confirm new password<input type="password" name="password_confirmation" maxlength="200" autocomplete="new-password" required></label>
       <p class="field-help">At least 12 characters with uppercase, lowercase, and a number.</p>

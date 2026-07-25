@@ -8,4 +8,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Method not allowed.');
 }
 portal_require_csrf();
-portal_logout();
+$reason = (string)($_POST['reason'] ?? '');
+portal_logout(false);
+portal_redirect($reason === 'idle' ? '/index.php?session=expired' : '/index.php');

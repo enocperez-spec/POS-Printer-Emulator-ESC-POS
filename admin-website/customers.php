@@ -3,11 +3,15 @@ declare(strict_types=1);
 
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/customer_crm.php';
+require __DIR__ . '/includes/customer_portal_schema.php';
+require __DIR__ . '/includes/communications.php';
 require_authentication();
 require_admin_capability('customers.read');
 
 $pdo = database();
 $migration = backfill_customer_crm($pdo);
+ensure_customer_portal_schema($pdo);
+ensure_communication_schema($pdo);
 $actor = trim((string)($_SESSION['admin_username'] ?? 'owner')) ?: 'owner';
 $flash = '';
 $flashType = 'success';
@@ -18,7 +22,10 @@ function crm_customer(PDO $pdo, string $customerId): array
         "SELECT c.*,
                 (SELECT COUNT(*) FROM installations i WHERE i.customer_id=c.customer_id) installation_count,
                 (SELECT COUNT(*) FROM issued_licenses l WHERE l.customer_id=c.customer_id AND l.control_state<>'Deleted') license_count,
-                (SELECT COUNT(*) FROM support_requests s WHERE s.customer_id=c.customer_id) support_count
+                (SELECT COUNT(*) FROM support_requests s WHERE s.customer_id=c.customer_id) support_count,
+                (SELECT a.mfa_enabled FROM portal_accounts a WHERE a.customer_id=c.customer_id) portal_mfa_enabled,
+                (SELECT a.mfa_reenrollment_required FROM portal_accounts a WHERE a.customer_id=c.customer_id) portal_mfa_reenrollment_required,
+                EXISTS(SELECT 1 FROM portal_accounts a WHERE a.customer_id=c.customer_id) portal_account_exists
          FROM customers c WHERE c.customer_id=:id LIMIT 1"
     );
     $query->execute(['id' => strtolower($customerId)]);
@@ -58,6 +65,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 fputcsv($output, array_values($row));
             }
             fclose($output);
+            exit;
+        }
+
+        if ($action === 'reset_customer_mfa') {
+            require_admin_capability('customers.mfa.reset');
+            if ((int)($_SESSION['two_factor_verified_at'] ?? 0) < time() - 900) {
+                throw new DomainException('Verify your Administrator Portal two-factor authentication again before resetting customer MFA.');
+            }
+            $customerId = strtolower(trim((string)($_POST['customer_id'] ?? '')));
+            $customer = crm_customer($pdo, $customerId);
+            $verificationMethod = trim((string)($_POST['identity_verification_method'] ?? ''));
+            $verificationEvidence = trim((string)($_POST['identity_verification_evidence'] ?? ''));
+            $reason = trim((string)($_POST['reason'] ?? ''));
+            $allowedVerificationMethods = [
+                'Verified callback',
+                'Verified purchase record',
+                'Verified support challenge',
+                'In-person identity verification',
+            ];
+            if (!in_array($verificationMethod, $allowedVerificationMethods, true) ||
+                mb_strlen($verificationEvidence) < 12 ||
+                mb_strlen($reason) < 12 ||
+                !hash_equals('RESET MFA', strtoupper(trim((string)($_POST['confirmation_phrase'] ?? '')))) ||
+                !hash_equals('yes', (string)($_POST['confirmed'] ?? ''))) {
+                throw new InvalidArgumentException(
+                    'Verify the customer identity, document the evidence and reason, type RESET MFA, and confirm the warning.'
+                );
+            }
+            if (empty($customer['portal_account_exists']) || empty($customer['portal_mfa_enabled'])) {
+                throw new DomainException('This customer does not have an active MFA setup that can be reset.');
+            }
+            if (empty($customer['email_verified_at']) || trim((string)$customer['canonical_email']) === '') {
+                throw new DomainException('The customer must have a verified email before MFA recovery can continue.');
+            }
+
+            $pdo->beginTransaction();
+            $reset = $pdo->prepare(
+                'UPDATE portal_accounts
+                 SET mfa_secret_ciphertext=NULL,mfa_secret_nonce=NULL,mfa_secret_tag=NULL,mfa_enabled=0,
+                     mfa_reenrollment_required=1,session_revision=session_revision+1
+                 WHERE customer_id=:customer_id'
+            );
+            $reset->execute(['customer_id' => $customerId]);
+            $deleteCodes = $pdo->prepare('DELETE FROM portal_recovery_codes WHERE customer_id=:customer_id');
+            $deleteCodes->execute(['customer_id' => $customerId]);
+            $revokeSessions = $pdo->prepare(
+                'UPDATE portal_sessions SET revoked_at=UTC_TIMESTAMP(6)
+                 WHERE customer_id=:customer_id AND revoked_at IS NULL'
+            );
+            $revokeSessions->execute(['customer_id' => $customerId]);
+            $auditReason = $reason . ' Identity verification: ' . $verificationMethod . ' — ' . $verificationEvidence;
+            crm_record_admin_audit(
+                $pdo,
+                $customerId,
+                'CUSTOMER_MFA_RESET',
+                $actor,
+                'Portal Account',
+                $customerId,
+                $auditReason,
+                (string)($_SERVER['REMOTE_ADDR'] ?? '')
+            );
+            communication_enqueue(
+                $pdo,
+                $customerId,
+                'mfa_admin_reset_notification',
+                [
+                    'customer_name' => (string)$customer['display_name'],
+                    'event_label' => 'reset by an authorized administrator',
+                    'portal_url' => 'https://userportal.posprinteremulator.com/',
+                ],
+                'security:mfa-admin-reset:' . $customerId . ':' . gmdate('YmdHis')
+            );
+            $pdo->commit();
+            try {
+                communication_worker_process_one($pdo);
+            } catch (Throwable $notificationException) {
+                error_log('MFA reset notification remains queued: ' . get_class($notificationException));
+            }
+            $_SESSION['crm_flash'] = [
+                'type' => 'success',
+                'message' => 'Customer MFA was reset, sessions were revoked, and re-enrollment is required at next sign-in.',
+            ];
+            header('Location: /customers.php?customer=' . rawurlencode($customerId));
             exit;
         }
 
@@ -212,8 +302,10 @@ if ($selectedId !== '') {
         $selected = null;
     }
 }
+$customersCssVersion = (string)(filemtime(__DIR__ . '/assets/customers.css') ?: 1);
+$customersScriptVersion = (string)(filemtime(__DIR__ . '/assets/customers.js') ?: 1);
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Customers | POS Printer Emulator Admin Portal</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/customers.css?v=20260723-1"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Customers | POS Printer Emulator Admin Portal</title><link rel="icon" type="image/png" href="assets/favicon.png"><link rel="stylesheet" href="assets/admin.css?v=20260714-2"><link rel="stylesheet" href="assets/customers.css?v=<?=e($customersCssVersion)?>"><link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1"></head>
 <body><div class="app-shell"><header class="topbar"><a class="brand" href="/"><img src="assets/icon-web.png" alt=""><span>POS Printer Emulator <small>Admin Portal</small></span></a><form method="post" action="/logout.php" class="logout-form"><span><?= e(ucfirst(admin_role())) ?> account</span><input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>"><button>Log out</button></form></header>
 <aside class="sidebar"><nav><a href="/"><span aria-hidden="true">▥</span>Dashboard</a><a class="active" href="/customers.php"><span aria-hidden="true">◎</span>Customers</a><a href="/licenses.php"><span aria-hidden="true">◇</span>License Manager</a><a href="/orders.php"><span aria-hidden="true">▤</span>Purchase Orders</a><a href="/pricing.php"><span aria-hidden="true">$</span>Purchase Pricing</a><a href="/communications.php"><span aria-hidden="true">✉</span>Communications</a><a href="/dev-support.php"><span aria-hidden="true">⌁</span>Dev Support</a></nav><p>Receipt contents and activation keys are excluded from customer views and exports.</p></aside>
 <main class="crm-main"><div class="page-heading"><div><h1>Customers</h1><p>Verified ownership, licenses, installations, support, and consent in one auditable record.</p></div><?php if(admin_can('customers.export')):?><button class="secondary" type="button" data-open-dialog="export-dialog">Export CSV</button><?php endif;?></div>
@@ -232,10 +324,11 @@ if ($selectedId !== '') {
 </form>
 <div class="crm-workspace"><section class="customer-list" aria-label="Customer records"><?php if(!$customers):?><div class="empty">No customers match these filters.</div><?php endif;?><?php foreach($customers as $customer):?><a class="customer-row <?=$selectedId===$customer['customer_id']?'selected':''?>" href="?<?=http_build_query(array_filter(['q'=>$q,'tier'=>$tier,'maintenance'=>$maintenance,'version'=>$version,'activity'=>$activity,'verified'=>$verified,'marketing'=>$marketing,'support'=>$supportFilter,'duplicates'=>$duplicatesOnly?'1':'','customer'=>$customer['customer_id']],fn($v)=>$v!==''))?>"><div><strong><?=e((string)$customer['display_name'])?></strong><span><?=e(crm_mask_email((string)$customer['canonical_email']))?></span></div><div><span class="tier <?=strtolower((string)$customer['license_tier'])?>"><?=e((string)$customer['license_tier'])?></span><small><?= (int)$customer['installation_count'] ?> installation<?= (int)$customer['installation_count']===1?'':'s' ?></small></div><?php if((int)$customer['duplicate_count']>0):?><em>Review duplicate</em><?php endif;?></a><?php endforeach;?></section>
 <section class="customer-detail"><?php if(!$selected):?><div class="empty"><h2>Select a customer</h2><p>Choose a record to review its linked activity.</p></div><?php else:?><header><div><span>Customer record</span><h2><?=e((string)$selected['display_name'])?></h2><code><?=e((string)$selected['customer_id'])?></code></div><span class="verification <?=empty($selected['email_verified_at'])?'unverified':'verified'?>"><?=empty($selected['email_verified_at'])?'Not verified':'Verified'?></span></header>
-<dl class="identity"><div><dt>Email</dt><dd><?=e((string)$selected['canonical_email']?:'Not provided')?></dd></div><div><dt>Installations</dt><dd><?=count($installations)?></dd></div><div><dt>Licenses</dt><dd><?=count($licenses)?></dd></div><div><dt>Purchases</dt><dd><?=count($purchases)?></dd></div><div><dt>Support requests</dt><dd><?=count($supportRequests)?></dd></div></dl>
+<dl class="identity"><div><dt>Email</dt><dd><?=e((string)$selected['canonical_email']?:'Not provided')?></dd></div><div><dt>Installations</dt><dd><?=count($installations)?></dd></div><div><dt>Licenses</dt><dd><?=count($licenses)?></dd></div><div><dt>Purchases</dt><dd><?=count($purchases)?></dd></div><div><dt>Support requests</dt><dd><?=count($supportRequests)?></dd></div><div><dt>Two-factor authentication</dt><dd><?php if(!empty($selected['portal_mfa_enabled'])):?>Enabled<?php elseif(!empty($selected['portal_mfa_reenrollment_required'])):?>Re-enrollment required<?php elseif(!empty($selected['portal_account_exists'])):?>Not enabled<?php else:?>No portal account<?php endif;?></dd></div></dl>
 <div class="detail-grid"><section><h3>Licenses</h3><?php if(!$licenses):?><p>No paid license is linked.</p><?php else:?><ul><?php foreach($licenses as $license):?><li><strong><?=e((string)$license['license_tier'])?> · <?=e((string)$license['control_state'])?></strong><span>Key ending ••••<?=e((string)$license['activation_key_ending'])?> · <?=e((string)$license['license_id'])?></span></li><?php endforeach;?></ul><?php endif;?></section><section><h3>Installations</h3><?php if(!$installations):?><p>No installation is linked.</p><?php else:?><ul><?php foreach($installations as $installation):?><li><strong><?=e((string)$installation['license_mode'])?> · v<?=e((string)$installation['app_version'])?></strong><span><?=e((string)$installation['installation_uuid'])?> · last seen <?=e((string)$installation['last_seen_at'])?> UTC</span></li><?php endforeach;?></ul><?php endif;?></section><section><h3>Purchases</h3><?php if(!$purchases):?><p>No verified purchase is linked.</p><?php else:?><ul><?php foreach($purchases as $purchase):?><li><strong><?=e((string)$purchase['license_tier'])?> <?=e(strtolower((string)$purchase['order_type']))?> · <?=e((string)$purchase['purchase_status'])?></strong><span><?=e((string)$purchase['purchase_reference'])?> · <?=e((string)$purchase['amount'].' '.(string)$purchase['currency'])?></span></li><?php endforeach;?></ul><?php endif;?></section></div>
 <details open><summary>Consent ledger</summary><div class="ledger"><?php if(!$consents):?><p>No consent decision has been recorded.</p><?php else:?><table><thead><tr><th>Purpose</th><th>Decision</th><th>Policy</th><th>Source</th><th>Recorded UTC</th></tr></thead><tbody><?php foreach($consents as $consent):?><tr><td><?=e((string)$consent['consent_type'])?></td><td><?=e((string)$consent['consent_state'])?></td><td><?=e((string)$consent['policy_version'])?></td><td><?=e((string)$consent['source'])?></td><td><?=e((string)$consent['recorded_at'])?></td></tr><?php endforeach;?></tbody></table><?php endif;?><?php if(admin_can('customers.consent')):?><form method="post" class="consent-form"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="consent"><input type="hidden" name="customer_id" value="<?=e((string)$selected['customer_id'])?>"><input type="hidden" name="confirmed" value="yes"><label>Purpose<select name="consent_type"><?php foreach(CRM_CONSENT_TYPES as $value):?><option><?=e($value)?></option><?php endforeach;?></select></label><label>Decision<select name="consent_state"><?php foreach(CRM_CONSENT_STATES as $value):?><option><?=e($value)?></option><?php endforeach;?></select></label><label>Policy version<input name="policy_version" maxlength="40" value="privacy-2026-07" required></label><button>Record evidence</button></form><?php endif;?></div></details>
 <details><summary>Lifecycle activity</summary><div class="timeline"><?php foreach($events as $event):?><article><strong><?=e((string)$event['event_type'])?></strong><p><?=e((string)$event['event_summary'])?></p><small><?=e((string)$event['source'])?> · <?=e((string)$event['occurred_at'])?> UTC</small></article><?php endforeach;?><?php if(!$events):?><p>No lifecycle events are recorded.</p><?php endif;?></div></details>
 <?php if(admin_can('customers.consent')):?><details><summary>Verified ownership and duplicate controls</summary><div class="sensitive-actions"><?php if(empty($selected['email_verified_at'])):?><form method="post"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="verify_email"><input type="hidden" name="customer_id" value="<?=e((string)$selected['customer_id'])?>"><input type="hidden" name="confirmed" value="yes"><h3>Mark email verified</h3><p>Use only after independently confirming that this customer controls the address.</p><label>Type VERIFIED<input name="confirmation_phrase" autocomplete="off" required></label><button>Mark verified</button></form><?php endif;?><form method="post"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="merge"><input type="hidden" name="customer_id" value="<?=e((string)$selected['customer_id'])?>"><input type="hidden" name="confirmed" value="yes"><h3>Merge reviewed duplicate</h3><p>This is never automatic. Linked records move to the target and permanent merge history is retained.</p><label>Target customer ID<input name="target_customer_id" pattern="[0-9a-fA-F-]{36}" required></label><label>Business reason<input name="reason" minlength="8" maxlength="500" required></label><label>Type MERGE<input name="confirmation_phrase" autocomplete="off" required></label><button class="danger">Merge customer</button></form></div></details><?php endif;?>
+<?php if(admin_can('customers.mfa.reset')&&!empty($selected['portal_mfa_enabled'])):?><details class="mfa-recovery"><summary>Customer MFA recovery</summary><div class="sensitive-actions"><form method="post" data-confirm="Reset this customer's two-factor authentication, revoke every portal session, and require setup again at next sign-in?"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="reset_customer_mfa"><input type="hidden" name="customer_id" value="<?=e((string)$selected['customer_id'])?>"><input type="hidden" name="confirmed" value="yes"><h3>Reset two-factor authentication</h3><p>This temporary recovery action clears the existing MFA enrollment without displaying its secret. Every Customer Portal session will be revoked and the customer must enroll again at next sign-in.</p><label>Identity verification method<select name="identity_verification_method" required><option value="">Select a verified method</option><option>Verified callback</option><option>Verified purchase record</option><option>Verified support challenge</option><option>In-person identity verification</option></select></label><label>Identity verification evidence<textarea name="identity_verification_evidence" minlength="12" maxlength="500" rows="3" required></textarea></label><label>Administrative reason<textarea name="reason" minlength="12" maxlength="500" rows="3" required></textarea></label><label>Type RESET MFA<input name="confirmation_phrase" autocomplete="off" required></label><button class="danger">Reset customer MFA</button></form></div></details><?php endif;?>
 <?php endif;?></section></div></main></div>
-<?php if(admin_can('customers.export')):?><dialog id="export-dialog"><form method="post"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="export"><h2>Export customer records?</h2><p>The export contains personal information. It excludes activation keys, receipt contents, diagnostic attachments, and private-network addresses.</p><label>Business reason<input name="reason" minlength="8" maxlength="500" required></label><label class="check"><input type="checkbox" name="confirmed" value="yes" required> I will store and share this export securely.</label><div><button type="button" data-close-dialog>Cancel</button><button>Download CSV</button></div></form></dialog><?php endif;?><script src="assets/customers.js?v=20260723-1" defer></script></body></html>
+<?php if(admin_can('customers.export')):?><dialog id="export-dialog"><form method="post"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="export"><h2>Export customer records?</h2><p>The export contains personal information. It excludes activation keys, receipt contents, diagnostic attachments, and private-network addresses.</p><label>Business reason<input name="reason" minlength="8" maxlength="500" required></label><label class="check"><input type="checkbox" name="confirmed" value="yes" required> I will store and share this export securely.</label><div><button type="button" data-close-dialog>Cancel</button><button>Download CSV</button></div></form></dialog><?php endif;?><script src="assets/customers.js?v=<?=e($customersScriptVersion)?>" defer></script></body></html>

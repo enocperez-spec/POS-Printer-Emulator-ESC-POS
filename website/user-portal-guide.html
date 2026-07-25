@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>POS Printer Emulator Customer Portal Guide</title>
+    <meta
+      name="description"
+      content="Use the POS Printer Emulator Customer Portal to manage licenses, activated computers, purchases, downloads, maintenance, security, and support requests."
+    />
+    <link
+      rel="canonical"
+      href="https://www.posprinteremulator.com/user-portal-guide"
+    />
+    <link rel="icon" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260724-portal-guide" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260724-portal-guide" />
+    <link
+      rel="stylesheet"
+      href="user-portal-guide.css?v=20260724-current-portal"
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": "How to use the POS Printer Emulator Customer Portal",
+        "dateModified": "2026-07-25",
+        "step": [
+          {
+            "@type": "HowToStep",
+            "name": "Verify and sign in",
+            "text": "Verify the registered email, create a portal password, and sign in."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Review the account overview",
+            "text": "Check the active license, Maintenance and Support date, update status, computers, purchases, and recent support activity."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Manage licenses",
+            "text": "Review masked license details and securely resend an eligible activation key to the verified account email."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Purchase, upgrade, or renew",
+            "text": "Compare licenses, purchase or upgrade through the authenticated portal, and renew optional annual Maintenance and Support."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Review billing",
+            "text": "Review customer-owned transactions and open printable purchase receipts."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Manage computers",
+            "text": "Review installed computers and deactivate an old computer before moving a license."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Download eligible releases",
+            "text": "Compare installed and current versions, review release notes, and download an eligible installer."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Request support",
+            "text": "Submit, monitor, and reply to an eligible private support request."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Manage privacy and security",
+            "text": "Manage consent, configure QR-code two-step verification, export account data, or close portal access."
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/"
+          ><img src="assets/logo-web.png" alt="POS Printer Emulator" /></a
+        ><button
+          class="menu-toggle"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          data-menu-toggle
+          aria-label="Open navigation"
+        >
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="site-nav" id="site-nav" data-nav>
+          <a href="/">Home</a><a href="features">Features</a
+          ><a href="documentation">Documentation</a><a href="pricing">Pricing</a
+          ><a href="faq">FAQ</a
+          ><a
+            class="button button-small"
+            href="https://userportal.posprinteremulator.com/"
+            >Customer Portal</a
+          >
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero">
+        <div class="shell">
+          <div class="breadcrumbs">
+            <a href="/">Home</a><span>/</span
+            ><a href="documentation">Documentation</a><span>/</span
+            ><span>Customer Portal</span>
+          </div>
+          <h1>Customer Portal Guide</h1>
+          <p>
+            Manage ownership, computers, purchases, Maintenance and Support,
+            downloads, account security, and support requests from one verified
+            account.
+          </p>
+        </div>
+      </section>
+      <section class="page-body">
+        <div class="shell article-layout">
+          <article class="article-content portal-guide-content">
+            <div class="portal-guide-intro">
+              <span class="video-label">Updated customer reference</span>
+              <h2>Everything you can manage in the Customer Portal</h2>
+              <p>
+                Use this guide to verify your account, understand license and
+                Maintenance and Support status, purchase or upgrade safely,
+                manage computers, download eligible releases, request support,
+                and protect your account.
+              </p>
+              <a
+                class="button button-primary"
+                href="https://userportal.posprinteremulator.com/"
+                >Open Customer Portal</a
+              >
+            </div>
+
+            <nav class="portal-guide-directory" aria-label="Customer Portal guide sections">
+              <a href="#account-access"><strong>Account access</strong><span>Verification, recovery, and sign-in</span></a>
+              <a href="#overview"><strong>Overview</strong><span>License, coverage, and update status</span></a>
+              <a href="#licenses"><strong>Licenses</strong><span>Masked keys and activation delivery</span></a>
+              <a href="#plans"><strong>Plans</strong><span>Purchases, upgrades, trials, and renewal</span></a>
+              <a href="#billing"><strong>Purchase &amp; Billing</strong><span>Transactions and receipts</span></a>
+              <a href="#computers"><strong>Computers</strong><span>Installed devices and transfers</span></a>
+              <a href="#downloads"><strong>Downloads</strong><span>Version status and eligible installers</span></a>
+              <a href="#support"><strong>Support</strong><span>Private requests, replies, and history</span></a>
+              <a href="#preferences"><strong>Preferences</strong><span>Privacy, two-step verification, and account actions</span></a>
+            </nav>
+
+            <section class="portal-guide-step" id="account-access">
+              <span class="guide-step-label">01 · Account access</span>
+              <h2>Verify your email, create a password, and sign in</h2>
+              <p>
+                Select the verification link sent to your registered email
+                address and create a Customer Portal password. Verification and
+                password-reset links are single-use and expire automatically.
+                If you forget your password, use <strong>Reset your password</strong>
+                on the sign-in page. For privacy, the recovery form displays the
+                same confirmation whether or not an account matches the email.
+              </p>
+              <div class="portal-guide-callout">
+                <strong>Security reminder</strong>
+                <span>
+                  The portal automatically signs you out after 10 minutes without
+                  activity. Save changes before leaving the portal unattended.
+                </span>
+              </div>
+            </section>
+
+            <section class="portal-guide-step" id="overview">
+              <span class="guide-step-label">02 · Overview</span>
+              <h2>See your account status at a glance</h2>
+              <p>
+                Overview welcomes you by your full customer or company name and
+                displays your current license as <strong>Active</strong>, its
+                listener allowance, and the exact
+                <strong>Maintenance and Support Until</strong> date. Beginning
+                90 days before coverage expires, a daily reminder shows the
+                expiration date, days remaining, and a renewal button.
+              </p>
+              <p>
+                When the installed application is behind the current release,
+                Overview shows the installed and latest versions, how many
+                releases behind you are, a release-notes link, and either
+                <strong>Download Latest Version</strong> or
+                <strong>Renew Maintenance and Support</strong>.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window">
+                  <div class="portal-shot-topbar"><span>POS Printer Emulator</span><small>Alex Morgan · Sign out</small></div>
+                  <div class="portal-shot-layout">
+                    <div class="portal-shot-nav"><strong>Overview</strong><span>Licenses</span><span>Plans</span><span>Purchase &amp; Billing</span><span>Computers</span><span>Downloads</span><span>Support</span><span>Preferences</span></div>
+                    <div class="portal-shot-main">
+                      <h3>Welcome back, Alex Morgan</h3>
+                      <div class="portal-license-hero"><div><b>✓</b><span><strong>Pro License</strong><small>● Active</small><em>Maintenance and Support Until: October 23, 2026</em></span></div><button>Download Latest Version</button></div>
+                      <div class="portal-update-card"><strong>New version available!</strong><span>Installed v0.3.49 · Latest v0.3.52 · 3 versions behind</span><a>View release notes</a></div>
+                      <div class="portal-mini-grid"><div><strong>Licenses</strong><span>Pro · 2 listeners</span></div><div><strong>Installed computers</strong><span>Development PC · Active</span></div><div><strong>Recent support</strong><span>REQ-1042 · Open</span></div></div>
+                    </div>
+                  </div>
+                </div>
+                <figcaption>
+                  Overview combines license status, coverage, version awareness,
+                  computers, purchases, and recent support activity.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="licenses">
+              <span class="guide-step-label">03 · Licenses</span>
+              <h2>Review ownership without exposing activation keys</h2>
+              <p>
+                Licenses shows the masked key ending, license level, Active
+                status, issue date, listener allowance, and Maintenance and
+                Support expiration. Complete activation keys are never displayed.
+              </p>
+              <ol>
+                <li>Confirm your Customer Portal password; confirmation remains valid for five minutes.</li>
+                <li>Select <strong>Resend Activation Key</strong> for the correct license.</li>
+                <li>The key is sent only to the verified email address on the account.</li>
+              </ol>
+              <p>
+                Resending requires active Maintenance and Support. When coverage
+                has expired, the button is disabled and the portal provides the
+                expiration date plus a direct renewal action.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Licenses</span><small>Plans &amp; maintenance</small></div>
+                  <div class="portal-data-card">
+                    <div class="portal-data-head"><span>Masked key</span><span>License</span><span>Status</span><span>Coverage</span><span>Delivery</span></div>
+                    <div class="portal-data-row"><span>••••-••••-7K2M</span><span>Pro</span><span class="portal-active">Active</span><span>Oct 23, 2026</span><button>Resend Activation Key</button></div>
+                  </div>
+                </div>
+                <figcaption>
+                  Activation delivery is password-confirmed, maintenance-aware,
+                  rate-limited, and sent only to the verified account email.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="plans">
+              <span class="guide-step-label">04 · Plans &amp; maintenance</span>
+              <h2>Purchase, upgrade, evaluate, or renew</h2>
+              <p>
+                Your current license is visually highlighted. The portal compares
+                Lite, Pro, and Enterprise capabilities and offers the correct
+                action: first purchase, upward upgrade, or clearly labeled
+                additional license. A selected license from the public Buy page
+                remains selected after sign-in.
+              </p>
+              <ul>
+                <li>Confirm your password before creating a secure checkout.</li>
+                <li>Purchases are one-time payments; paid licenses are permanent.</li>
+                <li>Optional annual Maintenance and Support renewal adds one year of updates and assisted support.</li>
+                <li>Eligible installations can start a server-authorized Five-Day Promotional Trial from the application—no key is required.</li>
+              </ul>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Plans &amp; maintenance</span><small>Secure account purchase</small></div>
+                  <div class="portal-plan-grid">
+                    <div><small>POS Printer Emulator License</small><strong>Lite</strong><span>1 printer listener</span><button>Buy Additional Lite License</button></div>
+                    <div class="current"><small>Your current license</small><strong>Pro</strong><span>Up to 2 printer listeners</span><em>✓ Current license</em></div>
+                    <div><small>Maximum flexibility</small><strong>Enterprise</strong><span>Up to 15 printer listeners</span><button>Upgrade to Enterprise</button></div>
+                  </div>
+                  <div class="portal-maintenance-strip"><span><strong>Maintenance and Support</strong> · Coverage through October 23, 2026</span><button>Renew Maintenance and Support</button></div>
+                </div>
+                <figcaption>
+                  The current license stands out, and every purchase or renewal
+                  is associated with the signed-in customer.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="billing">
+              <span class="guide-step-label">05 · Purchase &amp; Billing</span>
+              <h2>Review payments and download receipts</h2>
+              <p>
+                Purchase &amp; Billing separates license purchases, upgrades,
+                and Maintenance and Support renewals. Each row shows payment
+                status, the associated masked license, amount, transaction
+                reference, and a receipt that can be printed or saved as PDF.
+                Payment credentials and complete activation keys are never shown.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Purchase &amp; Billing</span><small>Purchase or renew</small></div>
+                  <div class="portal-metric-row"><div><span>Total transactions</span><strong>3</strong></div><div><span>Paid transactions</span><strong>3</strong></div><div><span>License purchases</span><strong>2</strong></div><div><span>Renewals</span><strong>1</strong></div></div>
+                  <div class="portal-data-card"><div class="portal-data-head billing"><span>Date</span><span>Purchase</span><span>Status</span><span>Amount</span><span>Receipt</span></div><div class="portal-data-row billing"><span>Jul 24, 2026</span><span>Maintenance renewal · Pro</span><span class="portal-active">Paid</span><span>USD 19.99</span><button>View receipt</button></div></div>
+                </div>
+                <figcaption>
+                  Billing history provides customer-owned transaction records
+                  without exposing payment credentials.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="computers">
+              <span class="guide-step-label">06 · Computers</span>
+              <h2>Link computers and move a license securely</h2>
+              <p>
+                In the application, open <strong>Settings → License</strong> and
+                select <strong>Link This Computer</strong>. The app displays a
+                single-use code and opens the Customer Portal. Sign in with a
+                verified email, confirm your password, review the requesting
+                Windows computer, select an eligible license, and approve the
+                link. The app checks for approval and activates automatically.
+              </p>
+              <ol>
+                <li>Start the link from the computer you want to activate.</li>
+                <li>Approve the code within 10 minutes; expired and used codes cannot be reused.</li>
+                <li>Select a license that is not active on another computer.</li>
+                <li>Return to the app and wait for the linked-and-activated confirmation.</li>
+              </ol>
+              <p>
+                To transfer a license, confirm your portal password, enter a
+                transfer reason, and deactivate the old computer first. If the
+                old device is lost or unavailable, submit a <strong>License
+                Issue</strong> in Support for identity-verified recovery. Backup
+                activation keys follow this same portal flow and never establish
+                ownership on their own.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Link this computer</span><small>Account-based activation</small></div>
+                  <div class="portal-update-card"><strong>Code ABCD-2345</strong><span>Development PC · Windows 11 Pro · v0.3.52</span><a>Approve and link computer</a></div>
+                  <div class="portal-data-card"><div class="portal-data-head computers"><span>Computer</span><span>Version</span><span>Last seen</span><span>Status</span></div><div class="portal-data-row computers"><span>Development PC<small>Windows 11 Pro</small></span><span>v0.3.52</span><span>Today, 2:15 PM</span><span class="portal-active">Active</span></div></div>
+                </div>
+                <figcaption>
+                  Approval binds the selected account-owned license to this
+                  computer; deactivation releases it for a replacement.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="downloads">
+              <span class="guide-step-label">07 · Downloads</span>
+              <h2>Know when an update is available</h2>
+              <p>
+                Downloads compares the latest version reported by your active
+                installation with the current published release. It displays the
+                installed version, latest version, release date, versions behind,
+                and release notes.
+              </p>
+              <p>
+                Active Maintenance and Support unlocks
+                <strong>Download Latest Version</strong>. If coverage has expired,
+                the available version remains visible, but the download action
+                changes to <strong>Renew Maintenance and Support</strong>.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Downloads</span><small>Windows 11 Pro · x64</small></div>
+                  <div class="portal-download-card"><div><small>Software update</small><strong>New version available!</strong><span>You are 3 versions behind.</span></div><div class="portal-version-pairs"><span>Installed<strong>v0.3.49</strong></span><span>Latest<strong>v0.3.52</strong></span><span>Released<strong>July 24, 2026</strong></span></div><div><button>Download Latest Version</button><a>View release notes</a></div></div>
+                </div>
+                <figcaption>
+                  Update eligibility is controlled by Maintenance and Support,
+                  while version availability remains visible to the customer.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="support">
+              <span class="guide-step-label">08 · Support</span>
+              <h2>Submit and follow a private support request</h2>
+              <p>
+                Choose Bug Report, Feature Request, License Issue, or Other
+                Issue. Add a clear subject and description, then optionally
+                attach one PNG, JPG, TXT, PDF, or ZIP file up to 2 MB. Do not
+                include activation keys, passwords, payment details, or customer
+                receipt contents.
+              </p>
+              <p>
+                Your support history shows the private reference, status,
+                conversation, and replies. A request saved locally but awaiting
+                secure submission includes a retry action.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Support</span><small>Private account request</small></div>
+                  <div class="portal-support-grid"><div><label>Request type</label><span>Bug Report</span><label>Subject</label><span>Receipt alignment question</span><label>Detailed description</label><span class="portal-textarea">Explain the observed result and steps to reproduce…</span><button>Submit support request</button></div><div><strong>Your support history</strong><span><code>REQ-1042</code> Receipt alignment question</span><small>Open · July 24, 2026</small></div></div>
+                </div>
+                <figcaption>
+                  Requests and replies stay associated with the verified
+                  customer account.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-guide-step" id="preferences">
+              <span class="guide-step-label">09 · Preferences &amp; security</span>
+              <h2>Control privacy and protect your account</h2>
+              <p>
+                Preferences lets you update the displayed customer or company
+                name, manage optional product-news and privacy-safe analytics
+                consent, and review the recorded consent history.
+              </p>
+              <h3>Two-step verification</h3>
+              <ol>
+                <li>Select <strong>Start two-step setup</strong>.</li>
+                <li>Scan the QR code with an authenticator app or enter the setup key.</li>
+                <li>Enter the six-digit code and save the one-time recovery codes.</li>
+              </ol>
+              <p>
+                To disable two-step verification, re-enter the account password,
+                provide a valid authenticator or recovery code, type
+                <strong>DISABLE</strong>, and confirm the warning. Every active
+                portal session is revoked and a security notification is sent.
+              </p>
+              <p>
+                Privacy actions include downloading your account data and
+                closing portal access after recent password confirmation.
+                Closing portal access does not cancel or delete a permanent
+                software license or required transaction records.
+              </p>
+              <figure class="portal-shot">
+                <div class="portal-shot-window compact">
+                  <div class="portal-shot-topbar"><span>Preferences &amp; security</span><small>Account protection</small></div>
+                  <div class="portal-security-grid"><div><strong>Two-step verification</strong><div class="portal-qr" aria-label="Illustration of an authenticator QR code"></div><span>Scan with your authenticator app</span></div><div><strong>Or enter the setup key</strong><code>ABCD EFGH IJKL MNOP</code><label>Six-digit code</label><span class="portal-code-field">123456</span><button>Verify and enable</button></div></div>
+                </div>
+                <figcaption>
+                  The real portal generates a unique QR code and setup key for
+                  the signed-in customer. The illustration uses sample data.
+                </figcaption>
+              </figure>
+            </section>
+
+            <section class="portal-privacy-summary">
+              <h2>Information the portal deliberately does not show</h2>
+              <ul>
+                <li>Complete activation keys on screen</li>
+                <li>Receipt text, raw ESC/POS bytes, barcodes, or receipt images</li>
+                <li>Passwords, authenticator secrets, or existing recovery codes</li>
+                <li>Payment credentials or private listener addresses</li>
+              </ul>
+            </section>
+          </article>
+          <aside class="sidebar-card">
+            <h2>Open your account</h2>
+            <p>
+              Sign in with the verified email associated with your license or
+              Trial registration.
+            </p>
+            <a
+              class="button button-primary"
+              href="https://userportal.posprinteremulator.com/"
+              >Open Customer Portal</a
+            ><a
+              class="button button-outline"
+              href="how-to-manage-pos-printer-emulator-license"
+              >License guide</a
+            >
+            <ul class="sidebar-links">
+              <li><a href="#overview">Overview and updates</a></li>
+              <li><a href="#licenses">Licenses and activation delivery</a></li>
+              <li><a href="#plans">Purchases, upgrades, and renewal</a></li>
+              <li><a href="#downloads">Downloads and version status</a></li>
+              <li><a href="#preferences">Preferences and security</a></li>
+              <li><a href="pricing">Compare licenses</a></li>
+              <li>
+                <a href="application-maintenance-support"
+                  >Maintenance details</a
+                >
+              </li>
+              <li>
+                <a href="how-to-submit-a-support-request"
+                  >Support request guide</a
+                >
+              </li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <section class="related">
+      <div class="shell">
+        <h2>Related guides</h2>
+        <div class="related-grid">
+          <a href="how-to-manage-pos-printer-emulator-license"
+            ><strong>License management</strong
+            ><span>Activate and move a license.</span></a
+          ><a href="how-to-check-for-pos-printer-emulator-updates"
+            ><strong>Updates</strong><span>Review eligible releases.</span></a
+          ><a href="how-to-submit-a-support-request"
+            ><strong>Support</strong
+            ><span>Prepare and submit a request.</span></a
+          >
+        </div>
+      </div>
+    </section>
+    <footer class="site-footer">
+      <div class="shell footer-top">
+        <a class="brand footer-brand" href="/"
+          ><img src="assets/logo-web.png" alt="POS Printer Emulator"
+        /></a>
+        <nav>
+          <a href="features">Features</a
+          ><a href="documentation">Documentation</a><a href="pricing">Pricing</a
+          ><a href="faq">FAQ</a><a href="privacy">Privacy</a>
+        </nav>
+      </div>
+      <div class="shell footer-bottom">
+        <span>© 2026 POS Printer Emulator.</span
+        ><span>Secure self-service account management.</span>
+      </div>
+    </footer>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>

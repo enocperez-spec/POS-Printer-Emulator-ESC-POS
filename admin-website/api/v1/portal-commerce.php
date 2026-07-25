@@ -287,6 +287,41 @@ try {
                 'maintenanceExpiresAt' => (string)$renewal['maintenance_expires_at'],
                 'maintenanceToken' => (string)$renewal['maintenance_token'],
             ];
+        } elseif ((string)$intent['order_type'] === 'LICENSE') {
+            $existing = $pdo->prepare(
+                "SELECT license_id,license_tier,maintenance_expires_at,activation_key,
+                        activation_key_ciphertext,activation_key_nonce,activation_key_tag
+                 FROM issued_licenses
+                 WHERE source_reference=:source_reference AND control_state IN ('Enabled','Deactivated')
+                 ORDER BY issued_at DESC LIMIT 1"
+            );
+            $existing->execute(['source_reference' => $sourceReference]);
+            $issued = $existing->fetch();
+            if (!is_array($issued)) {
+                $issued = issue_activation_key(
+                    (string)$intent['display_name'],
+                    (string)$intent['canonical_email'],
+                    (string)$intent['target_tier']
+                );
+                insert_issued_license(
+                    $pdo,
+                    $issued,
+                    'verified-self-service',
+                    'Purchase',
+                    $sourceReference,
+                    'PURCHASED',
+                    'INITIAL_INCLUDED',
+                    'One year of Application Maintenance and Support included with the POS Printer Emulator License.'
+                );
+            }
+            $fulfillment = [
+                'licenseId' => (string)$issued['license_id'],
+                'licenseTier' => (string)$issued['license_tier'],
+                'activationKey' => isset($issued['activation_key_ciphertext'])
+                    ? reveal_activation_key($issued)
+                    : (string)$issued['activation_key'],
+                'maintenanceExpiresAt' => (string)$issued['maintenance_expires_at'],
+            ];
         } elseif ((string)$intent['current_tier'] === 'Trial') {
             $existing = $pdo->prepare(
                 "SELECT license_id,license_tier,maintenance_expires_at,activation_key,
@@ -385,7 +420,7 @@ try {
         );
         $complete->execute([
             'capture_id' => $providerCaptureId,
-            'replacement_license_id' => (string)$intent['order_type'] === 'UPGRADE'
+            'replacement_license_id' => in_array((string)$intent['order_type'], ['UPGRADE', 'LICENSE'], true)
                 ? ($fulfillment['licenseId'] ?? null)
                 : null,
             'maintenance_new_expires_at' => $fulfillment['maintenanceExpiresAt'] ?? null,

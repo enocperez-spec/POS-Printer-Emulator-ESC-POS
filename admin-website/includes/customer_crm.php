@@ -201,6 +201,7 @@ function ensure_customer_crm_schema(PDO $pdo): void
             customer_id CHAR(36) NULL,
             action VARCHAR(64) NOT NULL,
             actor VARCHAR(80) NOT NULL,
+            actor_ip_address VARCHAR(45) NULL,
             object_type VARCHAR(40) NOT NULL,
             object_reference VARCHAR(96) NULL,
             reason VARCHAR(500) NULL,
@@ -274,6 +275,10 @@ function ensure_customer_crm_schema(PDO $pdo): void
     $support = crm_table_columns($pdo, 'support_requests');
     if (!isset($support['customer_id'])) {
         $pdo->exec('ALTER TABLE support_requests ADD COLUMN customer_id CHAR(36) NULL AFTER reference_code, ADD KEY ix_support_requests_customer (customer_id)');
+    }
+    $auditColumns = crm_table_columns($pdo, 'customer_admin_audit');
+    if (!isset($auditColumns['actor_ip_address'])) {
+        $pdo->exec('ALTER TABLE customer_admin_audit ADD COLUMN actor_ip_address VARCHAR(45) NULL AFTER actor');
     }
     $ready = true;
     $pdo->query("SELECT RELEASE_LOCK('ppe_customer_crm_schema_v1')")->fetchColumn();
@@ -378,14 +383,26 @@ function crm_record_consent(PDO $pdo, string $customerId, string $type, string $
     ]);
 }
 
-function crm_record_admin_audit(PDO $pdo, ?string $customerId, string $action, string $actor, string $objectType, ?string $reference, ?string $reason): void
+function crm_record_admin_audit(
+    PDO $pdo,
+    ?string $customerId,
+    string $action,
+    string $actor,
+    string $objectType,
+    ?string $reference,
+    ?string $reason,
+    ?string $actorIpAddress = null
+): void
 {
+    $actorIpAddress = filter_var($actorIpAddress, FILTER_VALIDATE_IP) ? $actorIpAddress : null;
     $statement = $pdo->prepare(
-        'INSERT INTO customer_admin_audit (customer_id, action, actor, object_type, object_reference, reason)
-         VALUES (:customer_id, :action, :actor, :object_type, :reference, :reason)'
+        'INSERT INTO customer_admin_audit
+            (customer_id, action, actor, actor_ip_address, object_type, object_reference, reason)
+         VALUES (:customer_id, :action, :actor, :actor_ip_address, :object_type, :reference, :reason)'
     );
     $statement->execute([
         'customer_id' => $customerId, 'action' => crm_text_slice($action, 0, 64), 'actor' => crm_text_slice($actor, 0, 80),
+        'actor_ip_address' => $actorIpAddress,
         'object_type' => crm_text_slice($objectType, 0, 40), 'reference' => $reference === null ? null : crm_text_slice($reference, 0, 96),
         'reason' => $reason === null ? null : crm_text_slice($reason, 0, 500),
     ]);

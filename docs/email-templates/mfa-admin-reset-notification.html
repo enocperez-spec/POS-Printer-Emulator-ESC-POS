@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Your two-factor authentication setup was reset</title>
+</head>
+<body style="margin:0;background:#eef3f8;color:#0b1e3a;font-family:Arial,sans-serif">
+  <div style="display:none;max-height:0;overflow:hidden">You must configure two-factor authentication again at your next Customer Portal sign-in.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef3f8">
+    <tr><td align="center" style="padding:28px 14px">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#fff;border:1px solid #d8e0ea;border-radius:12px">
+        <tr><td style="padding:24px 30px;background:#07172d;border-radius:12px 12px 0 0">
+          <img src="https://www.posprinteremulator.com/assets/logo-web.png" width="220" alt="POS Printer Emulator" style="display:block;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:30px">
+          <p style="margin:0 0 10px;color:#0d6ee8;font-size:13px;font-weight:bold;text-transform:uppercase">Account recovery notice</p>
+          <h1 style="margin:0 0 18px;font-size:28px;line-height:1.2">Two-factor authentication must be configured again</h1>
+          <p>Hello {{ params.customer_name }},</p>
+          <p>Your previous two-factor authentication setup was {{ params.event_label }} after an identity-verification recovery request. Every existing portal session was signed out.</p>
+          <p>At your next sign-in, the Customer Portal will require you to scan a new QR code and save new recovery codes before you can continue.</p>
+          <p style="margin:26px 0"><a href="{{ params.portal_url }}" style="display:inline-block;background:#0d6ee8;color:#fff;text-decoration:none;font-weight:bold;padding:13px 20px;border-radius:7px">Sign In and Configure Two-Factor Authentication</a></p>
+          <p>If you did not request this recovery action, submit a support request immediately.</p>
+          <p><a href="{{ params.documentation_url }}">View Documentation</a> &nbsp;|&nbsp; <a href="{{ params.support_request_url }}">Submit a Support Request</a></p>
+        </td></tr>
+        <tr><td style="padding:18px 30px;background:#f5f8fc;color:#5d6e86;font-size:12px;border-radius:0 0 12px 12px">
+          {{ params.no_reply_notice }}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

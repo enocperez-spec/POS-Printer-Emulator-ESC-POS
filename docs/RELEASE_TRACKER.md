@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.52 — released 2026-07-24**
+**Current public release: v0.3.53 — released 2026-07-25**
 
-**Current development: v0.3.53 — Projects and testing sessions**
+**Current development: v0.3.54 — Privacy-safe receipt masking**
 
-**Next release after v0.3.52: v0.3.53 — Projects and testing sessions**
+**Next release after v0.3.53: v0.3.54 — Privacy-safe receipt masking**
 
-**Future scheduled sequence: v0.3.53 through v0.3.60**
+**Future scheduled sequence: v0.3.50 through v0.3.59**
 
-**Most recently completed: v0.3.52 — Updater Download File-Lock Correction**
+**Most recently completed: v0.3.53 — Account-Based License Registration and Activation**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -92,11 +92,10 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.49 | Released | Receipt Image Sharing |
 | v0.3.50 | Released | Advanced Diagnostics PDF Report |
 | v0.3.51 | Released | Standard Diagnostics PDF Report |
-| v0.3.52 | Released | Updater Download File-Lock Correction |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49 provides direct receipt-image sharing; v0.3.50-v0.3.51 deliver the reusable advanced and standard diagnostic-report engine; v0.3.52 corrects the Windows updater file lifecycle; v0.3.53-v0.3.57 improve organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.58 delivers receipt comparison and automated validation; v0.3.59 makes public update awareness available to every license and maintenance state; and v0.3.60 restores the deferred automatic configuration-recovery release.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49 provides direct receipt-image sharing; v0.3.50-v0.3.51 deliver the reusable advanced and standard diagnostic-report engine; v0.3.52-v0.3.57 improve recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.58 delivers receipt comparison and automated validation; and v0.3.59 makes public update awareness available to every license and maintenance state.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -820,53 +819,54 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Verification:** The report is two pages versus the Advanced sample's six, includes the correct application logo and version, and passes PDF metadata, rendered-page, prohibited-value extraction, shared redaction, Enterprise authorization, production build, dependency audit, and automated test checks.
 
-### v0.3.52 — Updater Download File-Lock Correction
-
-**Status:** Released — 2026-07-24
-
-**Purpose:** Restore reliable in-app updating after Windows reported that the downloaded installer was still being used by another process.
-
-**Released scope:**
-
-- Move installer and checksum downloading into the shared update-security component.
-- Dispose the exclusive temporary output stream before promoting the completed download.
-- Reject a download when its byte count does not match the server-provided content length.
-- Remove partial `.download` files after a failed transfer.
-- Preserve the existing trusted-host, SHA-256 verification, safety-snapshot, controlled shutdown, installer, and restart flow.
-- Add a regression test that acquires an exclusive handle to the promoted installer after download.
-
-**License availability:** The correction applies to every license and maintenance state that is eligible to use the guided updater.
-
-**Security and privacy:** Downloads remain restricted to trusted HTTPS GitHub installer assets and must pass the published SHA-256 checksum before execution.
-
-**Complete when:** A verified installer download is promoted without a Windows sharing violation, incomplete transfers are rejected, partial files are cleaned up, and automated updater tests pass.
-
-**Verification:** The update-security regression suite, complete .NET test suite, Release desktop build, packaged installer validation, checksum verification, GitHub asset download, and live website release manifest all pass.
-
-### v0.3.53 — Projects and testing sessions
+### v0.3.52 — Automatic configuration restore points
 
 **Status:** Planned
 
-**GitHub:** [Issue #33 — Projects and testing sessions](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33)
+**GitHub:** [Issue #32 — Automatic configuration restore points](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32)
 
-**Purpose:** Organize receipts and configuration by customer, store, POS migration, register, or support engagement.
+**Purpose:** Protect customers from accidental configuration loss without requiring them to remember to create a manual backup.
 
 **Planned scope:**
 
-- Create named projects containing sessions, notes, tags, listener references, profiles, captures, validation baselines, and reports.
-- Add a default project so existing installations migrate without requiring customer action.
-- Provide project selection, recent projects, archive, duplicate, safe move or copy, export, and import workflows.
-- Preserve project filters and the last-open session across restarts without changing active listener routing unexpectedly.
-- Validate imported project schemas, integrity checksums, item limits, and safe paths before committing any data.
-- Expose stable project identifiers and data boundaries that the later receipt-comparison release can reuse while keeping shared built-in profiles and stored logos understandable.
+- Create encrypted restore points before listener, profile, stored-logo, configuration import, restore, repair, and update changes.
+- Add optional scheduled local restore points with retention limits by count, age, and total storage.
+- Show the creation time, reason, application version, included sections, and integrity state before restoration.
+- Restore transactionally, create a safety point first, and roll back automatically when validation or restart fails.
+- Provide clear storage usage and cleanup controls without deleting the only known-good restore point.
+- Reuse the established encrypted backup format while keeping automatic files in the protected application-data directory.
 
-**License availability:** Pro and Enterprise.
+**License availability:** Lite, Pro, and Enterprise. Trial receives automatic safety points for included setup changes without scheduled retention controls.
 
-**Security and privacy:** Projects remain local by default; exported packages require explicit content review and must not contain activation keys, credentials, unrelated receipts, or data from another project.
+**Security and privacy:** Encrypt restore points, restrict Windows ACLs, redact secrets from metadata, never upload automatically, and exclude activation keys or receipt payloads unless a separately reviewed protected format explicitly supports them.
 
-**Why this order:** The restore-point foundation in v0.3.52 makes project-level organization safer, and projects establish clean data boundaries for the later receipt-comparison release.
+**Why this order:** It reduces the recovery risk before projects and additional privacy or encoding configuration make customer state more complex.
 
-**Complete when:** A consultant can keep two customer projects isolated, switch between them safely, and export one project without leaking data or configuration from the other.
+**Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
+
+### v0.3.53 — Account-Based License Registration and Activation
+
+**Status:** Released — 2026-07-25
+
+**Purpose:** Establish license ownership through a verified Customer Portal account instead of customer-name, company-name, or email matching.
+
+**Released scope:**
+
+- Add **Link This Computer** to the desktop License settings.
+- Authenticate each link request using the registered installation identity.
+- Generate a ten-minute, single-use registration code and open the Customer Portal.
+- Require verified account sign-in, recent password confirmation, device review, and explicit approval.
+- Let the customer select an eligible account-owned license and activate it without reinstalling.
+- Enforce one active computer per license and record activation, deactivation, claim, and transfer history.
+- Allow a legacy activation key to be claimed only as a backup method through a verified account.
+- Replace the legacy local name, email, and key activation endpoint with clear account-link guidance.
+- Update purchase confirmations, approved email content, FAQ, documentation, and the illustrated User Portal guide.
+
+**Security and privacy:** Request secrets are stored only as hashes, codes expire and cannot be replayed, installations are authenticated, link creation is rate limited, activation keys remain masked in routine portal views, and all ownership changes are audited without receipt data.
+
+**Complete when:** A verified customer can approve a pending computer, activate an eligible account-owned license, release the device for transfer, and receive specific recovery guidance while expired, duplicate, unauthorized, or replayed requests are rejected.
+
+**Scheduling note:** Projects and testing sessions remain tracked in [Issue #33](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33) and return to the future roadmap after the account-ownership foundation.
 
 ### v0.3.54 — Privacy-safe receipt masking
 
@@ -1018,31 +1018,6 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 **Why this order:** Update awareness is useful to every customer, but it can build on the v0.3.39 guided-updater trust and restart foundation without destabilizing the already scheduled customer-experience releases.
 
 **Complete when:** Every license tier receives accurate, non-blocking new-version notifications; the UI shows both versions, versions behind, and a concise summary; Trial opens the official download page; active-maintenance paid users can install in-app; expired-maintenance paid users cannot bypass renewal; and automated tests cover all license states, version counting, offline caching, malformed release data, and trusted-link enforcement.
-
-### v0.3.60 — Automatic configuration restore points
-
-**Status:** Planned
-
-**GitHub:** [Issue #32 — Automatic configuration restore points](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32)
-
-**Purpose:** Protect customers from accidental configuration loss without requiring them to remember to create a manual backup.
-
-**Planned scope:**
-
-- Create encrypted restore points before listener, profile, stored-logo, configuration import, restore, repair, and update changes.
-- Add optional scheduled local restore points with retention limits by count, age, and total storage.
-- Show the creation time, reason, application version, included sections, and integrity state before restoration.
-- Restore transactionally, create a safety point first, and roll back automatically when validation or restart fails.
-- Provide clear storage usage and cleanup controls without deleting the only known-good restore point.
-- Reuse the established encrypted backup format while keeping automatic files in the protected application-data directory.
-
-**License availability:** Lite, Pro, and Enterprise. Trial receives automatic safety points for included setup changes without scheduled retention controls.
-
-**Security and privacy:** Encrypt restore points, restrict Windows ACLs, redact secrets from metadata, never upload automatically, and exclude activation keys or receipt payloads unless a separately reviewed protected format explicitly supports them.
-
-**Why this order:** The emergency v0.3.52 updater correction took its original release number. Restore points remain scheduled after the existing v0.3.53–v0.3.59 customer-experience releases.
-
-**Complete when:** A customer can recover the previous working configuration after a failed or accidental change with no partial state, secret exposure, or paid-license loss.
 
 ### v0.3.30 — Security remediation (Phase 1)
 

@@ -24,3 +24,145 @@
 @media (max-width:760px){.video-guide,.documentation-feature{grid-template-columns:1fr}.interface-map,.tip-grid{grid-template-columns:1fr}.interface-map section:last-child:nth-child(odd){grid-column:auto}}
 @media (max-width:600px){.page-hero{padding:125px 0 70px}.page-hero h1{font-size:42px}.article-content h2{font-size:32px}.compact-table{font-size:13px}.compact-table th,.compact-table td{padding:10px}.breadcrumbs{flex-wrap:wrap}.guide-directory{grid-template-columns:1fr}.video-guide{padding:16px}.guide-screenshot-wide{margin-right:-7px;margin-left:-7px;padding:6px}.interface-map section{padding:17px}}
 @media (max-width:600px){.method-version{display:grid}.formula-list>div{grid-template-columns:1fr;gap:8px}.assumption-grid{grid-template-columns:1fr}}
+.license-table-scroll {
+  width: 100%;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  outline: none;
+}
+
+.license-table-scroll:focus-visible {
+  box-shadow: 0 0 0 3px rgba(12, 188, 221, 0.35);
+}
+
+.license-comparison-table {
+  min-width: 920px;
+}
+
+.license-comparison-table th:first-child {
+  min-width: 250px;
+  text-align: left;
+}
+
+.license-comparison-table tbody th[scope="row"],
+[data-license-comparison] .license-comparison-table th[scope="row"] {
+  color: #f7fbff;
+  background-color: var(--navy);
+  font-weight: 700;
+}
+
+.license-comparison-table th[scope="row"] * {
+  color: inherit;
+}
+
+.compare-grid > *,
+[data-license-comparison] {
+  min-width: 0;
+}
+
+[data-license-comparison] .license-table-scroll {
+  max-width: 100%;
+}
+
+.license-source-note {
+  color: #60738a;
+  font-size: 0.85rem;
+}
+
+.documentation-license-comparison .license-table-scroll {
+  overflow-x: visible;
+}
+
+.documentation-license-comparison .license-comparison-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.documentation-license-comparison .license-comparison-table th,
+.documentation-license-comparison .license-comparison-table td {
+  padding: 12px 10px;
+  overflow-wrap: anywhere;
+}
+
+.documentation-license-comparison .license-comparison-table th:first-child {
+  width: 34%;
+  min-width: 0;
+}
+
+.documentation-license-comparison .license-comparison-table th:not(:first-child) {
+  width: 16.5%;
+}
+
+@media (max-width: 600px) {
+  .documentation-license-comparison .license-comparison-table {
+    border-collapse: separate;
+    border-spacing: 0 14px;
+    font-size: 14px;
+  }
+
+  .documentation-license-comparison .license-comparison-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .documentation-license-comparison .license-comparison-table tbody,
+  .documentation-license-comparison .license-comparison-table tr,
+  .documentation-license-comparison .license-comparison-table th,
+  .documentation-license-comparison .license-comparison-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .documentation-license-comparison .license-comparison-table tr {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .documentation-license-comparison .license-comparison-table th[scope="row"] {
+    width: 100%;
+    min-width: 0;
+    padding: 14px;
+    border: 0;
+  }
+
+  .documentation-license-comparison .license-comparison-table td {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px 14px;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .documentation-license-comparison .license-comparison-table td::before {
+    color: var(--ink);
+    font-weight: 800;
+  }
+
+  .documentation-license-comparison .license-comparison-table td:nth-child(2)::before {
+    content: "Trial";
+  }
+
+  .documentation-license-comparison .license-comparison-table td:nth-child(3)::before {
+    content: "Lite";
+  }
+
+  .documentation-license-comparison .license-comparison-table td:nth-child(4)::before {
+    content: "Pro";
+  }
+
+  .documentation-license-comparison .license-comparison-table td:nth-child(5)::before {
+    content: "Enterprise";
+  }
+}

@@ -77,6 +77,7 @@ $expectThrows(static fn():DateTimeImmutable=>normalize_maintenance_expiration('2
 
 $licensesPage = file_get_contents($root . '/admin-website/licenses.php') ?: '';
 $pricingPage = file_get_contents($root . '/admin-website/pricing.php') ?: '';
+$ordersPage = file_get_contents($root . '/admin-website/orders.php') ?: '';
 $setupPage = file_get_contents($root . '/admin-website/setup.php') ?: '';
 $dashboardPage = file_get_contents($root . '/admin-website/index.php') ?: '';
 $dashboardStyles = file_get_contents($root . '/admin-website/assets/admin-overrides.css') ?: '';
@@ -85,6 +86,8 @@ $geographyMap = file_get_contents($root . '/admin-website/assets/geography-map.j
 $expectContains('<option value="Lite">Lite</option>', $licensesPage, 'License Manager is missing the Lite issuance/upgrade option.');
 $expectContains("foreach(['Lite','Pro','Enterprise']", $pricingPage, 'Admin Pricing is not rendering all three paid offers.');
 $expectContains("value=\"maintenance\"",$pricingPage,'Admin Pricing is missing server-controlled maintenance renewal prices.');
+$expectContains('userportal.posprinteremulator.com/index.php?return=billing',$ordersPage,'Admin Purchase Orders must link to the account-bound Customer Portal billing destination.');
+$expectContains('Every purchase is linked to a registered Customer Portal account.',$ordersPage,'Admin Purchase Orders must explain the registered-account requirement.');
 $expectContains('extend_maintenance',$licensesPage,'License Manager is missing manual maintenance extension controls.');
 $expectContains('revoke_maintenance',$licensesPage,'License Manager is missing maintenance revocation controls.');
 $expectContains('data-prepare-action="restore_maintenance"',$licensesPage,'License Manager is missing confirmed maintenance restoration controls.');
@@ -173,14 +176,13 @@ $expectContains("('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial E
 $expectContains("('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released'", $schema, 'Fresh database schema must identify v0.3.47 as released.');
 $expectContains("WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'", $devSupport, 'Admin Dev Support is missing the v0.3.47 GitHub release link.');
 $futureReleases = [
-    'v0.3.48' => ['Automatic configuration restore points', 32],
-    'v0.3.49' => ['Projects and testing sessions', 33],
-    'v0.3.50' => ['Privacy-safe receipt masking', 34],
-    'v0.3.51' => ['System tray health and notifications', 35],
-    'v0.3.52' => ['Character and code-page assistant', 36],
-    'v0.3.53' => ['Offline Enterprise update packages', 37],
-    'v0.3.54' => ['Receipt comparison and automated validation', 21],
-    'v0.3.55' => ['Update Notifications for All License Types', 40],
+    'v0.3.54' => ['Privacy-safe receipt masking', 34],
+    'v0.3.55' => ['System tray health and notifications', 35],
+    'v0.3.56' => ['Character and code-page assistant', 36],
+    'v0.3.57' => ['Offline Enterprise update packages', 37],
+    'v0.3.58' => ['Receipt comparison and automated validation', 21],
+    'v0.3.59' => ['Update Notifications for All License Types', 40],
+    'v0.3.60' => ['Automatic configuration restore points', 32],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
     $status = 'Planned';
@@ -212,7 +214,7 @@ $expectContains("WHEN 'v0.3.35' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("WHEN 'v0.3.36' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.36'", $devSupport, 'Admin Dev Support is missing the v0.3.36 release link.');
 $expectContains("WHEN 'v0.3.39' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.39'", $devSupport, 'Admin Dev Support is missing the v0.3.39 release link.');
 $expectContains("WHEN 'v0.3.38' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.38'", $devSupport, 'Admin Dev Support is missing the v0.3.38 release link.');
-$expectContains("WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.54 comparison issue link.');
+$expectContains("WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'", $devSupport, 'Admin Dev Support is missing the v0.3.58 comparison issue link.');
 $expectContains('server-authorized Lite, Pro, or Enterprise evaluation', $devSupport, 'Admin Dev Support is missing the promotional-trial server authorization scope.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';

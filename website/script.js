@@ -1,3 +1,5 @@
+import './license-catalog.js';
+
 const header = document.querySelector('[data-header]');
 const menuButton = document.querySelector('[data-menu-toggle]');
 const nav = document.querySelector('[data-nav]');

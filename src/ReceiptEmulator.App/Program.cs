@@ -51,6 +51,11 @@ builder.Services.AddSingleton<UsageTelemetryService>(services => new UsageTeleme
 builder.Services.AddSingleton<IUsageTelemetry>(services => services.GetRequiredService<UsageTelemetryService>());
 builder.Services.AddSingleton<IInstallationCredentialsProvider>(services => services.GetRequiredService<UsageTelemetryService>());
 builder.Services.AddHostedService(services => services.GetRequiredService<UsageTelemetryService>());
+builder.Services.AddHttpClient<AccountLinkService>(client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddHttpClient<PromotionAccessService>(client =>
 {
     client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
@@ -822,61 +827,56 @@ app.MapDelete("/api/support/requests/drafts/{reference}", (string reference, Sup
     catch (ArgumentException exception) { return Results.Problem(exception.Message, statusCode: 400); }
 });
 
-app.MapPost("/api/license/activate", async (
-    ActivationRequest request,
-    LicenseService license,
-    ReceiptStore store,
-    PrinterListenerManager listeners,
-    IUsageTelemetry telemetry,
-    ILoggerFactory loggerFactory,
+app.MapPost("/api/account-link/start", async (
+    AccountLinkStartRequest? request,
+    AccountLinkService accountLink,
     CancellationToken cancellationToken) =>
 {
-    var logger = loggerFactory.CreateLogger("LicenseActivation");
-    LicenseStatus status;
-
     try
     {
-        status = license.Activate(request.CustomerName, request.EmailAddress, request.ActivationKey);
+        return Results.Ok(await accountLink.StartAsync(request?.ActivationKey, cancellationToken));
     }
     catch (InvalidOperationException exception)
     {
         return Results.Problem(exception.Message, statusCode: 400);
     }
-    catch (Exception exception)
-    {
-        logger.LogError(exception, "A validated license could not be saved to local storage");
-        return Results.Problem(
-            "The activation key could not be saved on this computer. Download Activation Diagnostics from this License page and send it to support, then try again.",
-            statusCode: 500);
-    }
-
-    try
-    {
-        store.EnablePaidHistory();
-    }
-    catch (Exception exception)
-    {
-        logger.LogError(
-            exception,
-            "License {LicenseId} was activated, but paid receipt history could not be initialized",
-            status.LicenseId);
-    }
-
-    try
-    {
-        await listeners.ReconcileAsync(cancellationToken);
-    }
-    catch (Exception exception)
-    {
-        logger.LogError(
-            exception,
-            "License {LicenseId} was activated, but printer listeners could not be reconciled",
-            status.LicenseId);
-    }
-
-    telemetry.RecordActivation();
-    return Results.Ok(license.GetStatus());
 });
+
+app.MapPost("/api/account-link/status", async (
+    AccountLinkStatusRequest request,
+    AccountLinkService accountLink,
+    ReceiptStore store,
+    PrinterListenerManager listeners,
+    ILoggerFactory loggerFactory,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await accountLink.CheckAsync(request.LinkId, request.RequestToken, cancellationToken);
+        if (result.License is not null)
+        {
+            try
+            {
+                store.EnablePaidHistory();
+                await listeners.ReconcileAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                loggerFactory.CreateLogger("AccountLink")
+                    .LogWarning(exception, "The account license was activated but local paid services need reconciliation");
+            }
+        }
+        return Results.Ok(result);
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: 400);
+    }
+});
+
+app.MapPost("/api/license/activate", () => Results.Problem(
+    "Direct name, email, and key activation has been retired. Use Link This Computer so a verified Customer Portal account can claim the license and approve this computer.",
+    statusCode: 409));
 
 app.MapPost("/api/license/maintenance/apply", (
     MaintenanceEntitlementRequest request,

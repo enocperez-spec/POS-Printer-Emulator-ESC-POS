@@ -6,6 +6,9 @@ require_once __DIR__ . '/mailer.php';
 
 portal_session_start();
 
+const PORTAL_IDLE_TIMEOUT_SECONDS = 600;
+const PORTAL_ACTIVITY_HEARTBEAT_SECONDS = 240;
+
 function portal_csrf_token(): string
 {
     if (!isset($_SESSION['csrf']) || !is_string($_SESSION['csrf']) || strlen($_SESSION['csrf']) < 40) {
@@ -32,6 +35,46 @@ function portal_password_is_valid(string $password): bool
         preg_match('/\d/', $password) === 1;
 }
 
+function portal_purchase_tier(mixed $value): string
+{
+    $tier = ucfirst(strtolower(trim((string)$value)));
+    return in_array($tier, ['Lite', 'Pro', 'Enterprise'], true) ? $tier : '';
+}
+
+function portal_return_page(mixed $value): string
+{
+    $page = strtolower(trim((string)$value));
+    return in_array($page, ['billing', 'plans', 'computers'], true) ? $page : '';
+}
+
+function portal_post_auth_destination(): string
+{
+    $tier = portal_purchase_tier($_SESSION['purchase_tier'] ?? '');
+    if ($tier !== '') {
+        return '/portal.php?page=plans&purchase=' . rawurlencode($tier);
+    }
+    if (!empty($_SESSION['maintenance_return'])) {
+        return '/portal.php?page=plans#maintenance-renewal';
+    }
+    return match (portal_return_page($_SESSION['portal_return'] ?? '')) {
+        'billing' => '/portal.php?page=billing',
+        'plans' => '/portal.php?page=plans',
+        'computers' => '/portal.php?page=computers' .
+            (!empty($_SESSION['computer_link_code']) ? '&link=' . rawurlencode((string)$_SESSION['computer_link_code']) : ''),
+        default => '/portal.php',
+    };
+}
+
+function portal_customer_uuid(): string
+{
+    $bytes = random_bytes(16);
+    $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+    $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+    $hex = bin2hex($bytes);
+    return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-' . substr($hex, 12, 4) . '-' .
+        substr($hex, 16, 4) . '-' . substr($hex, 20, 12);
+}
+
 function portal_account_by_email(string $email): ?array
 {
     $query = portal_database()->prepare(
@@ -49,6 +92,12 @@ function portal_account_by_email(string $email): ?array
 
 function portal_create_session(array $account): void
 {
+    $purchaseTier = portal_purchase_tier($_SESSION['purchase_tier'] ?? '');
+    $maintenanceReturn = !empty($_SESSION['maintenance_return']);
+    $portalReturn = portal_return_page($_SESSION['portal_return'] ?? '');
+    $computerLinkCode = preg_match('/^[A-Z0-9]{4}-[A-Z0-9]{4}$/', (string)($_SESSION['computer_link_code'] ?? ''))
+        ? (string)$_SESSION['computer_link_code']
+        : '';
     session_regenerate_id(true);
     $sessionId = session_id();
     $customerId = (string)$account['customer_id'];
@@ -75,6 +124,18 @@ function portal_create_session(array $account): void
         'mfa_pending' => !empty($account['mfa_enabled']),
         'authenticated' => empty($account['mfa_enabled']),
     ];
+    if ($purchaseTier !== '') {
+        $_SESSION['purchase_tier'] = $purchaseTier;
+    }
+    if ($maintenanceReturn) {
+        $_SESSION['maintenance_return'] = true;
+    }
+    if ($portalReturn !== '') {
+        $_SESSION['portal_return'] = $portalReturn;
+    }
+    if ($computerLinkCode !== '') {
+        $_SESSION['computer_link_code'] = $computerLinkCode;
+    }
 }
 
 function portal_current_account(bool $allowMfaPending = false): ?array
@@ -87,7 +148,7 @@ function portal_current_account(bool $allowMfaPending = false): ?array
         return null;
     }
     $lastActivity = (int)($_SESSION['last_activity'] ?? 0);
-    if ($lastActivity < time() - 1800) {
+    if ($lastActivity < time() - PORTAL_IDLE_TIMEOUT_SECONDS) {
         portal_logout(false);
         return null;
     }
@@ -213,24 +274,60 @@ function portal_verify_password_login(string $email, string $password): array
     return [true, ''];
 }
 
-function portal_request_enrollment(string $email): void
+function portal_request_enrollment(
+    string $email,
+    string $displayName = '',
+    string $companyName = '',
+    string $purchaseTier = '',
+    string $portalReturn = '',
+    string $computerLinkCode = ''
+): void
 {
     if (!portal_rate_limit(portal_request_bucket('enrollment'), 5, 3600)) {
         return;
     }
     $query = portal_database()->prepare(
-        "SELECT c.customer_id,c.canonical_email,c.display_name
+        "SELECT c.customer_id,c.canonical_email,c.display_name,a.customer_id portal_account_id
          FROM customers c
          LEFT JOIN portal_accounts a ON a.customer_id=c.customer_id
-         WHERE c.email_hash=UNHEX(SHA2(:email,256)) AND c.status='Active' AND a.customer_id IS NULL
+         WHERE c.email_hash=UNHEX(SHA2(:email,256)) AND c.status='Active'
          ORDER BY c.created_at
          LIMIT 2"
     );
     $query->execute(['email' => $email]);
     $matches = $query->fetchAll();
+    $purchaseTier = portal_purchase_tier($purchaseTier);
+    $portalReturn = portal_return_page($portalReturn);
+    if (count($matches) === 0 && ($purchaseTier !== '' || in_array($portalReturn, ['plans', 'computers'], true))) {
+        $displayName = trim(preg_replace('/\s+/', ' ', $displayName) ?? '');
+        $companyName = trim(preg_replace('/\s+/', ' ', $companyName) ?? '');
+        if ($displayName === '' || mb_strlen($displayName) > 160 || mb_strlen($companyName) > 160) {
+            throw new DomainException('Enter your full name and, optionally, a company name.');
+        }
+        $customerId = portal_customer_uuid();
+        $insertCustomer = portal_database()->prepare(
+            "INSERT INTO customers(customer_id,display_name,company_name,canonical_email,email_hash,status)
+             VALUES(:customer_id,:display_name,:company_name,:email,UNHEX(SHA2(:email,256)),'Active')"
+        );
+        $insertCustomer->execute([
+            'customer_id' => $customerId,
+            'display_name' => $displayName,
+            'company_name' => $companyName === '' ? null : $companyName,
+            'email' => $email,
+        ]);
+        $matches = [[
+            'customer_id' => $customerId,
+            'canonical_email' => $email,
+            'display_name' => $displayName,
+        ]];
+        $auditDetail = $purchaseTier !== ''
+            ? "Customer account created before a {$purchaseTier} License purchase."
+            : 'Customer account created to review POS Printer Emulator License purchase options.';
+        portal_audit($customerId, 'Portal Purchase Account Requested', $auditDetail);
+    }
     // A matching email alone must never merge or expose two separate customer identities.
     // Ambiguous records remain private until an administrator verifies and resolves ownership.
-    if (count($matches) !== 1) {
+    if (count($matches) !== 1 || !empty($matches[0]['portal_account_id'])) {
         return;
     }
     $customer = $matches[0];
@@ -241,6 +338,15 @@ function portal_request_enrollment(string $email): void
     );
     $insert->execute(['customer_id' => $customer['customer_id'], 'email' => $email, 'token' => $token]);
     $link = portal_configured_base_url() . '/verify.php?purpose=enroll&token=' . rawurlencode($token);
+    if ($purchaseTier !== '') {
+        $link .= '&purchase=' . rawurlencode($purchaseTier);
+    } elseif ($portalReturn !== '') {
+        $link .= '&return=' . rawurlencode($portalReturn);
+        if ($portalReturn === 'computers' &&
+            preg_match('/^[A-Z0-9]{4}-[A-Z0-9]{4}$/', $computerLinkCode)) {
+            $link .= '&link=' . rawurlencode($computerLinkCode);
+        }
+    }
     portal_queue_mail(
         (string)$customer['customer_id'],
         (string)$customer['canonical_email'],
@@ -451,9 +557,26 @@ function portal_complete_mfa(string $code): bool
     if (!is_array($account) || empty($account['mfa_enabled'])) {
         return false;
     }
+    $valid = portal_verify_account_second_factor($account, $code);
+    if ($valid) {
+        $_SESSION['authenticated'] = true;
+        $_SESSION['mfa_pending'] = false;
+        portal_audit((string)$account['customer_id'], 'Portal MFA', 'Customer completed two-step verification.');
+    }
+    return $valid;
+}
+
+function portal_verify_account_second_factor(array $account, string $code): bool
+{
+    if (empty($account['mfa_enabled'])) {
+        return false;
+    }
     $valid = portal_verify_totp(portal_mfa_secret($account), $code);
     if (!$valid) {
         $normalizedRecoveryCode = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($code))) ?? '';
+        if (strlen($normalizedRecoveryCode) !== 10) {
+            return false;
+        }
         $hash = portal_hash($normalizedRecoveryCode);
         $query = portal_database()->prepare(
             'SELECT id FROM portal_recovery_codes
@@ -469,12 +592,45 @@ function portal_complete_mfa(string $code): bool
             $valid = true;
         }
     }
-    if ($valid) {
-        $_SESSION['authenticated'] = true;
-        $_SESSION['mfa_pending'] = false;
-        portal_audit((string)$account['customer_id'], 'Portal MFA', 'Customer completed two-step verification.');
-    }
     return $valid;
+}
+
+function portal_disable_mfa(array $account, string $password, string $secondFactor): void
+{
+    if (empty($account['mfa_enabled']) ||
+        !password_verify($password, (string)$account['password_hash']) ||
+        !portal_verify_account_second_factor($account, $secondFactor)) {
+        throw new DomainException('The password or two-factor authentication code was not accepted.');
+    }
+
+    $customerId = (string)$account['customer_id'];
+    $pdo = portal_database();
+    $pdo->beginTransaction();
+    try {
+        $disable = $pdo->prepare(
+            'UPDATE portal_accounts
+             SET mfa_secret_ciphertext=NULL,mfa_secret_nonce=NULL,mfa_secret_tag=NULL,mfa_enabled=0,
+                 mfa_reenrollment_required=0,session_revision=session_revision+1
+             WHERE customer_id=:customer_id AND mfa_enabled=1'
+        );
+        $disable->execute(['customer_id' => $customerId]);
+        if ($disable->rowCount() !== 1) {
+            throw new DomainException('Two-factor authentication changed before this request completed.');
+        }
+        $deleteCodes = $pdo->prepare('DELETE FROM portal_recovery_codes WHERE customer_id=:customer_id');
+        $deleteCodes->execute(['customer_id' => $customerId]);
+        $revokeSessions = $pdo->prepare(
+            'UPDATE portal_sessions SET revoked_at=UTC_TIMESTAMP(6)
+             WHERE customer_id=:customer_id AND revoked_at IS NULL'
+        );
+        $revokeSessions->execute(['customer_id' => $customerId]);
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
 }
 
 function portal_recently_reauthenticated(array $account): bool

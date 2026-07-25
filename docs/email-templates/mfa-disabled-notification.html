@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Two-factor authentication was disabled</title>
+</head>
+<body style="margin:0;background:#eef3f8;color:#0b1e3a;font-family:Arial,sans-serif">
+  <div style="display:none;max-height:0;overflow:hidden">A security setting changed on your POS Printer Emulator Customer Portal account.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef3f8">
+    <tr><td align="center" style="padding:28px 14px">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#fff;border:1px solid #d8e0ea;border-radius:12px">
+        <tr><td style="padding:24px 30px;background:#07172d;border-radius:12px 12px 0 0">
+          <img src="https://www.posprinteremulator.com/assets/logo-web.png" width="220" alt="POS Printer Emulator" style="display:block;max-width:100%;height:auto">
+        </td></tr>
+        <tr><td style="padding:30px">
+          <p style="margin:0 0 10px;color:#0d6ee8;font-size:13px;font-weight:bold;text-transform:uppercase">Account security notice</p>
+          <h1 style="margin:0 0 18px;font-size:28px;line-height:1.2">Two-factor authentication was disabled</h1>
+          <p>Hello {{ params.customer_name }},</p>
+          <p>Two-factor authentication was {{ params.event_label }} for your Customer Portal account. Every existing portal session was signed out.</p>
+          <p>If you made this change, no further action is required. You can sign in and enable two-factor authentication again at any time.</p>
+          <p style="margin:26px 0"><a href="{{ params.portal_url }}" style="display:inline-block;background:#0d6ee8;color:#fff;text-decoration:none;font-weight:bold;padding:13px 20px;border-radius:7px">Review Account Security</a></p>
+          <p>If you did not make this change, submit a support request immediately.</p>
+          <p><a href="{{ params.documentation_url }}">View Documentation</a> &nbsp;|&nbsp; <a href="{{ params.support_request_url }}">Submit a Support Request</a></p>
+        </td></tr>
+        <tr><td style="padding:18px 30px;background:#f5f8fc;color:#5d6e86;font-size:12px;border-radius:0 0 12px 12px">
+          {{ params.no_reply_notice }}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

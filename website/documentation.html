@@ -20,7 +20,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css?v=20260719-tiers" />
-    <link rel="stylesheet" href="seo-pages.css?v=20260722-main-page" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260724-documentation-table-fit-v2" />
   </head>
   <body>
     <header class="site-header">
@@ -63,7 +63,7 @@
           <article class="article-content">
             <div class="callout">
               <p>
-                <strong>Current release:</strong> v0.3.52 replaces manual
+                <strong>Current release:</strong> v0.3.53 replaces manual
                 promotional-key entry with a secure Five-Day Promotional Trial
                 for eligible Lite, Pro, and Enterprise evaluations.
               </p>
@@ -104,8 +104,8 @@
             <h3>Activity</h3>
             <p>
               Shows received print jobs with time, source, printer listener,
-              size, status, and warnings. Select a job to inspect it. Enterprise
-              customers can filter or clear Activity for one printer while
+              size, status, and warnings. Select a job to inspect it. Pro and
+              Enterprise customers can filter or clear Activity for one printer while
               keeping jobs from other listeners. Collapse the panel when you
               need more preview space.
             </p>
@@ -113,7 +113,10 @@
             <p>
               Displays the rendered thermal receipt. Zoom, return to actual
               size, view extracted text or raw content, and use paid-license
-              print/PDF tools. Trial previews include a watermark.
+              text, raw, print/PDF, capture, replay, and Copy Receipt as Image
+              tools. Copy Receipt as Image places a PNG on the Windows
+              clipboard for pasting into another application. Trial previews
+              include a watermark and paid tools remain locked.
             </p>
             <h3>Commands, Raw data, and Job details</h3>
             <p>
@@ -122,6 +125,16 @@
               details lists receipt ID, time, source address, payload size,
               result, and unsupported-command count. The right panel can be
               collapsed.
+            </p>
+            <h3>Enterprise diagnostic reports</h3>
+            <p>
+              The <strong>Standard Development Diagnostics Report</strong> and
+              <strong>Advanced Diagnostics Package</strong> are Enterprise-only
+              tools. They can include a rendered receipt image, parsed ESC/POS
+              commands, raw print data, job details, warnings and errors,
+              unsupported commands, listener and application configuration,
+              environment and version information, and advanced technical
+              troubleshooting details after the user reviews the package.
             </p>
             <p><a href="how-to-use-pos-printer-emulator-main-page"><strong>Read the complete illustrated main page guide</strong></a> for every control, example workflow, limitation, and captioned video lesson.</p>
             <h2>Connecting a POS</h2>
@@ -147,7 +160,7 @@
             </p>
             <h2>Printer Listener Allowances</h2>
             <p>
-              In v0.3.25, Trial and Lite allow one total listener, Pro allows
+              Trial and Lite allow one total listener, Pro allows
               two, and Enterprise allows up to 15. Pro and Enterprise unlock
               Settings → Printer Listeners for their additional endpoints.
               Assign each printer a unique name, TCP port, network address, and
@@ -157,20 +170,50 @@
             </p>
             <h2>Registration and activation</h2>
             <p>
-              Enter the customer or company name and email requested during
-              setup. Every installation begins in Trial Mode. To activate, open
-              Settings, enter the unique activation key supplied after purchase,
-              and validate it. The purchased Lite, Pro, or Enterprise level
-              unlocks immediately without another download. Lite is $24.99;
-              current Pro and Enterprise prices are shown on the Buy page.
+              Every installation begins in Trial Mode. To activate, open
+              <strong>Settings → License</strong>, select
+              <strong>Link This Computer</strong>, and sign in to your verified
+              Customer Portal account. Review the computer information, choose
+              an eligible Lite, Pro, or Enterprise License, and approve the
+              link. The application detects approval and activates automatically
+              without a reinstall. Temporary link codes expire after 10 minutes
+              and work only once.
+            </p>
+            <p>
+              A backup activation key can start the same secure claim flow, but
+              it never establishes ownership by itself. The key must be claimed
+              by a verified Customer Portal account. Before moving a license,
+              deactivate its current computer in the portal; then link and
+              approve the replacement computer. If the old computer is
+              unavailable, submit a License Issue through the portal for
+              support-assisted recovery.
             </p>
             <h2>Trial limits</h2>
             <ul>
-              <li>Five emulated print jobs per calendar day.</li>
+              <li>One automatically configured printer listener named POS Printer Emulator.</li>
+              <li>Local connection address <code>127.0.0.1</code>, beginning at port <code>9100</code>; the setup wizard selects the next available port if 9100 is assigned.</li>
+              <li>Five external POS print jobs per local calendar day.</li>
+              <li>Unlimited built-in Test Receipts; they are clearly identified and do not use the external-job allowance.</li>
               <li>No historical print-job data beyond the current session.</li>
               <li>TRIAL watermark across the receipt viewer.</li>
-              <li>Premium features, including exports, unavailable.</li>
+              <li>History, exports, Copy Receipt as Image, capture/import/replay, Printer Profiles, Stored Logos, Printer State, update checks, assisted support, and diagnostic PDF reports are unavailable.</li>
             </ul>
+            <h3>Five-Day Promotional Trial</h3>
+            <p>
+              The base Trial License and the Five-Day Promotional Trial are
+              different. An eligible verified customer and eligible device may
+              claim one server-authorized five-day evaluation of Lite, Pro, or
+              Enterprise. The application shows the evaluated edition, start
+              and expiration times, and live time remaining. Reinstalling or
+              removing the application does not create another promotional
+              entitlement. When the five-day evaluation expires, the previous
+              Trial or permanent license returns automatically and the
+              application presents an upgrade action.
+            </p>
+            <h2>Application-verified license comparison</h2>
+            <div class="documentation-license-comparison" data-license-comparison>
+              <p>Loading the current license comparison…</p>
+            </div>
             <h2>Configuration backup and restore</h2>
             <p>
               Open Settings → Backup &amp; Restore to create a password-encrypted
@@ -178,7 +221,6 @@
               configuration. Backups are restored inside POS Printer Emulator;
               they are not normal ZIP archives and should not be extracted in
               Windows.
-            </p>
             <p>
               Follow the illustrated
               <a href="how-to-back-up-and-restore-pos-printer-emulator"
@@ -190,6 +232,9 @@
             <p>
               Each guide follows the current Windows application and includes
               real screenshots, recommended choices, and recovery tips.
+              The running POS Printer Emulator version is displayed in the
+              lower-left corner throughout Settings so customers and support
+              staff can confirm the installed build.
             </p>
             <div class="guide-directory">
               <a href="how-to-manage-pos-printer-emulator-license"><strong>License</strong><span>Activate a tier and review maintenance.</span></a>
@@ -201,10 +246,11 @@
               <a href="how-to-back-up-and-restore-pos-printer-emulator"><strong>Backup &amp; Restore</strong><span>Create, review, and restore an encrypted package.</span></a>
               <a href="how-to-check-for-pos-printer-emulator-updates"><strong>Check for Updates</strong><span>Review the official release and install covered updates.</span></a>
               <a href="how-to-submit-a-support-request"><strong>Support</strong><span>Run diagnostics and submit a privacy-reviewed request.</span></a>
+              <a href="user-portal-guide"><strong>Customer Portal</strong><span>Manage licenses, computers, purchases, downloads, maintenance, and support requests.</span></a>
             </div>
             <h2>Annual Application Maintenance and Support</h2>
             <p>
-              Starting with v0.3.26, a new Lite, Pro, or Enterprise license
+              A new Lite, Pro, or Enterprise license
               includes one year of application updates and upgrades, assisted
               technical support, and Check for Updates access. The software
               license is still a permanent one-time purchase, not a
@@ -214,20 +260,22 @@
               When maintenance expires, the installed application, purchased
               features, local history, and licensed listeners continue working.
               Check for Updates, update downloads, and assisted support remain
-              unavailable until coverage is renewed. Local health information,
+              unavailable until coverage is renewed. Activation-key recovery
+              or resend for a newer version also requires active coverage.
+              Local health information,
               activation diagnostics, troubleshooting details, and privacy-safe
               log export stay available without active maintenance.
             </p>
+            <div data-maintenance-pricing>
+              <p>Loading current renewal pricing…</p>
+            </div>
             <ul>
-              <li>Lite renewal: $9.99 for one additional year.</li>
-              <li>Pro renewal: $19.99 for one additional year.</li>
-              <li>Enterprise renewal: $59.99 for one additional year.</li>
               <li>
                 Early renewal adds 12 months to the current expiration date;
                 lapsed renewal begins on the confirmed payment date.
               </li>
               <li>
-                Paid licenses issued before v0.3.26 receive maintenance through
+                Paid licenses issued before the maintenance policy launched receive maintenance through
                 July 19, 2027.
               </li>
             </ul>
@@ -260,7 +308,7 @@
           </article>
           <aside class="sidebar-card">
             <h2>Documentation links</h2>
-            <p>Version 0.3.52</p>
+            <p>Version 0.3.53</p>
             <a
               class="button button-primary"
               href="download.php?source=documentation"

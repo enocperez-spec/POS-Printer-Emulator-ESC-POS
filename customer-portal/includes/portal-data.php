@@ -35,9 +35,19 @@ function portal_customer_snapshot(string $customerId): array
     $installationQuery->execute(['customer_id' => $customerId]);
 
     $purchaseQuery = $pdo->prepare(
-        'SELECT purchase_reference,order_type,license_tier,purchase_status,amount,currency,paid_at
-         FROM customer_purchases WHERE customer_id=:customer_id
-         ORDER BY paid_at DESC,updated_at DESC LIMIT 50'
+        "SELECT p.purchase_reference,p.order_type,p.license_tier,p.purchase_status,p.amount,p.currency,
+                p.paid_at,p.updated_at,
+                i.order_type AS checkout_order_type,i.provider_order_id,i.provider_capture_id,
+                i.license_id,i.replacement_license_id,i.maintenance_previous_expires_at,
+                i.maintenance_new_expires_at,
+                l.activation_key_ending,l.control_state AS license_control_state
+         FROM customer_purchases p
+         LEFT JOIN portal_checkout_intents i
+           ON p.purchase_reference=CONCAT('portal:',i.intent_id) AND i.customer_id=p.customer_id
+         LEFT JOIN issued_licenses l
+           ON l.license_id=COALESCE(i.replacement_license_id,i.license_id) AND l.customer_id=p.customer_id
+         WHERE p.customer_id=:customer_id
+         ORDER BY p.paid_at DESC,p.updated_at DESC LIMIT 100"
     );
     $purchaseQuery->execute(['customer_id' => $customerId]);
 
@@ -135,6 +145,217 @@ function portal_license_status_label(?string $status): string
 {
     $label = trim((string)$status);
     return strcasecmp($label, 'Enabled') === 0 ? 'Active' : ($label !== '' ? $label : 'Not available');
+}
+
+function portal_purchase_record(string $customerId, string $reference): ?array
+{
+    if ($reference === '' || strlen($reference) > 64 ||
+        !preg_match('/^[A-Za-z0-9:_-]+$/', $reference)) {
+        return null;
+    }
+    $query = portal_database()->prepare(
+        "SELECT p.purchase_reference,p.order_type,p.license_tier,p.purchase_status,p.amount,p.currency,
+                p.paid_at,p.updated_at,c.display_name,c.canonical_email,
+                i.order_type AS checkout_order_type,i.provider_order_id,i.provider_capture_id,
+                i.license_id,i.replacement_license_id,i.maintenance_previous_expires_at,
+                i.maintenance_new_expires_at,
+                l.activation_key_ending,l.control_state AS license_control_state
+         FROM customer_purchases p
+         INNER JOIN customers c ON c.customer_id=p.customer_id
+         LEFT JOIN portal_checkout_intents i
+           ON p.purchase_reference=CONCAT('portal:',i.intent_id) AND i.customer_id=p.customer_id
+         LEFT JOIN issued_licenses l
+           ON l.license_id=COALESCE(i.replacement_license_id,i.license_id) AND l.customer_id=p.customer_id
+         WHERE p.customer_id=:customer_id AND p.purchase_reference=:reference
+         LIMIT 1"
+    );
+    $query->execute(['customer_id' => $customerId, 'reference' => $reference]);
+    $purchase = $query->fetch();
+    return is_array($purchase) ? $purchase : null;
+}
+
+function portal_purchase_type_label(array $purchase): string
+{
+    return match ((string)($purchase['checkout_order_type'] ?? $purchase['order_type'] ?? '')) {
+        'UPGRADE' => 'License upgrade',
+        'MAINTENANCE' => 'Maintenance and Support renewal',
+        default => 'POS Printer Emulator License',
+    };
+}
+
+function portal_purchase_status_label(string $status): string
+{
+    return match (strtoupper(trim($status))) {
+        'FULFILLED', 'COMPLETED', 'PAID' => 'Paid',
+        'REFUNDED' => 'Refunded',
+        'CANCELED', 'CANCELLED' => 'Canceled',
+        'FAILED' => 'Failed',
+        default => ucfirst(strtolower(trim($status))) ?: 'Pending',
+    };
+}
+
+function portal_purchase_display_reference(array $purchase): string
+{
+    $providerReference = trim((string)($purchase['provider_order_id'] ?? ''));
+    if ($providerReference !== '') {
+        return $providerReference;
+    }
+    $reference = (string)($purchase['purchase_reference'] ?? '');
+    return str_starts_with($reference, 'portal:') ? strtoupper(substr($reference, 7, 8)) : $reference;
+}
+
+function portal_purchase_license_label(array $purchase): string
+{
+    $tier = (string)($purchase['license_tier'] ?? 'License');
+    $ending = strtoupper(trim((string)($purchase['activation_key_ending'] ?? '')));
+    return $ending === '' ? $tier . ' license' : $tier . ' · •••• ' . $ending;
+}
+
+function portal_normalize_version(?string $version): ?string
+{
+    $value = trim((string)$version);
+    if (!preg_match('/^v?(\d+)\.(\d+)\.(\d+)(?:\.0)?$/i', $value, $matches)) {
+        return null;
+    }
+    if ((int)$matches[2] > 99 || (int)$matches[3] > 99) {
+        return null;
+    }
+    return (int)$matches[1] . '.' . (int)$matches[2] . '.' . str_pad((string)(int)$matches[3], 2, '0', STR_PAD_LEFT);
+}
+
+function portal_version_ordinal(?string $version): ?int
+{
+    $normalized = portal_normalize_version($version);
+    if ($normalized === null || !preg_match('/^(\d+)\.(\d+)\.(\d+)$/', $normalized, $matches)) {
+        return null;
+    }
+    return ((int)$matches[1] * 10000) + ((int)$matches[2] * 100) + (int)$matches[3];
+}
+
+/**
+ * @return array{installedVersion:?string,latestVersion:?string,versionsBehind:?int,updateAvailable:?bool}
+ */
+function portal_version_status(?string $installedVersion, ?string $latestVersion): array
+{
+    $installed = portal_normalize_version($installedVersion);
+    $latest = portal_normalize_version($latestVersion);
+    $installedOrdinal = portal_version_ordinal($installed);
+    $latestOrdinal = portal_version_ordinal($latest);
+    if ($installedOrdinal === null || $latestOrdinal === null) {
+        return [
+            'installedVersion' => $installed,
+            'latestVersion' => $latest,
+            'versionsBehind' => null,
+            'updateAvailable' => null,
+        ];
+    }
+    $behind = max(0, $latestOrdinal - $installedOrdinal);
+    return [
+        'installedVersion' => $installed,
+        'latestVersion' => $latest,
+        'versionsBehind' => $behind,
+        'updateAvailable' => $behind > 0,
+    ];
+}
+
+function portal_primary_installation(array $installations): ?array
+{
+    foreach ($installations as $installation) {
+        if (is_array($installation) && empty($installation['portal_deactivated_at'])) {
+            return $installation;
+        }
+    }
+    return null;
+}
+
+function portal_primary_active_license(array $licenses): ?array
+{
+    foreach ($licenses as $license) {
+        if (is_array($license) && strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') === 0) {
+            return $license;
+        }
+    }
+    return null;
+}
+
+function portal_has_active_maintenance(?array $license, ?DateTimeImmutable $now = null): bool
+{
+    if (!is_array($license) ||
+        !empty($license['maintenance_revoked_at']) ||
+        strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') !== 0) {
+        return false;
+    }
+    $expiresAt = trim((string)($license['maintenance_expires_at'] ?? ''));
+    if ($expiresAt === '') {
+        return false;
+    }
+    try {
+        $utc = new DateTimeZone('UTC');
+        $expiration = new DateTimeImmutable($expiresAt, $utc);
+        $current = ($now ?? new DateTimeImmutable('now', $utc))->setTimezone($utc);
+        return $expiration >= $current;
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+/**
+ * @return array{currentVersion:string,releaseDate:string,releaseNotesUrl:string,downloadUrl:string}|null
+ */
+function portal_latest_release(): ?array
+{
+    $cached = $_SESSION['portal_release_manifest'] ?? null;
+    if (is_array($cached) && (int)($cached['cachedAt'] ?? 0) >= time() - 3600) {
+        return $cached['release'] ?? null;
+    }
+
+    $url = 'https://www.posprinteremulator.com/release.json';
+    $body = null;
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        ]);
+        $response = curl_exec($curl);
+        $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        curl_close($curl);
+        if (is_string($response) && $status === 200) {
+            $body = $response;
+        }
+    }
+
+    $decoded = is_string($body) ? json_decode($body, true) : null;
+    $version = is_array($decoded) ? portal_normalize_version((string)($decoded['currentVersion'] ?? '')) : null;
+    if ($version === null) {
+        return is_array($cached) && is_array($cached['release'] ?? null) ? $cached['release'] : null;
+    }
+
+    $releaseDate = (string)($decoded['releaseDate'] ?? '');
+    $releaseNotesUrl = (string)($decoded['releaseNotesUrl'] ?? '');
+    $downloadUrl = (string)($decoded['downloadUrl'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $releaseDate)) {
+        $releaseDate = '';
+    }
+    if (!preg_match('#^https://github\.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v\d+\.\d+\.\d+$#', $releaseNotesUrl)) {
+        $releaseNotesUrl = 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v' . $version;
+    }
+    if (!preg_match('#^https://www\.posprinteremulator\.com/downloads/POSPrinterEmulatorSetup-\d+\.\d+\.\d+-win-x64\.exe$#', $downloadUrl)) {
+        $downloadUrl = 'https://www.posprinteremulator.com/downloads/POSPrinterEmulatorSetup-' . $version . '-win-x64.exe';
+    }
+
+    $release = [
+        'currentVersion' => $version,
+        'releaseDate' => $releaseDate,
+        'releaseNotesUrl' => $releaseNotesUrl,
+        'downloadUrl' => $downloadUrl,
+    ];
+    $_SESSION['portal_release_manifest'] = ['cachedAt' => time(), 'release' => $release];
+    return $release;
 }
 
 /**

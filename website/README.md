@@ -5,6 +5,10 @@ This directory contains the static production website for `posprinteremulator.co
 ## Contents
 
 - `index.html`: public product, feature, licensing, download, and FAQ page.
+- `features.html`: application-verified Trial, Lite, Pro, and Enterprise feature comparison.
+- `user-portal-guide.html`: Customer Portal account, license, computer, purchase, download, security, and support guide.
+- `license-catalog.json`: canonical public license, listener, feature, Trial, and Maintenance and Support data.
+- `license-catalog.js`: renders shared comparisons from the canonical catalog.
 - `application-maintenance-support.html`: canonical permanent-license and optional annual maintenance policy, renewal pricing, and renewal links.
 - `documentation.html`: product documentation and links to task-specific setup guides.
 - `how-to-use-pos-printer-emulator-main-page.html`: complete illustrated main-page reference with practical examples, troubleshooting, screenshots, and five captioned instructional videos.
@@ -32,6 +36,21 @@ node src\ReceiptEmulator.Viewer\node_modules\vite\bin\vite.js website --host 127
 ```
 
 Open `http://127.0.0.1:4173`.
+
+## License catalog synchronization and checks
+
+When application feature gates, listener limits, license terms, or renewal prices
+change, update `website/license-catalog.json`, then synchronize the exact catalog
+to the Buy site and Customer Portal:
+
+```console
+dotnet run --project tools\POSPrinterEmulator.WebsitePublisher -- sync-license-catalog .
+php tests\php\website-content-tests.php
+```
+
+The content check fails when release versions drift, catalog copies differ,
+Enterprise-only reports are exposed to another license, obsolete Trial wording
+returns, or required comparison and sitemap pages are missing.
 
 ## Publish
 

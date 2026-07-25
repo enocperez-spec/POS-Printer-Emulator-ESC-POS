@@ -34,6 +34,8 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  website-publisher list [remote-directory]");
+    Console.WriteLine("  website-publisher download <remote-file> <local-file>");
+    Console.WriteLine("  website-publisher upload <local-file> <remote-file>");
     Console.WriteLine("  website-publisher publish <local-directory> [remote-directory]");
     Console.WriteLine("  website-publisher configure <schema-file> [remote-directory]");
     Console.WriteLine("  website-publisher upload-schema <schema-file> [remote-directory]");
@@ -41,12 +43,15 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher download-protected <private/remote-file> <local-file> [remote-directory]");
     Console.WriteLine("  website-publisher configure-crm-secrets [remote-directory]");
     Console.WriteLine("  website-publisher configure-communications [remote-directory]");
+    Console.WriteLine("  website-publisher set-communications-test-allowlist <email> [remote-directory]");
     Console.WriteLine("  website-publisher migrate-crm <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-communications <https-migration-url>");
     Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
     Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
     Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-self-service-commerce <https-migration-url>");
+    Console.WriteLine("  website-publisher portal-diagnostics <https-diagnostics-url> <email>");
+    Console.WriteLine("  website-publisher sync-license-catalog [repository-root]");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
     return 0;
@@ -92,6 +97,21 @@ if (args[0].Equals("migrate-self-service-commerce", StringComparison.OrdinalIgno
     await MigrateSelfServiceCommerceAsync(migrationUri);
     return 0;
 }
+if (args[0].Equals("portal-diagnostics", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 3 || !Uri.TryCreate(args[1], UriKind.Absolute, out var diagnosticsUri) ||
+        diagnosticsUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The portal-diagnostics command requires an HTTPS diagnostics URL and email.");
+    }
+    await RunPortalDiagnosticsAsync(diagnosticsUri, args[2]);
+    return 0;
+}
+if (args[0].Equals("sync-license-catalog", StringComparison.OrdinalIgnoreCase))
+{
+    SyncLicenseCatalog(args.Length > 1 ? args[1] : Directory.GetCurrentDirectory());
+    return 0;
+}
 
 var host = RequiredEnvironmentVariable(HostVariable);
 var username = RequiredEnvironmentVariable(UserVariable);
@@ -120,6 +140,20 @@ try
     {
         case "list":
             ListDirectory(client, args.Length > 1 ? args[1] : ".");
+            break;
+        case "download":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException("The download command requires a remote file and local destination.");
+            }
+            DownloadFile(client, args[1], Path.GetFullPath(args[2]));
+            break;
+        case "upload":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException("The upload command requires a local file and remote destination.");
+            }
+            UploadFile(client, Path.GetFullPath(args[1]), args[2]);
             break;
         case "publish":
             if (args.Length < 2)
@@ -171,6 +205,13 @@ try
         case "configure-communications":
             ConfigureCommunications(client, args.Length > 1 ? args[1] : ".");
             break;
+        case "set-communications-test-allowlist":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The set-communications-test-allowlist command requires an email address.");
+            }
+            SetCommunicationsTestAllowlist(client, args[1], args.Length > 2 ? args[2] : ".");
+            break;
         case "configure-customer-portal":
             ConfigureCustomerPortal(client, args.Length > 1 ? args[1] : ".");
             break;
@@ -201,6 +242,43 @@ static string RequiredEnvironmentVariable(string name) =>
     Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
         ? value
         : throw new InvalidOperationException($"Required environment variable {name} is not set.");
+
+static void SyncLicenseCatalog(string repositoryRoot)
+{
+    var root = Path.GetFullPath(repositoryRoot);
+    var source = Path.Combine(root, "website", "license-catalog.json");
+    if (!File.Exists(source))
+    {
+        throw new FileNotFoundException("The canonical website/license-catalog.json file was not found.", source);
+    }
+
+    using var catalog = JsonDocument.Parse(File.ReadAllBytes(source));
+    var rootElement = catalog.RootElement;
+    if (!rootElement.TryGetProperty("sourceOfTruth", out var sourceOfTruth) ||
+        !sourceOfTruth.TryGetProperty("applicationVersion", out var version) ||
+        string.IsNullOrWhiteSpace(version.GetString()) ||
+        !rootElement.TryGetProperty("licenses", out var licenses) ||
+        licenses.ValueKind != JsonValueKind.Object ||
+        !rootElement.TryGetProperty("features", out var matrix) ||
+        matrix.ValueKind != JsonValueKind.Array)
+    {
+        throw new InvalidDataException("The canonical license catalog is missing required sourceOfTruth.applicationVersion, licenses, or features data.");
+    }
+
+    var bytes = File.ReadAllBytes(source);
+    var destinations = new[]
+    {
+        Path.Combine(root, "buy-website", "assets", "license-catalog.json"),
+        Path.Combine(root, "customer-portal", "assets", "license-catalog.json")
+    };
+
+    foreach (var destination in destinations)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        File.WriteAllBytes(destination, bytes);
+        Console.WriteLine($"Synchronized {Path.GetRelativePath(root, destination)} (catalog {version.GetString()}).");
+    }
+}
 
 static void ListDirectory(SftpClient client, string remoteDirectory)
 {
@@ -598,6 +676,8 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
                 'brevo_api_key' => {PhpString(apiKey)},
                 'webhook_token' => {PhpString(webhookToken)},
                 'sender_email' => {PhpString(senderEmail)},
+                'service_sender_email' => 'info@buy.posprinteremulator.com',
+                'sales_sender_email' => 'sales@buy.posprinteremulator.com',
                 'sender_name' => {PhpString(senderName)},
                 'reply_to_email' => {PhpString(replyToEmail)},
                 'reply_to_name' => {PhpString(senderName + " Support")},
@@ -940,6 +1020,27 @@ static string RecoverCrmServiceToken()
     return serviceToken;
 }
 
+static async Task RunPortalDiagnosticsAsync(Uri diagnosticsUri, string email)
+{
+    var serviceToken = RecoverCrmServiceToken();
+    using var request = new HttpRequestMessage(HttpMethod.Post, diagnosticsUri);
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+    request.Content = new StringContent(
+        JsonSerializer.Serialize(new { email }),
+        System.Text.Encoding.UTF8,
+        "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(
+            $"Portal diagnostics failed with HTTP {(int)response.StatusCode}: {body}");
+    }
+    using var result = JsonDocument.Parse(body);
+    Console.WriteLine(JsonSerializer.Serialize(result.RootElement, new JsonSerializerOptions { WriteIndented = true }));
+}
+
 static async Task RunProtectedMigrationAsync(Uri migrationUri, string serviceToken, string name)
 {
     using var request = new HttpRequestMessage(HttpMethod.Post, migrationUri);
@@ -950,13 +1051,156 @@ static async Task RunProtectedMigrationAsync(Uri migrationUri, string serviceTok
     var body = await response.Content.ReadAsStringAsync();
     if (!response.IsSuccessStatusCode)
     {
-        throw new InvalidOperationException($"{name} migration failed with HTTP {(int)response.StatusCode}.");
+        var detail = "";
+        try
+        {
+            using var errorDocument = JsonDocument.Parse(body);
+            if (errorDocument.RootElement.TryGetProperty("detail", out var detailElement) &&
+                detailElement.ValueKind == JsonValueKind.String)
+            {
+                detail = detailElement.GetString() ?? "";
+            }
+        }
+        catch (JsonException)
+        {
+            // The protected endpoint did not return a structured diagnostic.
+        }
+        throw new InvalidOperationException(
+            $"{name} migration failed with HTTP {(int)response.StatusCode}" +
+            (detail.Length > 0 ? $": {detail}" : "."));
     }
     using var result = JsonDocument.Parse(body);
     if (!result.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
     {
         throw new InvalidDataException($"The {name} migration response was invalid.");
     }
+    if (result.RootElement.TryGetProperty("trialGuidance", out var trialGuidance) &&
+        trialGuidance.ValueKind == JsonValueKind.String)
+    {
+        Console.WriteLine($"Trial guidance workflow: {trialGuidance.GetString()}.");
+    }
+    if (result.RootElement.TryGetProperty("senderPolicy", out var senderPolicy) &&
+        senderPolicy.ValueKind == JsonValueKind.Object)
+    {
+        var updated = senderPolicy.TryGetProperty("updated", out var updatedElement) &&
+            updatedElement.TryGetInt32(out var updatedCount) ? updatedCount : 0;
+        var verified = senderPolicy.TryGetProperty("verified", out var verifiedElement) &&
+            verifiedElement.TryGetInt32(out var verifiedCount) ? verifiedCount : 0;
+        Console.WriteLine($"Template sender policy: {verified} verified, {updated} updated.");
+    }
+    if (result.RootElement.TryGetProperty("processed", out var processed) &&
+        processed.TryGetInt32(out var processedCount) &&
+        result.RootElement.TryGetProperty("summary", out var summary) &&
+        summary.ValueKind == JsonValueKind.Object)
+    {
+        var mapped = summary.TryGetProperty("mapped", out var mappedElement) && mappedElement.TryGetInt32(out var mappedCount)
+            ? mappedCount : 0;
+        var failed = summary.TryGetProperty("failed", out var failedElement) && failedElement.TryGetInt32(out var failedCount)
+            ? failedCount : 0;
+        Console.WriteLine($"Protected workflow processed {processedCount} item(s): {mapped} mapped, {failed} failed.");
+        if (result.RootElement.TryGetProperty("results", out var results) &&
+            results.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in results.EnumerateArray())
+            {
+                var templateKey = item.TryGetProperty("template_key", out var keyElement)
+                    ? keyElement.GetString() ?? "unknown" : "unknown";
+                var status = item.TryGetProperty("status", out var statusElement)
+                    ? statusElement.GetString() ?? "unknown" : "unknown";
+                var error = item.TryGetProperty("error", out var errorElement) &&
+                    errorElement.ValueKind == JsonValueKind.String
+                    ? errorElement.GetString() : null;
+                Console.WriteLine(error is { Length: > 0 }
+                    ? $"  {templateKey}: {status} — {error}"
+                    : $"  {templateKey}: {status}");
+            }
+        }
+    }
+}
+
+static void DownloadFile(SftpClient client, string remoteFile, string localPath)
+{
+    var resolvedFile = ResolveRemotePath(client, remoteFile);
+    if (!client.Exists(resolvedFile))
+    {
+        throw new FileNotFoundException("The remote file was not found.", resolvedFile);
+    }
+    var parent = Path.GetDirectoryName(localPath);
+    if (!string.IsNullOrWhiteSpace(parent))
+    {
+        Directory.CreateDirectory(parent);
+    }
+    using var output = File.Create(localPath);
+    client.DownloadFile(resolvedFile, output);
+    var remoteSize = client.GetAttributes(resolvedFile).Size;
+    if (output.Length != remoteSize)
+    {
+        throw new IOException($"Size verification failed for {resolvedFile}.");
+    }
+    Console.WriteLine($"Downloaded and size-verified {resolvedFile} ({remoteSize:N0} bytes).");
+}
+
+static void UploadFile(SftpClient client, string localPath, string remoteFile)
+{
+    if (!File.Exists(localPath))
+    {
+        throw new FileNotFoundException("The local file was not found.", localPath);
+    }
+    var resolvedFile = ResolveRemotePath(client, remoteFile);
+    var separator = resolvedFile.LastIndexOf('/');
+    if (separator > 0)
+    {
+        EnsureDirectory(client, resolvedFile[..separator], new HashSet<string>(StringComparer.Ordinal));
+    }
+    using var input = File.OpenRead(localPath);
+    client.UploadFile(input, resolvedFile, true);
+    var remoteLength = client.GetAttributes(resolvedFile).Size;
+    if (remoteLength != input.Length)
+    {
+        throw new IOException($"Upload size verification failed for {resolvedFile}.");
+    }
+    Console.WriteLine($"Uploaded and size-verified {resolvedFile} ({input.Length:N0} bytes).");
+}
+
+static void SetCommunicationsTestAllowlist(SftpClient client, string email, string remoteDirectory)
+{
+    email = email.Trim().ToLowerInvariant();
+    if (!System.Net.Mail.MailAddress.TryCreate(email, out _))
+    {
+        throw new ArgumentException("The communications test recipient is invalid.");
+    }
+    var remoteRoot = ResolveRemotePath(client, remoteDirectory).TrimEnd('/');
+    if (remoteRoot.Length == 0) remoteRoot = "/";
+    var remotePath = CombineRemote(remoteRoot, "private/communications.php");
+    if (!client.Exists(remotePath))
+    {
+        throw new FileNotFoundException("The protected communications configuration is unavailable.");
+    }
+    string config;
+    using (var input = client.OpenRead(remotePath))
+    using (var reader = new StreamReader(input, System.Text.Encoding.UTF8, true, leaveOpen: false))
+    {
+        config = reader.ReadToEnd();
+    }
+    var pattern = @"'test_allowlist'\s*=>\s*\[[^\]]*\]";
+    if (!System.Text.RegularExpressions.Regex.IsMatch(
+        config,
+        pattern,
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+    {
+        throw new InvalidDataException("The protected communications allowlist setting could not be located.");
+    }
+    var updated = System.Text.RegularExpressions.Regex.Replace(
+        config,
+        pattern,
+        "'test_allowlist' => [" + PhpString(email) + "]",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    UploadText(client, remotePath, updated);
+    if (client.GetAttributes(remotePath).Size != System.Text.Encoding.UTF8.GetByteCount(updated))
+    {
+        throw new IOException("The protected communications allowlist update could not be verified.");
+    }
+    Console.WriteLine("Updated and size-verified the protected communications test allowlist.");
 }
 
 static void UploadText(SftpClient client, string remotePath, string content)

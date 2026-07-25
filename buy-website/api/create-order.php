@@ -26,7 +26,7 @@ try {
     if ((float)$amount<=0) throw new RuntimeException('Checkout is not configured.');
     $description=$product==='maintenance'
         ? 'POS Printer Emulator '.$tier.' Annual Application Maintenance and Support Renewal'
-        : 'POS Printer Emulator '.$tier.' Permanent License';
+        : 'POS Printer Emulator '.$tier.' License';
     $publicId=random_public_id(); $created=paypal_request('POST','/v2/checkout/orders',[
       'intent'=>'CAPTURE','purchase_units'=>[['reference_id'=>$publicId,'description'=>$description,'amount'=>['currency_code'=>$currency,'value'=>$amount]]],
       'payment_source'=>['paypal'=>['experience_context'=>['brand_name'=>'POS Emulator','shipping_preference'=>'NO_SHIPPING','user_action'=>'PAY_NOW','return_url'=>config('app_url').'/?status=return','cancel_url'=>config('app_url').'/?status=cancel']]],

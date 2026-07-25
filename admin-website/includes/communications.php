@@ -59,6 +59,8 @@ function communication_config(): array
         'brevo_api_key' => '',
         'webhook_token' => '',
         'sender_email' => '',
+        'service_sender_email' => 'info@buy.posprinteremulator.com',
+        'sales_sender_email' => 'sales@buy.posprinteremulator.com',
         'sender_name' => 'POS Printer Emulator',
         'reply_to_email' => '',
         'reply_to_name' => 'POS Printer Emulator Support',
@@ -129,6 +131,11 @@ function ensure_communication_schema(PDO $pdo): void
                 preview_brevo_template_id BIGINT UNSIGNED NULL,
                 preview_verified_at DATETIME(6) NULL,
                 preview_warnings_json TEXT NULL,
+                mapping_candidate_brevo_template_id BIGINT UNSIGNED NULL,
+                mapping_status ENUM('NotMapped','Creating','Validating','Mapped','Failed') NOT NULL DEFAULT 'NotMapped',
+                mapping_error_detail VARCHAR(500) NULL,
+                mapping_validated_at DATETIME(6) NULL,
+                mapping_test_sent_at DATETIME(6) NULL,
                 updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
                 updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
                 PRIMARY KEY (template_key),
@@ -138,6 +145,16 @@ function ensure_communication_schema(PDO $pdo): void
         $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS preview_brevo_template_id BIGINT UNSIGNED NULL AFTER description");
         $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS preview_verified_at DATETIME(6) NULL AFTER preview_brevo_template_id");
         $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS preview_warnings_json TEXT NULL AFTER preview_verified_at");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS mapping_candidate_brevo_template_id BIGINT UNSIGNED NULL AFTER preview_warnings_json");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS mapping_status ENUM('NotMapped','Creating','Validating','Mapped','Failed') NOT NULL DEFAULT 'NotMapped' AFTER mapping_candidate_brevo_template_id");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS mapping_error_detail VARCHAR(500) NULL AFTER mapping_status");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS mapping_validated_at DATETIME(6) NULL AFTER mapping_error_detail");
+        $pdo->exec("ALTER TABLE communication_templates ADD COLUMN IF NOT EXISTS mapping_test_sent_at DATETIME(6) NULL AFTER mapping_validated_at");
+        $pdo->exec(
+            "UPDATE communication_templates
+             SET mapping_status=IF(brevo_template_id IS NULL,'NotMapped','Mapped')
+             WHERE mapping_status='NotMapped' AND brevo_template_id IS NOT NULL"
+        );
         $pdo->exec(
             "CREATE TABLE IF NOT EXISTS communication_tags (
                 tag_key VARCHAR(32) NOT NULL,
@@ -292,7 +309,7 @@ function communication_seed_template_tags(PDO $pdo): void
 {
     $seeded = communication_setting($pdo, 'template_tags_seeded', '0') === '1';
     $version = (int)communication_setting($pdo, 'template_tag_seed_version', '0');
-    if ($seeded && $version >= 2) {
+    if ($seeded && $version >= 3) {
         return;
     }
 
@@ -326,6 +343,8 @@ function communication_seed_template_tags(PDO $pdo): void
     }
 
     $newAssignments = [
+        'mfa_disabled_notification' => ['service', 'essential', 'it'],
+        'mfa_admin_reset_notification' => ['service', 'essential', 'it'],
         'we_want_to_help' => ['marketing', 'inactive-user', 'troubleshooting'],
         'welcome_trial_start' => ['service', 'welcome', 'trial', 'setup'],
         'welcome_lite_purchase' => ['service', 'welcome', 'lite', 'setup', 'purchase'],
@@ -348,7 +367,7 @@ function communication_seed_template_tags(PDO $pdo): void
     $setting = $pdo->prepare(
         "INSERT INTO communication_settings(setting_key,setting_value,updated_by) VALUES
            ('template_tags_seeded','1','system'),
-           ('template_tag_seed_version','2','system')
+           ('template_tag_seed_version','3','system')
          ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by='system'"
     );
     $setting->execute();
@@ -391,6 +410,89 @@ function communication_tag_catalog(PDO $pdo): array
         ];
     }
     return $catalog;
+}
+
+function communication_template_tag_keys(PDO $pdo, string $templateKey): array
+{
+    $statement = $pdo->prepare(
+        'SELECT tag_key FROM communication_template_tags
+         WHERE template_key=:template_key ORDER BY tag_key'
+    );
+    $statement->execute(['template_key' => $templateKey]);
+    return array_values(array_filter(array_map(
+        'strval',
+        $statement->fetchAll(PDO::FETCH_COLUMN)
+    )));
+}
+
+function communication_template_sender(
+    PDO $pdo,
+    string $templateKey,
+    ?string $messageClass = null,
+    ?array $config = null
+): array {
+    $config ??= communication_config();
+    $tags = communication_template_tag_keys($pdo, $templateKey);
+    $salesIntent = strcasecmp((string)$messageClass, 'Marketing') === 0
+        || array_intersect($tags, ['purchase', 'marketing', 'upgrade']) !== [];
+    $email = trim((string)($config[
+        $salesIntent ? 'sales_sender_email' : 'service_sender_email'
+    ] ?? ''));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('The approved template sender email is not configured.');
+    }
+    return [
+        'email' => strtolower($email),
+        'name' => trim((string)($config['sender_name'] ?? 'POS Printer Emulator')),
+        'channel' => $salesIntent ? 'sales' : 'service',
+    ];
+}
+
+function communication_sync_brevo_template_sender(
+    PDO $pdo,
+    string $templateKey,
+    int $templateId,
+    string $actor
+): array {
+    if ($templateId < 1) {
+        throw new InvalidArgumentException('A mapped Brevo template ID is required.');
+    }
+    $class = $pdo->prepare(
+        'SELECT message_class FROM communication_templates
+         WHERE template_key=:template_key AND brevo_template_id=:template_id LIMIT 1'
+    );
+    $class->execute(['template_key' => $templateKey, 'template_id' => $templateId]);
+    $messageClass = $class->fetchColumn();
+    if (!is_string($messageClass)) {
+        throw new DomainException('The approved registry mapping was not found.');
+    }
+    $sender = communication_template_sender($pdo, $templateKey, $messageClass);
+    $provider = communication_brevo_request('GET', '/smtp/templates/' . $templateId);
+    $current = is_array($provider['sender'] ?? null) ? $provider['sender'] : [];
+    $changed = strcasecmp(trim((string)($current['email'] ?? '')), $sender['email']) !== 0
+        || !hash_equals(trim((string)($current['name'] ?? '')), $sender['name']);
+    if ($changed) {
+        communication_brevo_request('PUT', '/smtp/templates/' . $templateId, [
+            'sender' => ['email' => $sender['email'], 'name' => $sender['name']],
+        ]);
+    }
+    $verified = communication_brevo_request('GET', '/smtp/templates/' . $templateId);
+    $verifiedSender = is_array($verified['sender'] ?? null) ? $verified['sender'] : [];
+    if (strcasecmp(trim((string)($verifiedSender['email'] ?? '')), $sender['email']) !== 0) {
+        throw new DomainException('Brevo did not retain the approved sender address.');
+    }
+    if ($changed) {
+        crm_record_admin_audit(
+            $pdo,
+            null,
+            'COMMUNICATION_TEMPLATE_SENDER_UPDATED',
+            $actor,
+            'Communication Template',
+            $templateKey . ':' . $templateId,
+            'Applied the approved ' . $sender['channel'] . ' sender address'
+        );
+    }
+    return ['changed' => $changed, 'sender' => $sender];
 }
 
 function communication_seed_managed_lifecycle_mappings(PDO $pdo): void
@@ -442,6 +544,8 @@ function communication_seed_templates(PDO $pdo): void
     $templates = [
         ['email_verification', 'Email verification', 'Service', 1, 1, 'Sends a secure, single-use link that confirms the customer controls the email address used for their Customer Portal account.'],
         ['password_recovery', 'Password recovery', 'Service', 1, 1, 'Sends a secure, expiring password-reset link when a verified Customer Portal user requests account recovery.'],
+        ['mfa_disabled_notification', 'Two-factor authentication disabled', 'Service', 1, 1, 'Notifies a customer after they disable two-factor authentication and every Customer Portal session is revoked.'],
+        ['mfa_admin_reset_notification', 'Two-factor authentication administrator reset', 'Service', 1, 1, 'Notifies a customer after an authorized administrator resets MFA, revokes sessions, and requires enrollment at next sign-in.'],
         ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 1, 'Confirms a completed purchase and directs the customer to the secure portal; it never includes an activation key in email.'],
         ['activation_ready', 'Activation ready', 'Service', 1, 1, 'Notifies the customer that their approved license is ready and directs them to the secure portal for activation delivery.'],
         ['support_confirmation', 'Support request confirmation', 'Service', 1, 1, 'Acknowledges a submitted support request and provides its reference number and secure tracking link.'],
@@ -489,7 +593,8 @@ function communication_setting(PDO $pdo, string $key, ?string $default = null): 
 function communication_template_priority(string $templateKey): int
 {
     return match ($templateKey) {
-        'email_verification', 'password_recovery' => 10,
+        'email_verification', 'password_recovery',
+        'mfa_disabled_notification', 'mfa_admin_reset_notification' => 10,
         'purchase_confirmation', 'activation_ready' => 20,
         'support_confirmation' => 30,
         'maintenance_reminder' => 40,
@@ -511,6 +616,10 @@ function communication_template_trigger_flow(string $templateKey): string
             'Customer selects Verify your email → one eligible customer record is found → a single-use 30-minute link is sent → the customer creates a portal password and verifies ownership.',
         'password_recovery' =>
             'Existing portal user requests a reset → a single-use 30-minute link is sent → the customer chooses a new password → existing portal sessions are revoked.',
+        'mfa_disabled_notification' =>
+            'Customer confirms MFA removal with their password and a valid authenticator or recovery code → all portal sessions are revoked → this security notification is queued immediately.',
+        'mfa_admin_reset_notification' =>
+            'Authorized owner verifies customer identity, records a reason, and confirms reset → the encrypted secret is cleared without being read → sessions are revoked → this security notification is queued → MFA enrollment is required at next sign-in.',
         'purchase_confirmation' =>
             'Verified payment is captured and fulfilled → the purchase is recorded → confirmation is queued with a secure Customer Portal link. Activation keys are never emailed.',
         'activation_ready' =>
@@ -631,10 +740,10 @@ function communication_onboarding_template(string $licenseTier, string $event): 
 function communication_tier_features(string $licenseTier): string
 {
     return match (strtolower(trim($licenseTier))) {
-        'trial' => 'Up to five emulated print jobs per day, live receipt preview, and core ESC/POS testing.',
-        'lite' => 'Unlimited jobs, one printer listener, receipt history, and no Trial watermark.',
-        'pro' => 'Unlimited jobs, up to two printer listeners, full history, capture and replay, and advanced troubleshooting.',
-        'enterprise' => 'Unlimited jobs, up to fifteen printer listeners, full history, capture and replay, and all enterprise capabilities.',
+        'trial' => 'Up to five external POS print jobs per day, unlimited built-in Test Receipts, one listener, session-only activity, and a Trial watermark.',
+        'lite' => 'Unlimited jobs, one printer listener, full local history, watermark-free preview, exports, and Copy Receipt as Image.',
+        'pro' => 'Everything in Lite, up to two printer listeners, full local history, capture, import, replay, exports, and Copy Receipt as Image.',
+        'enterprise' => 'Everything in Pro, up to fifteen printer listeners, Copy Receipt as Image, the Standard Development Diagnostics Report, and the Advanced Diagnostics Package.',
         default => 'POS receipt emulation, preview, and troubleshooting tools.',
     };
 }
@@ -651,6 +760,13 @@ function communication_test_parameters(string $templateKey, string $customerName
     return match ($templateKey) {
         'email_verification' => ['customer_name' => $customerName, 'verification_url' => $portal],
         'password_recovery' => ['customer_name' => $customerName, 'reset_url' => $portal],
+        'mfa_disabled_notification' => [
+            'customer_name' => $customerName, 'event_label' => 'disabled by you', 'portal_url' => $portal,
+        ],
+        'mfa_admin_reset_notification' => [
+            'customer_name' => $customerName, 'event_label' => 'reset by an authorized administrator',
+            'portal_url' => $portal,
+        ],
         'purchase_confirmation', 'activation_ready' => [
             'customer_name' => $customerName, 'license_tier' => 'Pro', 'portal_url' => $portal,
         ],
@@ -691,6 +807,458 @@ function communication_test_parameters(string $templateKey, string $customerName
         })(),
         default => ['customer_name' => $customerName, 'portal_url' => $portal],
     };
+}
+
+function communication_template_blueprint(string $templateKey): array
+{
+    $catalog = [
+        'email_verification' => [
+            'subject' => 'Verify your POS Printer Emulator account',
+            'headline' => 'Verify your customer account',
+            'intro' => 'Hello {{ params.customer_name }}, use the secure button below within 30 minutes to verify your email address and create your Customer Portal password.',
+            'detail' => 'This single-use link protects your account and will expire automatically.',
+            'button' => 'Verify my account',
+            'button_url' => '{{ params.verification_url }}',
+        ],
+        'password_recovery' => [
+            'subject' => 'Reset your POS Printer Emulator password',
+            'headline' => 'Reset your password',
+            'intro' => 'Hello {{ params.customer_name }}, a password reset was requested for your POS Printer Emulator Customer Portal account.',
+            'detail' => 'Use the secure button below within 30 minutes. The link is single-use and existing portal sessions will be revoked after the password changes.',
+            'button' => 'Reset my password',
+            'button_url' => '{{ params.reset_url }}',
+        ],
+        'mfa_disabled_notification' => [
+            'subject' => 'Two-factor authentication was disabled',
+            'headline' => 'Account security changed',
+            'intro' => 'Hello {{ params.customer_name }}, two-factor authentication was {{ params.event_label }} for your Customer Portal account.',
+            'detail' => 'All existing portal sessions were revoked. If you did not make this change, secure your account and submit a support request immediately.',
+            'button' => 'Open Customer Portal',
+            'button_url' => '{{ params.portal_url }}',
+        ],
+        'mfa_admin_reset_notification' => [
+            'subject' => 'Two-factor authentication was reset',
+            'headline' => 'Two-factor authentication reset',
+            'intro' => 'Hello {{ params.customer_name }}, two-factor authentication was {{ params.event_label }} after an identity-verification request.',
+            'detail' => 'All existing sessions were revoked. You must enroll a new authenticator the next time you sign in.',
+            'button' => 'Open Customer Portal',
+            'button_url' => '{{ params.portal_url }}',
+        ],
+        'purchase_confirmation' => [
+            'subject' => 'Your POS Printer Emulator purchase is confirmed',
+            'headline' => 'Thank you for your purchase',
+            'intro' => 'Hello {{ params.customer_name }}, your {{ params.license_tier }} License purchase is confirmed.',
+            'detail' => 'Open POS Printer Emulator and select Settings → License → Link This Computer. Then sign in to the Customer Portal, review the computer, choose this license, and approve the link. Activation keys are never included in email.',
+            'button' => 'Open setup guide',
+            'button_url' => 'https://www.posprinteremulator.com/user-portal-guide#computers',
+        ],
+        'activation_ready' => [
+            'subject' => 'Your POS Printer Emulator license is ready',
+            'headline' => 'Your activation is ready',
+            'intro' => 'Hello {{ params.customer_name }}, your {{ params.license_tier }} License entitlement is ready.',
+            'detail' => 'In POS Printer Emulator, select Settings → License → Link This Computer. Sign in with your verified account, approve the computer, and choose the eligible license. A backup key must be claimed through the same verified flow.',
+            'button' => 'Link and activate',
+            'button_url' => 'https://www.posprinteremulator.com/user-portal-guide#computers',
+        ],
+        'support_confirmation' => [
+            'subject' => 'Support request {{ params.support_reference }} received',
+            'headline' => 'We received your support request',
+            'intro' => 'Hello {{ params.customer_name }}, your POS Printer Emulator support request was recorded as {{ params.support_reference }}.',
+            'detail' => 'Use the secure support area to review its status and add any requested information.',
+            'button' => 'View support request',
+            'button_url' => '{{ params.support_url }}',
+        ],
+        'maintenance_reminder' => [
+            'subject' => 'Maintenance and Support coverage reminder',
+            'headline' => 'Keep updates and support available',
+            'intro' => 'Hello {{ params.customer_name }}, Maintenance and Support for your {{ params.license_tier }} License is scheduled through {{ params.maintenance_end }}.',
+            'detail' => 'Your permanent software license does not expire. Renewal keeps future updates and eligible technical support available.',
+            'button' => 'Review renewal options',
+            'button_url' => '{{ params.renewal_url }}',
+        ],
+        'release_announcement' => [
+            'subject' => 'POS Printer Emulator {{ params.latest_version }} is available',
+            'headline' => 'A new version is ready',
+            'intro' => 'Hello {{ params.customer_name }}, {{ params.latest_version }} is now available. Your reported installation is {{ params.installed_version }}.',
+            'detail' => '{{ params.release_summary }}',
+            'button' => 'Download latest version',
+            'button_url' => '{{ params.download_url }}',
+        ],
+        'trial_guidance' => [
+            'subject' => 'Get more from your POS Printer Emulator Trial',
+            'headline' => 'Make the most of your Trial',
+            'intro' => 'Hello {{ params.customer_name }}, use the setup guide to connect a Windows TCP/IP printer port and begin testing ESC/POS receipts.',
+            'detail' => 'Trial Mode includes five external POS print jobs per day, unlimited built-in Test Receipts, one listener, live receipt preview, and core ESC/POS testing.',
+            'button' => 'Start setup',
+            'button_url' => '{{ params.documentation_url }}',
+        ],
+        'inactivity_help' => [
+            'subject' => 'Need help with POS Printer Emulator?',
+            'headline' => 'We want to help',
+            'intro' => 'Hello {{ params.customer_name }}, it has been a while since POS Printer Emulator reported activity.',
+            'detail' => 'Our setup and troubleshooting guides can help with listener configuration, port 9100, ESC/POS data, and receipt preview.',
+            'button' => 'Get setup help',
+            'button_url' => '{{ params.documentation_url }}',
+        ],
+        'promotion' => [
+            'subject' => 'Explore more POS Printer Emulator capabilities',
+            'headline' => 'More tools for receipt testing',
+            'intro' => 'Hello {{ params.customer_name }}, explore the latest POS Printer Emulator plans and capabilities for your testing workflow.',
+            'detail' => 'Compare listener allowances, receipt history, capture and replay, Copy Receipt as Image, and Enterprise diagnostic reports.',
+            'button' => 'View documentation',
+            'button_url' => '{{ params.documentation_url }}',
+        ],
+        'we_want_to_help' => [
+            'subject' => 'We want to help with POS Printer Emulator',
+            'headline' => 'We want to help',
+            'intro' => 'Hello {{ params.customer_name }}, POS Printer Emulator has not reported activity for more than 30 days.',
+            'detail' => 'Your {{ params.license_tier }} License includes {{ params.feature_summary }} Use the resources below for setup and troubleshooting assistance.',
+            'button' => 'Get setup help',
+            'button_url' => '{{ params.setup_url }}',
+            'secondary_button' => 'View troubleshooting guide',
+            'secondary_url' => '{{ params.troubleshooting_url }}',
+        ],
+        'welcome_setup' => [
+            'subject' => 'Welcome to POS Printer Emulator',
+            'headline' => 'Let’s get your emulator ready',
+            'intro' => 'Hello {{ params.customer_name }}, thank you for choosing POS Printer Emulator.',
+            'detail' => 'Follow the setup guide to install the listener, configure TCP/IP port 9100, and preview your first ESC/POS receipt.',
+            'button' => 'Open setup guide',
+            'button_url' => '{{ params.documentation_url }}',
+        ],
+    ];
+
+    if (preg_match('/^welcome_(trial|lite|pro|enterprise)_(start|purchase|upgrade)$/', $templateKey, $match)) {
+        $tier = ucfirst($match[1]);
+        $event = $match[2];
+        $eventText = $event === 'start'
+            ? 'Thank you for trying POS Printer Emulator.'
+            : ($event === 'purchase'
+                ? 'Thank you for purchasing POS Printer Emulator.'
+                : 'Your POS Printer Emulator license upgrade is complete.');
+        $catalog[$templateKey] = [
+            'subject' => $event === 'start'
+                ? 'Welcome to your POS Printer Emulator Trial'
+                : 'Welcome to POS Printer Emulator ' . $tier,
+            'headline' => $event === 'upgrade' ? 'Your ' . $tier . ' upgrade is ready' : 'Welcome to ' . $tier,
+            'intro' => 'Hello {{ params.customer_name }}, ' . $eventText,
+            'detail' => 'Your {{ params.license_tier }} License includes {{ params.feature_summary }} Follow the recommended setup guide to begin.',
+            'button' => 'Start setup',
+            'button_url' => '{{ params.setup_url }}',
+        ];
+    }
+
+    if (!isset($catalog[$templateKey])) {
+        throw new InvalidArgumentException('No approved Brevo template blueprint exists for this registry entry.');
+    }
+    $blueprint = $catalog[$templateKey];
+    $blueprint['template_name'] = 'PPE · ' . str_replace('_', ' ', $templateKey);
+    $blueprint['tag'] = 'ppe-' . str_replace('_', '-', $templateKey);
+    $blueprint['html'] = communication_template_html($blueprint);
+    return $blueprint;
+}
+
+function communication_template_html(array $blueprint): string
+{
+    $secondary = '';
+    if (!empty($blueprint['secondary_button']) && !empty($blueprint['secondary_url'])) {
+        $secondary = '<a class="button secondary" href="' . $blueprint['secondary_url'] . '">' .
+            htmlspecialchars((string)$blueprint['secondary_button'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>';
+    }
+    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">' .
+        '<style>body{margin:0;background:#eef4f8;color:#10233d;font:16px/1.55 Arial,sans-serif}.wrap{padding:28px 14px}' .
+        '.card{max-width:640px;margin:auto;background:#fff;border:1px solid #d9e6ef;border-radius:14px;overflow:hidden}' .
+        '.header{background:#071d35;padding:22px 28px}.header img{display:block;width:220px;max-width:100%;height:auto}' .
+        '.content{padding:32px 28px}.content h1{margin:0 0 16px;font-size:27px;line-height:1.2}.content p{margin:0 0 18px}' .
+        '.actions{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.button{display:inline-block;padding:12px 18px;border-radius:8px;background:#16b9dc;color:#031526!important;font-weight:700;text-decoration:none}' .
+        '.button.secondary{background:#e8f4f8}.help{padding-top:18px;border-top:1px solid #d9e6ef;font-size:14px}.help a{color:#087fa3}' .
+        '.footer{padding:20px 28px;background:#f5f9fc;color:#60788b;font-size:12px}@media(max-width:520px){.content,.header,.footer{padding-left:20px;padding-right:20px}.button{display:block;text-align:center}}</style></head>' .
+        '<body><div class="wrap"><div class="card"><div class="header"><img src="https://www.posprinteremulator.com/assets/logo-web.png" alt="POS Printer Emulator"></div>' .
+        '<div class="content"><h1>' . htmlspecialchars((string)$blueprint['headline'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h1>' .
+        '<p>' . $blueprint['intro'] . '</p><p>' . $blueprint['detail'] . '</p><div class="actions"><a class="button" href="' .
+        $blueprint['button_url'] . '">' . htmlspecialchars((string)$blueprint['button'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</a>' . $secondary . '</div>' .
+        '<div class="help"><strong>Need help with POS Printer Emulator?</strong><p>Our complete documentation and troubleshooting guides are available online.</p>' .
+        '<p><a href="{{ params.documentation_url }}">View Documentation</a> &nbsp;·&nbsp; <a href="{{ params.support_request_url }}">Submit a Support Request</a></p></div></div>' .
+        '<div class="footer"><p>{{ params.no_reply_notice }}</p><p>EPCOM Ltd. · POS Printer Emulator</p></div></div></div></body></html>';
+}
+
+function communication_brevo_request(string $method, string $path, ?array $payload = null): array
+{
+    $config = communication_config();
+    $apiKey = trim((string)($config['brevo_api_key'] ?? ''));
+    $apiBase = rtrim((string)($config['brevo_api_base'] ?? ''), '/');
+    $parts = parse_url($apiBase);
+    if ($apiKey === '' || !function_exists('curl_init') || !is_array($parts) ||
+        strtolower((string)($parts['scheme'] ?? '')) !== 'https' ||
+        strtolower((string)($parts['host'] ?? '')) !== 'api.brevo.com') {
+        throw new RuntimeException('Brevo template management is not configured on this server.');
+    }
+    if (!preg_match('#^/[A-Za-z0-9/_-]+$#', $path)) {
+        throw new InvalidArgumentException('The Brevo API path is invalid.');
+    }
+    $curl = curl_init($apiBase . $path);
+    $headers = ['Accept: application/json', 'api-key: ' . $apiKey];
+    $options = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST => strtoupper($method),
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_FOLLOWLOCATION => false,
+    ];
+    if ($payload !== null) {
+        $body = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $options[CURLOPT_POSTFIELDS] = $body;
+        $options[CURLOPT_HTTPHEADER][] = 'Content-Type: application/json';
+    }
+    curl_setopt_array($curl, $options);
+    $body = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    $networkError = curl_error($curl);
+    curl_close($curl);
+    if (!is_string($body)) {
+        throw new RuntimeException($networkError !== '' ? $networkError : 'Brevo did not return a response.');
+    }
+    $decoded = trim($body) === '' ? [] : json_decode($body, true);
+    if ($status < 200 || $status >= 300) {
+        $detail = is_array($decoded) ? (string)($decoded['message'] ?? $decoded['code'] ?? '') : '';
+        throw new RuntimeException('Brevo returned HTTP ' . $status . ($detail !== '' ? ': ' . $detail : '.'));
+    }
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Brevo returned an invalid response.');
+    }
+    return $decoded;
+}
+
+function communication_validate_brevo_template(
+    array $provider,
+    array $blueprint,
+    string $expectedSenderEmail
+): array
+{
+    $warnings = [];
+    $config = communication_config();
+    $html = (string)($provider['htmlContent'] ?? '');
+    $subject = trim((string)($provider['subject'] ?? ''));
+    $sender = is_array($provider['sender'] ?? null) ? $provider['sender'] : [];
+    if (!hash_equals((string)$blueprint['subject'], $subject)) {
+        $warnings[] = 'The Brevo subject does not match the approved subject.';
+    }
+    if (!hash_equals(
+        hash('sha256', (string)$blueprint['html']),
+        hash('sha256', $html)
+    )) {
+        $warnings[] = 'The Brevo content, branding, buttons, links, or placeholders differ from the approved template.';
+    }
+    if (strcasecmp(trim($expectedSenderEmail), trim((string)($sender['email'] ?? ''))) !== 0) {
+        $warnings[] = 'The Brevo sender does not match the approved sender.';
+    }
+    if (!str_contains($html, 'https://www.posprinteremulator.com/assets/logo-web.png')) {
+        $warnings[] = 'The approved POS Printer Emulator logo is missing.';
+    }
+    foreach (['documentation_url', 'support_request_url', 'no_reply_notice'] as $required) {
+        if (!preg_match('/{{\s*params\.' . preg_quote($required, '/') . '\s*}}/i', $html)) {
+            $warnings[] = 'The required global placeholder is missing: ' . $required;
+        }
+    }
+    preg_match_all('/{{\s*params\.([a-z0-9_]+)\s*}}/i', (string)$blueprint['subject'] . ' ' . $blueprint['html'], $approved);
+    preg_match_all('/{{\s*params\.([a-z0-9_]+)\s*}}/i', $subject . ' ' . $html, $actual);
+    $approvedPlaceholders = array_values(array_unique(array_map('strtolower', $approved[1] ?? [])));
+    $actualPlaceholders = array_values(array_unique(array_map('strtolower', $actual[1] ?? [])));
+    foreach (array_diff($approvedPlaceholders, $actualPlaceholders) as $missing) {
+        $warnings[] = 'The approved placeholder is missing: ' . $missing;
+    }
+    foreach (array_diff($actualPlaceholders, COMMUNICATION_PARAMETER_KEYS) as $unknown) {
+        $warnings[] = 'The template contains an unapproved placeholder: ' . $unknown;
+    }
+    if ((bool)($provider['isActive'] ?? false)) {
+        $warnings[] = 'Newly created Brevo templates must remain inactive until approved.';
+    }
+    $policyHtml = preg_replace(
+        '/{{\s*params\.no_reply_notice\s*}}/i',
+        'Please do not reply to this email. This inbox is not monitored.',
+        $html
+    ) ?? $html;
+    return array_values(array_unique(array_merge(
+        $warnings,
+        communication_template_language_warnings(
+            $subject,
+            $policyHtml,
+            (bool)($config['inbox_monitored'] ?? false),
+            $html
+        )
+    )));
+}
+
+function communication_create_and_map_template(
+    PDO $pdo,
+    string $templateKey,
+    string $actor,
+    string $reason
+): array {
+    ensure_communication_schema($pdo);
+    $template = $pdo->prepare(
+        'SELECT template_key,display_name,brevo_template_id,mapping_candidate_brevo_template_id
+         FROM communication_templates WHERE template_key=:key LIMIT 1'
+    );
+    $template->execute(['key' => $templateKey]);
+    $row = $template->fetch();
+    if (!is_array($row)) {
+        throw new InvalidArgumentException('The approved registry entry was not found.');
+    }
+    $blueprint = communication_template_blueprint($templateKey);
+    $config = communication_config();
+    $messageClass = $pdo->prepare(
+        'SELECT message_class FROM communication_templates WHERE template_key=:key LIMIT 1'
+    );
+    $messageClass->execute(['key' => $templateKey]);
+    $sender = communication_template_sender(
+        $pdo,
+        $templateKey,
+        (string)$messageClass->fetchColumn(),
+        $config
+    );
+    $mappedId = (int)($row['brevo_template_id'] ?? 0);
+    $candidateId = $mappedId > 0
+        ? $mappedId
+        : (int)($row['mapping_candidate_brevo_template_id'] ?? 0);
+    try {
+        $mark = $pdo->prepare(
+            "UPDATE communication_templates SET mapping_status=:status,mapping_error_detail=NULL,
+             enabled=0,updated_by=:actor WHERE template_key=:key"
+        );
+        $mark->execute([
+            'status' => $candidateId > 0 ? 'Validating' : 'Creating',
+            'actor' => $actor,
+            'key' => $templateKey,
+        ]);
+        if ($candidateId < 1) {
+            $created = communication_brevo_request('POST', '/smtp/templates', [
+                'sender' => [
+                    'name' => $sender['name'],
+                    'email' => $sender['email'],
+                ],
+                'subject' => (string)$blueprint['subject'],
+                'templateName' => (string)$blueprint['template_name'],
+                'htmlContent' => (string)$blueprint['html'],
+                'isActive' => false,
+                'tag' => (string)$blueprint['tag'],
+            ]);
+            $candidateId = (int)($created['id'] ?? 0);
+            if ($candidateId < 1) {
+                throw new RuntimeException('Brevo did not return a template ID.');
+            }
+            $saveCandidate = $pdo->prepare(
+                "UPDATE communication_templates SET mapping_candidate_brevo_template_id=:id,
+                 mapping_status='Validating',updated_by=:actor WHERE template_key=:key"
+            );
+            $saveCandidate->execute(['id' => $candidateId, 'actor' => $actor, 'key' => $templateKey]);
+            crm_record_admin_audit(
+                $pdo, null, 'COMMUNICATION_TEMPLATE_CREATED', $actor,
+                'Communication Template', $templateKey . ':' . $candidateId, $reason
+            );
+        }
+        if ($mappedId > 0) {
+            $duplicate = $pdo->prepare(
+                'SELECT COUNT(*) FROM communication_templates
+                 WHERE brevo_template_id=:template_id AND template_key<>:template_key'
+            );
+            $duplicate->execute(['template_id' => $mappedId, 'template_key' => $templateKey]);
+            if ((int)$duplicate->fetchColumn() > 0) {
+                throw new DomainException('The Brevo template ID is assigned to more than one approved registry entry.');
+            }
+            communication_brevo_request('PUT', '/smtp/templates/' . $mappedId, [
+                'sender' => [
+                    'name' => $sender['name'],
+                    'email' => $sender['email'],
+                ],
+                'subject' => (string)$blueprint['subject'],
+                'templateName' => (string)$blueprint['template_name'],
+                'htmlContent' => (string)$blueprint['html'],
+                'isActive' => false,
+                'tag' => (string)$blueprint['tag'],
+            ]);
+            crm_record_admin_audit(
+                $pdo, null, 'COMMUNICATION_TEMPLATE_SYNCHRONIZED', $actor,
+                'Communication Template', $templateKey . ':' . $mappedId, $reason
+            );
+        }
+
+        $provider = communication_brevo_request('GET', '/smtp/templates/' . $candidateId);
+        $warnings = communication_validate_brevo_template(
+            $provider,
+            $blueprint,
+            $sender['email']
+        );
+        if ($warnings !== []) {
+            throw new DomainException(implode(' ', $warnings));
+        }
+        crm_record_admin_audit(
+            $pdo, null, 'COMMUNICATION_TEMPLATE_VALIDATED', $actor,
+            'Communication Template', $templateKey . ':' . $candidateId, $reason
+        );
+
+        $allowlist = array_values(array_filter(
+            array_map('trim', is_array($config['test_allowlist'] ?? null) ? $config['test_allowlist'] : []),
+            static fn(string $email): bool => (bool)filter_var($email, FILTER_VALIDATE_EMAIL)
+        ));
+        if ($allowlist === []) {
+            throw new DomainException('Add a verified test recipient to the protected Brevo test allowlist.');
+        }
+        $parameters = array_replace(
+            communication_test_parameters($templateKey, 'Alex Morgan'),
+            communication_global_parameters($pdo)
+        );
+        communication_brevo_request('POST', '/smtp/email', [
+            'to' => [['email' => $allowlist[0], 'name' => 'POS Printer Emulator Test Recipient']],
+            'templateId' => $candidateId,
+            'params' => $parameters,
+            'headers' => [
+                'X-Mailin-custom' => 'ppe-template-validation|' . $templateKey,
+                'Idempotency-Key' => hash('sha256', 'template-validation|' . $templateKey . '|' . $candidateId),
+            ],
+        ]);
+        crm_record_admin_audit(
+            $pdo, null, 'COMMUNICATION_TEMPLATE_TEST_SENT', $actor,
+            'Communication Template', $templateKey . ':' . $candidateId, $reason
+        );
+
+        $map = $pdo->prepare(
+            "UPDATE communication_templates SET brevo_template_id=:id,enabled=0,
+             preview_brevo_template_id=:preview_id,preview_verified_at=UTC_TIMESTAMP(6),
+             preview_warnings_json='[]',mapping_status='Mapped',mapping_error_detail=NULL,
+             mapping_validated_at=UTC_TIMESTAMP(6),mapping_test_sent_at=UTC_TIMESTAMP(6),
+             updated_by=:actor WHERE template_key=:key
+               AND COALESCE(brevo_template_id,0)=:expected_id"
+        );
+        $map->execute([
+            'id' => $candidateId, 'preview_id' => $candidateId,
+            'actor' => $actor, 'key' => $templateKey, 'expected_id' => $mappedId,
+        ]);
+        if ($map->rowCount() !== 1) {
+            throw new DomainException('The registry mapping changed while validation was in progress.');
+        }
+        crm_record_admin_audit(
+            $pdo, null, $mappedId > 0 ? 'COMMUNICATION_TEMPLATE_REVALIDATED' : 'COMMUNICATION_TEMPLATE_MAPPED', $actor,
+            'Communication Template', $templateKey . ':' . $candidateId, $reason
+        );
+        return ['status' => $mappedId > 0 ? 'revalidated' : 'mapped', 'template_id' => $candidateId];
+    } catch (Throwable $exception) {
+        $detail = communication_sanitize_provider_error($exception->getMessage());
+        $failed = $pdo->prepare(
+            "UPDATE communication_templates SET mapping_status='Failed',mapping_error_detail=:detail,
+             enabled=0,preview_brevo_template_id=NULL,preview_verified_at=NULL,
+             preview_warnings_json=NULL,updated_by=:actor WHERE template_key=:key"
+        );
+        $failed->execute(['detail' => crm_text_slice($detail, 0, 500), 'actor' => $actor, 'key' => $templateKey]);
+        crm_record_admin_audit(
+            $pdo, null, 'COMMUNICATION_TEMPLATE_MAPPING_FAILED', $actor,
+            'Communication Template', $templateKey . ($candidateId > 0 ? ':' . $candidateId : ''), $detail
+        );
+        return ['status' => 'failed', 'error' => $detail];
+    }
 }
 
 function communication_latest_consent(PDO $pdo, string $customerId, string $type): string
@@ -1110,7 +1678,13 @@ function communication_worker_process_one(PDO $pdo): array
             return ['status' => 'deferred', 'message_id' => $messageId];
         }
 
-        $result = communication_send_brevo($message, $email, $config);
+        $sender = communication_template_sender(
+            $pdo,
+            (string)$message['template_key'],
+            (string)$message['message_class'],
+            $config
+        );
+        $result = communication_send_brevo($message, $email, $config, $sender);
         if ($result['status'] === 'sent') {
             $statement = $pdo->prepare(
                 "UPDATE communication_outbox SET state='Sent',provider_message_id=:provider_id,sent_at=UTC_TIMESTAMP(6),
@@ -1138,14 +1712,19 @@ function communication_worker_process_one(PDO $pdo): array
     }
 }
 
-function communication_send_brevo(array $message, string $email, array $config): array
+function communication_send_brevo(
+    array $message,
+    string $email,
+    array $config,
+    array $sender
+): array
 {
     if (!function_exists('curl_init')) {
         return ['status' => 'failed', 'retryable' => false, 'code' => 'CURL_UNAVAILABLE', 'detail' => 'The secure HTTP client is unavailable.'];
     }
     $parameters = json_decode((string)$message['parameters_json'], true, 20, JSON_THROW_ON_ERROR);
     $payload = [
-        'sender' => ['email' => $config['sender_email'], 'name' => $config['sender_name']],
+        'sender' => ['email' => (string)$sender['email'], 'name' => (string)$sender['name']],
         'to' => [['email' => $email]],
         'templateId' => (int)$message['brevo_template_id'],
         'params' => communication_validate_parameters(is_array($parameters) ? $parameters : []),

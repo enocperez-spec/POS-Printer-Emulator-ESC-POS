@@ -17,6 +17,59 @@ function portal_access_response(int $status, array $payload): never
     exit;
 }
 
+function portal_access_brevo_events(string $email): array
+{
+    $config = communication_config();
+    $apiKey = trim((string)($config['brevo_api_key'] ?? ''));
+    $apiBase = rtrim((string)($config['brevo_api_base'] ?? ''), '/');
+    $parts = parse_url($apiBase);
+    if ($apiKey === '' || !function_exists('curl_init') || !is_array($parts) ||
+        strtolower((string)($parts['scheme'] ?? '')) !== 'https' ||
+        strtolower((string)($parts['host'] ?? '')) !== 'api.brevo.com') {
+        throw new RuntimeException('Brevo delivery diagnostics are not configured.');
+    }
+
+    $query = http_build_query([
+        'email' => $email,
+        'limit' => 20,
+        'sort' => 'desc',
+    ], '', '&', PHP_QUERY_RFC3986);
+    $curl = curl_init($apiBase . '/smtp/statistics/events?' . $query);
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Accept: application/json', 'api-key: ' . $apiKey],
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_FOLLOWLOCATION => false,
+    ]);
+    $body = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    $networkError = curl_error($curl);
+    curl_close($curl);
+    if (!is_string($body)) {
+        throw new RuntimeException($networkError !== '' ? $networkError : 'Brevo did not return a response.');
+    }
+    $decoded = trim($body) === '' ? [] : json_decode($body, true);
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        throw new RuntimeException('Brevo delivery diagnostics returned HTTP ' . $status . '.');
+    }
+
+    $events = [];
+    foreach (is_array($decoded['events'] ?? null) ? $decoded['events'] : [] as $event) {
+        if (!is_array($event)) continue;
+        $events[] = [
+            'event' => (string)($event['event'] ?? ''),
+            'date' => (string)($event['date'] ?? ''),
+            'subject' => (string)($event['subject'] ?? ''),
+            'messageId' => (string)($event['messageId'] ?? ''),
+            'reason' => (string)($event['reason'] ?? ''),
+        ];
+    }
+    return $events;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     portal_access_response(404, ['error' => 'Not found.']);
 }
@@ -73,6 +126,39 @@ try {
            AND o.template_key IN ('email_verification','password_recovery')
          ORDER BY o.created_at DESC LIMIT 10"
     );
+    $licenses = $pdo->prepare(
+        "SELECT license_tier,control_state,maintenance_expires_at
+         FROM issued_licenses
+         WHERE customer_id=:customer_id
+         ORDER BY issued_at DESC"
+    );
+    $purchases = $pdo->prepare(
+        "SELECT p.purchase_status,p.order_type,p.license_tier,
+                i.order_type AS checkout_order_type,
+                COALESCE(i.replacement_license_id,i.license_id) AS associated_license_id,
+                i.provider_order_id
+         FROM customer_purchases p
+         LEFT JOIN portal_checkout_intents i
+           ON p.purchase_reference=CONCAT('portal:',i.intent_id) AND i.customer_id=p.customer_id
+         WHERE p.customer_id=:customer_id
+         ORDER BY p.paid_at DESC,p.updated_at DESC LIMIT 100"
+    );
+    $activationEvents = $pdo->prepare(
+        "SELECT event_type,event_summary,source_reference,occurred_at
+         FROM customer_events
+         WHERE customer_id=:customer_id
+           AND event_type IN (
+             'Activation Resend Requested','Activation Key Resent',
+             'Activation Resend Restricted','Activation Resend Failed'
+           )
+         ORDER BY occurred_at DESC LIMIT 20"
+    );
+    $suppressions = $pdo->prepare(
+        "SELECT reason,source,created_at
+         FROM customer_email_suppressions
+         WHERE customer_id=:customer_id AND active=1
+         ORDER BY created_at DESC"
+    );
 
     $diagnosticStage = 'record_details';
     $records = [];
@@ -81,6 +167,11 @@ try {
         $verification->execute(['customer_id' => $customerId]);
         $reset->execute(['customer_id' => $customerId]);
         $queue->execute(['customer_id' => $customerId]);
+        $licenses->execute(['customer_id' => $customerId]);
+        $purchases->execute(['customer_id' => $customerId]);
+        $purchaseRecords = $purchases->fetchAll();
+        $activationEvents->execute(['customer_id' => $customerId]);
+        $suppressions->execute(['customer_id' => $customerId]);
         $records[] = [
             'customerId' => $customerId,
             'customerStatus' => (string)$match['status'],
@@ -96,6 +187,18 @@ try {
             'latestVerification' => $verification->fetch() ?: null,
             'latestPasswordReset' => $reset->fetch() ?: null,
             'securityEmailQueue' => $queue->fetchAll(),
+            'licenses' => $licenses->fetchAll(),
+            'billing' => [
+                'purchaseCount' => count($purchaseRecords),
+                'mappedPurchaseCount' => count(array_filter(
+                    $purchaseRecords,
+                    static fn(array $purchase): bool =>
+                        !empty($purchase['provider_order_id']) || !empty($purchase['associated_license_id'])
+                )),
+                'records' => $purchaseRecords,
+            ],
+            'activationResendEvents' => $activationEvents->fetchAll(),
+            'activeEmailSuppressions' => $suppressions->fetchAll(),
         ];
     }
 
@@ -103,11 +206,21 @@ try {
         $records,
         static fn(array $record): bool => $record['customerStatus'] === 'Active'
     ));
+    $providerEvents = [];
+    $providerDiagnosticError = null;
+    try {
+        $providerEvents = portal_access_brevo_events($email);
+    } catch (Throwable $providerException) {
+        $providerDiagnosticError = 'Brevo delivery events could not be retrieved.';
+        error_log('Portal access Brevo diagnostics failed: ' . get_class($providerException));
+    }
     portal_access_response(200, [
         'ok' => true,
         'matchCount' => count($records),
         'activeMatchCount' => count($activeMatches),
         'ambiguousActiveMatches' => count($activeMatches) > 1,
+        'providerEvents' => $providerEvents,
+        'providerDiagnosticError' => $providerDiagnosticError,
         'records' => $records,
     ]);
 } catch (Throwable $exception) {

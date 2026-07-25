@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS support_requests (
 CREATE TABLE IF NOT EXISTS customers (
     customer_id CHAR(36) NOT NULL,
     display_name VARCHAR(160) NOT NULL,
+    company_name VARCHAR(160) NULL,
     canonical_email VARCHAR(254) NOT NULL,
     email_hash BINARY(32) NOT NULL,
     email_verified_at DATETIME(6) NULL,
@@ -262,6 +263,7 @@ CREATE TABLE IF NOT EXISTS customer_admin_audit (
     customer_id CHAR(36) NULL,
     action VARCHAR(64) NOT NULL,
     actor VARCHAR(80) NOT NULL,
+    actor_ip_address VARCHAR(45) NULL,
     object_type VARCHAR(40) NOT NULL,
     object_reference VARCHAR(96) NULL,
     reason VARCHAR(500) NULL,
@@ -299,6 +301,11 @@ CREATE TABLE IF NOT EXISTS communication_templates (
     preview_brevo_template_id BIGINT UNSIGNED NULL,
     preview_verified_at DATETIME(6) NULL,
     preview_warnings_json TEXT NULL,
+    mapping_candidate_brevo_template_id BIGINT UNSIGNED NULL,
+    mapping_status ENUM('NotMapped','Creating','Validating','Mapped','Failed') NOT NULL DEFAULT 'NotMapped',
+    mapping_error_detail VARCHAR(500) NULL,
+    mapping_validated_at DATETIME(6) NULL,
+    mapping_test_sent_at DATETIME(6) NULL,
     updated_by VARCHAR(80) NOT NULL DEFAULT 'system',
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (template_key),
@@ -457,6 +464,8 @@ INSERT IGNORE INTO communication_templates
 VALUES
     ('email_verification','Email verification','Service',1,0,1,'Verify a customer-controlled email address.'),
     ('password_recovery','Password recovery','Service',1,0,1,'Recover access to the Customer Portal.'),
+    ('mfa_disabled_notification','Two-factor authentication disabled','Service',1,0,1,'Notify a customer after they disable two-factor authentication and all portal sessions are revoked.'),
+    ('mfa_admin_reset_notification','Two-factor authentication administrator reset','Service',1,0,1,'Notify a customer after an authorized administrator resets MFA and requires enrollment at next sign-in.'),
     ('purchase_confirmation','Purchase confirmation','Service',1,0,1,'Confirm a completed purchase without including an activation key.'),
     ('activation_ready','Activation ready','Service',1,0,1,'Direct the customer to the secure portal for activation delivery.'),
     ('support_confirmation','Support request confirmation','Service',1,0,1,'Confirm a submitted support request and reference number.'),
@@ -501,6 +510,12 @@ INSERT IGNORE INTO communication_template_tags(template_key,tag_key,created_by) 
     ('password_recovery','service','system'),
     ('password_recovery','essential','system'),
     ('password_recovery','it','system'),
+    ('mfa_disabled_notification','service','system'),
+    ('mfa_disabled_notification','essential','system'),
+    ('mfa_disabled_notification','it','system'),
+    ('mfa_admin_reset_notification','service','system'),
+    ('mfa_admin_reset_notification','essential','system'),
+    ('mfa_admin_reset_notification','it','system'),
     ('purchase_confirmation','service','system'),
     ('purchase_confirmation','essential','system'),
     ('activation_ready','service','system'),
@@ -558,7 +573,7 @@ INSERT INTO communication_settings(setting_key,setting_value,updated_by)
 VALUES('template_tags_seeded','1','system')
 ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by);
 INSERT INTO communication_settings(setting_key,setting_value,updated_by)
-VALUES('template_tag_seed_version','2','system')
+VALUES('template_tag_seed_version','3','system')
 ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by);
 
 CREATE TABLE IF NOT EXISTS portal_accounts (
@@ -568,6 +583,7 @@ CREATE TABLE IF NOT EXISTS portal_accounts (
     mfa_secret_nonce BINARY(12) NULL,
     mfa_secret_tag BINARY(16) NULL,
     mfa_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    mfa_reenrollment_required TINYINT(1) NOT NULL DEFAULT 0,
     failed_login_count SMALLINT UNSIGNED NOT NULL DEFAULT 0,
     locked_until DATETIME(6) NULL,
     session_revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
@@ -658,6 +674,77 @@ CREATE TABLE IF NOT EXISTS portal_device_actions (
     CONSTRAINT fk_portal_device_installation FOREIGN KEY (installation_id) REFERENCES installations(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS portal_computer_link_requests (
+    link_id CHAR(36) NOT NULL,
+    installation_id BIGINT UNSIGNED NOT NULL,
+    request_token_hash BINARY(32) NOT NULL,
+    user_code_hash BINARY(32) NOT NULL,
+    status ENUM('Pending','Approved','Rejected','Expired','Consumed') NOT NULL DEFAULT 'Pending',
+    approved_customer_id CHAR(36) NULL,
+    selected_license_id CHAR(36) NULL,
+    expires_at DATETIME(6) NOT NULL,
+    approved_at DATETIME(6) NULL,
+    consumed_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (link_id),
+    UNIQUE KEY uq_portal_link_request_token (request_token_hash),
+    UNIQUE KEY uq_portal_link_user_code (user_code_hash),
+    KEY ix_portal_link_installation (installation_id, status, expires_at),
+    KEY ix_portal_link_customer (approved_customer_id, created_at),
+    KEY ix_portal_link_license (selected_license_id, created_at),
+    CONSTRAINT fk_portal_link_installation FOREIGN KEY (installation_id) REFERENCES installations(id),
+    CONSTRAINT fk_portal_link_customer FOREIGN KEY (approved_customer_id) REFERENCES customers(customer_id),
+    CONSTRAINT fk_portal_link_license FOREIGN KEY (selected_license_id) REFERENCES issued_licenses(license_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS license_device_bindings (
+    binding_id CHAR(36) NOT NULL,
+    license_id CHAR(36) NOT NULL,
+    customer_id CHAR(36) NOT NULL,
+    installation_id BIGINT UNSIGNED NOT NULL,
+    binding_state ENUM('Pending','Active','Deactivated','Revoked') NOT NULL DEFAULT 'Pending',
+    activation_method ENUM('PortalLink','ActivationKeyClaim','AdminRecovery','LegacyMigration') NOT NULL,
+    activated_at DATETIME(6) NULL,
+    deactivated_at DATETIME(6) NULL,
+    deactivation_reason VARCHAR(300) NULL,
+    transfer_reference CHAR(36) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (binding_id),
+    KEY ix_license_binding_license (license_id, binding_state, activated_at),
+    KEY ix_license_binding_customer (customer_id, binding_state, activated_at),
+    KEY ix_license_binding_installation (installation_id, binding_state, activated_at),
+    KEY ix_license_binding_transfer (transfer_reference),
+    CONSTRAINT fk_license_binding_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
+    CONSTRAINT fk_license_binding_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    CONSTRAINT fk_license_binding_installation FOREIGN KEY (installation_id) REFERENCES installations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS license_activation_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    customer_id CHAR(36) NULL,
+    license_id CHAR(36) NULL,
+    installation_id BIGINT UNSIGNED NULL,
+    link_id CHAR(36) NULL,
+    event_type VARCHAR(64) NOT NULL,
+    outcome ENUM('Succeeded','Rejected','Failed') NOT NULL,
+    activation_method VARCHAR(40) NOT NULL,
+    event_summary VARCHAR(500) NOT NULL,
+    source_ip_digest BINARY(32) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY ix_activation_event_customer (customer_id, created_at),
+    KEY ix_activation_event_license (license_id, created_at),
+    KEY ix_activation_event_installation (installation_id, created_at),
+    KEY ix_activation_event_link (link_id, created_at),
+    KEY ix_activation_event_outcome (outcome, created_at),
+    CONSTRAINT fk_activation_event_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    CONSTRAINT fk_activation_event_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
+    CONSTRAINT fk_activation_event_installation FOREIGN KEY (installation_id) REFERENCES installations(id),
+    CONSTRAINT fk_activation_event_link FOREIGN KEY (link_id) REFERENCES portal_computer_link_requests(link_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS portal_mail_outbox (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id CHAR(36) NULL,
@@ -683,7 +770,7 @@ CREATE TABLE IF NOT EXISTS portal_checkout_intents (
     license_id CHAR(36) NULL,
     installation_id BIGINT UNSIGNED NULL,
     checkout_token_hash BINARY(32) NOT NULL,
-    order_type ENUM('MAINTENANCE','UPGRADE') NOT NULL,
+    order_type ENUM('MAINTENANCE','UPGRADE','LICENSE') NOT NULL,
     current_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
     target_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
     state ENUM('Prepared','ProviderCreated','Captured','Fulfilled','Canceled','Expired','Refunded','ChargebackReview','Failed') NOT NULL DEFAULT 'Prepared',
@@ -933,14 +1020,19 @@ VALUES
     ('v0.3.45', 'v0.3.45', 'Release', 'Consent-aware lifecycle communications and CRM analytics', 'Released', 345, 'Deliver useful lifecycle messages through Brevo while honoring consent and provider limits.', 'Protected Brevo integration, durable priority outbox, quota deferral, templates, authenticated webhooks, suppression, minimal telemetry, segmentation, and Admin dashboards.', 'Communication automation must follow the consent and commercial foundations.', 'Eligible messages send exactly once, opt-outs and suppressions are honored, quotas do not lose mail, and prohibited data never reaches Brevo.', '2026-07-23 00:00:00.000000'),
     ('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released', 346, 'Make primary workflows usable with keyboard and assistive technology.', 'Maximized first launch, taskbar-safe remembered placement, focus order, semantics, scaling, high contrast, reduced motion, captions, and WCAG regression checks.', 'Accessibility should be established before additional interface growth.', 'Window placement behaves safely and primary workflows pass keyboard, Narrator, scaling, contrast, and automated checks.', '2026-07-23 00:00:00.000000'),
     ('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released', 347, 'Replace manual promotional-key entry with a one-click server-authorized evaluation.', 'Lite, Pro, and Enterprise selection, verified-customer eligibility, signed automatic activation, exact countdown, purchase actions, safe expiry restoration, and permanent anti-repeat controls.', 'The existing customer and promotional entitlement foundations should become a clear desktop workflow before additional configuration screens are added.', 'Each edition activates correctly without key entry and reinstall, deletion, clock, concurrency, retry, or cross-edition attempts cannot create or extend a second promotion.', '2026-07-23 00:00:00.000000'),
-    ('v0.3.48', 'v0.3.48', 'Release', 'Automatic configuration restore points', 'Planned', 348, 'Protect customers from accidental configuration loss.', 'Encrypted pre-change and scheduled restore points, bounded retention, previews, transactional restore, and rollback.', 'Recovery protection precedes greater configuration complexity.', 'Customers restore a previous configuration without partial state, secret exposure, or license loss.', NULL),
-    ('v0.3.49', 'v0.3.49', 'Release', 'Projects and testing sessions', 'Planned', 349, 'Organize receipt testing into isolated customer projects.', 'Projects, sessions, notes, tags, profiles, captures, baselines, reports, safe export, and integrity validation.', 'Projects establish clean boundaries for later comparison suites.', 'Projects remain isolated and export without leaking unrelated data.', NULL),
-    ('v0.3.50', 'v0.3.50', 'Release', 'Privacy-safe receipt masking', 'Planned', 350, 'Reduce sensitive data exposure when receipts are shared.', 'Privacy View, configurable masking, safe screenshots, exports, reports, and support attachments with original preservation.', 'Sharing workflows require explicit privacy controls.', 'Privacy-safe artifacts contain no configured sensitive values.', NULL),
-    ('v0.3.51', 'v0.3.51', 'Release', 'System tray health and notifications', 'Planned', 351, 'Keep customers informed while the main window is closed.', 'Tray health, quick actions, privacy-safe alerts, deduplication, rate limits, and recovery clearing.', 'Background awareness reduces missed faults.', 'One actionable notification represents each fault and clears after recovery.', NULL),
-    ('v0.3.52', 'v0.3.52', 'Release', 'Character and code-page assistant', 'Planned', 352, 'Help customers correct receipt encoding problems.', 'Encoding diagnosis, byte tracing, code-page previews, profile recommendations, and immutable captures.', 'Deterministic encoding improves later comparisons.', 'Known fixtures produce the correct diagnosis without changing original bytes.', NULL),
-    ('v0.3.53', 'v0.3.53', 'Release', 'Offline Enterprise update packages', 'Planned', 353, 'Support secure updates on restricted networks.', 'Signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.', 'Restricted networks require a trusted offline workflow.', 'Valid packages install and invalid packages leave the current installation unchanged.', NULL),
-    ('v0.3.54', 'v0.3.54', 'Release', 'Receipt comparison and automated validation', 'Planned', 354, 'Provide repeatable compatibility testing.', 'Compare bytes, commands, text, warnings, and rendering against baselines with machine-readable results.', 'Earlier projects, privacy, and encoding work provide safe deterministic inputs.', 'Known-good captures pass and intentional differences fail precisely.', NULL),
-    ('v0.3.55', 'v0.3.55', 'Release', 'Update Notifications for All License Types', 'Planned', 355, 'Notify every license tier about newer public releases.', 'Installed/latest versions, releases behind, summary, manual Trial download, entitlement-aware update and renewal actions, offline cache, and trusted links.', 'Awareness is universal while installation still honors maintenance.', 'Every license state receives accurate notification without bypassing maintenance rules.', NULL),
+    ('v0.3.48', 'v0.3.48', 'Release', 'Settings Version and Evaluation Clarity', 'Released', 348, 'Make the running version and evaluation path unmistakable.', 'Persistent build-derived Settings version, keyless promotional-trial guidance, corrected portal verification, and default desktop shortcut.', 'Customers and support staff need to identify the installed build and evaluation path immediately.', 'The application shows its version consistently and evaluation remains keyless.', '2026-07-23 00:00:00.000000'),
+    ('v0.3.49', 'v0.3.49', 'Release', 'Receipt Image Sharing', 'Released', 349, 'Let paid customers share the complete rendered receipt.', 'Full off-screen PNG rendering, clipboard copy, Save As, validation, authorization, and privacy-safe action logging.', 'Receipt-only images improve documentation without exposing application chrome.', 'Paid customers create a complete receipt PNG and Trial requests are denied server-side.', '2026-07-24 00:00:00.000000'),
+    ('v0.3.50', 'v0.3.50', 'Release', 'Advanced Diagnostics PDF Report', 'Released', 350, 'Provide Enterprise customers a comprehensive diagnostic report.', 'Branded, redacted, reviewed, checksum-protected PDF reporting with receipt, command, listener, environment, health, and warning analysis.', 'A shared secure reporting engine supports detailed troubleshooting.', 'Representative receipts produce readable, privacy-reviewed, deterministic reports.', '2026-07-24 00:00:00.000000'),
+    ('v0.3.51', 'v0.3.51', 'Release', 'Standard Diagnostics PDF Report', 'Released', 351, 'Provide a concise Enterprise support report.', 'A shorter branded report reusing the secure collection, redaction, authorization, pagination, and checksum engine.', 'Common support cases need a focused report.', 'The Standard report is concise, complete, readable, and free of prohibited data.', '2026-07-24 00:00:00.000000'),
+    ('v0.3.52', 'v0.3.52', 'Release', 'Updater Download File-Lock Correction', 'Released', 352, 'Restore reliable in-app update installation.', 'Dispose download streams before promotion, validate length, clean partial files, preserve trusted hosts and checksums, and test exclusive access.', 'A completed installer cannot update the application while its download stream remains open.', 'Verified installers are promoted without sharing violations and incomplete transfers are rejected.', '2026-07-24 00:00:00.000000'),
+    ('v0.3.53', 'v0.3.53', 'Release', 'Account-Based License Registration and Activation', 'Released', 353, 'Establish license ownership through a verified Customer Portal account.', 'Authenticated single-use computer linking, account-owned license selection, device limits, transfer history, backup-key claims, and audit events.', 'Verified account ownership is required before expanded self-service licensing.', 'Customers can link, activate, release, and transfer licenses while invalid or replayed requests are rejected.', '2026-07-25 00:00:00.000000'),
+    ('v0.3.54', 'v0.3.54', 'Release', 'Privacy-safe receipt masking', 'Planned', 354, 'Reduce sensitive data exposure when receipts are shared.', 'Privacy View, configurable masking, safe screenshots, exports, reports, and support attachments with original preservation.', 'Sharing workflows require explicit privacy controls.', 'Privacy-safe artifacts contain no configured sensitive values.', NULL),
+    ('v0.3.55', 'v0.3.55', 'Release', 'System tray health and notifications', 'Planned', 355, 'Keep customers informed while the main window is closed.', 'Tray health, quick actions, privacy-safe alerts, deduplication, rate limits, and recovery clearing.', 'Background awareness reduces missed faults.', 'One actionable notification represents each fault and clears after recovery.', NULL),
+    ('v0.3.56', 'v0.3.56', 'Release', 'Character and code-page assistant', 'Planned', 356, 'Help customers correct receipt encoding problems.', 'Encoding diagnosis, byte tracing, code-page previews, profile recommendations, and immutable captures.', 'Deterministic encoding improves later comparisons.', 'Known fixtures produce the correct diagnosis without changing original bytes.', NULL),
+    ('v0.3.57', 'v0.3.57', 'Release', 'Offline Enterprise update packages', 'Planned', 357, 'Support secure updates on restricted networks.', 'Signed portable manifests, removable-media verification, downgrade protection, and offline entitlement guidance.', 'Restricted networks require a trusted offline workflow.', 'Valid packages install and invalid packages leave the current installation unchanged.', NULL),
+    ('v0.3.58', 'v0.3.58', 'Release', 'Receipt comparison and automated validation', 'Planned', 358, 'Provide repeatable compatibility testing.', 'Compare bytes, commands, text, warnings, and rendering against baselines with machine-readable results.', 'Earlier privacy and encoding work provide safe deterministic inputs.', 'Known-good captures pass and intentional differences fail precisely.', NULL),
+    ('v0.3.59', 'v0.3.59', 'Release', 'Update Notifications for All License Types', 'Planned', 359, 'Notify every license tier about newer public releases.', 'Installed/latest versions, releases behind, summary, manual Trial download, entitlement-aware update and renewal actions, offline cache, and trusted links.', 'Awareness is universal while installation still honors maintenance.', 'Every license state receives accurate notification without bypassing maintenance rules.', NULL),
+    ('v0.3.60', 'v0.3.60', 'Release', 'Automatic configuration restore points', 'Planned', 360, 'Protect customers from accidental configuration loss.', 'Encrypted pre-change and scheduled restore points, bounded retention, previews, transactional restore, and rollback.', 'Recovery protection precedes greater configuration complexity.', 'Customers restore a previous configuration without partial state, secret exposure, or license loss.', NULL),
     ('BACKLOG-001', NULL, 'Backlog', 'Service authentication and installer repair', 'Planned', 1001, 'Protect state-changing local APIs and provide a supported recovery path.', 'Per-installation credentials, origin restrictions, protected operations, repair workflow, data preservation, action logs, and health verification.', 'Highest backlog priority because it closes a security boundary before storage and licensing grow more complex.', 'Unauthorized local writes are rejected and repair restores a damaged installation without losing customer data.', NULL),
     ('BACKLOG-007', NULL, 'Backlog', 'Listener security and lifecycle hardening', 'Planned', 1002, 'Bound network resource use and make listener management cancellation-safe.', 'Per-listener and global connection caps, per-source and slow-client limits, aggregate in-flight byte limits, queue memory controls, rate-limited diagnostics, cancellation-safe lifecycle completion or rollback, atomic profile assignment/deletion, reviewed firewall narrowing, and adversarial concurrency tests.', 'Configurable private-network listeners increase the service resource and lifecycle surface, so hardening should precede larger histories and additional network-facing features.', 'Untrusted or slow LAN clients cannot cause unbounded memory growth, management cancellation cannot strand a listener transition, profile changes cannot race listener updates, and healthy listeners remain isolated.', NULL),
     ('BACKLOG-002', NULL, 'Backlog', 'Advanced SQLite maintenance and retention', 'Planned', 1003, 'Extend the v0.3.20 SQLite foundation with customer-facing scale and recovery controls.', 'Paging, fast search, source/listener/profile filters, aggregate counts, configurable count/size/age and fair per-listener retention, health checks, repair, backup, restore, and reviewed legacy-backup cleanup.', 'The transactional foundation and safe JSON migration are now part of v0.3.20; maintenance controls should follow after the listener runtime is hardened.', 'Large histories remain fast, one busy listener cannot evict all other history, and customers can validate, retain, back up, restore, repair, and safely clean migrated data.', NULL),
@@ -948,7 +1040,17 @@ VALUES
     ('BACKLOG-004', NULL, 'Backlog', 'Online license transfer and revocation', 'Planned', 1005, 'Complete outage-safe enforcement after the Admin Portal license-control foundation.', 'The portal now provides confirmed tier replacement, Trial upgrades, deactivation, reactivation, revocation, soft deletion, purchase synchronization, and audit history. Remaining work is per-computer activation tracking, transfer limits and cooldowns, server-signed entitlement checks that replace client-reported legacy paid status, a defined offline grace period, and privacy-minimized enforcement events.', 'Commercial control is valuable but must not disable customers during temporary outages; v0.3.23 offline keys remain valid until the enforcement release.', 'Transfers and remote revocations work with auditable state, the desktop clearly reports its entitlement, and temporary service outages preserve valid licensed use.', NULL),
     ('BACKLOG-005', NULL, 'Backlog', 'PNG and deterministic PDF export', 'Planned', 1006, 'Provide predictable receipt artifacts outside the application.', 'Complete receipt PNG, deterministic PDF, correct thermal dimensions, long pages, images, codes, watermark rules, batch export, and output tests.', 'Comparison should establish deterministic rendering before final export formats depend on it.', 'Exports are independent of window size, zoom, and theme and match tested receipt output.', NULL),
     ('BACKLOG-006', NULL, 'Backlog', 'Hardened Thermal adapter', 'Planned', 1007, 'Add deeper renderer compatibility through an isolated hardened process.', 'Stable ABI, structured errors and offsets, profile parity, safe malformed-input handling, golden tests, differential tests, fuzzing, performance limits, and managed fallback.', 'It carries the greatest integration risk and needs captures and baselines for safe validation.', 'The isolated renderer matches approved fixtures, survives hostile inputs, and falls back safely.', NULL),
-    ('BACKLOG-008', NULL, 'Backlog', 'Admin Portal License Manager tabs', 'Planned', 1008, 'Organize license administration into focused views without creating separate or conflicting admin areas.', 'Add accessible tabs for Issued Licenses, Trial Installations, and Recent License Activity; keep key generation and license actions in Issued Licenses; preserve per-tab filters, counts, deleted-license view, scroll position, direct links, and browser navigation; retain Trial verification warnings and audit disclosures; support responsive layouts and regression tests.', 'This is a contained usability enhancement to the completed License Manager foundation. It follows higher-risk security, listener, storage, signing, entitlement, export, and compatibility work, but can be pulled forward for a short Admin Portal release.', 'All three sections render as accessible tabs, the active tab survives refresh and Back/Forward navigation, existing confirmations work unchanged, filters and counts remain accurate, and desktop and mobile browser tests pass.', NULL);
+    ('BACKLOG-008', NULL, 'Backlog', 'Admin Portal License Manager tabs', 'Planned', 1008, 'Organize license administration into focused views without creating separate or conflicting admin areas.', 'Add accessible tabs for Issued Licenses, Trial Installations, and Recent License Activity; keep key generation and license actions in Issued Licenses; preserve per-tab filters, counts, deleted-license view, scroll position, direct links, and browser navigation; retain Trial verification warnings and audit disclosures; support responsive layouts and regression tests.', 'This is a contained usability enhancement to the completed License Manager foundation. It follows higher-risk security, listener, storage, signing, entitlement, export, and compatibility work, but can be pulled forward for a short Admin Portal release.', 'All three sections render as accessible tabs, the active tab survives refresh and Back/Forward navigation, existing confirmations work unchanged, filters and counts remain accurate, and desktop and mobile browser tests pass.', NULL),
+    ('UPE-123', NULL, 'Backlog', 'Device and Listener Health Dashboard', 'Planned', 1123, 'Give customers one clear view of the health of every registered computer and printer listener.', 'Show computer online status, installed version, listener names and ports, last successful print job, recent connection warnings, and Maintenance and Support eligibility.', 'User Portal Enhancement. This provides the highest immediate customer and support value by exposing operational health without opening the desktop application.', 'Customers can identify offline, outdated, or faulted computers and listeners from accurate, privacy-safe portal data.', NULL),
+    ('UPE-124', NULL, 'Backlog', 'Guided Setup Wizard', 'Planned', 1124, 'Guide customers from account login to a verified working POS connection.', 'Select a POS or generic ESC/POS profile, choose TCP/IP settings, test connectivity, send a test receipt, confirm rendering, and download a configuration summary.', 'User Portal Enhancement. Guided setup reduces configuration mistakes and shortens time to the first successful receipt.', 'A customer can complete the supported setup flow and verify a receipt without guessing listener or port settings.', NULL),
+    ('UPE-125', NULL, 'Backlog', 'Diagnostic Package and Support Integration', 'Planned', 1125, 'Let customers attach privacy-reviewed diagnostic evidence directly to a support request.', 'Collect application version, listener configuration, operating-system details, and relevant errors while excluding receipt contents, full activation keys, credentials, and unnecessary personal data.', 'User Portal Enhancement. Structured diagnostic packages reduce support time while preserving customer privacy.', 'Customers can preview and submit a redacted diagnostic package, and support staff can retrieve it only through authorized workflows.', NULL),
+    ('UPE-126', NULL, 'Backlog', 'Active Sessions and Security History', 'Planned', 1126, 'Give customers visibility and control over Customer Portal access.', 'List active and recent sessions with browser, approximate location, IP-derived security context, login time, idle time, and security events; allow remote sign-out without exposing session secrets.', 'User Portal Enhancement. Session visibility and revocation strengthen account security and help customers recognize unfamiliar access.', 'Customers can review account activity and terminate other sessions, with every security action recorded and notified appropriately.', NULL),
+    ('UPE-127', 'v0.3.53', 'Backlog', 'Account-Based License Registration and Transfer', 'Released', 1127, 'Provide a controlled self-service process for linking, activating, and moving a license between computers.', 'Verified account linking, explicit approval, license selection, device limits, deactivation, backup-key claims, installation guidance, and complete transfer history.', 'User Portal Enhancement. Account ownership and guided transfer reduce manual support work without weakening activation limits.', 'Eligible customers can link, activate, deactivate, and transfer licenses while duplicate, unauthorized, expired, or replayed requests are rejected and audited.', '2026-07-25 00:00:00.000000'),
+    ('UPE-128', NULL, 'Backlog', 'Enterprise Team Management', 'Planned', 1128, 'Allow Enterprise organizations to share portal responsibilities safely.', 'Invite and remove users; assign Owner, Administrator, Technician, Billing, and Read Only roles; enforce least privilege, MFA policy, and organization-scoped audit history.', 'User Portal Enhancement. Enterprise customers need delegated access without sharing one account or exposing unrelated controls.', 'Each role can perform only its authorized actions, ownership transfers are protected, and organization access is fully auditable.', NULL),
+    ('UPE-129', NULL, 'Backlog', 'Customer Notification Center', 'Planned', 1129, 'Centralize important customer notices inside the portal.', 'Display software updates, maintenance reminders, security alerts, purchase confirmations, support responses, and license changes with read state, priority, expiration, and destination links.', 'User Portal Enhancement. An in-portal inbox reduces dependence on email delivery and keeps actionable notices discoverable.', 'Customers receive each eligible notification once, can mark it read, and can open the correct secure destination without exposing sensitive content.', NULL),
+    ('UPE-130', NULL, 'Backlog', 'Release and Update Center', 'Planned', 1130, 'Turn Downloads into a complete entitlement-aware software release center.', 'Show release notes, release date, installed and latest versions, known issues, eligible previous versions, Maintenance and Support eligibility, and trusted download or renewal actions.', 'User Portal Enhancement. A consistent update center helps customers understand what they can install and why.', 'The portal offers only entitled, integrity-verified installers and accurately explains current, available, behind, and renewal-required states.', NULL),
+    ('UPE-131', NULL, 'Backlog', 'Purchase and Billing History', 'Released', 1131, 'Give customers a complete financial record of their product ownership.', 'Show purchases, upgrades, maintenance renewals, payment status, license association, downloadable receipts, and transaction references without exposing sensitive payment credentials.', 'User Portal Enhancement. Clear billing history reduces purchase confusion and supports customer recordkeeping.', 'Customers can reconcile every completed or pending transaction with the correct license and download a consistent receipt.', '2026-07-24 00:00:00.000000'),
+    ('UPE-132', NULL, 'Backlog', 'Portal Activity Timeline', 'Planned', 1132, 'Present important account, license, device, purchase, support, and security events in one chronological view.', 'Provide filterable events for activations, transfers, downloads, purchases, renewals, support requests, password and MFA changes, and administrative actions visible to the customer.', 'User Portal Enhancement. A unified timeline makes account changes understandable and improves troubleshooting and trust.', 'Customers can filter and review accurate, privacy-safe events while protected secrets and internal-only administrative details remain hidden.', NULL);
 
 UPDATE development_roadmap
 SET status = 'Released',

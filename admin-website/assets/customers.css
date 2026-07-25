@@ -48,7 +48,7 @@
 .verification { padding: 7px 10px; border-radius: 99px; font-weight: 700; font-size: 12px; }
 .verification.verified { color: #9af0bd; background: #123f2c; border: 1px solid #2c8059; }
 .verification.unverified { color: #ffd794; background: #4b3516; border: 1px solid #946a28; }
-.identity { display: grid; grid-template-columns: 2fr repeat(4, 1fr); border: 1px solid var(--line); border-radius: 9px; margin: 22px 0; }
+.identity { display: grid; grid-template-columns: 2fr repeat(5, 1fr); border: 1px solid var(--line); border-radius: 9px; margin: 22px 0; }
 .identity div { padding: 14px; border-right: 1px solid var(--line); }
 .identity div:last-child { border: 0; }
 .identity dt { color: var(--muted); font-size: 12px; }
@@ -72,6 +72,9 @@ summary { cursor: pointer; padding: 15px 17px; font-weight: 800; }
 .sensitive-actions form { border: 1px solid #34526c; border-radius: 8px; padding: 15px; display: grid; gap: 11px; }
 .sensitive-actions p { color: var(--muted); font-size: 13px; margin: 0; }
 .sensitive-actions .danger { border-color: #b35159; background: #652e34; }
+.mfa-recovery { border-color: #9b555d; }
+.mfa-recovery .sensitive-actions { grid-template-columns: minmax(0, 720px); }
+.mfa-recovery textarea { resize: vertical; }
 dialog { width: min(520px, calc(100% - 32px)); border: 1px solid #3c607f; border-radius: 12px; background: #081f38; color: #fff; padding: 24px; }
 dialog::backdrop { background: #020c17cc; }
 dialog form { display: grid; gap: 17px; }

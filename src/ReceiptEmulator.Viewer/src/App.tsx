@@ -50,7 +50,7 @@ import { PrinterProfilesSettings } from './PrinterProfilesSettings'
 import { StoredGraphicsSettings } from './StoredGraphicsSettings'
 import { BackupRestoreSettings } from './BackupRestoreSettings'
 import { TrialOnboarding } from './TrialOnboarding'
-import type { BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, PrinterListener, PromotionOfferStatus, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { AccountLinkStartResult, BackupPreferences, ConnectionDiagnosticCheck, ConnectionDiagnosticReport, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, PrinterListener, PromotionOfferStatus, ReceiptJob, ReceiptLine, ServiceStatus, StoredGraphic, SupportPackagePreview, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 const PrinterListenersSettings = lazy(() => import('./PrinterListenersSettings').then(module => ({ default: module.PrinterListenersSettings })))
 const trialOnboardingStorageKey = 'pos-printer-emulator-trial-onboarding-v2'
@@ -59,7 +59,7 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.52',
+  version: '0.3.53',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -1176,11 +1176,7 @@ function LicenseSettings({ status, onActivated }: {
   status: ServiceStatus
   onActivated: (license: ServiceStatus['license']) => void
 }) {
-  const [customerName, setCustomerName] = useState(status.license.customerName)
-  const [emailAddress, setEmailAddress] = useState(status.license.emailAddress)
   const [activationKey, setActivationKey] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<string>()
   const [changingLicense, setChangingLicense] = useState(!status.license.isPaid)
   const [maintenanceKey, setMaintenanceKey] = useState('')
   const [maintenanceBusy, setMaintenanceBusy] = useState(false)
@@ -1192,6 +1188,11 @@ function LicenseSettings({ status, onActivated }: {
   const [selectedPromotionTier, setSelectedPromotionTier] = useState<'Lite' | 'Pro' | 'Enterprise'>()
   const [promotionBusy, setPromotionBusy] = useState(false)
   const [promotionMessage, setPromotionMessage] = useState<string>()
+  const [accountLink, setAccountLink] = useState<(AccountLinkStartResult & { expiresAt: number })>()
+  const [accountLinkBusy, setAccountLinkBusy] = useState(false)
+  const [accountLinkMessage, setAccountLinkMessage] = useState<string>()
+  const [accountLinkState, setAccountLinkState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
+  const onActivatedRef = useRef(onActivated)
   const [countdownNow, setCountdownNow] = useState(Date.now())
   const showActivationForm = !status.license.isPaid || changingLicense
   const upgradeGuidance = status.license.mode === 'Lite'
@@ -1223,25 +1224,75 @@ function LicenseSettings({ status, onActivated }: {
   }, [status.license.promotion.isActive, status.license.promotion.isApplicable, status.license.promotion.state])
 
   useEffect(() => {
+    onActivatedRef.current = onActivated
+  }, [onActivated])
+
+  useEffect(() => {
     if (!status.license.promotion.isActive) return
     const timer = window.setInterval(() => setCountdownNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
   }, [status.license.promotion.isActive])
 
+  useEffect(() => {
+    if (!accountLink || accountLinkState !== 'pending') return
+    let cancelled = false
+    let checking = false
+    async function checkLink() {
+      if (checking || cancelled) return
+      if (Date.now() >= accountLink!.expiresAt) {
+        setAccountLinkState('error')
+        setAccountLinkMessage('This computer link code expired. Select Start a new link to try again.')
+        return
+      }
+      checking = true
+      try {
+        const result = await api.checkAccountLink(accountLink!.linkId, accountLink!.requestToken)
+        if (cancelled) return
+        setAccountLinkMessage(result.message)
+        if (result.state === 'Activated' && result.license) {
+          setAccountLinkState('success')
+          setChangingLicense(false)
+          onActivatedRef.current(result.license)
+        } else if (result.state === 'Rejected' || result.state === 'Expired' || result.state === 'Unavailable') {
+          setAccountLinkState('error')
+        }
+      } catch (cause) {
+        if (!cancelled) {
+          setAccountLinkState('error')
+          setAccountLinkMessage(cause instanceof Error ? cause.message : 'The computer-link status could not be checked.')
+        }
+      } finally {
+        checking = false
+      }
+    }
+    void checkLink()
+    const timer = window.setInterval(() => void checkLink(), 3_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [accountLink?.expiresAt, accountLink?.linkId, accountLink?.requestToken, accountLinkState])
+
+  async function startAccountLink(backupActivationKey?: string) {
+    setAccountLinkBusy(true)
+    setAccountLinkMessage(undefined)
+    try {
+      const result = await api.startAccountLink(backupActivationKey)
+      setAccountLink({ ...result, expiresAt: Date.now() + result.expiresInSeconds * 1000 })
+      setAccountLinkState('pending')
+      setAccountLinkMessage(result.message)
+      if (backupActivationKey) setActivationKey('')
+    } catch (cause) {
+      setAccountLinkState('error')
+      setAccountLinkMessage(cause instanceof Error ? cause.message : 'A secure computer-link request could not be started.')
+    } finally {
+      setAccountLinkBusy(false)
+    }
+  }
+
   async function activate(event: FormEvent) {
     event.preventDefault()
-    setBusy(true)
-    setMessage(undefined)
-    try {
-      const license = await api.activate({ customerName, emailAddress, activationKey })
-      setActivationKey('')
-      setChangingLicense(false)
-      onActivated(license)
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'The activation key could not be validated.')
-    } finally {
-      setBusy(false)
-    }
+    await startAccountLink(activationKey)
   }
 
   async function applyMaintenance(event: FormEvent) {
@@ -1315,6 +1366,37 @@ function LicenseSettings({ status, onActivated }: {
         <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
       </div>
+
+      <section className={`account-link-card is-${accountLinkState}`}>
+        <div className="account-link-heading">
+          <div><LockKeyhole size={19} /><strong>Link This Computer</strong></div>
+          <span>{accountLinkState === 'success' ? 'Linked' : accountLinkState === 'pending' ? 'Waiting for approval' : 'Recommended'}</span>
+        </div>
+        <p>Connect this installation to your verified Customer Portal account, approve the computer, and choose an eligible license. No name or email matching is required.</p>
+        {!accountLink || accountLinkState === 'error' ? (
+          <button className="account-link-primary" type="button" onClick={() => void startAccountLink()} disabled={accountLinkBusy}>
+            <LockKeyhole size={16} /> {accountLinkBusy ? 'Starting securely…' : accountLink ? 'Start a new link' : 'Link This Computer'}
+          </button>
+        ) : accountLinkState === 'pending' ? (
+          <>
+            <div className="account-link-code-row">
+              <div><span>Temporary code</span><strong>{accountLink.userCode}</strong></div>
+              <button type="button" onClick={() => void navigator.clipboard.writeText(accountLink.userCode)}><Copy size={15} /> Copy</button>
+            </div>
+            <div className="account-link-actions">
+              <a className="account-link-primary" href={accountLink.verificationUrl} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} /> Sign in and approve
+              </a>
+              <small>Expires at {new Date(accountLink.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. This code works once.</small>
+            </div>
+          </>
+        ) : null}
+        {accountLinkMessage && (
+          <div className={accountLinkState === 'error' ? 'account-link-error' : accountLinkState === 'success' ? 'account-link-success' : 'account-link-message'} role={accountLinkState === 'error' ? 'alert' : 'status'}>
+            {accountLinkMessage}
+          </div>
+        )}
+      </section>
 
       {(status.license.promotion.isApplicable || status.license.promotion.state !== 'None') && (
         <section className={`maintenance-card promotion-card ${status.license.promotion.isActive ? 'is-active' : status.license.promotion.state === 'Expired' ? 'is-expired' : ''}`}>
@@ -1408,19 +1490,15 @@ function LicenseSettings({ status, onActivated }: {
 
       {showActivationForm ? (
         <details className="permanent-activation-disclosure" open={status.license.isPaid}>
-          <summary>{status.license.isPaid ? 'Change or upgrade the permanent license' : 'Already purchased? Activate a permanent license'}</summary>
-          <p>The permanent-license form is separate from the Five-Day Promotional Trial. Starting an evaluation never requires an activation key.</p>
+          <summary>{status.license.isPaid ? 'Backup key activation or license recovery' : 'Use a backup activation key'}</summary>
+          <p>Account linking is the recommended activation method. An activation key is a backup credential and must be claimed by a verified Customer Portal account before it establishes ownership.</p>
           <form className="activation-form" onSubmit={activate}>
-            <label>Customer or company name<input required value={customerName} onChange={event => setCustomerName(event.target.value)} autoComplete="organization" /></label>
-            <label>Email address<input required type="email" value={emailAddress} onChange={event => setEmailAddress(event.target.value)} autoComplete="email" /></label>
             <label className="key-field">Purchased activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
-            {message && <div className="activation-error" role="alert"><AlertTriangle size={16} />{message}</div>}
-            {message && <a className="download-diagnostics activation-diagnostics" href="/api/support/activation-diagnostics" download><Download size={17} /> Download Activation Diagnostics</a>}
             <div className="settings-actions">
-              <button className="activate-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? 'Validating…' : status.license.isPaid ? 'Validate replacement key' : 'Validate and activate purchased license'}</button>
-              {status.license.isPaid && <button type="button" disabled={busy} onClick={() => { setChangingLicense(false); setActivationKey(''); setMessage(undefined) }}>Cancel</button>}
+              <button className="activate-button" type="submit" disabled={accountLinkBusy}><KeyRound size={17} /> {accountLinkBusy ? 'Starting secure claim…' : 'Claim key through Customer Portal'}</button>
+              {status.license.isPaid && <button type="button" disabled={accountLinkBusy} onClick={() => { setChangingLicense(false); setActivationKey('') }}>Cancel</button>}
             </div>
-            <p className="activation-note">A purchased Lite, Pro, or Enterprise activation key unlocks its permanent license level immediately without reinstalling. Any replacement key must match the customer information entered above.</p>
+            <p className="activation-note">Use this backup method only for a license already claimed in your verified Customer Portal account. Account ownership, device limits, and all activation attempts are enforced by the licensing service.</p>
           </form>
         </details>
       ) : null}

@@ -27,8 +27,8 @@ return [
     ],
     'admin_api_token' => 'REPLACE_WITH_RANDOM_32_BYTE_TOKEN',
     'mail' => [
-        'from_email' => 'licenses@posprinteremulator.com',
+        'from_email' => 'sales@buy.posprinteremulator.com',
         'from_name' => 'POS Printer Emulator',
-        'reply_to' => 'support@posprinteremulator.com',
+        'reply_to' => '',
     ],
 ];

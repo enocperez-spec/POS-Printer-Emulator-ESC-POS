@@ -170,6 +170,8 @@ public sealed record LicenseStatus(
 }
 
 public sealed record ActivationRequest(string CustomerName, string EmailAddress, string ActivationKey);
+public sealed record AccountLinkStatusRequest(Guid LinkId, string RequestToken);
+public sealed record AccountLinkStartRequest(string? ActivationKey);
 
 public sealed record SingleListenerSetupRequest(int Port);
 

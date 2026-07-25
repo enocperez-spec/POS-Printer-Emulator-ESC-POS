@@ -553,6 +553,25 @@ html[data-theme="dark"] .receipt-image-notice.error { background: #381c1a; color
 .license-summary div { display: grid; gap: 4px; padding: 13px 20px; background: var(--surface); font-size: 12px; }
 .license-summary span { color: var(--muted); }
 .license-summary strong { overflow-wrap: anywhere; }
+.account-link-card { display: grid; gap: 13px; margin: 20px 0 4px; padding: 17px; border: 1px solid color-mix(in srgb, var(--blue) 45%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--blue-soft) 55%, var(--surface)); }
+.account-link-card.is-success { border-color: color-mix(in srgb, var(--green) 55%, var(--border)); background: color-mix(in srgb, var(--green) 8%, var(--surface)); }
+.account-link-card.is-error { border-color: color-mix(in srgb, #d92d20 50%, var(--border)); }
+.account-link-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.account-link-heading > div { display: flex; align-items: center; gap: 8px; }
+.account-link-heading svg { color: var(--blue); }
+.account-link-heading span { padding: 4px 8px; border-radius: 99px; color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.account-link-card p, .account-link-card small { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.account-link-primary { width: fit-content; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border: 1px solid var(--blue); border-radius: 7px; color: #fff; background: var(--blue); font-size: 10px; font-weight: 800; text-decoration: none; cursor: pointer; }
+.account-link-primary:disabled { cursor: wait; opacity: .62; }
+.account-link-code-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.account-link-code-row > div { display: grid; gap: 4px; }
+.account-link-code-row span { color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; }
+.account-link-code-row strong { color: var(--text); font: 850 21px "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; }
+.account-link-code-row button { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface); cursor: pointer; }
+.account-link-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; }
+.account-link-message, .account-link-success, .account-link-error { padding: 10px 11px; border-radius: 7px; color: var(--text); background: color-mix(in srgb, var(--blue) 8%, var(--surface)); font-size: 10px; line-height: 1.5; }
+.account-link-success { color: var(--green); background: color-mix(in srgb, var(--green) 10%, var(--surface)); }
+.account-link-error { color: #c52a20; background: color-mix(in srgb, #d92d20 9%, var(--surface)); }
 .settings-panel .activation-form { margin: 0 -28px -26px; }
 .permanent-activation-disclosure { margin: 0 -28px -26px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, var(--panel)); }
 .permanent-activation-disclosure > summary { padding: 18px 28px; color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; list-style-position: inside; }

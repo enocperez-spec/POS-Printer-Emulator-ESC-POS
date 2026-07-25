@@ -36,9 +36,11 @@ try {
     $currency = (string)$offer['currency'];
     $tier = clean_license_tier((string)$session['targetTier']);
     $orderType = strtoupper((string)$session['orderType']);
-    $description = $orderType === 'MAINTENANCE'
-        ? "POS Printer Emulator {$tier} Annual Maintenance Renewal"
-        : "POS Printer Emulator {$session['currentTier']} to {$tier} Permanent License Upgrade";
+    $description = match ($orderType) {
+        'MAINTENANCE' => "POS Printer Emulator {$tier} Annual Maintenance and Support",
+        'LICENSE' => "POS Printer Emulator {$tier} License",
+        default => "POS Printer Emulator {$session['currentTier']} to {$tier} License Upgrade",
+    };
     $publicId = random_public_id();
     $created = paypal_request('POST', '/v2/checkout/orders', [
         'intent' => 'CAPTURE',

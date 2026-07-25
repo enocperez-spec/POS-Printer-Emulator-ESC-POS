@@ -4,14 +4,18 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
-## v0.3.52 — 2026-07-24
+## v0.3.53 — 2026-07-25
 
-- Fixes the Windows in-app updater failing after a completed download with “The process cannot access the file because it is being used by another process.”
-- Disposes the temporary download stream before promoting the verified installer into place.
-- Moves update downloading into the shared update-security component so the installer and checksum use the same safe file lifecycle.
-- Rejects incomplete downloads whose byte count does not match the server-provided content length.
-- Removes partial `.download` files when a download fails.
-- Adds a Windows file-lock regression test that verifies the completed installer can be opened exclusively after download.
+- Replaces customer-name, company-name, and email matching with verified Customer Portal account ownership.
+- Adds **Link This Computer** to the desktop License settings with an authenticated, ten-minute, single-use registration code.
+- Requires verified portal sign-in, recent password confirmation, device review, eligible-license selection, and explicit approval before activation.
+- Automatically retrieves and activates the approved license without a reinstall or separate download.
+- Enforces one active computer per license and records activation, deactivation, claim, and transfer history.
+- Keeps activation keys as a backup claim method while requiring the customer to claim the license through a verified account.
+- Retires the legacy local direct-activation endpoint so application UI changes cannot bypass account ownership.
+- Adds database storage for pending link requests, authoritative license-device bindings, and privacy-safe activation events.
+- Adds rate limiting, hashed request credentials, expiration, replay prevention, authenticated installations, and clear recovery errors.
+- Updates purchase confirmation guidance, approved email content, FAQ, documentation, and the illustrated Customer Portal guide.
 
 ## v0.3.51 — 2026-07-24
 

@@ -36,6 +36,7 @@ try {
     ensure_customer_portal_schema($pdo);
     $migration = $pdo->prepare('INSERT IGNORE INTO development_migrations (migration_key) VALUES (:migration_key)');
     $migration->execute(['migration_key' => 'secure-customer-portal-v0.3.43']);
+    $migration->execute(['migration_key' => 'account-based-activation-v1']);
     $status = $pdo->prepare(
         "UPDATE development_roadmap SET status='In progress',completed_at=NULL WHERE item_key='v0.3.43'"
     );
@@ -46,7 +47,7 @@ try {
     }
     portal_migration_response([
         'ok' => true,
-        'migration' => 'secure-customer-portal-v0.3.43',
+        'migration' => 'account-based-activation-v1',
     ]);
 } catch (Throwable $exception) {
     error_log('POS Printer Emulator Customer Portal migration failed: ' . get_class($exception));

@@ -121,6 +121,22 @@ export type ActivationRequest = {
   activationKey: string
 }
 
+export type AccountLinkStartResult = {
+  state: 'Pending'
+  linkId: string
+  requestToken: string
+  userCode: string
+  expiresInSeconds: number
+  verificationUrl: string
+  message: string
+}
+
+export type AccountLinkStatusResult = {
+  state: 'Pending' | 'Approved' | 'Activated' | 'Rejected' | 'Expired' | 'Consumed' | 'Unavailable'
+  message: string
+  license?: LicenseStatus
+}
+
 export type MaintenanceEntitlementRequest = {
   entitlementToken: string
 }

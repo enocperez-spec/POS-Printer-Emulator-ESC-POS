@@ -24,7 +24,7 @@ function ensure_self_service_commerce_schema(PDO $pdo): void
                 license_id CHAR(36) NULL,
                 installation_id BIGINT UNSIGNED NULL,
                 checkout_token_hash BINARY(32) NOT NULL,
-                order_type ENUM('MAINTENANCE','UPGRADE') NOT NULL,
+                order_type ENUM('MAINTENANCE','UPGRADE','LICENSE') NOT NULL,
                 current_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
                 target_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
                 state ENUM('Prepared','ProviderCreated','Captured','Fulfilled','Canceled','Expired','Refunded','ChargebackReview','Failed') NOT NULL DEFAULT 'Prepared',
@@ -133,6 +133,13 @@ function ensure_self_service_commerce_schema(PDO $pdo): void
 
         foreach ($statements as $statement) {
             $pdo->exec($statement);
+        }
+        $checkoutColumns = crm_table_columns($pdo, 'portal_checkout_intents');
+        if (isset($checkoutColumns['order_type'])) {
+            $pdo->exec(
+                "ALTER TABLE portal_checkout_intents
+                 MODIFY order_type ENUM('MAINTENANCE','UPGRADE','LICENSE') NOT NULL"
+            );
         }
         $promotionColumns = crm_table_columns($pdo, 'portal_promotions');
         if (!isset($promotionColumns['entitlement_token_ciphertext'])) {

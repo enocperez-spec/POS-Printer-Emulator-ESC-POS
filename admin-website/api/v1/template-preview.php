@@ -260,6 +260,7 @@ $html = sanitize_brevo_preview_html($populatedHtml, $invalidLinks, $links);
 $sender = is_array($provider['sender'] ?? null) ? $provider['sender'] : [];
 $senderName = trim((string)($sender['name'] ?? $config['sender_name'] ?? 'POS Printer Emulator'));
 $senderEmail = trim((string)($sender['email'] ?? $config['sender_email'] ?? ''));
+$expectedSender = communication_template_sender($pdo, $templateKey, null, $config);
 $warnings = [];
 foreach (array_keys($missing) as $key) $warnings[] = 'Missing sample data for placeholder: ' . $key;
 foreach (array_unique($invalidLinks) as $url) {
@@ -269,6 +270,10 @@ if ($sourceHtml === '' || $html === '') $warnings[] = 'The provider template doe
 if ($subject === '') $warnings[] = 'The provider template does not have a subject line.';
 if ($senderName === '' || !filter_var($senderEmail, FILTER_VALIDATE_EMAIL)) {
     $warnings[] = 'The sender name or email address is missing or invalid.';
+}
+if (strcasecmp($senderEmail, (string)$expectedSender['email']) !== 0) {
+    $warnings[] = 'The sender must be ' . $expectedSender['email'] .
+        ' for this template’s assigned tags.';
 }
 $warnings = array_values(array_unique(array_merge(
     $warnings,
