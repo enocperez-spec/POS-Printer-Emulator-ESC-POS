@@ -38,7 +38,9 @@ try {
     $migration->execute(['migration_key' => 'secure-customer-portal-v0.3.43']);
     $migration->execute(['migration_key' => 'account-based-activation-v1']);
     $status = $pdo->prepare(
-        "UPDATE development_roadmap SET status='In progress',completed_at=NULL WHERE item_key='v0.3.43'"
+        "UPDATE development_roadmap
+         SET status='Released',completed_at=COALESCE(completed_at,UTC_TIMESTAMP(6))
+         WHERE item_key IN ('v0.3.53','UPE-127')"
     );
     $status->execute();
     $diagnosticPath = dirname(__DIR__, 2) . '/private/customer-portal-migration-error.log';

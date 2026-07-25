@@ -232,6 +232,8 @@ $contains("ensure_customer_portal_schema", $schemaHelper, 'Admin deployment must
 $contains("GET_LOCK('ppe_customer_portal_schema_v1'", $schemaHelper, 'Customer Portal schema upgrades must be serialized.');
 $contains("crm_authorization_header", $migrationEndpoint, 'Customer Portal migration must authenticate a server bearer token.');
 $contains("'secure-customer-portal-v0.3.43'", $migrationEndpoint, 'Customer Portal migration must record durable evidence.');
+$contains("'v0.3.53','UPE-127'", $migrationEndpoint, 'Account-link migration must mark the current release and enhancement complete.');
+$notContains("item_key='v0.3.43'", $migrationEndpoint, 'A later Customer Portal migration must not reopen the released v0.3.43 roadmap item.');
 $contains("crm_authorization_header", $backend, 'Admin support handoff must authenticate a server bearer token.');
 $contains("subject, contact information", $backend, 'Public GitHub issues must keep private support content in the Admin Portal.');
 $notContains("\$request['subject']", $backend, 'Public GitHub issue titles must not expose customer-provided subjects.');
