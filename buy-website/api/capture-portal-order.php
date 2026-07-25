@@ -55,17 +55,15 @@ try {
     ]);
     $update = db()->prepare(
         "UPDATE orders SET paypal_capture_id=?,paid_at=?,status='APPROVED',approved_at=?,
-            activation_key=?,license_id=?,maintenance_new_expires_at=?,maintenance_token=?,last_error=NULL
+            license_id=?,maintenance_new_expires_at=?,last_error=NULL
          WHERE id=? AND status IN ('CREATED','PAID_AWAITING_APPROVAL')"
     );
     $update->execute([
         $providerCaptureId,
         $paidAt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
         now_utc(),
-        $fulfilled['activationKey'] ?? null,
         $fulfilled['licenseId'] ?? null,
         $fulfilled['maintenanceExpiresAt'] ?? null,
-        $fulfilled['maintenanceToken'] ?? null,
         $order['id'],
     ]);
     audit((int)$order['id'], 'PORTAL_ORDER_FULFILLED', json_encode([
@@ -76,7 +74,7 @@ try {
     $query->execute([$paypalId, (string)$session['intentId']]);
     $completedOrder = $query->fetch();
     try {
-        email_activation_key($completedOrder);
+        email_license_confirmation($completedOrder);
         $sent = db()->prepare("UPDATE orders SET status='EMAILED',emailed_at=?,last_error=NULL WHERE id=?");
         $sent->execute([now_utc(), $order['id']]);
         audit((int)$order['id'], 'PORTAL_FULFILLMENT_EMAIL_SENT');

@@ -78,7 +78,7 @@ $customer = $query->fetch();
 if (!is_array($customer)) {
     crm_api_response(['error' => 'Not found.'], 404);
 }
-$licenses = $pdo->prepare("SELECT license_id,license_tier,control_state,activation_key_ending,maintenance_expires_at FROM issued_licenses WHERE customer_id=:id AND control_state<>'Deleted' ORDER BY issued_at DESC");
+$licenses = $pdo->prepare("SELECT license_id,license_tier,control_state,maintenance_expires_at FROM issued_licenses WHERE customer_id=:id AND control_state<>'Deleted' ORDER BY issued_at DESC");
 $licenses->execute(['id' => $customerId]);
 $consent = $pdo->prepare(
     'SELECT consent_type,consent_state,policy_version,recorded_at FROM customer_consents cc
@@ -96,7 +96,7 @@ crm_api_response([
     ],
     'licenses' => array_map(static fn(array $license): array => [
         'id' => $license['license_id'], 'tier' => $license['license_tier'], 'state' => $license['control_state'],
-        'keyEnding' => $license['activation_key_ending'], 'maintenanceExpiresAt' => $license['maintenance_expires_at'],
+        'maintenanceExpiresAt' => $license['maintenance_expires_at'],
     ], $licenses->fetchAll()),
     'consent' => $consent->fetchAll(),
 ]);

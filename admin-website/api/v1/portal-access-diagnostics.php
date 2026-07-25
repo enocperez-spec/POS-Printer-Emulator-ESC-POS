@@ -143,13 +143,13 @@ try {
          WHERE p.customer_id=:customer_id
          ORDER BY p.paid_at DESC,p.updated_at DESC LIMIT 100"
     );
-    $activationEvents = $pdo->prepare(
+    $licenseEvents = $pdo->prepare(
         "SELECT event_type,event_summary,source_reference,occurred_at
          FROM customer_events
          WHERE customer_id=:customer_id
            AND event_type IN (
-             'Activation Resend Requested','Activation Key Resent',
-             'Activation Resend Restricted','Activation Resend Failed'
+             'Portal Computer Link Approved','Portal Device Deactivated',
+             'Portal Checkout Prepared','Portal Promotion Started'
            )
          ORDER BY occurred_at DESC LIMIT 20"
     );
@@ -170,7 +170,7 @@ try {
         $licenses->execute(['customer_id' => $customerId]);
         $purchases->execute(['customer_id' => $customerId]);
         $purchaseRecords = $purchases->fetchAll();
-        $activationEvents->execute(['customer_id' => $customerId]);
+        $licenseEvents->execute(['customer_id' => $customerId]);
         $suppressions->execute(['customer_id' => $customerId]);
         $records[] = [
             'customerId' => $customerId,
@@ -197,7 +197,7 @@ try {
                 )),
                 'records' => $purchaseRecords,
             ],
-            'activationResendEvents' => $activationEvents->fetchAll(),
+            'accountLicenseEvents' => $licenseEvents->fetchAll(),
             'activeEmailSuppressions' => $suppressions->fetchAll(),
         ];
     }

@@ -19,21 +19,26 @@ public sealed class AccountLinkServiceTests
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
         var installationId = Guid.NewGuid();
         var linkId = Guid.NewGuid();
-        var activationKey = ActivationKeyCodec.Issue(
+        var deviceEntitlement = DeviceEntitlementCodec.Issue(
             vendorKey.ExportECPrivateKeyPem(),
-            "Verified Customer",
-            "verified@example.com",
-            LicenseTier.Pro);
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            installationId,
+            LicenseTier.Pro,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddYears(1),
+            1);
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Data:Root"] = root,
             ["Licensing:PublicKeyPem"] = vendorKey.ExportSubjectPublicKeyInfoPem(),
             ["AccountLink:Endpoint"] = "https://www.posprinteremulator.com/api/v1/account-link.php",
+            ["AccountLink:EntitlementEndpoint"] = "https://admin.posprinteremulator.com/api/v1/device-entitlement.php",
         }).Build();
         var license = new LicenseService(new TestEnvironment(), configuration);
         license.BindInstallationId(installationId);
         var telemetry = new RecordingTelemetry();
-        var handler = new LinkHandler(linkId, activationKey);
+        var handler = new LinkHandler(linkId, deviceEntitlement);
         var service = new AccountLinkService(
             new HttpClient(handler),
             new CredentialsProvider(installationId),
@@ -43,7 +48,7 @@ public sealed class AccountLinkServiceTests
 
         try
         {
-            var started = await service.StartAsync(activationKey, CancellationToken.None);
+            var started = await service.StartAsync(CancellationToken.None);
             var completed = await service.CheckAsync(started.LinkId, started.RequestToken, CancellationToken.None);
 
             Assert.Equal("ABCD-2345", started.UserCode);
@@ -51,11 +56,11 @@ public sealed class AccountLinkServiceTests
             Assert.NotNull(completed.License);
             Assert.Equal("Pro", completed.License!.Mode);
             Assert.Equal(1, telemetry.Activations);
-            Assert.Equal(["start", "status", "complete"], handler.Actions);
+            Assert.Equal(["start", "status", "entitlement", "complete"], handler.Actions);
             Assert.All(handler.Tokens, token => Assert.Equal(
                 "installation-token-abcdefghijklmnopqrstuvwxyz123456",
                 token));
-            Assert.Equal(activationKey, handler.StartActivationKey);
+            Assert.False(handler.StartIncludedLegacyCredential);
         }
         finally
         {
@@ -84,7 +89,7 @@ public sealed class AccountLinkServiceTests
         try
         {
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                service.StartAsync(null, CancellationToken.None));
+                service.StartAsync(CancellationToken.None));
             Assert.Contains("could not complete", exception.Message);
             Assert.DoesNotContain("private server detail", exception.Message);
         }
@@ -94,11 +99,11 @@ public sealed class AccountLinkServiceTests
         }
     }
 
-    private sealed class LinkHandler(Guid linkId, string activationKey) : HttpMessageHandler
+    private sealed class LinkHandler(Guid linkId, string deviceEntitlement) : HttpMessageHandler
     {
         public List<string> Actions { get; } = [];
         public List<string> Tokens { get; } = [];
-        public string? StartActivationKey { get; private set; }
+        public bool StartIncludedLegacyCredential { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -106,11 +111,22 @@ public sealed class AccountLinkServiceTests
         {
             Tokens.Add(request.Headers.GetValues("X-Installation-Token").Single());
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            if (request.RequestUri!.AbsolutePath.EndsWith("/device-entitlement.php", StringComparison.Ordinal))
+            {
+                Actions.Add("entitlement");
+                return Json(HttpStatusCode.OK, new
+                {
+                    state = "Active",
+                    deviceEntitlement,
+                    customerName = "Verified Customer",
+                    emailAddress = "verified@example.com",
+                });
+            }
             var action = body.RootElement.GetProperty("action").GetString()!;
             Actions.Add(action);
             if (action == "start")
             {
-                StartActivationKey = body.RootElement.GetProperty("activationKey").GetString();
+                StartIncludedLegacyCredential = body.RootElement.TryGetProperty("activationKey", out _);
                 return Json(HttpStatusCode.Created, new
                 {
                     state = "Pending",
@@ -131,7 +147,6 @@ public sealed class AccountLinkServiceTests
                     emailAddress = "verified@example.com",
                     licenseId = Guid.NewGuid(),
                     licenseTier = "Pro",
-                    activationKey,
                     message = "Approved.",
                 });
             }

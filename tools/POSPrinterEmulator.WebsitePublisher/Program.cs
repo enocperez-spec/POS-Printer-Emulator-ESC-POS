@@ -624,7 +624,7 @@ static void ConfigureCrmSecrets(SftpClient client, string remoteDirectory)
     {
         version = 1,
         createdAtUtc = DateTimeOffset.UtcNow,
-        purpose = "Admin CRM service authentication and activation-key data protection",
+        purpose = "Admin CRM service authentication and protected legacy-record migration",
         protectedFor = Environment.UserName,
         recoveryFile = Path.GetFileName(recoveryPath)
     }, new JsonSerializerOptions { WriteIndented = true }));

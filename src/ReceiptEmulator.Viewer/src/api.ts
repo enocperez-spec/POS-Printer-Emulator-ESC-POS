@@ -1,4 +1,4 @@
-import type { AccountLinkStartResult, AccountLinkStatusResult, ActivationRequest, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, LicenseStatus, MaintenanceEntitlementRequest, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionEntitlementRequest, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
+import type { AccountLinkStartResult, AccountLinkStatusResult, ConfigurationBackupCreateRequest, ConfigurationBackupPreview, ConfigurationRestoreResult, ConnectionDiagnosticsResponse, DiagnosticPdfPreview, DiagnosticPdfRequest, JobSummary, LicenseStatus, MaintenanceRefreshResult, PrinterListener, PrinterListenerCollection, PrinterListenerInput, PrinterPortSelection, PrinterProfile, PrinterProfileInput, PrinterProfileStatus, PrinterSetupStatus, PrinterStateStatus, PrinterStateUpdate, PromotionOfferStatus, PromotionStartResult, ReceiptJob, ServiceStatus, StoredGraphic, SupportRequestDraftSummary, SupportRequestInput, SupportRequestPreview, SupportRequestResult, UpdateStatus } from './types'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -105,30 +105,15 @@ export const api = {
     `/api/jobs/${id}/receipt-image/authorize`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) },
   ),
-  activate: (request: ActivationRequest) => json<LicenseStatus>('/api/license/activate', {
+  startAccountLink: () => json<AccountLinkStartResult>('/api/account-link/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  }),
-  startAccountLink: (activationKey?: string) => json<AccountLinkStartResult>('/api/account-link/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activationKey: activationKey || null }),
+    body: '{}',
   }),
   checkAccountLink: (linkId: string, requestToken: string) => json<AccountLinkStatusResult>('/api/account-link/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ linkId, requestToken }),
-  }),
-  applyMaintenance: (request: MaintenanceEntitlementRequest) => json<LicenseStatus>('/api/license/maintenance/apply', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  }),
-  applyPromotion: (request: PromotionEntitlementRequest) => json<LicenseStatus>('/api/license/promotion/apply', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
   }),
   promotionOffer: () => json<PromotionOfferStatus>('/api/license/promotion/offer'),
   startPromotion: (grantedTier: 'Lite' | 'Pro' | 'Enterprise') => json<PromotionStartResult>('/api/license/promotion/start', {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sourceOfTruth": {
-    "applicationVersion": "0.3.53",
+    "applicationVersion": "0.3.54",
     "featureFlags": "src/ReceiptEmulator.App/LicenseService.cs",
     "listenerLimits": "src/ReceiptEmulator.App/LicenseService.cs",
     "diagnosticAuthorization": "src/ReceiptEmulator.App/DiagnosticPdfService.cs"
@@ -35,7 +35,7 @@
       "Application updates",
       "Version upgrades released during coverage",
       "Eligible technical support",
-      "Applicable activation-key recovery services"
+      "Eligible account and computer recovery assistance"
     ]
   },
   "licenses": {
@@ -146,7 +146,7 @@
       "Enterprise": "With active Maintenance and Support"
     },
     {
-      "name": "Assisted technical support and activation-key recovery",
+      "name": "Assisted technical support and account recovery",
       "Trial": "Self-service documentation",
       "Lite": "With active Maintenance and Support",
       "Pro": "With active Maintenance and Support",

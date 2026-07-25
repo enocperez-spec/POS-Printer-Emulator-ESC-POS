@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.53 — released 2026-07-25**
+**Current public release: v0.3.54 — released 2026-07-25**
 
-**Current development: v0.3.54 — Privacy-safe receipt masking**
+**Current development: v0.3.55 — System tray health and notifications**
 
-**Next release after v0.3.53: v0.3.54 — Privacy-safe receipt masking**
+**Next release after v0.3.54: v0.3.55 — System tray health and notifications**
 
 **Future scheduled sequence: v0.3.50 through v0.3.59**
 
-**Most recently completed: v0.3.53 — Account-Based License Registration and Activation**
+**Most recently completed: v0.3.54 — Keyless Account and Device Licensing**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -868,7 +868,27 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Scheduling note:** Projects and testing sessions remain tracked in [Issue #33](https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/33) and return to the future roadmap after the account-ownership foundation.
 
-### v0.3.54 — Privacy-safe receipt masking
+### v0.3.54 — Keyless Account and Device Licensing
+
+**Status:** Released — 2026-07-25
+
+**Purpose:** Make verified account ownership and registered-computer approval the only supported licensing workflow.
+
+**Released scope:**
+
+- Remove activation-key entry, generation, delivery, resend, recovery, display, and copy/paste workflows.
+- Assign paid entitlements directly to verified Customer Portal accounts.
+- Bind a selected entitlement to an approved computer using a secure installation identifier.
+- Deliver signed, short-lived device authorization and synchronize account, tier, maintenance, promotion, reassignment, and revocation changes automatically.
+- Give customers computer deactivation and transfer controls without exposing internal credentials.
+- Give authorized administrators confirmation-gated entitlement, device, tier, maintenance, reassignment, revocation, and deletion controls with complete audit evidence.
+- Preserve historical records for migration and audit while retiring the obsolete key utilities and endpoints.
+
+**Security and privacy:** Device authorization is signed, installation-bound, short-lived, and never displayed to customers or administrators. Server changes increment the entitlement revision, destructive actions require confirmation and a reason, and audit records include the administrator, customer, device, time, IP address, action, and reason.
+
+**Complete when:** A verified customer can link a computer and receive the correct license automatically; transfers and administrative changes synchronize promptly; and no supported workflow generates, displays, emails, copies, pastes, resends, recovers, or accepts an activation key.
+
+### v0.3.61 — Privacy-safe receipt masking
 
 **Status:** Planned
 

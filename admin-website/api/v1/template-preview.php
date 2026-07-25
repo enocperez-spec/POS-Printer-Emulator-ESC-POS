@@ -96,7 +96,6 @@ function template_preview_samples(string $templateKey): array
         'currency' => 'USD',
         'order_reference' => 'PPE-TEST-1001',
         'product' => 'POS Printer Emulator',
-        'activation_key' => 'Available securely in the Customer Portal',
         'license_id' => 'PPE-TEST-LICENSE',
         'maintenance_token' => 'Available securely in the Customer Portal',
         'request_type' => 'Technical support',

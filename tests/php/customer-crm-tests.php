@@ -75,7 +75,7 @@ $contains('name="activity"', $page, 'Customer search is missing the activity fil
 $contains('name="marketing"', $page, 'Customer search is missing the marketing-consent filter.');
 $contains('name="support"', $page, 'Customer search is missing the support-history filter.');
 $contains('name="version"', $page, 'Customer search is missing the application-version filter.');
-$contains('activation_key_ending', $page, 'Customer detail does not use masked activation-key endings.');
+$expect(!str_contains($page, 'activation_key_ending'), 'Customer detail must not query or display legacy activation-key endings.');
 $expect(!str_contains($page, "['activation_key']"), 'The customer page must not render full activation keys.');
 $expect(!str_contains($licensesPage, 'l.activation_key,'), 'Routine License Manager rows must not query complete activation keys.');
 $expect(!str_contains($licensesPage, 'data-key="<?= e((string)$license[\'activation_key\'])'), 'Routine License Manager rows must not embed complete activation keys.');

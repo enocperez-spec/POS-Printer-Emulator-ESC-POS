@@ -52,7 +52,7 @@ public sealed partial class DiagnosticPdfService(
     ];
     private static readonly string[] AlwaysExcluded =
     [
-        "activation, maintenance, and promotional license keys",
+        "account, device, maintenance, and promotional entitlements",
         "passwords, API keys, authentication tokens, cookies, and encryption keys",
         "customer registration name and email address",
         "Windows username, full computer name, product key, and hardware serial numbers",
@@ -549,7 +549,7 @@ public sealed partial class DiagnosticPdfService(
             section.AddParagraph(string.Join("; ", findings.Select(finding =>
                 $"{finding.Category} ({finding.Count})")) + ". Detected values are masked or omitted.");
         section.AddParagraph(
-            "Always excluded: license keys, credentials, registration details, Windows identity, other receipt jobs, and unrelated logs.");
+            "Always excluded: license entitlements, credentials, registration details, Windows identity, other receipt jobs, and unrelated logs.");
 
         return document;
     }

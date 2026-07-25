@@ -111,10 +111,6 @@ try {
         $linkId = account_link_uuid();
         $requestToken = account_link_token();
         $userCode = account_link_user_code();
-        $activationKey = trim((string)($body['activationKey'] ?? ''));
-        if (strlen($activationKey) > 1024) {
-            throw new InvalidArgumentException('The activation key is invalid.');
-        }
         $pdo->beginTransaction();
         $recentRequestCount = $pdo->prepare(
             'SELECT COUNT(*)
@@ -129,28 +125,6 @@ try {
                 'error' => 'Too many computer-link requests were created recently. Wait and try again.',
             ], 429);
         }
-        $requestedLicenseId = null;
-        if ($activationKey !== '') {
-            $findRequestedLicense = $pdo->prepare(
-                "SELECT license_id,control_state
-                 FROM issued_licenses
-                 WHERE activation_key_fingerprint=UNHEX(SHA2(:fingerprint_key,256))
-                    OR activation_key=:legacy_key
-                 LIMIT 1 FOR UPDATE"
-            );
-            $findRequestedLicense->execute([
-                'fingerprint_key' => $activationKey,
-                'legacy_key' => $activationKey,
-            ]);
-            $requestedLicense = $findRequestedLicense->fetch();
-            if (!is_array($requestedLicense) || (string)$requestedLicense['control_state'] !== 'Enabled') {
-                $pdo->rollBack();
-                json_response([
-                    'error' => 'That activation key is not eligible. Verify the key or submit a license support request.',
-                ], 400);
-            }
-            $requestedLicenseId = (string)$requestedLicense['license_id'];
-        }
         $expirePrevious = $pdo->prepare(
             "UPDATE portal_computer_link_requests
              SET status='Expired'
@@ -159,16 +133,15 @@ try {
         $expirePrevious->execute(['installation_id' => $installationId]);
         $insert = $pdo->prepare(
             'INSERT INTO portal_computer_link_requests
-                (link_id,installation_id,request_token_hash,user_code_hash,selected_license_id,expires_at)
+                (link_id,installation_id,request_token_hash,user_code_hash,expires_at)
              VALUES(:link_id,:installation_id,UNHEX(SHA2(:request_token,256)),
-                    UNHEX(SHA2(:user_code,256)),:selected_license_id,DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 10 MINUTE))'
+                    UNHEX(SHA2(:user_code,256)),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 10 MINUTE))'
         );
         $insert->execute([
             'link_id' => $linkId,
             'installation_id' => $installationId,
             'request_token' => $requestToken,
             'user_code' => str_replace('-', '', $userCode),
-            'selected_license_id' => $requestedLicenseId,
         ]);
         account_link_event(
             $pdo,
@@ -189,9 +162,7 @@ try {
             'expiresInSeconds' => ACCOUNT_LINK_LIFETIME_MINUTES * 60,
             'verificationUrl' => 'https://userportal.posprinteremulator.com/index.php?return=computers&link=' .
                 rawurlencode($userCode),
-            'message' => $requestedLicenseId === null
-                ? 'Sign in to the Customer Portal and approve this computer within 10 minutes.'
-                : 'Sign in to claim this backup activation key and approve the computer within 10 minutes.',
+            'message' => 'Sign in to the Customer Portal and approve this computer within 10 minutes.',
         ], 201);
     }
 
@@ -204,7 +175,7 @@ try {
     $query = $pdo->prepare(
         "SELECT r.link_id,r.status,r.expires_at,r.approved_customer_id,r.selected_license_id,
                 c.display_name,c.canonical_email,
-                l.license_tier,l.control_state,l.activation_key,l.maintenance_expires_at,
+                l.license_tier,l.control_state,l.maintenance_expires_at,
                 b.binding_id,b.binding_state
          FROM portal_computer_link_requests r
          LEFT JOIN customers c ON c.customer_id=r.approved_customer_id
@@ -287,7 +258,6 @@ try {
         'licenseId' => (string)$link['selected_license_id'],
         'licenseTier' => (string)$link['license_tier'],
         'maintenanceExpiresAt' => (string)$link['maintenance_expires_at'],
-        'activationKey' => (string)$link['activation_key'],
         'message' => 'The Customer Portal approved this computer and selected an eligible license.',
     ]);
 } catch (InvalidArgumentException $exception) {

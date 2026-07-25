@@ -72,7 +72,7 @@ $maintenanceNew = portal_long_date($purchase['maintenance_new_expires_at'] ?? nu
     </dl>
     <div class="total"><strong>Total paid</strong><strong><?= portal_e((string)$purchase['currency']) ?> <?= number_format((float)$purchase['amount'], 2) ?></strong></div>
   </main>
-  <footer>This receipt records a completed POS Printer Emulator transaction. Payment credentials and full activation keys are intentionally excluded.</footer>
+  <footer>This receipt records a completed POS Printer Emulator transaction. Payment and account credentials are intentionally excluded.</footer>
 </article>
 </body>
 </html>

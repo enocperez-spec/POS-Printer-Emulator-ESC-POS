@@ -255,7 +255,7 @@ public sealed class ConfigurationBackupService
                 "Application appearance preferences",
                 .. payload.IncludesHistory ? ["Local receipt history"] : Array.Empty<string>()
             ],
-            ["Activation and maintenance keys", "Customer registration", "Credentials", "Application logs", "Windows drivers and printer queues"],
+            ["Account and device entitlements", "Customer registration", "Credentials", "Application logs", "Windows drivers and printer queues"],
             warnings,
             NormalizePreferences(payload.Preferences));
     }

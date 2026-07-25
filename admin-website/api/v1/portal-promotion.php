@@ -4,6 +4,7 @@ declare(strict_types=1);
 require dirname(__DIR__, 2) . '/includes/bootstrap.php';
 require dirname(__DIR__, 2) . '/includes/customer_crm.php';
 require dirname(__DIR__, 2) . '/includes/license_keys.php';
+require dirname(__DIR__, 2) . '/includes/data_protection.php';
 require dirname(__DIR__, 2) . '/includes/self_service_commerce_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -160,12 +161,15 @@ try {
         $issuedAt,
         $expiresAt
     );
+    $protectedToken = protect_promotion_token($token);
     $insert = $pdo->prepare(
         'INSERT INTO portal_promotions
             (promotion_id,customer_id,license_id,installation_id,exception_id,previous_tier,granted_tier,
-             entitlement_token_hash,starts_at,expires_at,created_by,exception_reason)
+             entitlement_token_hash,entitlement_token_ciphertext,entitlement_token_nonce,entitlement_token_tag,
+             starts_at,expires_at,created_by,exception_reason)
          VALUES(:promotion_id,:customer_id,:license_id,:installation_id,:exception_id,:previous_tier,:granted_tier,
-                :token_hash,:starts_at,:expires_at,\'Customer Portal\',:exception_reason)'
+                :token_hash,:token_ciphertext,:token_nonce,:token_tag,
+                :starts_at,:expires_at,\'Customer Portal\',:exception_reason)'
     );
     $insert->bindValue(':promotion_id', $promotionId);
     $insert->bindValue(':customer_id', $customerId);
@@ -175,6 +179,9 @@ try {
     $insert->bindValue(':previous_tier', $previousTier);
     $insert->bindValue(':granted_tier', $grantedTier);
     $insert->bindValue(':token_hash', hash('sha256', $token, true), PDO::PARAM_LOB);
+    $insert->bindValue(':token_ciphertext', $protectedToken['ciphertext'], PDO::PARAM_LOB);
+    $insert->bindValue(':token_nonce', $protectedToken['nonce'], PDO::PARAM_LOB);
+    $insert->bindValue(':token_tag', $protectedToken['tag'], PDO::PARAM_LOB);
     $insert->bindValue(':starts_at', $issuedAt->format('Y-m-d H:i:s.u'));
     $insert->bindValue(':expires_at', $expiresAt->format('Y-m-d H:i:s.u'));
     $insert->bindValue(':exception_reason', is_array($exception) ? (string)$exception['reason'] : null);
@@ -216,7 +223,6 @@ try {
         'previousTier' => $previousTier,
         'grantedTier' => $grantedTier,
         'expiresAt' => $expiresAt->format(DATE_ATOM),
-        'entitlementToken' => $token,
     ]);
 } catch (DomainException $exception) {
     if (isset($pdo) && $pdo->inTransaction()) {

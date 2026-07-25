@@ -1,21 +1,4 @@
 (() => {
-  const copy = async (value, button) => {
-    await navigator.clipboard.writeText(value);
-    const original = button.textContent;
-    button.textContent = 'Copied';
-    setTimeout(() => { button.textContent = original; }, 1400);
-  };
-
-  document.querySelectorAll('[data-copy-target]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const target = document.getElementById(button.dataset.copyTarget);
-      if (target) copy(target.value, button).catch(() => target.select());
-    });
-  });
-  document.querySelectorAll('[data-key]').forEach((button) => {
-    button.addEventListener('click', () => copy(button.dataset.key, button).catch(() => {}));
-  });
-
   const search = document.getElementById('license-search');
   const filter = document.getElementById('status-filter');
   const rows = [...document.querySelectorAll('#license-rows tr[data-status]')];
@@ -69,6 +52,7 @@
   const trialView = document.getElementById('trial-manage-view');
   const confirmView = document.getElementById('license-confirm-view');
   const targetTier = document.getElementById('manage-target-tier');
+  const targetCustomer = document.getElementById('manage-target-customer');
   const trialTargetTier = document.getElementById('trial-target-tier');
   const reasonField = document.getElementById('reason-field');
   const reasonInput = document.getElementById('action-reason');
@@ -171,27 +155,32 @@
     const copies = {
       change_tier: {
         title: 'Confirm license type change',
-        description: `Change ${selected.customer} from ${selected.tier} to ${nextTier}? A replacement key will be generated and the current key will be revoked. The customer must enter the new key.`,
-        label: `Generate ${nextTier} replacement`,
+        description: `Change ${selected.customer} from ${selected.tier} to ${nextTier}? Registered computers will synchronize the new entitlement automatically.`,
+        label: `Change to ${nextTier}`,
+      },
+      reassign_customer: {
+        title: 'Confirm customer reassignment',
+        description: 'Release the current registered computer and move this license to the selected verified customer account? This action is audited.',
+        label: 'Reassign license',
       },
       deactivate: {
         title: 'Confirm deactivation',
-        description: 'Deactivate this license in the Admin Portal and return linked server registrations to Trial? The v0.3.21 offline key may continue working on a customer PC until online entitlement enforcement is released.',
+        description: 'Deactivate this license and release its registered computer? The application will synchronize the change promptly when online.',
         label: 'Confirm deactivation',
       },
       reactivate: {
         title: 'Confirm reactivation',
-        description: 'Return this deactivated license to Enabled in the Admin Portal? The customer may continue using the original signed key.',
+        description: 'Return this deactivated license to Active? The customer can link an eligible computer again.',
         label: 'Confirm reactivation',
       },
       revoke: {
         title: 'Confirm permanent revocation',
-        description: 'Permanently revoke this license in the Admin Portal? This cannot be reversed through the ordinary License Manager. The current offline desktop version may continue working until online enforcement is released.',
+        description: 'Permanently revoke this entitlement and its device assignment? This cannot be reversed through the ordinary License Manager.',
         label: 'Permanently revoke',
       },
       delete: {
         title: 'Confirm license deletion',
-        description: 'Delete this license from normal License Manager views? The audit tombstone will remain, but this action cannot be undone. The current offline desktop version may continue working until online enforcement is released.',
+        description: 'Delete this license from normal License Manager views? The audit tombstone and device history will remain, but this action cannot be undone.',
         label: 'Delete license record',
       },
       extend_maintenance: {
@@ -210,9 +199,9 @@
         label: 'Restore maintenance access',
       },
       upgrade_trial: {
-        title: 'Confirm Trial upgrade key',
-        description: `Generate a ${nextTier} key for this Trial installation? The customer must enter the new key in Settings → License before the desktop application upgrades.`,
-        label: `Generate ${nextTier} key`,
+        title: 'Confirm Trial account upgrade',
+        description: `Assign a ${nextTier} entitlement to the verified account for this Trial installation? The application will synchronize it automatically after linking.`,
+        label: `Assign ${nextTier} license`,
       },
     };
     return copies[action];
@@ -222,6 +211,10 @@
     const action = document.getElementById('action-name').value;
     if (action === 'upgrade_trial') {
       confirmSubmit.disabled = !customerVerified.checked;
+      return;
+    }
+    if (action === 'reassign_customer') {
+      confirmSubmit.disabled = !targetCustomer.value || reasonInput.value.trim().length < 3;
       return;
     }
     if (!['revoke', 'delete'].includes(action)) {
@@ -247,18 +240,20 @@
       document.getElementById('action-installation-id').value = selected.installationId || '';
       document.getElementById('action-row-version').value = selected.rowVersion || '';
       document.getElementById('action-target-tier').value = nextTier || '';
+      document.getElementById('action-target-customer').value = action === 'reassign_customer' ? targetCustomer.value : '';
       reasonInput.value = '';
       phraseInput.value = '';
       customerVerified.checked = false;
       const trialUpgrade = action === 'upgrade_trial';
       verificationField.hidden = !trialUpgrade;
       customerVerified.required = trialUpgrade;
-      const destructive = ['revoke', 'delete'].includes(action);
+      const destructive = ['revoke', 'delete', 'reassign_customer'].includes(action);
+      const phraseRequired = ['revoke', 'delete'].includes(action);
       reasonField.hidden = !destructive;
       reasonInput.required = destructive;
-      phraseField.hidden = !destructive;
-      phraseInput.required = destructive;
-      requiredPhrase.textContent = destructive ? action.toUpperCase() : '';
+      phraseField.hidden = !phraseRequired;
+      phraseInput.required = phraseRequired;
+      requiredPhrase.textContent = phraseRequired ? action.toUpperCase() : '';
       confirmSubmit.textContent = copy.label;
       confirmSubmit.classList.toggle('danger', destructive);
       showView('confirm');

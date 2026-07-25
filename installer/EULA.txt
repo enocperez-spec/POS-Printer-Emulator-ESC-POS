@@ -35,16 +35,18 @@ shown in the application, pricing page, or order confirmation. A license does
 not include more installations, listeners, users, or features than the
 applicable edition permits.
 
-3. REGISTRATION AND ACTIVATION
+3. ACCOUNT REGISTRATION AND DEVICE LICENSING
 
-New installations operate in Trial mode unless activated. You agree to provide
-accurate customer or company name and email information. Activation keys,
-maintenance tokens, and installation credentials are confidential. You may
-not publish, share, resell, sublicense, or use them for more installations or
-capacity than purchased. A valid key may upgrade an existing installation
-without a reinstall. Licensor may verify license validity and enforce the
-applicable edition limits, but will not knowingly collect receipt content as
-part of activation or ordinary usage reporting.
+New installations operate in Trial mode unless linked to an eligible license.
+You agree to provide accurate customer or company name and email information,
+verify the Customer Portal account, and approve only computers you control.
+Account credentials, device identifiers, and internal entitlement documents
+are confidential. You may not publish, share, resell, sublicense, or use them
+for more installations or capacity than purchased. Linking an eligible
+computer may upgrade an existing installation without a reinstall. Licensor
+may verify license validity and enforce the applicable edition limits, but
+will not knowingly collect receipt content as part of licensing or ordinary
+usage reporting.
 
 4. PERMITTED COPIES AND TRANSFERS
 

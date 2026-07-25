@@ -4,6 +4,16 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.54 — 2026-07-25
+
+- Removes activation-key entry, validation, generation, resend, recovery, display, and copy/paste workflows from the desktop application, Customer Portal, Admin Portal, purchase flow, email content, installer, and public documentation.
+- Assigns every paid license directly to a verified Customer Portal account and binds it to an explicitly approved computer.
+- Adds signed, short-lived device entitlements that synchronize automatically, are restricted to one installation, and stop authorizing an offline computer after their validity window expires.
+- Synchronizes license tier, revocation, reassignment, registered-computer, promotion, and Maintenance and Support changes without a reinstall or separate download.
+- Adds confirmation-gated Admin controls for tier changes, reassignment, device release, deactivation, revocation, deletion, and maintenance changes with administrator, time, IP address, customer, device, and reason audit evidence.
+- Preserves historical license records for migration and audit while retiring legacy delivery endpoints and removing the standalone key-generation utilities from the build.
+- Updates the Customer Portal, purchase confirmations, EULA, privacy notice, FAQ, documentation, support guidance, and account-linking instructions for the automatic licensing workflow.
+
 ## v0.3.53 — 2026-07-25
 
 - Replaces customer-name, company-name, and email matching with verified Customer Portal account ownership.
@@ -11,7 +21,7 @@ For the current release status, scheduled versions, future backlog, and release-
 - Requires verified portal sign-in, recent password confirmation, device review, eligible-license selection, and explicit approval before activation.
 - Automatically retrieves and activates the approved license without a reinstall or separate download.
 - Enforces one active computer per license and records activation, deactivation, claim, and transfer history.
-- Keeps activation keys as a backup claim method while requiring the customer to claim the license through a verified account.
+- Established a transitional backup claim method that is retired by v0.3.54.
 - Retires the legacy local direct-activation endpoint so application UI changes cannot bypass account ownership.
 - Adds database storage for pending link requests, authoritative license-device bindings, and privacy-safe activation events.
 - Adds rate limiting, hashed request credentials, expiration, replay prevention, authenticated installations, and clear recovery errors.

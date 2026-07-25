@@ -115,12 +115,6 @@ export type PrinterListenerCollection = {
   maximumListeners?: number
 }
 
-export type ActivationRequest = {
-  customerName: string
-  emailAddress: string
-  activationKey: string
-}
-
 export type AccountLinkStartResult = {
   state: 'Pending'
   linkId: string
@@ -135,14 +129,6 @@ export type AccountLinkStatusResult = {
   state: 'Pending' | 'Approved' | 'Activated' | 'Rejected' | 'Expired' | 'Consumed' | 'Unavailable'
   message: string
   license?: LicenseStatus
-}
-
-export type MaintenanceEntitlementRequest = {
-  entitlementToken: string
-}
-
-export type PromotionEntitlementRequest = {
-  entitlementToken: string
 }
 
 export type PromotionOfferStatus = {

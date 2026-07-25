@@ -85,42 +85,6 @@ function portal_checkout_url(string $token): string
     return $baseUrl . '/self-service.php?session=' . rawurlencode($token);
 }
 
-function portal_resend_activation_backend(string $customerId, string $licenseId): array
-{
-    $token = trim((string)(portal_config()['portal']['support_backend_token'] ?? ''));
-    if (!preg_match('/^[A-Za-z0-9_-]{43,128}$/', $token) || !function_exists('curl_init')) {
-        throw new RuntimeException('Secure activation delivery is not configured.');
-    }
-    $curl = curl_init('https://admin.posprinteremulator.com/api/v1/portal-license-delivery.php');
-    curl_setopt_array($curl, [
-        CURLOPT_POST => true,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 8,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
-        CURLOPT_FOLLOWLOCATION => false,
-        CURLOPT_HTTPHEADER => [
-            'Accept: application/json',
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json',
-        ],
-        CURLOPT_POSTFIELDS => json_encode(
-            ['customerId' => $customerId, 'licenseId' => $licenseId],
-            JSON_THROW_ON_ERROR
-        ),
-    ]);
-    $response = curl_exec($curl);
-    $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-    curl_close($curl);
-    $decoded = is_string($response) ? json_decode($response, true) : null;
-    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
-        $message = is_array($decoded) ? trim((string)($decoded['error'] ?? '')) : '';
-        throw new DomainException($message !== '' ? $message : 'The activation key could not be sent. Try again later.');
-    }
-    return $decoded;
-}
-
 function portal_start_promotion_backend(
     string $customerId,
     ?string $licenseId,
@@ -160,8 +124,8 @@ function portal_start_promotion_backend(
         $message = is_array($decoded) ? trim((string)($decoded['error'] ?? '')) : '';
         throw new DomainException($message !== '' ? $message : 'Promotional access could not be started. Try again later.');
     }
-    if (!preg_match('/^PPEP1-[A-Za-z0-9_-]+$/', (string)($decoded['entitlementToken'] ?? ''))) {
-        throw new RuntimeException('The promotion service returned an invalid entitlement.');
+    if (empty($decoded['promotionId']) || empty($decoded['expiresAt'])) {
+        throw new RuntimeException('The promotion service returned an incomplete result.');
     }
     return $decoded;
 }
@@ -242,14 +206,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
                 throw new DomainException('That computer link code expired. Start a new request from the application.');
             }
-            if (!empty($linkRequest['selected_license_id']) &&
-                !hash_equals(strtolower((string)$linkRequest['selected_license_id']), $licenseId)) {
-                throw new DomainException('This link request is for the license identified by the backup activation key.');
-            }
             $findLicense = $pdo->prepare(
                 'SELECT license_id,license_tier,control_state,maintenance_expires_at,customer_id
                  FROM issued_licenses
-                 WHERE license_id=:license_id AND (customer_id=:customer_id OR customer_id IS NULL)
+                 WHERE license_id=:license_id AND customer_id=:customer_id
                  LIMIT 1 FOR UPDATE'
             );
             $findLicense->execute(['license_id' => $licenseId, 'customer_id' => $customerId]);
@@ -257,24 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!is_array($license) || (string)$license['control_state'] !== 'Enabled') {
                 throw new DomainException('That license is not eligible or is owned by another Customer Portal account.');
             }
-            $activationMethod = empty($license['customer_id']) ? 'ActivationKeyClaim' : 'PortalLink';
-            if (empty($license['customer_id'])) {
-                $claimLicense = $pdo->prepare(
-                    'UPDATE issued_licenses
-                     SET customer_id=:customer_id,customer_name=:customer_name,email_address=:email_address,
-                         row_version=row_version+1
-                     WHERE license_id=:license_id AND customer_id IS NULL'
-                );
-                $claimLicense->execute([
-                    'customer_id' => $customerId,
-                    'customer_name' => $account['display_name'],
-                    'email_address' => $account['canonical_email'],
-                    'license_id' => $licenseId,
-                ]);
-                if ($claimLicense->rowCount() !== 1) {
-                    throw new DomainException('The activation key could not be claimed. Refresh and try again.');
-                }
-            }
+            $activationMethod = 'PortalLink';
             $activeBinding = $pdo->prepare(
                 'SELECT binding_id,installation_id
                  FROM license_device_bindings
@@ -362,13 +305,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'license_id' => $licenseId,
                 'installation_id' => $linkRequest['installation_id'],
                 'link_id' => $linkRequest['link_id'],
-                'event_type' => $activationMethod === 'ActivationKeyClaim'
-                    ? 'ACTIVATION_KEY_CLAIMED'
-                    : 'COMPUTER_LINK_APPROVED',
+                'event_type' => 'COMPUTER_LINK_APPROVED',
                 'activation_method' => $activationMethod,
-                'summary' => $activationMethod === 'ActivationKeyClaim'
-                    ? 'Customer claimed a backup activation key with a verified portal account and approved the computer.'
-                    : 'Customer approved a verified portal account link for a computer.',
+                'summary' => 'Customer approved a verified portal account link for a computer.',
             ]);
             $pdo->commit();
             unset($_SESSION['computer_link_code']);
@@ -379,7 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Customer linked a computer and selected an eligible license.',
                 (string)$linkRequest['installation_uuid']
             );
-            $notice = 'Computer approved. Return to POS Printer Emulator; activation will finish automatically.';
+            $notice = 'Computer approved. Return to POS Printer Emulator; account licensing will synchronize automatically.';
         } elseif ($action === 'deactivate-device') {
             $fresh = portal_current_account();
             if (!is_array($fresh) || !portal_recently_reauthenticated($fresh)) {
@@ -450,31 +389,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->commit();
             portal_audit($customerId, 'Portal Device Deactivated', 'Customer deactivated an old computer.', (string)$installation['installation_uuid']);
             $notice = 'The selected computer was deactivated. Open the application on the replacement computer to activate it.';
-        } elseif ($action === 'resend-activation') {
-            $fresh = portal_current_account();
-            if (!is_array($fresh) || !portal_recently_reauthenticated($fresh)) {
-                throw new DomainException('Confirm your password first. Reauthentication is valid for five minutes.');
-            }
-            if (!portal_rate_limit('activation-resend|' . $customerId, 5, 3600)) {
-                portal_audit(
-                    $customerId,
-                    'Activation Resend Restricted',
-                    'Activation-key resend was rate limited in the Customer Portal.'
-                );
-                throw new DomainException('Too many resend requests were made. Wait before trying again.');
-            }
-            $licenseId = trim((string)($_POST['license_id'] ?? ''));
-            if (!preg_match('/^[0-9a-f-]{36}$/i', $licenseId)) {
-                throw new DomainException('Choose a valid license.');
-            }
-            portal_resend_activation_backend($customerId, $licenseId);
-            portal_audit(
-                $customerId,
-                'Activation Resend Requested',
-                'Customer requested delivery to the verified account email.',
-                $licenseId
-            );
-            $notice = 'The activation key was sent to your verified email address.';
         } elseif ($action === 'prepare-checkout') {
             $fresh = portal_current_account();
             if (!is_array($fresh) || !portal_recently_reauthenticated($fresh)) {
@@ -862,13 +776,9 @@ if ($computerLinkCode !== '') {
     $compactLinkCode = str_replace('-', '', $computerLinkCode);
     $linkQuery = portal_database()->prepare(
         'SELECT r.link_id,r.status,r.expires_at,r.selected_license_id,
-                i.installation_uuid,i.device_label,i.app_version,i.windows_version,
-                l.license_tier AS requested_license_tier,l.control_state AS requested_license_state,
-                l.customer_id AS requested_license_customer_id,
-                l.activation_key_ending AS requested_key_ending
+                i.installation_uuid,i.device_label,i.app_version,i.windows_version
          FROM portal_computer_link_requests r
          INNER JOIN installations i ON i.id=r.installation_id
-         LEFT JOIN issued_licenses l ON l.license_id=r.selected_license_id
          WHERE r.user_code_hash=UNHEX(SHA2(:code,256))
          LIMIT 1'
     );
@@ -945,7 +855,7 @@ function portal_nav_icon(string $name): string
       <a href="/portal.php?page=<?= $item ?>" <?= $page === $item ? 'aria-current="page"' : '' ?>><?= portal_nav_icon($item) ?><span><?= portal_e(ucfirst($item)) ?></span></a>
     <?php endforeach; ?>
   </nav>
-  <p>Your privacy matters. Receipt contents and full activation keys are never shown here.</p>
+  <p>Your privacy matters. Receipt contents and account credentials are never shown here.</p>
 </aside>
 <main class="portal-main" id="main-content">
   <?php if ($error !== ''): ?><div class="alert error" role="alert"><?= portal_e($error) ?></div><?php endif; ?>
@@ -965,7 +875,7 @@ function portal_nav_icon(string $name): string
         <?php endif; ?>
       </section>
     <?php else: ?>
-      <section class="license-hero trial"><div><span class="hero-symbol">T</span><div><h2>Trial License</h2><p>Install the latest version and activate when you are ready.</p></div></div><a class="button primary" href="/portal.php?page=downloads">View downloads</a></section>
+      <section class="license-hero trial"><div><span class="hero-symbol">T</span><div><h2>Trial License</h2><p>Install the latest version, then link this computer when you purchase a license.</p></div></div><a class="button primary" href="/portal.php?page=downloads">View downloads</a></section>
     <?php endif; ?>
     <?php if (is_array($latestRelease) && $versionStatus['updateAvailable'] === true): ?>
       <section class="release-notification update-available overview-release" role="status" aria-labelledby="overview-new-version-title">
@@ -1008,9 +918,8 @@ function portal_nav_icon(string $name): string
       </aside>
     </div>
   <?php elseif ($page === 'licenses'): ?>
-    <div class="page-heading"><div><h1>Licenses</h1><p>Activation keys remain masked in the portal and can only be resent to your verified email while Maintenance and Support is active.</p></div><a class="button primary" href="/portal.php?page=plans">Plans &amp; maintenance</a></div>
-    <section class="reauth-panel"><h2>Confirm before resending</h2><p>Enter your Customer Portal password. Confirmation remains valid for five minutes and is required before an activation key can be emailed.</p><form method="post" class="inline-form"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="reauthenticate"><label><span class="sr-only">Password</span><input type="password" name="password" autocomplete="current-password" placeholder="Portal password" required></label><button class="button secondary" type="submit">Confirm password</button></form></section>
-    <section class="data-section"><div class="table-wrap"><table><thead><tr><th>Masked key</th><th>Tier</th><th>Status</th><th>Issued</th><th>Maintenance and Support Until</th><th>Listeners</th><th>Activation delivery</th></tr></thead><tbody><?php foreach ($licenses as $license): ?><?php $licenseMaintenanceActive = portal_has_active_maintenance($license); ?><tr><td><?= portal_masked_license($license) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_license_status_label((string)$license['control_state'])) ?></td><td><?= portal_e(portal_date($license['issued_at'])) ?></td><td><strong><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></strong></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td class="license-delivery-cell"><?php if ($licenseMaintenanceActive): ?><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="resend-activation"><input type="hidden" name="license_id" value="<?= portal_e((string)$license['license_id']) ?>"><button class="button secondary compact" type="submit">Resend Activation Key</button></form><small>Sent only to your verified account email.</small><?php else: ?><button class="button secondary compact" type="button" disabled>Resend Activation Key</button><div class="maintenance-required"><strong>Maintenance and Support renewal required</strong><span>Your coverage expired on <?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?>. Renew before this activation key can be resent.</span><a href="/portal.php?page=plans#maintenance-renewal">Renew Maintenance and Support</a></div><?php endif; ?></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="7">No paid licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
+    <div class="page-heading"><div><h1>Licenses</h1><p>Licenses belong to your verified account and are applied automatically after you approve a registered computer.</p></div><a class="button primary" href="/portal.php?page=plans">Plans &amp; maintenance</a></div>
+    <section class="data-section"><div class="table-wrap"><table><thead><tr><th>License</th><th>Tier</th><th>Status</th><th>Issued</th><th>Maintenance and Support Until</th><th>Listeners</th><th>Computer assignment</th></tr></thead><tbody><?php foreach ($licenses as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_license_status_label((string)$license['control_state'])) ?></td><td><?= portal_e(portal_date($license['issued_at'])) ?></td><td><strong><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></strong></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><a href="/portal.php?page=computers">Manage computers</a></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="7">No paid licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
     <section class="info-band"><h2>POS Printer Emulator License with optional annual maintenance</h2><p>Your purchased version keeps working when maintenance expires. Use Plans &amp; maintenance to renew coverage, upgrade a license, or purchase an additional license. No subscription is created.</p></section>
   <?php elseif ($page === 'plans'): ?>
     <?php
@@ -1067,9 +976,7 @@ function portal_nav_icon(string $name): string
     </section>
     <?php if (is_array($promotionDelivery)): ?>
       <section class="promotion-delivery" role="status">
-        <div><span class="plan-kicker">Promotion ready</span><h2><?= portal_e((string)$promotionDelivery['grantedTier']) ?> access through <?= portal_e(portal_date((string)$promotionDelivery['expiresAt'])) ?></h2><p>Copy this delivery key. In POS Printer Emulator, open <strong>Settings → License</strong>, paste it under Five-day promotional access, and choose Start promotional access.</p></div>
-        <textarea readonly rows="5" aria-label="Promotional access key"><?= portal_e((string)$promotionDelivery['entitlementToken']) ?></textarea>
-        <button class="button secondary" type="button" data-copy-promotion>Copy promotional key</button>
+        <div><span class="plan-kicker">Promotion ready</span><h2><?= portal_e((string)$promotionDelivery['grantedTier']) ?> access through <?= portal_e(portal_date((string)$promotionDelivery['expiresAt'])) ?></h2><p>Your promotional entitlement is associated with your verified account and selected computer. Keep POS Printer Emulator online briefly; it will synchronize and apply access automatically.</p></div>
       </section>
     <?php endif; ?>
     <section class="promotion-panel">
@@ -1099,7 +1006,7 @@ function portal_nav_icon(string $name): string
       <article><span>Maintenance renewals</span><strong><?= $renewalCount ?></strong></article>
     </section>
     <section class="data-section billing-history">
-      <header><div><h2>Transaction history</h2><p>Payment credentials and complete activation keys are never displayed.</p></div></header>
+      <header><div><h2>Transaction history</h2><p>Payment credentials are never displayed.</p></div></header>
       <?php if ($snapshot['purchases'] === []): ?>
         <div class="billing-empty"><h3>No transactions yet</h3><p>License purchases and Maintenance and Support renewals will appear here after payment is completed.</p><a class="button primary" href="/portal.php?page=plans">View licenses</a></div>
       <?php else: ?>
@@ -1150,37 +1057,24 @@ function portal_nav_icon(string $name): string
         </div>
         <?php
           $eligibleLinkLicenses = [];
-          if (!empty($pendingComputerLink['selected_license_id'])) {
-              $requestedOwner = (string)($pendingComputerLink['requested_license_customer_id'] ?? '');
-              if ((string)$pendingComputerLink['requested_license_state'] === 'Enabled' &&
-                  ($requestedOwner === '' || $requestedOwner === $customerId)) {
-                  $eligibleLinkLicenses[] = [
-                      'license_id' => $pendingComputerLink['selected_license_id'],
-                      'license_tier' => $pendingComputerLink['requested_license_tier'],
-                      'control_state' => $pendingComputerLink['requested_license_state'],
-                      'activation_key_ending' => $pendingComputerLink['requested_key_ending'],
-                  ];
-              }
-          } else {
-              $eligibleLinkLicenses = array_values(array_filter(
-                  $licenses,
-                  static fn(array $license): bool => (string)$license['control_state'] === 'Enabled'
-              ));
-          }
+          $eligibleLinkLicenses = array_values(array_filter(
+              $licenses,
+              static fn(array $license): bool => (string)$license['control_state'] === 'Enabled'
+          ));
         ?>
         <?php if ($eligibleLinkLicenses === []): ?>
-          <div class="inline-alert"><strong>No eligible license is available.</strong> The key may belong to another account, or you may need to purchase a license.</div>
+          <div class="inline-alert"><strong>No eligible license is available.</strong> Purchase a license or contact support if an account entitlement is missing.</div>
           <a class="button primary" href="/portal.php?page=plans">View purchase options</a>
         <?php else: ?>
           <form method="post" class="computer-link-approval" data-confirm="Approve this computer and assign the selected license?">
             <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
             <input type="hidden" name="action" value="approve-computer-link">
             <input type="hidden" name="link_code" value="<?= portal_e($computerLinkCode) ?>">
-            <label><?= !empty($pendingComputerLink['selected_license_id']) ? 'Backup key license to claim' : 'License to activate' ?>
+            <label>License to apply
               <select name="license_id" required>
                 <?php foreach ($eligibleLinkLicenses as $license): ?>
                   <option value="<?= portal_e((string)$license['license_id']) ?>">
-                    <?= portal_e((string)$license['license_tier']) ?> · key ending <?= portal_e((string)($license['activation_key_ending'] ?: '—')) ?>
+                    <?= portal_e((string)$license['license_tier']) ?> · <?= portal_masked_license($license) ?>
                   </option>
                 <?php endforeach; ?>
               </select>
@@ -1232,8 +1126,8 @@ function portal_nav_icon(string $name): string
     <section class="download-panel"><div><h2>POS Printer Emulator <?= is_array($latestRelease) ? 'v' . portal_e((string)$latestRelease['currentVersion']) : 'for Windows' ?></h2><p>Windows 11 Pro · x64 · self-contained installer</p></div><?php if (is_array($latestRelease) && $maintenanceActive): ?><a class="button <?= $versionStatus['updateAvailable'] === true ? 'update-download' : 'primary' ?>" href="<?= portal_e($latestRelease['downloadUrl']) ?>" rel="noopener"><?= $versionStatus['updateAvailable'] === true ? 'Download Latest Version' : 'Download installer' ?></a><?php elseif (is_array($primaryLicense)): ?><a class="button renewal" href="/portal.php?page=plans#maintenance-renewal">Renew Maintenance and Support</a><?php else: ?><a class="button secondary" href="https://buy.posprinteremulator.com/" rel="noopener">View License Options</a><?php endif; ?></section>
     <section class="info-band"><h2>Update eligibility</h2><p>All customers can see when a newer version exists. Paid update downloads and assisted support follow the maintenance date shown on the Licenses page.</p></section>
   <?php elseif ($page === 'support'): ?>
-    <div class="page-heading"><div><h1>Support</h1><p>Submit a private support request without exposing receipt data or activation keys.</p></div></div>
-    <section class="form-panel"><h2>Submit a support request</h2><form method="post" enctype="multipart/form-data" class="form-grid"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="support-request"><label>Request type<select name="request_type" required><option>Bug Report</option><option>Feature Request</option><option>License Issue</option><option>Other Issue</option></select></label><label>Subject<input name="subject" maxlength="160" required></label><label class="wide">Detailed description<textarea name="description" rows="7" maxlength="8000" required></textarea></label><label class="wide">Optional attachment <span>PNG, JPG, TXT, PDF, or ZIP · maximum 2 MB</span><input type="file" name="attachment" accept=".png,.jpg,.jpeg,.txt,.pdf,.zip"></label><div class="wide form-actions"><p>Do not include activation keys, passwords, payment details, or customer receipt content.</p><button class="button primary" type="submit">Submit support request</button></div></form></section>
+    <div class="page-heading"><div><h1>Support</h1><p>Submit a private support request without exposing receipt data or account credentials.</p></div></div>
+    <section class="form-panel"><h2>Submit a support request</h2><form method="post" enctype="multipart/form-data" class="form-grid"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="support-request"><label>Request type<select name="request_type" required><option>Bug Report</option><option>Feature Request</option><option>License Issue</option><option>Other Issue</option></select></label><label>Subject<input name="subject" maxlength="160" required></label><label class="wide">Detailed description<textarea name="description" rows="7" maxlength="8000" required></textarea></label><label class="wide">Optional attachment <span>PNG, JPG, TXT, PDF, or ZIP · maximum 2 MB</span><input type="file" name="attachment" accept=".png,.jpg,.jpeg,.txt,.pdf,.zip"></label><div class="wide form-actions"><p>Do not include passwords, payment details, authentication codes, or customer receipt content.</p><button class="button primary" type="submit">Submit support request</button></div></form></section>
     <section class="data-section"><header><h2>Your support history</h2></header><?php foreach ($snapshot['support'] as $request): ?><details class="support-item"><summary><span><code><?= portal_e((string)$request['reference_code']) ?></code><strong><?= portal_e((string)$request['subject']) ?></strong></span><span><?= portal_e((string)$request['state']) ?> · <?= portal_e(portal_date($request['created_at'])) ?></span></summary><div class="conversation"><?php foreach ($snapshot['supportReplies'] as $reply): ?><?php if ($reply['reference_code'] === $request['reference_code']): ?><article class="<?= strtolower((string)$reply['author_type']) ?>"><header><?= portal_e((string)$reply['author_type']) ?> · <?= portal_e(portal_datetime($reply['created_at'])) ?></header><p><?= nl2br(portal_e((string)$reply['message'])) ?></p></article><?php endif; ?><?php endforeach; ?></div><?php if ($request['state'] === 'Pending'): ?><form method="post" class="support-retry"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="retry-support"><input type="hidden" name="reference" value="<?= portal_e((string)$request['reference_code']) ?>"><p>This request is saved privately but is still waiting for secure submission.</p><button class="button secondary" type="submit">Retry secure submission</button></form><?php endif; ?><form method="post" class="support-reply"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="support-reply"><input type="hidden" name="reference" value="<?= portal_e((string)$request['reference_code']) ?>"><label>Reply<textarea name="message" rows="4" maxlength="5000" required></textarea></label><button class="button secondary" type="submit">Add reply</button><?php if ($request['github_issue_url']): ?><a href="<?= portal_e((string)$request['github_issue_url']) ?>" rel="noopener">View public issue #<?= (int)$request['github_issue_number'] ?></a><?php endif; ?></form></details><?php endforeach; ?><?php if ($snapshot['support'] === []): ?><p class="empty-state">You have not submitted any support requests.</p><?php endif; ?></section>
   <?php elseif ($page === 'preferences'): ?>
     <div class="page-heading"><div><h1>Preferences &amp; security</h1><p>Manage your contact name, optional consent, account protection, and privacy actions.</p></div></div>

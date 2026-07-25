@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-trust">
       <section><span class="trust-icon" aria-hidden="true">◇</span><div><h2>Secure by design</h2><p>Protected sessions, verified ownership, and careful data handling.</p></div></section>
       <section><span class="trust-icon" aria-hidden="true">○</span><div><h2>Verified accounts</h2><p>We verify your email before customer records become available.</p></div></section>
-      <section><span class="trust-icon" aria-hidden="true">✓</span><div><h2>Protection first</h2><p>Your activation key is never used as a password.</p></div></section>
+      <section><span class="trust-icon" aria-hidden="true">✓</span><div><h2>Protection first</h2><p>Your verified account and registered computer control license access.</p></div></section>
     </div>
     <a class="brand-help" href="https://www.posprinteremulator.com/how-to-submit-a-support-request">Need help? Visit Support</a>
   </aside>
@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </form>
           <a class="inline-link" href="#reset" data-auth-mode="reset">Forgot password?</a>
           <p class="new-account">New here? <a href="#verify" data-auth-mode="verify">Verify your email</a> to create an account.</p>
-          <p class="security-note">Your activation key is never used as a password.</p>
+          <p class="security-note">License access is applied automatically after secure account and computer verification.</p>
         </section>
         <div class="auth-secondary">
           <section id="verify" data-auth-panel="verify">

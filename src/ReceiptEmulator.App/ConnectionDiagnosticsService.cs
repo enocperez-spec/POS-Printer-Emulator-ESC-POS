@@ -144,7 +144,7 @@ public sealed class ConnectionDiagnosticsService(
             new("printer-setup.log", "Printer setup log", "Recent Printer Setup Wizard events after deterministic redaction.")
         ],
         ["application and Windows versions", "license tier only", "diagnostic results", "listener/profile summaries", "driver, queue, spooler, and firewall summaries", "recent redacted application errors"],
-        ["receipt text and raw receipt bytes", "saved receipt history and imported captures", "activation and maintenance keys", "customer contact and payment information", "IP addresses", "Windows user names and full local paths"]);
+        ["receipt text and raw receipt bytes", "saved receipt history and imported captures", "license entitlements and account credentials", "customer contact and payment information", "IP addresses", "Windows user names and full local paths"]);
 
     public async Task<byte[]> CreatePackageAsync(ConnectionDiagnosticReport report, CancellationToken cancellationToken = default)
     {
@@ -362,7 +362,7 @@ public sealed class ConnectionDiagnosticsService(
             .AppendLine();
         foreach (var check in report.Checks)
             builder.AppendLine($"[{check.Status}] {check.Area} / {check.Title}: {check.Summary}");
-        builder.AppendLine().AppendLine("Sensitive values are removed from this package. No receipt contents, raw receipt bytes, activation keys, maintenance keys, customer contact information, or payment data are included.");
+        builder.AppendLine().AppendLine("Sensitive values are removed from this package. No receipt contents, raw receipt bytes, account credentials, entitlement tokens, customer contact information, or payment data are included.");
         return SupportRequestService.Redact(builder.ToString());
     }
 

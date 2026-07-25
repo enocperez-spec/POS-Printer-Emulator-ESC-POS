@@ -59,7 +59,7 @@ const viewModeStorageKey = 'pos-printer-emulator-view-mode'
 const emptyStatus: ServiceStatus = {
   listening: false,
   listener: '0.0.0.0:9100',
-  version: '0.3.53',
+  version: '0.3.54',
   license: {
     mode: 'Trial', isPaid: false, hasProAccess: false, isEnterprise: false, maximumListeners: 1, dailyLimit: 5, usedToday: 0, remaining: 5, localDate: '',
     customerName: '', emailAddress: '',
@@ -1176,10 +1176,6 @@ function LicenseSettings({ status, onActivated }: {
   status: ServiceStatus
   onActivated: (license: ServiceStatus['license']) => void
 }) {
-  const [activationKey, setActivationKey] = useState('')
-  const [changingLicense, setChangingLicense] = useState(!status.license.isPaid)
-  const [maintenanceKey, setMaintenanceKey] = useState('')
-  const [maintenanceBusy, setMaintenanceBusy] = useState(false)
   const [maintenanceRefreshBusy, setMaintenanceRefreshBusy] = useState(false)
   const [maintenanceMessage, setMaintenanceMessage] = useState<string>()
   const [maintenanceMessageKind, setMaintenanceMessageKind] = useState<'success' | 'info' | 'error'>('info')
@@ -1194,13 +1190,12 @@ function LicenseSettings({ status, onActivated }: {
   const [accountLinkState, setAccountLinkState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
   const onActivatedRef = useRef(onActivated)
   const [countdownNow, setCountdownNow] = useState(Date.now())
-  const showActivationForm = !status.license.isPaid || changingLicense
   const upgradeGuidance = status.license.mode === 'Lite'
     ? 'Upgrade to Pro for up to 2 printer listeners, or Enterprise for up to 15.'
     : status.license.mode === 'Pro'
       ? 'Upgrade to Enterprise for up to 15 printer listeners.'
       : status.license.mode === 'Enterprise'
-        ? 'Enter a replacement Enterprise key whenever this installation is reissued.'
+        ? 'Manage Enterprise computers and license assignments in the Customer Portal.'
         : 'Lite unlocks all paid features with one listener; Pro supports 2 and Enterprise supports up to 15.'
 
   useEffect(() => {
@@ -1251,7 +1246,6 @@ function LicenseSettings({ status, onActivated }: {
         setAccountLinkMessage(result.message)
         if (result.state === 'Activated' && result.license) {
           setAccountLinkState('success')
-          setChangingLicense(false)
           onActivatedRef.current(result.license)
         } else if (result.state === 'Rejected' || result.state === 'Expired' || result.state === 'Unavailable') {
           setAccountLinkState('error')
@@ -1273,43 +1267,19 @@ function LicenseSettings({ status, onActivated }: {
     }
   }, [accountLink?.expiresAt, accountLink?.linkId, accountLink?.requestToken, accountLinkState])
 
-  async function startAccountLink(backupActivationKey?: string) {
+  async function startAccountLink() {
     setAccountLinkBusy(true)
     setAccountLinkMessage(undefined)
     try {
-      const result = await api.startAccountLink(backupActivationKey)
+      const result = await api.startAccountLink()
       setAccountLink({ ...result, expiresAt: Date.now() + result.expiresInSeconds * 1000 })
       setAccountLinkState('pending')
       setAccountLinkMessage(result.message)
-      if (backupActivationKey) setActivationKey('')
     } catch (cause) {
       setAccountLinkState('error')
       setAccountLinkMessage(cause instanceof Error ? cause.message : 'A secure computer-link request could not be started.')
     } finally {
       setAccountLinkBusy(false)
-    }
-  }
-
-  async function activate(event: FormEvent) {
-    event.preventDefault()
-    await startAccountLink(activationKey)
-  }
-
-  async function applyMaintenance(event: FormEvent) {
-    event.preventDefault()
-    setMaintenanceBusy(true)
-    setMaintenanceMessage(undefined)
-    try {
-      const license = await api.applyMaintenance({ entitlementToken: maintenanceKey })
-      setMaintenanceKey('')
-      setMaintenanceMessage('Maintenance coverage was updated successfully.')
-      setMaintenanceMessageKind('success')
-      onActivated(license)
-    } catch (cause) {
-      setMaintenanceMessage(cause instanceof Error ? cause.message : 'The maintenance renewal key could not be validated.')
-      setMaintenanceMessageKind('error')
-    } finally {
-      setMaintenanceBusy(false)
     }
   }
 
@@ -1362,7 +1332,7 @@ function LicenseSettings({ status, onActivated }: {
 
       <div className="license-summary">
         <div><span>Status</span><strong>{status.license.promotion.isActive ? `Five-Day Trial Active · ${status.license.promotion.grantedTier}` : status.license.isPaid ? `Activated · ${status.license.mode} License` : 'Trial License'}</strong></div>
-        <div><span>Permanent activation key</span><strong>{status.license.promotion.isActive && status.license.promotion.previousTier === 'Trial' ? 'No permanent key installed' : status.license.isPaid ? 'Validated and stored securely' : 'No activation key installed'}</strong></div>
+        <div><span>Computer status</span><strong>{status.license.isPaid ? 'Linked and licensed' : 'Not linked to a paid entitlement'}</strong></div>
         <div><span>Printer listeners</span><strong>Up to {status.license.maximumListeners}</strong></div>
         {status.license.licenseId && <div><span>License ID</span><strong>{status.license.licenseId}</strong></div>}
       </div>
@@ -1430,7 +1400,7 @@ function LicenseSettings({ status, onActivated }: {
                 <button className="promotion-primary" type="button" disabled={promotionBusy || !selectedPromotionTier} onClick={startPromotion}>
                   <FlaskConical size={16} /> {promotionBusy ? 'Starting securely…' : `Start Five-Day ${selectedPromotionTier ?? ''} Trial`}
                 </button>
-                <small>No key entry is required. Eligibility and expiration are verified securely by the licensing server.</small>
+                <small>Eligibility and expiration are verified securely by the licensing server.</small>
               </div>
             </>
           )}
@@ -1468,13 +1438,6 @@ function LicenseSettings({ status, onActivated }: {
             {status.license.maintenance.renewalUrl && <a href={status.license.maintenance.renewalUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Renew optional annual maintenance</a>}
           </div>
           {maintenanceMessage && <div className={maintenanceMessageKind === 'success' ? 'maintenance-success' : maintenanceMessageKind === 'error' ? 'maintenance-error' : 'maintenance-message'} role={maintenanceMessageKind === 'error' ? 'alert' : 'status'}>{maintenanceMessage}</div>}
-          <details className="maintenance-key-panel">
-            <summary>Apply a maintenance renewal key</summary>
-            <form onSubmit={applyMaintenance}>
-              <label>Renewal key<textarea required rows={3} value={maintenanceKey} onChange={event => setMaintenanceKey(event.target.value)} placeholder="PPEM1-…" spellCheck={false} /></label>
-              <button className="secondary-action" type="submit" disabled={maintenanceBusy}><KeyRound size={16} /> {maintenanceBusy ? 'Applying…' : 'Apply renewal key'}</button>
-            </form>
-          </details>
         </section>
       )}
 
@@ -1483,24 +1446,9 @@ function LicenseSettings({ status, onActivated }: {
           <div><span>Registered to</span><strong>{status.license.customerName}</strong></div>
           <div><span>Email</span><strong>{status.license.emailAddress}</strong></div>
           <p className="settings-note">{upgradeGuidance}</p>
-          {!showActivationForm && <button className="secondary-action" type="button" onClick={() => setChangingLicense(true)}><KeyRound size={16} /> Change or upgrade license</button>}
-          <p className="settings-note">Your activation key is never included in support diagnostics.</p>
+          <a className="secondary-action" href="https://userportal.posprinteremulator.com/portal.php?page=licenses" target="_blank" rel="noreferrer"><ExternalLink size={16} /> Manage or upgrade license</a>
+          <p className="settings-note">License ownership and computer assignments are managed through your verified Customer Portal account.</p>
         </div>
-      ) : null}
-
-      {showActivationForm ? (
-        <details className="permanent-activation-disclosure" open={status.license.isPaid}>
-          <summary>{status.license.isPaid ? 'Backup key activation or license recovery' : 'Use a backup activation key'}</summary>
-          <p>Account linking is the recommended activation method. An activation key is a backup credential and must be claimed by a verified Customer Portal account before it establishes ownership.</p>
-          <form className="activation-form" onSubmit={activate}>
-            <label className="key-field">Purchased activation key<textarea required rows={4} value={activationKey} onChange={event => setActivationKey(event.target.value)} placeholder="PPE1-…" spellCheck={false} /></label>
-            <div className="settings-actions">
-              <button className="activate-button" type="submit" disabled={accountLinkBusy}><KeyRound size={17} /> {accountLinkBusy ? 'Starting secure claim…' : 'Claim key through Customer Portal'}</button>
-              {status.license.isPaid && <button type="button" disabled={accountLinkBusy} onClick={() => { setChangingLicense(false); setActivationKey('') }}>Cancel</button>}
-            </div>
-            <p className="activation-note">Use this backup method only for a license already claimed in your verified Customer Portal account. Account ownership, device limits, and all activation attempts are enforced by the licensing service.</p>
-          </form>
-        </details>
       ) : null}
     </div>
   )
@@ -1816,7 +1764,7 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
               ? <label className={pdfRequest.redactSensitiveData ? 'recommended' : 'danger'}><input type="checkbox" checked={pdfRequest.redactSensitiveData} onChange={event => updatePdf('redactSensitiveData', event.target.checked)} /><span><strong>Redact sensitive data</strong><small>{pdfRequest.redactSensitiveData ? 'Recommended and enabled by default.' : 'Warning: the report may contain private receipt or network information.'}</small></span></label>
               : <div className="privacy-callout"><LockKeyhole size={17} /><p>Standard reports always mask sensitive information and exclude raw print bytes and network addresses.</p></div>}
           </div>
-          <div className="privacy-callout wide"><LockKeyhole size={17} /><p>Activation keys, passwords, API keys, tokens, cookies, customer registration details, Windows identity, and unrelated receipt jobs are always excluded.</p></div>
+          <div className="privacy-callout wide"><LockKeyhole size={17} /><p>Passwords, API credentials, tokens, cookies, customer account details, Windows identity, and unrelated receipt jobs are always excluded.</p></div>
           <div className="support-form-actions wide"><button type="button" onClick={() => { setShowAdvancedPdf(false); setShowStandardPdf(false) }}>Cancel</button><button className="primary-action" type="submit" disabled={pdfBusy}>{pdfBusy ? 'Analyzing…' : 'Review report contents'}</button></div>
         </form>}
         {pdfPreview && <section className="diagnostic-pdf-preview">
@@ -1841,7 +1789,7 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
         <button className="primary-action" type="button" disabled={!assistedSupport} title={!assistedSupport ? 'Requires active Application Maintenance and Support' : undefined} onClick={() => setShowForm(value => !value)}><LifeBuoy size={16} /> Submit a Support Request</button>
         {!assistedSupport && maintenance.renewalUrl && <a className="primary-action" href={maintenance.renewalUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Renew maintenance</a>}
       </div>
-      <div className="privacy-callout"><LockKeyhole size={17} /><p>The report includes application events, version, service status, and basic system details. It does not include receipt contents or activation keys.</p></div>
+      <div className="privacy-callout"><LockKeyhole size={17} /><p>The report includes application events, version, service status, and basic system details. It does not include receipt contents or account credentials.</p></div>
       {showForm && <form className="support-request-form" onSubmit={reviewRequest}>
         <div className="support-request-heading"><div><span>Private submission</span><h3>Support request details</h3></div><button type="button" onClick={() => setShowForm(false)} aria-label="Close support request"><X size={16} /></button></div>
         <label>Request type<select value={request.requestType} onChange={event => update('requestType', event.target.value as SupportRequestInput['requestType'])}><option>Bug Report</option><option>Feature Request</option><option>License Issue</option><option>Other Issue</option></select></label>

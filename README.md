@@ -8,15 +8,15 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 - RAW TCP/IP listener on `0.0.0.0:9100` with cut-command and idle-timeout job framing.
 - Trial, Lite, Pro, and Enterprise provide total listener allowances of 1, 1, 2, and 15; managed listeners retain independent ports, profiles, state, buffers, counters, and Activity filtering.
-- Annual Application Maintenance and Support keeps paid licenses permanent, includes one year of updates, applicable activation-key recovery, and assisted support with new purchases, and offers later annual renewals as optional one-time purchases rather than subscriptions.
+- Annual Application Maintenance and Support keeps paid licenses permanent, includes one year of updates and assisted support with new purchases, and offers later annual renewals as optional one-time purchases rather than subscriptions.
 - Receipt preview with persistent Light and Dark viewing modes.
 - Trial Mode by default with five external POS print jobs per day, unlimited built-in Test Receipts, session-only jobs, a receipt watermark, and locked paid controls.
 - The v0.3.38 Trial onboarding correction provides a reopenable two-step setup guide, shows the included listener as read-only with exact local and LAN connection targets, and retains unlimited ephemeral built-in Test Receipts plus privacy-safe ten-line previews after the complete-job allowance is exhausted.
 - The v0.3.39 release downloads and verifies updates in the background, creates an encrypted safety snapshot, drains active receipt work, closes file-locking processes, installs through a separate updater, restores the prior workspace view, and relaunches automatically.
 - The v0.3.41 release corrects the Windows installer artwork with a purpose-built tall banner that preserves the official product logo proportions.
-- The v0.3.48 release keeps the running build version visible throughout Settings, clarifies that the Five-Day Promotional Trial requires no activation key, and selects the desktop shortcut by default during setup.
+- The v0.3.48 release keeps the running build version visible throughout Settings, provides a server-authorized Five-Day Promotional Trial, and selects the desktop shortcut by default during setup.
 - The v0.3.51 release adds a concise Standard Diagnostics PDF that reuses the privacy-reviewed, logo-branded Enterprise reporting engine.
-- Offline signed activation keys that immediately unlock unlimited jobs, persistent history, watermark-free receipts, exports, and premium features for Lite, Pro, and Enterprise without reinstalling.
+- Verified-account and registered-computer entitlements that automatically unlock unlimited jobs, persistent history, watermark-free receipts, exports, and paid features for Lite, Pro, and Enterprise without reinstalling.
 - ESC/POS text modes, positioning, legacy and raster images, configured barcodes, standards-based QR rendering, feeds, cuts, and common code pages.
 - Command diagnostics with byte offsets, hexadecimal values, and unsupported-command reporting.
 - Stored Logo imports that map local PNG, JPEG, or WebP artwork to Epson NV graphic keys used by POS receipts.
@@ -32,7 +32,7 @@ POS Printer Emulator is a local Windows ESC/POS receipt emulator for testing poi
 
 Feature upgrades and the `v0.MINOR.FEATURE` numbering sequence are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-> **Release status:** v0.3.53 Account-Based License Registration and Activation is the current public release, released July 25, 2026.
+> **Release status:** v0.3.54 Keyless Account and Device Licensing is the current public release, released July 25, 2026.
 
 The public `posprinteremulator.com` marketing and download website is maintained in [`website`](website/README.md).
 
@@ -80,7 +80,7 @@ Pro and Enterprise installations can assign additional unique ports under **Sett
 
 Every new installation begins in **Trial Mode**. Trial Mode permits five completed emulated print jobs per local calendar day. Trial jobs remain available only for the current service session, every receipt displays a visible trial watermark, and exports and premium controls are locked.
 
-After purchase, open **License** in the application and enter the customer/company name, email address, and activation key. A valid Lite, Pro, or Enterprise key immediately enables:
+After purchase, open **License** in the application and select **Link This Computer**. Sign in to the verified Customer Portal account, approve the computer, and select an eligible Lite, Pro, or Enterprise entitlement. The application applies it automatically and immediately enables:
 
 - unlimited emulated print jobs;
 - persistent print-job history of up to 500 jobs;
@@ -94,7 +94,7 @@ The paid feature set is the same across Lite, Pro, and Enterprise. The license l
 - **Pro:** two total listeners and all paid features; the current price is shown on the Buy page and managed through the Admin Portal.
 - **Enterprise:** up to 15 total listeners and all paid features, including the full multi-listener workflow; the current price is shown on the Buy page and managed through the Admin Portal.
 
-Activation is validated offline using a public-key signature. The customer does not reinstall the application or download another package. Activation keys are tied to the registered customer/company name and email address.
+Licensing uses a signed, short-lived entitlement bound to the verified customer account and registered computer. The application synchronizes it automatically and does not require a reinstall or separate paid package.
 
 ### Annual Application Maintenance and Support (v0.3.26)
 
@@ -108,9 +108,9 @@ Optional one-year renewals are **Lite $9.99**, **Pro $19.99**, and **Enterprise 
 
 Version 0.3.36 reports installation registration, Trial, Lite, Pro, or Enterprise status, maintenance status and coverage date, application version, launch counts, emulated print-job counts, last-seen time, and approximate country or U.S. state to the canonical HTTPS telemetry API at `www.posprinteremulator.com`. The public IP address may be processed transiently to derive those coarse codes but is not stored in the product-analytics database. Failed usage reports are retained in memory and retried while the application remains running. Receipt text, raw ESC/POS payloads, barcodes, QR-code contents, imported logos, capture packages, printer profiles, listener configuration, and rendered receipt images are never uploaded.
 
-The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and the activation-key signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and a web License Manager for issuing signed customer keys and reviewing issued licenses. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
+The protected Admin Portal is hosted at `https://admin.posprinteremulator.com/`. Password sign-in is followed by a six-digit authenticator-app challenge. First-time enrollment presents a locally rendered QR code; its TOTP secret and entitlement-signing key remain in the web host's blocked `private` directory. The Admin Portal includes the usage dashboard, Purchase Pricing, and account/device entitlement management. The application reports in the background; an unavailable internet connection never blocks receipt emulation.
 
-Version 0.3.42 adds the protected Customers workspace and its exact-ID service API. Before deploying it, merge the `service_api` and `data_protection` sections from [`admin-website/private/service-api.example.php`](admin-website/private/service-api.example.php) into the server-owned `admin-website/private/config.php`. Store only the SHA-256 digest of a random service token and a Base64-encoded independent 32-byte activation-key encryption key. Keep both values in the deployment vault, verify that production PHP provides OpenSSL AES-256-GCM, upload the additive schema, run the authenticated setup action, and then open Customers to complete the idempotent ownership backfill. Never commit the live token, encryption key, database credentials, or generated private configuration.
+Version 0.3.42 adds the protected Customers workspace and its exact-ID service API. Before deploying it, merge the `service_api` and `data_protection` sections from [`admin-website/private/service-api.example.php`](admin-website/private/service-api.example.php) into the server-owned `admin-website/private/config.php`. Store only the SHA-256 digest of a random service token and the required independent data-protection material. Keep those values in the deployment vault, verify that production PHP provides OpenSSL AES-256-GCM, upload the additive schema, run the authenticated setup action, and then open Customers to complete the idempotent ownership backfill. Never commit live tokens, encryption material, database credentials, or generated private configuration.
 
 Production operators should follow the [integration-token rotation runbook](docs/SECURITY_TOKEN_ROTATION.md) whenever purchase-site or Admin Portal credentials are created, rotated, or suspected of exposure.
 
@@ -204,17 +204,11 @@ gh auth login
 gh release create v0.3.41 artifacts/installer/POSPrinterEmulatorSetup-0.3.41-win-x64.exe artifacts/installer/POSPrinterEmulatorSetup-0.3.41-win-x64.exe.sha256 --title "POS Printer Emulator 0.3.41" --notes-file artifacts/release-notes-v0.3.41.md
 ```
 
-## Issue customer activation keys
+## Manage customer license entitlements
 
-The vendor private key is intentionally stored outside this Git repository and must never be included in the application or installer. Back it up securely before selling licenses. Issue a key with the exact registration details supplied by the customer:
+The protected Admin Portal assigns Lite, Pro, and Enterprise entitlements directly to verified Customer Portal accounts. Administrators can change the license type, reassign ownership, release a registered computer, deactivate or revoke access, extend Maintenance and Support, and review the complete audit trail. Each change increments the entitlement revision and synchronizes automatically to the registered application.
 
-```console
-dotnet run --project tools/POSPrinterEmulator.LicenseTool -- issue --private-key "..\License Keys\vendor-private-key.pem" --customer "Customer or Company Name" --email "customer@example.com"
-```
-
-Send the printed `PPE1-...` value to the customer. The corresponding public key is embedded in the application and can validate the key without internet access.
-
-The protected Admin Portal License Manager unifies manual and purchase-issued keys, can issue paid upgrades for registered Trial installations, and provides confirmation-gated tier replacement, deactivation, reactivation, revocation, deletion, and audit history. Paid-tier changes always generate a new signed key; the customer must enter that replacement key because the tier is cryptographically embedded in the original key. Portal lifecycle controls do not remotely erase a key already stored by v0.3.23—the outage-safe online entitlement and transfer workflow remains tracked in `BACKLOG-004`. Until that release adds signed entitlement proof, telemetry for a legacy paid license ID that is not yet in the central ledger remains client-reported for dashboard compatibility; this reporting does not unlock desktop features.
+The vendor signing key remains outside this repository and signs short-lived, device-bound entitlement documents returned only by the protected licensing service. Customers and administrators never view, copy, email, or paste those internal credentials.
 
 For unattended installation, provide the required registration fields:
 
@@ -281,7 +275,7 @@ The permanent status list for every completed, scheduled, and future release is 
 - **Released in v0.3.50 — Advanced Diagnostics PDF Report:** Generate a detailed Enterprise diagnostic PDF with the application logo, report metadata, receipt rendering, command analysis, listener and environment state, checksums, and privacy review.
 - **Released in v0.3.51 — Standard Diagnostics PDF Report:** Reuse the verified report engine to create a shorter Enterprise support PDF with the most useful findings, redacted configuration, and clear next actions.
 - **v0.3.52 — Automatic configuration restore points:** Create encrypted, bounded, rollback-safe recovery points before important configuration changes.
-- **Released in v0.3.53 — Account-Based License Registration and Activation:** Link a computer through a verified Customer Portal account, approve an eligible license, enforce device limits, claim a backup activation key securely, and retain auditable activation and transfer history.
+- **Released in v0.3.53 — Account-Based License Registration and Activation:** Link a computer through a verified Customer Portal account, approve an eligible entitlement, enforce device limits, and retain auditable account-linking and transfer history.
 - **v0.3.54 — Privacy-safe receipt masking:** Create reviewed masked views and exports while preserving the authorized original receipt locally.
 - **v0.3.55 — System tray health and notifications:** Surface listener health and actionable privacy-safe alerts while the main window is closed.
 - **v0.3.56 — Character and code-page assistant:** Diagnose probable encoding problems and preview safe printer-profile corrections without changing capture bytes.

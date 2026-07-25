@@ -169,15 +169,10 @@ public sealed record LicenseStatus(
     public bool HasProAccess => IsPaid;
 }
 
-public sealed record ActivationRequest(string CustomerName, string EmailAddress, string ActivationKey);
 public sealed record AccountLinkStatusRequest(Guid LinkId, string RequestToken);
-public sealed record AccountLinkStartRequest(string? ActivationKey);
+public sealed record AccountLinkStartRequest;
 
 public sealed record SingleListenerSetupRequest(int Port);
-
-public sealed record MaintenanceEntitlementRequest(string EntitlementToken);
-
-public sealed record PromotionEntitlementRequest(string EntitlementToken);
 
 public sealed record MaintenanceRefreshResult(
     LicenseStatus License,

@@ -17,7 +17,7 @@ function portal_customer_snapshot(string $customerId): array
     }
 
     $licenseQuery = $pdo->prepare(
-        "SELECT license_id,license_tier,control_state,activation_key_ending,issued_at,
+        "SELECT license_id,license_tier,control_state,issued_at,
                 maintenance_expires_at,maintenance_revoked_at
          FROM issued_licenses
          WHERE customer_id=:customer_id AND control_state<>'Deleted'
@@ -40,7 +40,7 @@ function portal_customer_snapshot(string $customerId): array
                 i.order_type AS checkout_order_type,i.provider_order_id,i.provider_capture_id,
                 i.license_id,i.replacement_license_id,i.maintenance_previous_expires_at,
                 i.maintenance_new_expires_at,
-                l.activation_key_ending,l.control_state AS license_control_state
+                l.control_state AS license_control_state
          FROM customer_purchases p
          LEFT JOIN portal_checkout_intents i
            ON p.purchase_reference=CONCAT('portal:',i.intent_id) AND i.customer_id=p.customer_id
@@ -103,8 +103,8 @@ function portal_customer_snapshot(string $customerId): array
 
 function portal_masked_license(array $license): string
 {
-    $ending = strtoupper((string)($license['activation_key_ending'] ?? ''));
-    return $ending === '' ? 'Not available' : '•••• ' . portal_e($ending);
+    $licenseId = strtoupper((string)($license['license_id'] ?? ''));
+    return $licenseId === '' ? 'Not available' : 'License ' . portal_e(substr($licenseId, 0, 8));
 }
 
 function portal_listener_allowance(string $tier): string
@@ -159,7 +159,7 @@ function portal_purchase_record(string $customerId, string $reference): ?array
                 i.order_type AS checkout_order_type,i.provider_order_id,i.provider_capture_id,
                 i.license_id,i.replacement_license_id,i.maintenance_previous_expires_at,
                 i.maintenance_new_expires_at,
-                l.activation_key_ending,l.control_state AS license_control_state
+                l.control_state AS license_control_state
          FROM customer_purchases p
          INNER JOIN customers c ON c.customer_id=p.customer_id
          LEFT JOIN portal_checkout_intents i
@@ -207,8 +207,7 @@ function portal_purchase_display_reference(array $purchase): string
 function portal_purchase_license_label(array $purchase): string
 {
     $tier = (string)($purchase['license_tier'] ?? 'License');
-    $ending = strtoupper(trim((string)($purchase['activation_key_ending'] ?? '')));
-    return $ending === '' ? $tier . ' license' : $tier . ' · •••• ' . $ending;
+    return $tier . ' license';
 }
 
 function portal_normalize_version(?string $version): ?string
@@ -412,7 +411,6 @@ function portal_customer_export(array $snapshot): array
             'licenseId' => $row['license_id'],
             'tier' => $row['license_tier'],
             'status' => $row['control_state'],
-            'activationKey' => $row['activation_key_ending'] ? '•••• ' . $row['activation_key_ending'] : null,
             'issuedAt' => $row['issued_at'],
             'maintenanceExpiresAt' => $row['maintenance_expires_at'],
         ], $snapshot['licenses']),

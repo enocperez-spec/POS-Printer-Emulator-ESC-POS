@@ -778,7 +778,7 @@ $releaseSync = database()->prepare(
          'The C# packaging tool builds without warnings or errors, Inno Setup reads both independent branding assets, and the compiled installer displays the product mark without stretching.', UTC_TIMESTAMP(6)),
         ('v0.3.42', 'v0.3.42', 'Release', 'Customer identity, consent, and CRM foundation', 'Released', 342,
          'Create one privacy-aware customer record before exposing portal or automated marketing workflows.',
-         'Canonical verified customer IDs; normalized registration, installation, license, maintenance, purchase, support, consent, suppression, and event records; safe backfill; Admin customer search, filters, detail, and controlled export; masked key lookup; retention and correction workflows; and authenticated service APIs.',
+         'Canonical verified customer IDs; normalized registration, installation, license, maintenance, purchase, support, consent, suppression, and event records; safe backfill; Admin customer search, filters, detail, and controlled export; entitlement lookup; retention and correction workflows; and authenticated service APIs.',
          'Every later portal, renewal, promotional, email, and analytics workflow depends on trustworthy ownership and consent evidence.',
          'Existing entitlements migrate unchanged, verified customers resolve to one auditable profile, unauthorized enumeration is blocked, and prohibited receipt or secret data is absent.', '2026-07-22 00:00:00.000000'),
         ('v0.3.43', 'v0.3.43', 'Release', 'Secure Customer Portal MVP', 'Released', 343,
@@ -833,10 +833,15 @@ $releaseSync = database()->prepare(
          'The downloaded installer is promoted without a sharing violation, incomplete transfers are rejected, partial files are removed, and automated updater tests pass.', UTC_TIMESTAMP(6)),
         ('v0.3.53', 'v0.3.53', 'Release', 'Account-Based License Registration and Activation', 'Released', 353,
          'Replace customer-name and email matching with verified account ownership and an explicit computer-link approval workflow.',
-         'Verified Customer Portal accounts; authenticated desktop link requests; expiring single-use registration codes; customer approval; account-owned license selection; one-computer device limits; deactivation and transfer history; backup activation-key claims; clear activation guidance; and privacy-safe audit events.',
+         'Verified Customer Portal accounts; authenticated desktop link requests; expiring single-use registration codes; customer approval; account-owned license selection; one-computer device limits; deactivation and transfer history; support-assisted recovery; clear account-linking guidance; and privacy-safe audit events.',
          'License ownership must be established through a verified customer account before additional self-service device and commercial workflows can be trusted.',
          'A verified customer links a computer, selects an eligible account-owned license, activates it without reinstalling, and can later release the device while duplicate, expired, unauthorized, or replayed requests are rejected and audited.', UTC_TIMESTAMP(6)),
-        ('v0.3.54', 'v0.3.54', 'Release', 'Privacy-safe receipt masking', 'Planned', 354,
+        ('v0.3.54', 'v0.3.54', 'Release', 'Keyless Account and Device Licensing', 'Released', 354,
+         'Complete the transition from customer-entered activation credentials to automatic verified-account and registered-computer licensing.',
+         'Account-owned entitlements; signed short-lived device authorization; automatic desktop synchronization; keyless paid and promotional access; Customer Portal computer transfer; full Admin entitlement controls; destructive-action confirmation; audit evidence; retired legacy delivery endpoints; migration-safe historical retention; and updated installer, website, email, and support guidance.',
+         'The transitional backup-key path in v0.3.53 must be removed before account ownership can be the only supported licensing authority.',
+         'A verified customer links a computer and receives the correct license automatically, administrative changes synchronize promptly, revoked or expired authorization cannot remain valid indefinitely offline, and no customer or administrator copies, pastes, receives, generates, or recovers an activation key.', UTC_TIMESTAMP(6)),
+        ('v0.3.61', 'v0.3.61', 'Release', 'Privacy-safe receipt masking', 'Planned', 361,
          'Let customers demonstrate, screenshot, export, and share receipts without unnecessarily exposing sensitive data.',
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
          'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.',
@@ -1011,13 +1016,14 @@ database()->prepare(
          WHEN 'v0.3.51' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.51'
          WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.52'
          WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.53'
-         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.54'
          WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
          WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
          WHEN 'v0.3.57' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
          WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
          WHEN 'v0.3.59' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
          WHEN 'v0.3.60' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
+         WHEN 'v0.3.61' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -1025,7 +1031,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'v0.3.61', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

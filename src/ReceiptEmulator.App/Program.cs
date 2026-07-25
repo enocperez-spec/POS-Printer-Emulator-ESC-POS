@@ -56,6 +56,7 @@ builder.Services.AddHttpClient<AccountLinkService>(client =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
     client.Timeout = TimeSpan.FromSeconds(20);
 });
+builder.Services.AddHostedService<DeviceEntitlementSyncService>();
 builder.Services.AddHttpClient<PromotionAccessService>(client =>
 {
     client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
@@ -70,12 +71,7 @@ builder.Services.AddHttpClient<UpdateService>(client =>
     client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
     client.Timeout = TimeSpan.FromSeconds(15);
 });
-builder.Services.AddHttpClient<MaintenanceRefreshService>(client =>
-{
-    client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
-    client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
-    client.Timeout = TimeSpan.FromSeconds(15);
-});
+builder.Services.AddTransient<MaintenanceRefreshService>();
 builder.Services.AddHttpClient<SupportRequestService>(client =>
 {
     client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
@@ -677,7 +673,7 @@ app.MapGet("/api/support/activation-diagnostics", (LicenseService license) =>
         .AppendLine($"Last storage error type: {storage.LastErrorType ?? "None"}")
         .AppendLine($"Last storage error: {storage.LastErrorMessage ?? "None"}")
         .AppendLine()
-        .AppendLine("This report does not contain the activation key, customer registration data, or receipt contents.")
+        .AppendLine("This report does not contain account credentials, device entitlement tokens, customer registration data, or receipt contents.")
         .ToString();
     return Results.File(Encoding.UTF8.GetBytes(report), "text/plain", $"POS-Printer-Emulator-Activation-Diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
 });
@@ -828,13 +824,12 @@ app.MapDelete("/api/support/requests/drafts/{reference}", (string reference, Sup
 });
 
 app.MapPost("/api/account-link/start", async (
-    AccountLinkStartRequest? request,
     AccountLinkService accountLink,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        return Results.Ok(await accountLink.StartAsync(request?.ActivationKey, cancellationToken));
+        return Results.Ok(await accountLink.StartAsync(cancellationToken));
     }
     catch (InvalidOperationException exception)
     {
@@ -871,56 +866,6 @@ app.MapPost("/api/account-link/status", async (
     catch (InvalidOperationException exception)
     {
         return Results.Problem(exception.Message, statusCode: 400);
-    }
-});
-
-app.MapPost("/api/license/activate", () => Results.Problem(
-    "Direct name, email, and key activation has been retired. Use Link This Computer so a verified Customer Portal account can claim the license and approve this computer.",
-    statusCode: 409));
-
-app.MapPost("/api/license/maintenance/apply", (
-    MaintenanceEntitlementRequest request,
-    LicenseService license,
-    ILoggerFactory loggerFactory) =>
-{
-    try
-    {
-        return Results.Ok(license.InstallMaintenanceEntitlement(request.EntitlementToken));
-    }
-    catch (InvalidOperationException exception)
-    {
-        return Results.Problem(exception.Message, statusCode: 400);
-    }
-    catch (Exception exception)
-    {
-        loggerFactory.CreateLogger("MaintenanceEntitlement")
-            .LogError(exception, "A validated maintenance entitlement could not be saved to local storage");
-        return Results.Problem(
-            "The maintenance renewal could not be saved on this computer. Download Activation Diagnostics and try again.",
-            statusCode: 500);
-    }
-});
-
-app.MapPost("/api/license/promotion/apply", (
-    PromotionEntitlementRequest request,
-    LicenseService license,
-    ILoggerFactory loggerFactory) =>
-{
-    try
-    {
-        return Results.Ok(license.InstallPromotionEntitlement(request.EntitlementToken));
-    }
-    catch (InvalidOperationException exception)
-    {
-        return Results.Problem(exception.Message, statusCode: 400);
-    }
-    catch (Exception exception)
-    {
-        loggerFactory.CreateLogger("PromotionEntitlement")
-            .LogError(exception, "A validated promotion entitlement could not be saved to local storage");
-        return Results.Problem(
-            "The promotional access key could not be saved on this computer. Download Activation Diagnostics and try again.",
-            statusCode: 500);
     }
 });
 

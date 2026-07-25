@@ -24,11 +24,11 @@ The first command reuses the protected v0.3.42 service token and creates a porta
 
 Never place production credentials, bearer tokens, encryption keys, email-provider credentials, or database passwords in this directory before committing or packaging it.
 
-The browser receives only a 20-minute opaque checkout token. The Buy service resolves customer and license ownership through the protected Admin service, calculates the current server price, verifies PayPal capture, and then requests idempotent fulfillment. Do not add PayPal credentials, activation-key signing material, or browser-supplied amounts to the Customer Portal.
+The browser receives only a 20-minute opaque checkout token. The Buy service resolves customer and license ownership through the protected Admin service, calculates the current server price, verifies PayPal capture, and then requests idempotent account-entitlement fulfillment. Do not add PayPal credentials, device-entitlement signing material, or browser-supplied amounts to the Customer Portal.
 
 ## Purchase and billing history
 
-The **Purchase & Billing** section joins customer-owned purchase records to their canonical checkout intent and masked license record. It displays licenses, upgrades, Maintenance and Support renewals, payment status, transaction references, and totals. Authenticated customers can view or download an HTML receipt suitable for local printing or saving as PDF. Receipts never contain payment credentials or complete activation keys.
+The **Purchase & Billing** section joins customer-owned purchase records to their canonical checkout intent and account entitlement. It displays licenses, upgrades, Maintenance and Support renewals, payment status, transaction references, and totals. Authenticated customers can view or download an HTML receipt suitable for local printing or saving as PDF. Receipts never contain payment credentials, account credentials, or device-entitlement tokens.
 
 ## Local checks
 

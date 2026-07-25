@@ -45,7 +45,7 @@
           {
             "@type": "HowToStep",
             "name": "Manage licenses",
-            "text": "Review masked license details and securely resend an eligible activation key to the verified account email."
+            "text": "Review account-owned licenses, device assignments, status, and maintenance coverage without copying or managing license credentials."
           },
           {
             "@type": "HowToStep",
@@ -145,7 +145,7 @@
             <nav class="portal-guide-directory" aria-label="Customer Portal guide sections">
               <a href="#account-access"><strong>Account access</strong><span>Verification, recovery, and sign-in</span></a>
               <a href="#overview"><strong>Overview</strong><span>License, coverage, and update status</span></a>
-              <a href="#licenses"><strong>Licenses</strong><span>Masked keys and activation delivery</span></a>
+              <a href="#licenses"><strong>Licenses</strong><span>Account entitlements and registered computers</span></a>
               <a href="#plans"><strong>Plans</strong><span>Purchases, upgrades, trials, and renewal</span></a>
               <a href="#billing"><strong>Purchase &amp; Billing</strong><span>Transactions and receipts</span></a>
               <a href="#computers"><strong>Computers</strong><span>Installed devices and transfers</span></a>
@@ -214,33 +214,34 @@
 
             <section class="portal-guide-step" id="licenses">
               <span class="guide-step-label">03 · Licenses</span>
-              <h2>Review ownership without exposing activation keys</h2>
+              <h2>Review account-owned licenses and device status</h2>
               <p>
-                Licenses shows the masked key ending, license level, Active
-                status, issue date, listener allowance, and Maintenance and
-                Support expiration. Complete activation keys are never displayed.
+                Licenses shows the license level, Active status, issue date,
+                listener allowance, registered computer, and Maintenance and
+                Support expiration. Licensing is automatic after account and
+                computer verification.
               </p>
               <ol>
-                <li>Confirm your Customer Portal password; confirmation remains valid for five minutes.</li>
-                <li>Select <strong>Resend Activation Key</strong> for the correct license.</li>
-                <li>The key is sent only to the verified email address on the account.</li>
+                <li>Confirm that the license is assigned to your verified account.</li>
+                <li>Review the registered computer and current activation status.</li>
+                <li>Deactivate the computer before moving the license to another device.</li>
               </ol>
               <p>
-                Resending requires active Maintenance and Support. When coverage
-                has expired, the button is disabled and the portal provides the
-                expiration date plus a direct renewal action.
+                License and maintenance changes synchronize automatically with
+                linked computers. When coverage has expired, the portal shows
+                the expiration date and a direct renewal action.
               </p>
               <figure class="portal-shot">
                 <div class="portal-shot-window compact">
                   <div class="portal-shot-topbar"><span>Licenses</span><small>Plans &amp; maintenance</small></div>
                   <div class="portal-data-card">
-                    <div class="portal-data-head"><span>Masked key</span><span>License</span><span>Status</span><span>Coverage</span><span>Delivery</span></div>
-                    <div class="portal-data-row"><span>••••-••••-7K2M</span><span>Pro</span><span class="portal-active">Active</span><span>Oct 23, 2026</span><button>Resend Activation Key</button></div>
+                    <div class="portal-data-head"><span>License</span><span>Status</span><span>Computer</span><span>Coverage</span><span>Action</span></div>
+                    <div class="portal-data-row"><span>Pro</span><span class="portal-active">Active</span><span>Development PC</span><span>Oct 23, 2026</span><button>Manage computer</button></div>
                   </div>
                 </div>
                 <figcaption>
-                  Activation delivery is password-confirmed, maintenance-aware,
-                  rate-limited, and sent only to the verified account email.
+                  Account ownership, device assignment, and maintenance coverage
+                  are visible without exposing a reusable license credential.
                 </figcaption>
               </figure>
             </section>
@@ -286,7 +287,7 @@
                 and Maintenance and Support renewals. Each row shows payment
                 status, the associated masked license, amount, transaction
                 reference, and a receipt that can be printed or saved as PDF.
-                Payment credentials and complete activation keys are never shown.
+                Payment credentials and device-entitlement tokens are never shown.
               </p>
               <figure class="portal-shot">
                 <div class="portal-shot-window compact">
@@ -322,9 +323,8 @@
                 To transfer a license, confirm your portal password, enter a
                 transfer reason, and deactivate the old computer first. If the
                 old device is lost or unavailable, submit a <strong>License
-                Issue</strong> in Support for identity-verified recovery. Backup
-                activation keys follow this same portal flow and never establish
-                ownership on their own.
+                Issue</strong> in Support for identity-verified recovery. License
+                ownership always remains with the verified account.
               </p>
               <figure class="portal-shot">
                 <div class="portal-shot-window compact">
@@ -373,7 +373,7 @@
                 Choose Bug Report, Feature Request, License Issue, or Other
                 Issue. Add a clear subject and description, then optionally
                 attach one PNG, JPG, TXT, PDF, or ZIP file up to 2 MB. Do not
-                include activation keys, passwords, payment details, or customer
+                include passwords, device-entitlement tokens, payment details, or customer
                 receipt contents.
               </p>
               <p>
@@ -434,7 +434,7 @@
             <section class="portal-privacy-summary">
               <h2>Information the portal deliberately does not show</h2>
               <ul>
-                <li>Complete activation keys on screen</li>
+                <li>Account credentials or device-entitlement tokens on screen</li>
                 <li>Receipt text, raw ESC/POS bytes, barcodes, or receipt images</li>
                 <li>Passwords, authenticator secrets, or existing recovery codes</li>
                 <li>Payment credentials or private listener addresses</li>
@@ -458,7 +458,7 @@
             >
             <ul class="sidebar-links">
               <li><a href="#overview">Overview and updates</a></li>
-              <li><a href="#licenses">Licenses and activation delivery</a></li>
+              <li><a href="#licenses">Licenses and registered computers</a></li>
               <li><a href="#plans">Purchases, upgrades, and renewal</a></li>
               <li><a href="#downloads">Downloads and version status</a></li>
               <li><a href="#preferences">Preferences and security</a></li>
@@ -484,7 +484,7 @@
         <div class="related-grid">
           <a href="how-to-manage-pos-printer-emulator-license"
             ><strong>License management</strong
-            ><span>Activate and move a license.</span></a
+            ><span>Link and move a license.</span></a
           ><a href="how-to-check-for-pos-printer-emulator-updates"
             ><strong>Updates</strong><span>Review eligible releases.</span></a
           ><a href="how-to-submit-a-support-request"

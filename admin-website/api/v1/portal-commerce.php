@@ -87,26 +87,6 @@ function commerce_event(
     ]);
 }
 
-function commerce_reveal_replacement(PDO $pdo, string $licenseId): array
-{
-    $query = $pdo->prepare(
-        'SELECT license_id,license_tier,maintenance_expires_at,activation_key,
-                activation_key_ciphertext,activation_key_nonce,activation_key_tag
-         FROM issued_licenses WHERE license_id=:license_id LIMIT 1'
-    );
-    $query->execute(['license_id' => $licenseId]);
-    $license = $query->fetch();
-    if (!is_array($license)) {
-        throw new RuntimeException('The fulfilled license could not be loaded.');
-    }
-    return [
-        'licenseId' => (string)$license['license_id'],
-        'licenseTier' => (string)$license['license_tier'],
-        'activationKey' => reveal_activation_key($license),
-        'maintenanceExpiresAt' => (string)$license['maintenance_expires_at'],
-    ];
-}
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     commerce_response(['error' => 'Not found.'], 404);
 }
@@ -226,11 +206,6 @@ try {
                     'licenseId' => (string)$intent['license_id'],
                     'licenseTier' => (string)$intent['target_tier'],
                     'maintenanceExpiresAt' => (string)$intent['maintenance_new_expires_at'],
-                    'maintenanceToken' => issue_maintenance_token(
-                        (string)$intent['license_id'],
-                        (string)$intent['target_tier'],
-                        (string)$intent['maintenance_new_expires_at']
-                    ),
                 ];
             } elseif (!empty($intent['replacement_license_id'])) {
                 $response += commerce_reveal_replacement($pdo, (string)$intent['replacement_license_id']);
@@ -285,12 +260,10 @@ try {
                 'licenseId' => (string)$renewal['license_id'],
                 'licenseTier' => (string)$renewal['license_tier'],
                 'maintenanceExpiresAt' => (string)$renewal['maintenance_expires_at'],
-                'maintenanceToken' => (string)$renewal['maintenance_token'],
             ];
         } elseif ((string)$intent['order_type'] === 'LICENSE') {
             $existing = $pdo->prepare(
-                "SELECT license_id,license_tier,maintenance_expires_at,activation_key,
-                        activation_key_ciphertext,activation_key_nonce,activation_key_tag
+                "SELECT license_id,license_tier,maintenance_expires_at
                  FROM issued_licenses
                  WHERE source_reference=:source_reference AND control_state IN ('Enabled','Deactivated')
                  ORDER BY issued_at DESC LIMIT 1"
@@ -298,7 +271,7 @@ try {
             $existing->execute(['source_reference' => $sourceReference]);
             $issued = $existing->fetch();
             if (!is_array($issued)) {
-                $issued = issue_activation_key(
+                $issued = create_license_entitlement(
                     (string)$intent['display_name'],
                     (string)$intent['canonical_email'],
                     (string)$intent['target_tier']
@@ -317,15 +290,11 @@ try {
             $fulfillment = [
                 'licenseId' => (string)$issued['license_id'],
                 'licenseTier' => (string)$issued['license_tier'],
-                'activationKey' => isset($issued['activation_key_ciphertext'])
-                    ? reveal_activation_key($issued)
-                    : (string)$issued['activation_key'],
                 'maintenanceExpiresAt' => (string)$issued['maintenance_expires_at'],
             ];
         } elseif ((string)$intent['current_tier'] === 'Trial') {
             $existing = $pdo->prepare(
-                "SELECT license_id,license_tier,maintenance_expires_at,activation_key,
-                        activation_key_ciphertext,activation_key_nonce,activation_key_tag
+                "SELECT license_id,license_tier,maintenance_expires_at
                  FROM issued_licenses
                  WHERE source_reference=:source_reference AND control_state IN ('Enabled','Deactivated')
                  ORDER BY issued_at DESC LIMIT 1"
@@ -338,15 +307,12 @@ try {
                     (string)$intent['installation_uuid'],
                     (string)$intent['target_tier'],
                     'verified-self-service',
-                    static fn(string $name, string $email, string $tier): array => issue_activation_key($name, $email, $tier)
+                    static fn(string $name, string $email, string $tier): array => create_license_entitlement($name, $email, $tier)
                 );
             }
             $fulfillment = [
                 'licenseId' => (string)$issued['license_id'],
                 'licenseTier' => (string)$issued['license_tier'],
-                'activationKey' => isset($issued['activation_key_ciphertext'])
-                    ? reveal_activation_key($issued)
-                    : (string)$issued['activation_key'],
                 'maintenanceExpiresAt' => (string)$issued['maintenance_expires_at'],
             ];
         } else {
@@ -358,35 +324,28 @@ try {
             if (!is_array($license)) {
                 throw new DomainException('The license selected for this upgrade no longer exists.');
             }
-            if (!empty($license['superseded_by_license_id'])) {
-                $replacement = commerce_reveal_replacement($pdo, (string)$license['superseded_by_license_id']);
-                $issued = [
-                    'license_id' => $replacement['licenseId'],
-                    'license_tier' => $replacement['licenseTier'],
-                    'activation_key' => $replacement['activationKey'],
-                    'maintenance_expires_at' => $replacement['maintenanceExpiresAt'],
-                ];
-            } else {
-                $result = manage_issued_license(
-                    $pdo,
-                    'change_tier',
-                    (string)$intent['license_id'],
-                    (int)$license['row_version'],
-                    'verified-self-service',
-                    static fn(string $name, string $email, string $tier, string $maintenance): array =>
-                        issue_activation_key($name, $email, $tier, $maintenance),
-                    (string)$intent['target_tier'],
-                    'Verified PayPal self-service upgrade ' . $intent['intent_id']
-                );
-                if (!is_array($result['issued'] ?? null)) {
-                    throw new RuntimeException('The replacement license was not generated.');
-                }
-                $issued = $result['issued'];
+            manage_issued_license(
+                $pdo,
+                'change_tier',
+                (string)$intent['license_id'],
+                (int)$license['row_version'],
+                'verified-self-service',
+                (string)$intent['target_tier'],
+                null,
+                'Verified PayPal self-service upgrade ' . $intent['intent_id']
+            );
+            $updatedLicense = $pdo->prepare(
+                'SELECT license_id,license_tier,maintenance_expires_at
+                 FROM issued_licenses WHERE license_id=:license_id LIMIT 1'
+            );
+            $updatedLicense->execute(['license_id' => $intent['license_id']]);
+            $issued = $updatedLicense->fetch();
+            if (!is_array($issued)) {
+                throw new RuntimeException('The updated account entitlement could not be loaded.');
             }
             $fulfillment = [
                 'licenseId' => (string)$issued['license_id'],
                 'licenseTier' => (string)$issued['license_tier'],
-                'activationKey' => (string)$issued['activation_key'],
                 'maintenanceExpiresAt' => (string)$issued['maintenance_expires_at'],
             ];
         }

@@ -27,11 +27,6 @@ $expectThrows = static function (callable $action, string $message) use (&$failu
 $expectSame(1, activation_tier_value('Pro'), 'Pro activation byte changed.');
 $expectSame(2, activation_tier_value('Enterprise'), 'Enterprise activation byte changed.');
 $expectSame(3, activation_tier_value('Lite'), 'Lite activation byte is not 3.');
-$expectSame('Pro', activation_tier_name(1), 'Activation byte 1 must remain Pro.');
-$expectSame('Enterprise', activation_tier_name(2), 'Activation byte 2 must remain Enterprise.');
-$expectSame('Lite', activation_tier_name(3), 'Activation byte 3 must decode as Lite.');
-$expectThrows(static fn(): string => activation_tier_name(4), 'Unknown activation bytes must be rejected.');
-
 if (function_exists('openssl_pkey_new')) {
     $promotionKey = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
     if ($promotionKey === false) {
@@ -97,7 +92,7 @@ $managementCode=file_get_contents($root.'/admin-website/includes/license_managem
 $expectContains("if (!empty(\$license['maintenance_revoked_at']))",$managementCode,'Paid renewal must not bypass an Admin maintenance revocation.');
 $expectContains('Restore maintenance before changing this license level.',$managementCode,'Tier replacement must not silently clear an Admin maintenance revocation.');
 $expectContains('Restore maintenance before extending its coverage period.',$managementCode,'Manual extension must not silently clear an Admin maintenance revocation.');
-$expectContains("'COVERAGE_TRANSFERRED'",$managementCode,'A tier replacement must record transferred coverage instead of claiming a new included year.');
+$expectContains('entitlement_revision=entitlement_revision+1',$managementCode,'License and maintenance changes must advance the device-entitlement revision.');
 $expectContains("'idempotent'=>true",$managementCode,'A repeated renewal application must return its existing expiration idempotently.');
 $expectContains("ALTER TABLE installations ADD COLUMN maintenance_status",$managementCode,'License Manager schema assurance must migrate installation maintenance status.');
 $expectContains("ALTER TABLE installations ADD COLUMN maintenance_expires_at",$managementCode,'License Manager schema assurance must migrate installation maintenance expiration.');
@@ -175,14 +170,17 @@ $expectContains("WHEN 'v0.3.45' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains("('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.47 as released.');
 $expectContains("('v0.3.47', 'v0.3.47', 'Release', 'Five-Day Promotional Trial Experience', 'Released'", $schema, 'Fresh database schema must identify v0.3.47 as released.');
 $expectContains("WHEN 'v0.3.47' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.47'", $devSupport, 'Admin Dev Support is missing the v0.3.47 GitHub release link.');
+$expectContains("('v0.3.54', 'v0.3.54', 'Release', 'Keyless Account and Device Licensing', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.54 as released.');
+$expectContains("('v0.3.54', 'v0.3.54', 'Release', 'Keyless Account and Device Licensing', 'Released'", $schema, 'Fresh database schema must identify v0.3.54 as released.');
+$expectContains("WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.54'", $devSupport, 'Admin Dev Support is missing the v0.3.54 GitHub release link.');
 $futureReleases = [
-    'v0.3.54' => ['Privacy-safe receipt masking', 34],
     'v0.3.55' => ['System tray health and notifications', 35],
     'v0.3.56' => ['Character and code-page assistant', 36],
     'v0.3.57' => ['Offline Enterprise update packages', 37],
     'v0.3.58' => ['Receipt comparison and automated validation', 21],
     'v0.3.59' => ['Update Notifications for All License Types', 40],
     'v0.3.60' => ['Automatic configuration restore points', 32],
+    'v0.3.61' => ['Privacy-safe receipt masking', 34],
 ];
 foreach ($futureReleases as $version => [$title, $issue]) {
     $status = 'Planned';
@@ -218,9 +216,8 @@ $expectContains("WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Prin
 $expectContains('server-authorized Lite, Pro, or Enterprise evaluation', $devSupport, 'Admin Dev Support is missing the promotional-trial server authorization scope.');
 
 $entitlementEndpoint=file_get_contents($root.'/admin-website/api/maintenance-entitlement.php')?:'';
-$expectContains('ensure_license_management_schema($pdo);',$entitlementEndpoint,'Maintenance entitlement API must assure license-management columns before querying them.');
-$expectContains("'status'=>'not_found'",$entitlementEndpoint,'Entitlement refresh contract is missing privacy-safe not_found status.');
-$expectContains("'maintenanceToken'",$entitlementEndpoint,'Entitlement refresh contract is missing signed maintenance tokens.');
+$expectContains('ACCOUNT_ENTITLEMENTS_REQUIRED',$entitlementEndpoint,'The retired standalone maintenance endpoint must direct clients to account entitlements.');
+$expectContains('http_response_code(410)',$entitlementEndpoint,'The retired standalone maintenance endpoint must return HTTP 410.');
 if(str_contains($entitlementEndpoint,"body['activationKey']")||str_contains($entitlementEndpoint,"body['activation_key']")){
     $failures[]='Entitlement refresh must never accept an activation key.';
 }

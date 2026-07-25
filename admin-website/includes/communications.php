@@ -546,8 +546,8 @@ function communication_seed_templates(PDO $pdo): void
         ['password_recovery', 'Password recovery', 'Service', 1, 1, 'Sends a secure, expiring password-reset link when a verified Customer Portal user requests account recovery.'],
         ['mfa_disabled_notification', 'Two-factor authentication disabled', 'Service', 1, 1, 'Notifies a customer after they disable two-factor authentication and every Customer Portal session is revoked.'],
         ['mfa_admin_reset_notification', 'Two-factor authentication administrator reset', 'Service', 1, 1, 'Notifies a customer after an authorized administrator resets MFA, revokes sessions, and requires enrollment at next sign-in.'],
-        ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 1, 'Confirms a completed purchase and directs the customer to the secure portal; it never includes an activation key in email.'],
-        ['activation_ready', 'Activation ready', 'Service', 1, 1, 'Notifies the customer that their approved license is ready and directs them to the secure portal for activation delivery.'],
+        ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 1, 'Confirms a completed purchase and directs the customer to the secure portal for automatic account and computer licensing.'],
+        ['activation_ready', 'License ready', 'Service', 1, 1, 'Notifies the customer that their approved account license is ready and directs them to secure computer linking.'],
         ['support_confirmation', 'Support request confirmation', 'Service', 1, 1, 'Acknowledges a submitted support request and provides its reference number and secure tracking link.'],
         ['maintenance_reminder', 'Maintenance reminder', 'Service', 0, 168, 'Reminds an eligible paid customer before maintenance coverage ends and links to optional renewal without implying the permanent license expires.'],
         ['welcome_setup', 'Welcome and setup guidance', 'Service', 0, 72, 'Welcomes a newly registered customer and links to the quick-start guide, TCP/IP port 9100 setup, documentation, and FAQ.'],
@@ -621,9 +621,9 @@ function communication_template_trigger_flow(string $templateKey): string
         'mfa_admin_reset_notification' =>
             'Authorized owner verifies customer identity, records a reason, and confirms reset → the encrypted secret is cleared without being read → sessions are revoked → this security notification is queued → MFA enrollment is required at next sign-in.',
         'purchase_confirmation' =>
-            'Verified payment is captured and fulfilled → the purchase is recorded → confirmation is queued with a secure Customer Portal link. Activation keys are never emailed.',
+            'Verified payment is captured and fulfilled → the account entitlement is recorded → confirmation is queued with a secure Customer Portal link.',
         'activation_ready' =>
-            'A new paid license or upgrade is fulfilled → the license entitlement is ready → the customer is directed to the secure Customer Portal to retrieve activation information.',
+            'A new paid license or upgrade is fulfilled → the account entitlement is ready → the customer is directed to the secure Customer Portal to link a computer.',
         'support_confirmation' =>
             'A support request is successfully submitted → a private reference is created → confirmation is queued with the reference and tracking destination.',
         'maintenance_reminder' =>
@@ -848,16 +848,16 @@ function communication_template_blueprint(string $templateKey): array
             'subject' => 'Your POS Printer Emulator purchase is confirmed',
             'headline' => 'Thank you for your purchase',
             'intro' => 'Hello {{ params.customer_name }}, your {{ params.license_tier }} License purchase is confirmed.',
-            'detail' => 'Open POS Printer Emulator and select Settings → License → Link This Computer. Then sign in to the Customer Portal, review the computer, choose this license, and approve the link. Activation keys are never included in email.',
+            'detail' => 'Open POS Printer Emulator and select Settings → License → Link This Computer. Then sign in to the Customer Portal, review the computer, choose this license, and approve the link. Licensing is applied automatically.',
             'button' => 'Open setup guide',
             'button_url' => 'https://www.posprinteremulator.com/user-portal-guide#computers',
         ],
         'activation_ready' => [
             'subject' => 'Your POS Printer Emulator license is ready',
-            'headline' => 'Your activation is ready',
+            'headline' => 'Your license is ready',
             'intro' => 'Hello {{ params.customer_name }}, your {{ params.license_tier }} License entitlement is ready.',
-            'detail' => 'In POS Printer Emulator, select Settings → License → Link This Computer. Sign in with your verified account, approve the computer, and choose the eligible license. A backup key must be claimed through the same verified flow.',
-            'button' => 'Link and activate',
+            'detail' => 'In POS Printer Emulator, select Settings → License → Link This Computer. Sign in with your verified account, approve the computer, and choose the eligible license. The application applies it automatically.',
+            'button' => 'Link this computer',
             'button_url' => 'https://www.posprinteremulator.com/user-portal-guide#computers',
         ],
         'support_confirmation' => [

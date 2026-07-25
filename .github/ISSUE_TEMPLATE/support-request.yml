@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Do not paste activation keys, passwords, customer receipt data, email addresses, IP addresses, or private diagnostic packages into a public issue. Customers using the desktop application should prefer Settings → Support → Submit a Support Request so private material stays in the Admin Portal.
+        Do not paste account credentials, license entitlement data, passwords, customer receipt data, email addresses, IP addresses, or private diagnostic packages into a public issue. Customers using the desktop application should prefer Settings → Support → Submit a Support Request so private material stays in the Admin Portal.
   - type: dropdown
     id: request-type
     attributes:
@@ -38,5 +38,5 @@ body:
     attributes:
       label: Privacy confirmation
       options:
-        - label: I removed activation keys, credentials, receipt data, contact details, IP addresses, and private logs.
+        - label: I removed license entitlement data, credentials, receipt data, contact details, IP addresses, and private logs.
           required: true

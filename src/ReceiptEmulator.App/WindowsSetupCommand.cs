@@ -171,9 +171,6 @@ public static class WindowsSetupCommand
             {
                 LicenseService.RestoreUpgradeStateAtDefaultPath();
             }
-            var expectedLicenseMode = LicenseService.ValidatePersistedLicenseForRegistrationAtDefaultPath(
-                customerName,
-                emailAddress);
             LicenseService.RegisterInstallationAtDefaultPath(customerName, emailAddress);
 
             Console.WriteLine("Configuring the POS Printer Emulator Windows service...");
@@ -196,7 +193,7 @@ public static class WindowsSetupCommand
             service.Start();
             service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
 
-            await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken, expectedLicenseMode);
+            await WaitForViewerAsync(TimeSpan.FromSeconds(30), cancellationToken);
             if (!upgradeStateRestored)
             {
                 LicenseService.CompleteUpgradeStateAtDefaultPath();
@@ -212,7 +209,7 @@ public static class WindowsSetupCommand
             catch (Exception restoreException)
             {
                 throw new AggregateException(
-                    "Windows setup failed and could not restore the preserved registration and activation files.",
+                    "Windows setup failed and could not restore the preserved account and device licensing files.",
                     installException,
                     restoreException);
             }

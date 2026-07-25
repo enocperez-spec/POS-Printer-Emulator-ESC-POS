@@ -13,13 +13,16 @@ public sealed class LicenseService
     private readonly string _trialStatePath;
     private readonly string _registrationPath;
     private readonly string _activationPath;
+    private readonly string _deviceEntitlementPath;
     private readonly string _maintenancePath;
     private readonly string _promotionPath;
     private readonly string _publicKeyPem;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly bool _allowLegacyTestActivation;
     private TrialState _trialState;
     private RegistrationInfo _registration;
     private ActivationRecord? _activation;
+    private DeviceEntitlementRecord? _deviceEntitlement;
     private MaintenanceRecord? _maintenance;
     private PromotionRecord? _promotion;
     private Guid? _installationId;
@@ -45,6 +48,7 @@ public sealed class LicenseService
         _trialStatePath = Path.Combine(RootPath, "trial-state.json");
         _registrationPath = Path.Combine(RootPath, "registration.json");
         _activationPath = Path.Combine(RootPath, "license.json");
+        _deviceEntitlementPath = Path.Combine(RootPath, "device-entitlement.json");
         _maintenancePath = Path.Combine(RootPath, "maintenance.json");
         _promotionPath = Path.Combine(RootPath, "promotion.json");
         _publicKeyPem = environment.IsEnvironment("Testing") &&
@@ -52,9 +56,11 @@ public sealed class LicenseService
             ? configuration!["Licensing:PublicKeyPem"]!
             : ActivationKeyCodec.PublicKeyPem;
         _utcNow = utcNow;
+        _allowLegacyTestActivation = environment.IsEnvironment("Testing");
         _trialState = Load<TrialState>(_trialStatePath) ?? NewTrialState();
         _registration = Load<RegistrationInfo>(_registrationPath) ?? new RegistrationInfo(string.Empty, string.Empty);
         _activation = Load<ActivationRecord>(_activationPath);
+        _deviceEntitlement = Load<DeviceEntitlementRecord>(_deviceEntitlementPath);
         _maintenance = Load<MaintenanceRecord>(_maintenancePath);
         _promotion = Load<PromotionRecord>(_promotionPath);
     }
@@ -168,29 +174,43 @@ public sealed class LicenseService
         }
     }
 
-    public LicenseStatus Activate(string customerName, string emailAddress, string activationKey)
+    public LicenseStatus InstallDeviceEntitlement(
+        string customerName,
+        string emailAddress,
+        string entitlementToken)
     {
         lock (_sync)
         {
-            if (!ActivationKeyCodec.TryValidateWithPublicKey(
-                    activationKey,
-                    customerName,
-                    emailAddress,
+            if (_installationId is not { } installationId)
+            {
+                throw new InvalidOperationException("This computer has not completed secure installation registration.");
+            }
+            if (!DeviceEntitlementCodec.TryValidateWithPublicKey(
+                    entitlementToken,
+                    installationId,
                     _publicKeyPem,
-                    out var license,
-                    out var error) || license is null)
+                    out var entitlement,
+                    out var error) || entitlement is null)
             {
                 throw new InvalidOperationException(error);
+            }
+            var now = _utcNow();
+            if (entitlement.IssuedAt > now.AddMinutes(5) || entitlement.ValidUntil <= now)
+            {
+                throw new InvalidOperationException(
+                    "The device entitlement is expired or is not active yet. Connect to the internet and synchronize again.");
             }
 
             var registration = new RegistrationInfo(
                 ActivationKeyCodec.NormalizeCustomerName(customerName),
                 ActivationKeyCodec.CanonicalizeEmail(emailAddress));
-            var activation = new ActivationRecord(activationKey.Trim(), DateTimeOffset.UtcNow);
-
-            SaveActivationPair(registration, activation);
+            var record = new DeviceEntitlementRecord(
+                string.Concat(entitlementToken.Where(character => !char.IsWhiteSpace(character))),
+                now);
+            SaveDeviceEntitlementPair(registration, record);
             _registration = registration;
-            _activation = activation;
+            _deviceEntitlement = record;
+            var license = ToLicense(entitlement);
             if (_maintenance is not null && !IsMaintenanceRecordFor(license))
             {
                 _maintenance = null;
@@ -201,6 +221,45 @@ public sealed class LicenseService
                 catch (Exception exception)
                 {
                     _lastStorageError = exception;
+                }
+            }
+            return GetStatus();
+        }
+    }
+
+    // Historical regression tests use this internal seam. It is unavailable in
+    // production and there is no HTTP or user-interface route to it.
+    internal LicenseStatus Activate(string customerName, string emailAddress, string legacyCredential)
+    {
+        if (!_allowLegacyTestActivation)
+        {
+            throw new InvalidOperationException("Legacy credential activation is no longer supported.");
+        }
+        lock (_sync)
+        {
+            if (!ActivationKeyCodec.TryValidateWithPublicKey(
+                    legacyCredential,
+                    customerName,
+                    emailAddress,
+                    _publicKeyPem,
+                    out var license,
+                    out var error) || license is null)
+            {
+                throw new InvalidOperationException(error);
+            }
+            var registration = new RegistrationInfo(
+                ActivationKeyCodec.NormalizeCustomerName(customerName),
+                ActivationKeyCodec.CanonicalizeEmail(emailAddress));
+            var activation = new ActivationRecord(legacyCredential.Trim(), _utcNow());
+            SaveActivationPair(registration, activation);
+            _registration = registration;
+            _activation = activation;
+            if (_maintenance is not null && !IsMaintenanceRecordFor(license))
+            {
+                _maintenance = null;
+                if (File.Exists(_maintenancePath))
+                {
+                    File.Delete(_maintenancePath);
                 }
             }
             return GetStatus();
@@ -393,7 +452,7 @@ public sealed class LicenseService
                 RootPath,
                 Directory.Exists(RootPath),
                 File.Exists(_registrationPath),
-                File.Exists(_activationPath),
+                File.Exists(_deviceEntitlementPath),
                 File.Exists(_maintenancePath),
                 File.Exists(_promotionPath),
                 _lastStorageError?.GetType().FullName,
@@ -414,89 +473,11 @@ public sealed class LicenseService
             ActivationKeyCodec.CanonicalizeEmail(emailAddress)));
     }
 
-    public static string? GetRequiredPersistedLicenseModeAtDefaultPath() =>
-        GetRequiredPersistedLicenseMode(DefaultRootPath, ActivationKeyCodec.PublicKeyPem);
-
-    public static string? ValidatePersistedLicenseForRegistrationAtDefaultPath(
-        string customerName,
-        string emailAddress) =>
-        ValidatePersistedLicenseForRegistration(
-            DefaultRootPath,
-            ActivationKeyCodec.PublicKeyPem,
-            customerName,
-            emailAddress);
-
-    internal static string? ValidatePersistedLicenseForRegistration(
-        string rootPath,
-        string publicKeyPem,
-        string customerName,
-        string emailAddress) =>
-        GetRequiredPersistedLicenseMode(
-            rootPath,
-            publicKeyPem,
-            new RegistrationInfo(
-                ActivationKeyCodec.NormalizeCustomerName(customerName),
-                ActivationKeyCodec.CanonicalizeEmail(emailAddress)));
-
-    internal static string? GetRequiredPersistedLicenseMode(string rootPath, string publicKeyPem)
-        => GetRequiredPersistedLicenseMode(rootPath, publicKeyPem, registrationOverride: null);
-
-    private static string? GetRequiredPersistedLicenseMode(
-        string rootPath,
-        string publicKeyPem,
-        RegistrationInfo? registrationOverride)
-    {
-        var activationPath = Path.Combine(rootPath, "license.json");
-        ActivationRecord activation;
-        try
-        {
-            activation = JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(activationPath))
-                ?? throw new InvalidOperationException("The existing activation license could not be read. The preserved upgrade files were not removed.");
-        }
-        catch (FileNotFoundException)
-        {
-            return null;
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return null;
-        }
-
-        var registration = registrationOverride;
-        if (registration is null)
-        {
-            var registrationPath = Path.Combine(rootPath, "registration.json");
-            try
-            {
-                registration = JsonSerializer.Deserialize<RegistrationInfo>(File.ReadAllText(registrationPath))
-                    ?? throw new InvalidOperationException("The existing customer registration could not be read. The preserved upgrade files were not removed.");
-            }
-            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
-            {
-                throw new InvalidOperationException(
-                    "The existing activation license is missing its customer registration. The preserved upgrade files were not removed.",
-                    exception);
-            }
-        }
-        if (!ActivationKeyCodec.TryValidateWithPublicKey(
-                activation.ActivationKey,
-                registration.CustomerName,
-                registration.EmailAddress,
-                publicKeyPem,
-                out var license,
-                out var error) || license is null)
-        {
-            throw new InvalidOperationException($"The existing activation license could not be validated: {error} The preserved upgrade files were not removed.");
-        }
-
-        return license.Tier.ToString();
-    }
-
     public static void RestoreUpgradeStateAtDefaultPath()
     {
         Directory.CreateDirectory(DefaultRootPath);
         RestoreUpgradeFile("registration.json");
-        RestoreUpgradeFile("license.json");
+        RestoreUpgradeFile("device-entitlement.json");
         RestoreUpgradeFile("maintenance.json");
         RestoreUpgradeFile("promotion.json");
     }
@@ -504,16 +485,16 @@ public sealed class LicenseService
     public static void CompleteUpgradeStateAtDefaultPath()
     {
         DeleteUpgradeFile("registration.json");
-        DeleteUpgradeFile("license.json");
+        DeleteUpgradeFile("device-entitlement.json");
         DeleteUpgradeFile("maintenance.json");
         DeleteUpgradeFile("promotion.json");
     }
 
     private ActivationLicense? GetValidatedLicense()
     {
-        if (_activation is null)
+        if (_deviceEntitlement is null)
         {
-            _activation = Load<ActivationRecord>(_activationPath);
+            _deviceEntitlement = Load<DeviceEntitlementRecord>(_deviceEntitlementPath);
         }
 
         if (string.IsNullOrWhiteSpace(_registration.CustomerName) ||
@@ -522,23 +503,75 @@ public sealed class LicenseService
             _registration = Load<RegistrationInfo>(_registrationPath) ?? _registration;
         }
 
-        if (_activation is null ||
+        if (_deviceEntitlement is null && _allowLegacyTestActivation)
+        {
+            _activation ??= Load<ActivationRecord>(_activationPath);
+            if (_activation is not null &&
+                !string.IsNullOrWhiteSpace(_registration.CustomerName) &&
+                !string.IsNullOrWhiteSpace(_registration.EmailAddress) &&
+                ActivationKeyCodec.TryValidateWithPublicKey(
+                    _activation.ActivationKey,
+                    _registration.CustomerName,
+                    _registration.EmailAddress,
+                    _publicKeyPem,
+                    out var legacy,
+                    out _))
+            {
+                return legacy;
+            }
+        }
+
+        if (_deviceEntitlement is null ||
+            _installationId is not { } installationId ||
             string.IsNullOrWhiteSpace(_registration.CustomerName) ||
             string.IsNullOrWhiteSpace(_registration.EmailAddress))
         {
             return null;
         }
 
-        return ActivationKeyCodec.TryValidateWithPublicKey(
-            _activation.ActivationKey,
-            _registration.CustomerName,
-            _registration.EmailAddress,
+        if (!DeviceEntitlementCodec.TryValidateWithPublicKey(
+            _deviceEntitlement.EntitlementToken,
+            installationId,
             _publicKeyPem,
-            out var license,
-            out _)
-            ? license
-            : null;
+            out var entitlement,
+            out _) ||
+            entitlement is null ||
+            entitlement.ValidUntil <= _utcNow())
+        {
+            return null;
+        }
+        return ToLicense(entitlement);
     }
+
+    public LicenseStatus RemoveDeviceEntitlement()
+    {
+        lock (_sync)
+        {
+            _deviceEntitlement = null;
+            try
+            {
+                if (File.Exists(_deviceEntitlementPath))
+                {
+                    File.Delete(_deviceEntitlementPath);
+                }
+                _lastStorageError = null;
+            }
+            catch (Exception exception)
+            {
+                _lastStorageError = exception;
+                throw;
+            }
+            return GetStatus();
+        }
+    }
+
+    private static ActivationLicense ToLicense(DeviceEntitlement entitlement) =>
+        new(
+            entitlement.LicenseId,
+            entitlement.IssuedAt,
+            entitlement.Tier,
+            entitlement.MaintenanceExpiresAt,
+            KeyVersion: 4);
 
     private MaintenanceStatus GetMaintenanceStatus(ActivationLicense? license)
     {
@@ -778,6 +811,26 @@ public sealed class LicenseService
         }
     }
 
+    private void SaveDeviceEntitlementPair(
+        RegistrationInfo registration,
+        DeviceEntitlementRecord entitlement)
+    {
+        var registrationSnapshot = ReadSnapshot(_registrationPath);
+        var entitlementSnapshot = ReadSnapshot(_deviceEntitlementPath);
+        try
+        {
+            SavePersistedJson(_registrationPath, registration);
+            SavePersistedJson(_deviceEntitlementPath, entitlement);
+        }
+        catch (Exception originalException)
+        {
+            TryRestoreSnapshot(_registrationPath, registrationSnapshot);
+            TryRestoreSnapshot(_deviceEntitlementPath, entitlementSnapshot);
+            _lastStorageError = originalException;
+            throw;
+        }
+    }
+
     private static void SaveJson<T>(string path, T value) =>
         WriteJsonWithFallback(path, JsonSerializer.Serialize(value), WriteJsonAtomically);
 
@@ -905,6 +958,7 @@ public sealed class LicenseService
     internal sealed record FileSnapshot(bool Exists, byte[]? Content);
     private sealed record TrialState(DateOnly Date, int Used);
     private sealed record ActivationRecord(string ActivationKey, DateTimeOffset ActivatedAt);
+    private sealed record DeviceEntitlementRecord(string EntitlementToken, DateTimeOffset InstalledAt);
     private sealed record MaintenanceRecord(
         string? EntitlementToken,
         DateTimeOffset InstalledAt,

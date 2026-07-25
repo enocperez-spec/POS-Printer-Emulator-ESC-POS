@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.53"
+#define MyAppVersion "0.3.54"
 #define MyAppPublisher "EPCOM Ltd."
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -204,7 +204,7 @@ begin
   RegistrationPage := CreateInputQueryPage(wpSelectDir,
     'Register POS Printer Emulator',
     'Enter the customer information for this installation.',
-    'The customer or company name and email address will be tied to the activation key.');
+    'The customer or company name and email address identify this installation until it is linked to a verified Customer Portal account.');
   RegistrationPage.Add('Customer or company name:', False);
   RegistrationPage.Add('Email address:', False);
   RegistrationPage.Values[0] := ExpandConstant('{param:CustomerName|}');

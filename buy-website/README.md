@@ -8,10 +8,10 @@ PHP customer purchase site for `https://buy.posprinteremulator.com`. All owner c
 2. The customer chooses Lite, Pro, or Enterprise. The server creates the PayPal order using that tier's configured price; the browser never controls the amount.
 3. After PayPal approval, the server captures and verifies the payment status, amount, and currency.
 4. The order enters `PAID_AWAITING_APPROVAL`.
-5. The owner signs in at `admin.posprinteremulator.com`, approves the order, and the Buy server generates a key compatible with the desktop application.
+5. The verified purchase is fulfilled as an account entitlement and appears in the customer’s portal for secure computer linking.
 6. The key is emailed to the purchase address. Failed delivery is retained for a safe retry without generating a second key.
 
-Every new paid license is permanent and includes one year of Application Maintenance and Support. The activation key carries the initial maintenance expiration in the signed v3 payload.
+Every new paid license is permanent and includes one year of Application Maintenance and Support. Coverage is stored with the account entitlement and synchronized to the registered computer.
 
 ## Verified Customer Portal checkout
 
@@ -29,7 +29,7 @@ Default annual renewal prices are Lite `$9.99`, Pro `$19.99`, and Enterprise `$5
 
 ## Desktop entitlement refresh contract
 
-The desktop sends `POST https://admin.posprinteremulator.com/api/maintenance-entitlement.php` with JSON `licenseId` and `registrationDigest`. The digest is lowercase hexadecimal SHA-256 of UTF-8 `NORMALIZED CUSTOMER\nnormalized-email`. Only ASCII space, tab, CR, LF, vertical tab, and form feed are trimmed/collapsed; customer ASCII `a-z` is mapped to `A-Z`, email ASCII `A-Z` is mapped to `a-z`, and all non-ASCII bytes are preserved. The endpoint never accepts or returns an activation key.
+The desktop periodically retrieves its signed, device-bound entitlement from the protected Admin service using its installation identifier and installation authentication token. The response carries the eligible license level and maintenance date and is valid only for that registered computer.
 
 The response includes `status` (`active`, `expired`, `revoked`, or `not_found`), UTC `serverTime`, License ID, tier, maintenance expiration, renewal URL, and a signed `PPEM1-` token only while entitled. Requests are rate-limited. The desktop verifies the signed token before saving it.
 
@@ -58,4 +58,4 @@ Public and in-app upgrade links may preselect a paid level with `?tier=Lite`, `?
 
 Both protected files are ignored by Git and denied by `.htaccess`. Never commit or email the private signing key or PayPal secret.
 
-Before enabling checkout, confirm the PayPal environment and run one controlled payment from order creation through email delivery and desktop activation.
+Before enabling checkout, confirm the PayPal environment and run one controlled payment from order creation through email delivery and automatic account/device licensing.

@@ -366,7 +366,7 @@ function MultipleListenerUpgradePanel({ licenseMode, maximumListeners, compact =
         <li><Check size={15} /> Filter Activity and diagnostics by printer</li>
       </ul>
       <a className="enterprise-upgrade-action" href="https://www.posprinteremulator.com/pricing" target="_blank" rel="noreferrer"><Crown size={16} /> Compare license options</a>
-      <small>Enter a replacement key under License to upgrade this installation without reinstalling.</small>
+      <small>License upgrades are applied automatically after this computer synchronizes with the verified Customer Portal account.</small>
     </div>
   )
 }

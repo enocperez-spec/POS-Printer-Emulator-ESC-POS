@@ -138,7 +138,7 @@ function ensure_customer_portal_schema(PDO $pdo): void
                 customer_id CHAR(36) NOT NULL,
                 installation_id BIGINT UNSIGNED NOT NULL,
                 binding_state ENUM('Pending','Active','Deactivated','Revoked') NOT NULL DEFAULT 'Pending',
-                activation_method ENUM('PortalLink','ActivationKeyClaim','AdminRecovery','LegacyMigration') NOT NULL,
+                activation_method ENUM('PortalLink','AdminRecovery','LegacyMigration') NOT NULL,
                 activated_at DATETIME(6) NULL,
                 deactivated_at DATETIME(6) NULL,
                 deactivation_reason VARCHAR(300) NULL,

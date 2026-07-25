@@ -24,6 +24,7 @@ public sealed class AccountLinkService
     private readonly LicenseService _license;
     private readonly IUsageTelemetry _telemetry;
     private readonly Uri _endpoint;
+    private readonly Uri _entitlementEndpoint;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public AccountLinkService(
@@ -45,16 +46,22 @@ public sealed class AccountLinkService
             throw new InvalidOperationException("The secure Customer Portal link service is not configured.");
         }
         _endpoint = endpoint;
+        var entitlementConfigured = configuration["AccountLink:EntitlementEndpoint"] ??
+                                    "https://admin.posprinteremulator.com/api/v1/device-entitlement.php";
+        if (!Uri.TryCreate(entitlementConfigured, UriKind.Absolute, out var entitlementEndpoint) ||
+            entitlementEndpoint.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The secure device licensing service is not configured.");
+        }
+        _entitlementEndpoint = entitlementEndpoint;
     }
 
-    public async Task<AccountLinkStartResult> StartAsync(
-        string? activationKey,
-        CancellationToken cancellationToken)
+    public async Task<AccountLinkStartResult> StartAsync(CancellationToken cancellationToken)
     {
         var credentials = await _credentials.GetCredentialsAsync(cancellationToken);
         var response = await SendAsync(
             credentials,
-            new AccountLinkServerRequest("start", credentials.InstallationId, null, null, activationKey),
+            new AccountLinkServerRequest("start", credentials.InstallationId, null, null),
             cancellationToken);
         if (!Guid.TryParse(response.LinkId, out var linkId) ||
             string.IsNullOrWhiteSpace(response.RequestToken) ||
@@ -85,7 +92,7 @@ public sealed class AccountLinkService
         var credentials = await _credentials.GetCredentialsAsync(cancellationToken);
         var response = await SendAsync(
             credentials,
-            new AccountLinkServerRequest("status", credentials.InstallationId, linkId, requestToken, null),
+            new AccountLinkServerRequest("status", credentials.InstallationId, linkId, requestToken),
             cancellationToken);
         var state = response.State ?? "Unavailable";
         if (!state.Equals("Approved", StringComparison.OrdinalIgnoreCase))
@@ -95,8 +102,7 @@ public sealed class AccountLinkService
                 response.Message ?? "Waiting for Customer Portal approval.");
         }
         if (string.IsNullOrWhiteSpace(response.CustomerName) ||
-            string.IsNullOrWhiteSpace(response.EmailAddress) ||
-            string.IsNullOrWhiteSpace(response.ActivationKey))
+            string.IsNullOrWhiteSpace(response.EmailAddress))
         {
             throw new InvalidOperationException("The approved license response was incomplete. Start a new link request.");
         }
@@ -104,10 +110,11 @@ public sealed class AccountLinkService
         LicenseStatus activated;
         try
         {
-            activated = _license.Activate(
-                response.CustomerName,
-                response.EmailAddress,
-                response.ActivationKey);
+            var deviceEntitlement = await FetchDeviceEntitlementAsync(credentials, cancellationToken);
+            activated = ApplyServerEntitlements(
+                deviceEntitlement,
+                deviceEntitlement.CustomerName ?? response.CustomerName,
+                deviceEntitlement.EmailAddress ?? response.EmailAddress);
         }
         catch (InvalidOperationException exception)
         {
@@ -119,13 +126,81 @@ public sealed class AccountLinkService
 
         await SendAsync(
             credentials,
-            new AccountLinkServerRequest("complete", credentials.InstallationId, linkId, requestToken, null),
+            new AccountLinkServerRequest("complete", credentials.InstallationId, linkId, requestToken),
             cancellationToken);
         _telemetry.RecordActivation();
         return new AccountLinkStatusResult(
             "Activated",
             "This computer is linked to your verified Customer Portal account and the selected license is active.",
             activated);
+    }
+
+    public async Task<LicenseStatus> SynchronizeAsync(CancellationToken cancellationToken)
+    {
+        var credentials = await _credentials.GetCredentialsAsync(cancellationToken);
+        var result = await FetchDeviceEntitlementAsync(credentials, cancellationToken);
+        if (string.IsNullOrWhiteSpace(result.CustomerName) ||
+            string.IsNullOrWhiteSpace(result.EmailAddress) ||
+            (string.IsNullOrWhiteSpace(result.DeviceEntitlement) &&
+             string.IsNullOrWhiteSpace(result.PromotionEntitlement)))
+        {
+            throw new InvalidOperationException("The device licensing service returned an incomplete entitlement.");
+        }
+        return ApplyServerEntitlements(result, result.CustomerName, result.EmailAddress);
+    }
+
+    private LicenseStatus ApplyServerEntitlements(
+        DeviceEntitlementServerResponse result,
+        string customerName,
+        string emailAddress)
+    {
+        LicenseStatus status;
+        if (!string.IsNullOrWhiteSpace(result.DeviceEntitlement))
+        {
+            status = _license.InstallDeviceEntitlement(
+                customerName,
+                emailAddress,
+                result.DeviceEntitlement);
+        }
+        else
+        {
+            _license.RegisterInstallation(customerName, emailAddress);
+            status = _license.GetStatus();
+        }
+        return !string.IsNullOrWhiteSpace(result.PromotionEntitlement)
+            ? _license.InstallPromotionEntitlement(result.PromotionEntitlement)
+            : status;
+    }
+
+    private async Task<DeviceEntitlementServerResponse> FetchDeviceEntitlementAsync(
+        InstallationCredentials credentials,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, _entitlementEndpoint)
+        {
+            Content = JsonContent.Create(new { installationId = credentials.InstallationId }),
+        };
+        request.Headers.Add("X-Installation-Token", credentials.Token);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        DeviceEntitlementServerResponse? result = null;
+        try
+        {
+            result = JsonSerializer.Deserialize<DeviceEntitlementServerResponse>(body, JsonOptions);
+        }
+        catch (JsonException) { }
+        if (!response.IsSuccessStatusCode ||
+            (string.IsNullOrWhiteSpace(result?.DeviceEntitlement) &&
+             string.IsNullOrWhiteSpace(result?.PromotionEntitlement)))
+        {
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                _license.RemoveDeviceEntitlement();
+            }
+            throw new InvalidOperationException(
+                result?.Error ?? "The approved license could not be synchronized to this computer.");
+        }
+        return result;
     }
 
     private async Task<AccountLinkServerResponse> SendAsync(
@@ -141,7 +216,6 @@ public sealed class AccountLinkService
                 installationId = payload.InstallationId,
                 linkId = payload.LinkId,
                 requestToken = payload.RequestToken,
-                activationKey = payload.ActivationKey,
                 appVersion = ProductInfo.Version,
             }),
         };
@@ -191,8 +265,7 @@ public sealed class AccountLinkService
         string Action,
         Guid InstallationId,
         Guid? LinkId,
-        string? RequestToken,
-        string? ActivationKey);
+        string? RequestToken);
 
     private sealed record AccountLinkServerResponse(
         string? State,
@@ -207,6 +280,13 @@ public sealed class AccountLinkService
         string? LicenseId,
         string? LicenseTier,
         string? MaintenanceExpiresAt,
-        string? ActivationKey,
+        string? Error);
+
+    private sealed record DeviceEntitlementServerResponse(
+        string? State,
+        string? DeviceEntitlement,
+        string? PromotionEntitlement,
+        string? CustomerName,
+        string? EmailAddress,
         string? Error);
 }

@@ -117,7 +117,7 @@ export function BackupRestoreSettings({ license, preferences, onRestored }: Prop
 
       <div className="backup-security-note">
         <ShieldCheck size={18} />
-        <p><strong>Private by design.</strong> Activation keys, maintenance keys, registration details, credentials, logs, Windows drivers, and printer queues are never exported.</p>
+        <p><strong>Private by design.</strong> Device entitlements, account details, credentials, logs, Windows drivers, and printer queues are never exported.</p>
       </div>
 
       <section className="backup-card">

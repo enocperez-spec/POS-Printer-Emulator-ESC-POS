@@ -11,69 +11,6 @@ function activation_tier_value(string $licenseTier): int
     };
 }
 
-function activation_tier_name(int $tierValue): string
-{
-    return match ($tierValue) {
-        1 => 'Pro',
-        2 => 'Enterprise',
-        3 => 'Lite',
-        default => throw new InvalidArgumentException('The imported activation key level is invalid.'),
-    };
-}
-
-function issue_activation_key(
-    string $customerName,
-    string $emailAddress,
-    string $licenseTier = 'Pro',
-    ?string $maintenanceExpiresAt = null,
-    ?string $privateKeyOverride = null
-): array
-{
-    $customerName = trim(preg_replace('/\s+/', ' ', $customerName) ?? '');
-    $emailAddress = strtolower(trim($emailAddress));
-    if ($customerName === '' || strlen($customerName) > 160) {
-        throw new InvalidArgumentException('Customer or company name is required.');
-    }
-    if (strlen($emailAddress) > 254 || filter_var($emailAddress, FILTER_VALIDATE_EMAIL) === false) {
-        throw new InvalidArgumentException('A valid email address is required.');
-    }
-    $tierValue = activation_tier_value($licenseTier);
-
-    $guidBytes = random_bytes(16);
-    $timestamp = time();
-    $maintenanceExpiration = normalize_maintenance_expiration($maintenanceExpiresAt, $timestamp, false);
-    $payload = chr(3)
-        . $guidBytes
-        . pack_unix_seconds($timestamp)
-        . registration_hash($customerName)
-        . registration_email_hash($emailAddress)
-        . chr($tierValue)
-        . pack_unix_seconds($maintenanceExpiration->getTimestamp());
-    if (strlen($payload) !== 66) {
-        throw new RuntimeException('The license payload has an unexpected length.');
-    }
-    $signature = sign_license_payload($payload,$privateKeyOverride);
-    $activationKey = 'PPE1-' . rtrim(strtr(base64_encode($payload . $signature), '+/', '-_'), '=');
-    $licenseId = dotnet_guid_string($guidBytes);
-
-    return [
-        'license_id' => $licenseId,
-        'issued_at' => gmdate('Y-m-d H:i:s', $timestamp),
-        'customer_name' => $customerName,
-        'email_address' => $emailAddress,
-        'license_tier' => $licenseTier,
-        'activation_key' => $activationKey,
-        'maintenance_expires_at' => $maintenanceExpiration->format('Y-m-d H:i:s'),
-        'maintenance_token' => $maintenanceExpiration->getTimestamp() > $timestamp ? issue_maintenance_token(
-            $licenseId,
-            $licenseTier,
-            $maintenanceExpiration->format('Y-m-d H:i:s'),
-            $timestamp,
-            $privateKeyOverride
-        ) : null,
-    ];
-}
-
 function issue_maintenance_token(
     string $licenseId,
     string $licenseTier,
@@ -132,6 +69,67 @@ function issue_promotion_token(
         throw new RuntimeException('The promotion payload has an unexpected length.');
     }
     return 'PPEP1-' . rtrim(strtr(base64_encode($payload . sign_license_payload($payload,$privateKeyOverride)), '+/', '-_'), '=');
+}
+
+function create_license_entitlement(
+    string $customerName,
+    string $emailAddress,
+    string $licenseTier = 'Pro',
+    ?string $maintenanceExpiresAt = null
+): array {
+    $customerName = trim(preg_replace('/\s+/', ' ', $customerName) ?? '');
+    $emailAddress = strtolower(trim($emailAddress));
+    if ($customerName === '' || strlen($customerName) > 160) {
+        throw new InvalidArgumentException('Customer or company name is required.');
+    }
+    if (strlen($emailAddress) > 254 || filter_var($emailAddress, FILTER_VALIDATE_EMAIL) === false) {
+        throw new InvalidArgumentException('A valid email address is required.');
+    }
+    activation_tier_value($licenseTier);
+    $issuedAt = time();
+    $maintenance = normalize_maintenance_expiration($maintenanceExpiresAt, $issuedAt, false);
+    return [
+        'license_id' => dotnet_guid_string(random_bytes(16)),
+        'issued_at' => gmdate('Y-m-d H:i:s', $issuedAt),
+        'customer_name' => $customerName,
+        'email_address' => $emailAddress,
+        'license_tier' => $licenseTier,
+        'maintenance_expires_at' => $maintenance->format('Y-m-d H:i:s'),
+    ];
+}
+
+function issue_device_entitlement(
+    string $licenseId,
+    string $customerId,
+    string $installationUuid,
+    string $licenseTier,
+    string $maintenanceExpiresAt,
+    int $revision,
+    ?string $privateKeyOverride = null
+): string {
+    if ($revision < 1) {
+        throw new InvalidArgumentException('The entitlement revision is invalid.');
+    }
+    $issuedAt = time();
+    $validUntil = $issuedAt + 86400;
+    $maintenance = normalize_maintenance_expiration($maintenanceExpiresAt, $issuedAt, false);
+    $payload = chr(2)
+        . dotnet_guid_bytes(canonical_license_uuid($licenseId))
+        . dotnet_guid_bytes(canonical_license_uuid($customerId))
+        . dotnet_guid_bytes(canonical_license_uuid($installationUuid))
+        . pack_unix_seconds($issuedAt)
+        . pack_unix_seconds($validUntil)
+        . pack_unix_seconds($maintenance->getTimestamp())
+        . chr(activation_tier_value($licenseTier))
+        . pack_unix_seconds($revision);
+    if (strlen($payload) !== 82) {
+        throw new RuntimeException('The device entitlement payload has an unexpected length.');
+    }
+    return 'PPED1-' . rtrim(strtr(
+        base64_encode($payload . sign_license_payload($payload, $privateKeyOverride)),
+        '+/',
+        '-_'
+    ), '=');
 }
 
 function sign_license_payload(string $payload, ?string $privateKeyOverride = null): string
@@ -236,83 +234,6 @@ function normalize_signature_integer(string $value): string
         throw new RuntimeException('The signature integer is too large.');
     }
     return str_pad($value, 32, "\0", STR_PAD_LEFT);
-}
-
-function validate_activation_key_record(array $license): void
-{
-    $activationKey = trim((string)($license['activation_key'] ?? ''));
-    if (!str_starts_with($activationKey, 'PPE1-')) {
-        throw new InvalidArgumentException('The imported activation key format is invalid.');
-    }
-    $encoded = substr($activationKey, 5);
-    $encoded .= str_repeat('=', (4 - strlen($encoded) % 4) % 4);
-    $decoded = base64_decode(strtr($encoded, '-_', '+/'), true);
-    if ($decoded === false || !in_array(strlen($decoded), [121, 122, 130], true)) {
-        throw new InvalidArgumentException('The imported activation key is incomplete or damaged.');
-    }
-    $version = ord($decoded[0]);
-    $payloadLength = match ($version) {
-        1 => 57,
-        2 => 58,
-        3 => 66,
-        default => 0,
-    };
-    if ($payloadLength === 0 || strlen($decoded) !== $payloadLength + 64) {
-        throw new InvalidArgumentException('The imported activation key version is unsupported.');
-    }
-    $payload = substr($decoded, 0, $payloadLength);
-    $signature = substr($decoded, $payloadLength, 64);
-
-    $licenseId = dotnet_guid_string(substr($payload, 1, 16));
-    $tier = $version === 1
-        ? 'Pro'
-        : activation_tier_name(ord($payload[57]));
-    if (!hash_equals($licenseId, canonical_license_uuid((string)($license['license_id'] ?? ''))) ||
-        !hash_equals($tier, canonical_paid_tier((string)($license['license_tier'] ?? ''))) ||
-        !hash_equals(substr($payload, 25, 16), registration_hash((string)($license['customer_name'] ?? ''))) ||
-        !hash_equals(
-            substr($payload, 41, 16),
-            $version === 3
-                ? registration_email_hash((string)($license['email_address'] ?? ''))
-                : registration_hash((string)($license['email_address'] ?? ''))
-        )) {
-        throw new InvalidArgumentException('The imported activation key does not match its customer, license ID, or level.');
-    }
-    if ($version === 3) {
-        $parts = unpack('Nhigh/Nlow', substr($payload, 58, 8));
-        $expirationTimestamp = ((int)$parts['high'] * 4294967296) + (int)$parts['low'];
-        $recordExpiration = trim((string)($license['maintenance_expires_at'] ?? ''));
-        if ($recordExpiration === '' ||
-            (new DateTimeImmutable($recordExpiration, new DateTimeZone('UTC')))->getTimestamp() !== $expirationTimestamp) {
-            throw new InvalidArgumentException('The imported activation key maintenance period does not match its record.');
-        }
-    }
-
-    $privateKeyPath = dirname(__DIR__) . '/private/vendor-private-key.pem';
-    $privateKeyPem = file_get_contents($privateKeyPath);
-    $privateKey = $privateKeyPem === false ? false : openssl_pkey_get_private($privateKeyPem);
-    $details = $privateKey === false ? false : openssl_pkey_get_details($privateKey);
-    $publicKey = is_array($details) && isset($details['key']) ? openssl_pkey_get_public((string)$details['key']) : false;
-    if ($publicKey === false || openssl_verify($payload, p1363_signature_to_der($signature), $publicKey, OPENSSL_ALGO_SHA256) !== 1) {
-        throw new InvalidArgumentException('The imported activation key signature is invalid.');
-    }
-}
-
-function p1363_signature_to_der(string $signature): string
-{
-    if (strlen($signature) !== 64) {
-        throw new InvalidArgumentException('The activation-key signature length is invalid.');
-    }
-    $encodeInteger = static function (string $value): string {
-        $value = ltrim($value, "\0");
-        $value = $value === '' ? "\0" : $value;
-        if ((ord($value[0]) & 0x80) !== 0) {
-            $value = "\0" . $value;
-        }
-        return "\x02" . chr(strlen($value)) . $value;
-    };
-    $body = $encodeInteger(substr($signature, 0, 32)) . $encodeInteger(substr($signature, 32, 32));
-    return "\x30" . chr(strlen($body)) . $body;
 }
 
 function dotnet_guid_string(string $bytes): string
