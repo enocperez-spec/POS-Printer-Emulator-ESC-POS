@@ -8,6 +8,7 @@ $download = file_get_contents($root . '/website/download.php') ?: '';
 $privacy = file_get_contents($root . '/website/privacy.html') ?: '';
 $schema = file_get_contents($root . '/database/schema.sql') ?: '';
 $legacyAdmin = file_get_contents($root . '/website/admin/index.php') ?: '';
+$htaccess = file_get_contents($root . '/website/.htaccess') ?: '';
 $failures = [];
 
 $expectContains = static function (string $needle, string $message) use ($telemetry, &$failures): void {
@@ -63,6 +64,9 @@ if (!str_contains($privacy, 'processed transiently') || !str_contains($privacy, 
 }
 if (!str_contains($privacy, 'Download totals record download starts')) {
     $failures[] = 'The privacy notice must distinguish download starts from completed downloads or installs.';
+}
+if (!str_contains($htaccess, 'Options -Indexes -MultiViews')) {
+    $failures[] = 'Extension-free routes must disable MultiViews so a same-named CSS file cannot shadow its HTML page.';
 }
 
 if (!str_contains($legacyAdmin, "https://admin.posprinteremulator.com/") ||
