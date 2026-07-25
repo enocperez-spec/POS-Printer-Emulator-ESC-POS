@@ -1,8 +1,11 @@
-Options -Indexes
+Options -Indexes -MultiViews
 DirectoryIndex index.html index.php
 
 <IfModule mod_mime.c>
   AddType video/mp4 .mp4
+  <FilesMatch "^[^.]+$">
+    ForceType text/html
+  </FilesMatch>
 </IfModule>
 
 <IfModule mod_rewrite.c>
@@ -19,8 +22,7 @@ DirectoryIndex index.html index.php
   RewriteRule ^(.+)\.html$ https://www.posprinteremulator.com/$1 [R=301,L,NE]
 
   RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME}.html -f
-  RewriteRule ^([A-Za-z0-9-]+)/?$ $1.html [L]
+  RewriteRule ^([A-Za-z0-9-]+)/?$ $1.html [END]
 </IfModule>
 
 <IfModule mod_deflate.c>

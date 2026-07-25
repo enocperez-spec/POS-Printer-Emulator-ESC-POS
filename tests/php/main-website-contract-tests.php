@@ -9,6 +9,8 @@ $privacy = file_get_contents($root . '/website/privacy.html') ?: '';
 $schema = file_get_contents($root . '/database/schema.sql') ?: '';
 $legacyAdmin = file_get_contents($root . '/website/admin/index.php') ?: '';
 $portalGuide = file_get_contents($root . '/website/user-portal-guide.html') ?: '';
+$htaccess = file_get_contents($root . '/website/.htaccess') ?: '';
+$publisher = file_get_contents($root . '/tools/POSPrinterEmulator.WebsitePublisher/Program.cs') ?: '';
 $failures = [];
 
 $expectContains = static function (string $needle, string $message) use ($telemetry, &$failures): void {
@@ -68,6 +70,16 @@ if (!str_contains($privacy, 'Download totals record download starts')) {
 if (!str_contains($portalGuide, 'href="portal-guide.css') ||
     file_exists($root . '/website/user-portal-guide.css')) {
     $failures[] = 'The extension-free User Portal guide must not share its basename with a CSS file under MultiViews.';
+}
+if (!str_contains($htaccess, 'Options -Indexes -MultiViews') ||
+    str_contains($htaccess, 'REQUEST_FILENAME}.html -f')) {
+    $failures[] = 'Canonical extension-free routes must use the explicit rewrite and must not rely on MultiViews path negotiation.';
+}
+if (!str_contains($htaccess, 'ForceType text/html')) {
+    $failures[] = 'Physical extensionless page aliases must be served with the HTML media type.';
+}
+if (!str_contains($publisher, 'PublishExtensionlessHtmlAliases')) {
+    $failures[] = 'The publisher must deploy physical extensionless aliases for IONOS canonical page routes.';
 }
 
 if (!str_contains($legacyAdmin, "https://admin.posprinteremulator.com/") ||

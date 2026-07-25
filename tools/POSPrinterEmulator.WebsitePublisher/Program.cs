@@ -369,7 +369,39 @@ static void Publish(SftpClient client, string localDirectory, string remoteDirec
         uploadedBytes += input.Length - Math.Min(remoteLength, input.Length);
     }
 
+    if (File.Exists(Path.Combine(localDirectory, "sitemap.xml")))
+    {
+        PublishExtensionlessHtmlAliases(client, localDirectory, remoteRoot);
+    }
+
     Console.WriteLine($"Published {files.Length} files ({skippedFiles} already current, {uploadedBytes:N0} bytes transferred) to {remoteRoot}.");
+}
+
+static void PublishExtensionlessHtmlAliases(SftpClient client, string localDirectory, string remoteRoot)
+{
+    foreach (var localFile in Directory.EnumerateFiles(localDirectory, "*.html", SearchOption.TopDirectoryOnly)
+                 .Where(path => !Path.GetFileName(path).Equals("index.html", StringComparison.OrdinalIgnoreCase))
+                 .Order(StringComparer.OrdinalIgnoreCase))
+    {
+        var aliasName = Path.GetFileNameWithoutExtension(localFile);
+        var remoteAlias = CombineRemote(remoteRoot, aliasName);
+        using var input = File.OpenRead(localFile);
+        var matches = client.Exists(remoteAlias) &&
+                      client.GetAttributes(remoteAlias).Size == input.Length &&
+                      RemotePrefixMatches(client, remoteAlias, input, input.Length);
+        if (matches)
+        {
+            Console.WriteLine($"Verified  {aliasName} (extensionless alias, {input.Length:N0} bytes)");
+            continue;
+        }
+        input.Position = 0;
+        client.UploadFile(input, remoteAlias, true);
+        if (client.GetAttributes(remoteAlias).Size != input.Length)
+        {
+            throw new IOException($"Size verification failed for extensionless alias {aliasName}.");
+        }
+        Console.WriteLine($"Uploaded  {aliasName} (extensionless alias, {input.Length:N0} bytes)");
+    }
 }
 
 static bool IsServerOwnedPrivateFile(string localRoot, string path)
