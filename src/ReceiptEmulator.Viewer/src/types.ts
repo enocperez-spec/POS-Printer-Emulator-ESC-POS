@@ -33,6 +33,15 @@ export type LicenseStatus = {
   customerName: string
   emailAddress: string
   licenseId?: string
+  synchronization: {
+    state: 'Active' | 'Synchronizing' | 'ConnectionError' | 'OfflineGrace' | 'OfflineGraceExpired' | 'Revoked' | 'Unlinked'
+    lastAttemptAt?: string
+    lastSuccessfulAt?: string
+    offlineGraceEndsAt?: string
+    computerName: string
+    deviceIdentifier: string
+    message: string
+  }
   maintenance: {
     isApplicable: boolean
     isActive: boolean
@@ -129,6 +138,16 @@ export type AccountLinkStatusResult = {
   state: 'Pending' | 'Approved' | 'Activated' | 'Rejected' | 'Expired' | 'Consumed' | 'Unavailable'
   message: string
   license?: LicenseStatus
+}
+
+export type LicenseSynchronizationResult = {
+  license: LicenseStatus
+  message: string
+}
+
+export type AccountUnlinkResult = {
+  license: LicenseStatus
+  message: string
 }
 
 export type PromotionOfferStatus = {

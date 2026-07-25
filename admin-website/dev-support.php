@@ -846,10 +846,15 @@ $releaseSync = database()->prepare(
          'Reversible display-only Privacy View; built-in and custom masking; detection of common personal and transaction values; masked screenshots, exports, reports, and support attachments; original preservation; preview; warnings; and bypass tests.',
          'Project, support, and receipt exports increase sharing, so privacy controls should precede later comparison reports.',
          'Privacy-safe artifacts contain no configured sensitive values while authorized originals remain unchanged and protected.', NULL),
-        ('v0.3.55', 'v0.3.55', 'Release', 'System tray health and notifications', 'Planned', 355,
+        ('v0.3.55', 'v0.3.55', 'Release', 'Reliable Account License Synchronization', 'Released', 355,
+         'Complete the customer-visible link, synchronization, offline, unlink, and upgrade behavior required by account-based licensing.',
+         'Startup, page-open, periodic, and manual synchronization; immediate runtime reconciliation; explicit license states and timestamps; server-authorized unlink; seven-day offline grace; durable promotion-device identity; Customer and Admin audit visibility; and stale WebView asset prevention.',
+         'The keyless ownership model in v0.3.54 needs a complete and observable device lifecycle before additional desktop features are added.',
+         'A linked computer applies its entitlement without restart, refreshes predictably, preserves paid access during short outages, releases the license without deleting local data, and never displays a retired credential workflow.', UTC_TIMESTAMP(6)),
+        ('v0.3.62', 'v0.3.62', 'Release', 'System tray health and notifications', 'Planned', 362,
          'Keep customers informed about important listener events without leaving the main window open.',
          'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
-         'Background awareness reduces missed faults and unnecessary support requests after core privacy controls are established.',
+         'Background awareness reduces missed faults and unnecessary support requests after core licensing and privacy controls are established.',
          'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
         ('v0.3.56', 'v0.3.56', 'Release', 'Character and code-page assistant', 'Planned', 356,
          'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
@@ -1017,7 +1022,7 @@ database()->prepare(
          WHEN 'v0.3.52' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.52'
          WHEN 'v0.3.53' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.53'
          WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.54'
-         WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
+         WHEN 'v0.3.62' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
          WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
          WHEN 'v0.3.57' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
          WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
@@ -1031,7 +1036,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'v0.3.61', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'v0.3.61', 'v0.3.62', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs

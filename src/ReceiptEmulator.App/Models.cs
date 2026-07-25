@@ -161,6 +161,7 @@ public sealed record LicenseStatus(
     string CustomerName,
     string EmailAddress,
     Guid? LicenseId,
+    LicenseSynchronizationStatus Synchronization,
     MaintenanceStatus Maintenance,
     PromotionStatus Promotion,
     FeatureStatus Features)
@@ -171,6 +172,20 @@ public sealed record LicenseStatus(
 
 public sealed record AccountLinkStatusRequest(Guid LinkId, string RequestToken);
 public sealed record AccountLinkStartRequest;
+public sealed record AccountUnlinkRequest(bool Confirm);
+
+public sealed record LicenseSynchronizationStatus(
+    string State,
+    DateTimeOffset? LastAttemptAt,
+    DateTimeOffset? LastSuccessfulAt,
+    DateTimeOffset? OfflineGraceEndsAt,
+    string ComputerName,
+    string DeviceIdentifier,
+    string Message);
+
+public sealed record LicenseSynchronizationResult(
+    LicenseStatus License,
+    string Message);
 
 public sealed record SingleListenerSetupRequest(int Port);
 

@@ -26,11 +26,20 @@ function portal_customer_snapshot(string $customerId): array
     $licenseQuery->execute(['customer_id' => $customerId]);
 
     $installationQuery = $pdo->prepare(
-        'SELECT id,installation_uuid,device_label,app_version,windows_version,license_mode,license_id,
-                maintenance_status,maintenance_expires_at,first_seen_at,last_seen_at,portal_deactivated_at
-         FROM installations
-         WHERE customer_id=:customer_id
-         ORDER BY portal_deactivated_at IS NULL DESC,last_seen_at DESC'
+        "SELECT i.id,i.installation_uuid,i.device_label,i.app_version,i.windows_version,i.license_mode,i.license_id,
+                i.maintenance_status,i.maintenance_expires_at,i.first_seen_at,i.last_seen_at,i.portal_deactivated_at,
+                i.license_last_sync_at,i.license_last_sync_status,i.license_last_sync_error,
+                RIGHT(HEX(i.device_fingerprint_hash),8) device_identifier_ending,
+                b.activated_at linked_at,b.deactivated_at unlinked_at
+         FROM installations i
+         LEFT JOIN license_device_bindings b
+           ON b.installation_id=i.id AND b.customer_id=i.customer_id
+          AND b.binding_id=(
+              SELECT b2.binding_id FROM license_device_bindings b2
+              WHERE b2.installation_id=i.id ORDER BY b2.created_at DESC LIMIT 1
+          )
+         WHERE i.customer_id=:customer_id
+         ORDER BY i.portal_deactivated_at IS NULL DESC,i.last_seen_at DESC"
     );
     $installationQuery->execute(['customer_id' => $customerId]);
 
@@ -87,6 +96,15 @@ function portal_customer_snapshot(string $customerId): array
          ORDER BY occurred_at DESC LIMIT 40'
     );
     $eventsQuery->execute(['customer_id' => $customerId]);
+    $licenseActivityQuery = $pdo->prepare(
+        'SELECT a.event_type,a.outcome,a.event_summary,a.created_at,
+                i.device_label,i.installation_uuid
+         FROM license_activation_events a
+         LEFT JOIN installations i ON i.id=a.installation_id
+         WHERE a.customer_id=:customer_id
+         ORDER BY a.created_at DESC LIMIT 100'
+    );
+    $licenseActivityQuery->execute(['customer_id' => $customerId]);
 
     return [
         'customer' => $customer,
@@ -98,6 +116,7 @@ function portal_customer_snapshot(string $customerId): array
         'consents' => $consentQuery->fetchAll(),
         'consentHistory' => $consentHistoryQuery->fetchAll(),
         'events' => $eventsQuery->fetchAll(),
+        'licenseActivity' => $licenseActivityQuery->fetchAll(),
     ];
 }
 

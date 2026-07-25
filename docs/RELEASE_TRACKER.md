@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.54 — released 2026-07-25**
+**Current public release: v0.3.55 — released 2026-07-25**
 
-**Current development: v0.3.55 — System tray health and notifications**
+**Current development: v0.3.56 — Character and Code-Page Assistant**
 
-**Next release after v0.3.54: v0.3.55 — System tray health and notifications**
+**Next release after v0.3.55: v0.3.56 — Character and Code-Page Assistant**
 
 **Future scheduled sequence: v0.3.50 through v0.3.59**
 
-**Most recently completed: v0.3.54 — Keyless Account and Device Licensing**
+**Most recently completed: v0.3.55 — Reliable Account License Synchronization**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -92,10 +92,26 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.49 | Released | Receipt Image Sharing |
 | v0.3.50 | Released | Advanced Diagnostics PDF Report |
 | v0.3.51 | Released | Standard Diagnostics PDF Report |
+| v0.3.52 | Released | Customer Portal and licensing recovery improvements |
+| v0.3.53 | Released | Account-Based License Registration |
+| v0.3.54 | Released | Keyless Account and Device Licensing |
+| v0.3.55 | Released | Reliable Account License Synchronization |
 
 ## Scheduled releases
 
 The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49 provides direct receipt-image sharing; v0.3.50-v0.3.51 deliver the reusable advanced and standard diagnostic-report engine; v0.3.52-v0.3.57 improve recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.58 delivers receipt comparison and automated validation; and v0.3.59 makes public update awareness available to every license and maintenance state.
+
+### v0.3.55 — Reliable Account License Synchronization
+
+**Status:** Released — 2026-07-25
+
+**Purpose:** Complete the customer-visible and enforceable computer lifecycle behind v0.3.54 account-based licensing.
+
+**Released scope:** Startup, page-open, periodic, and manual synchronization; immediate feature/listener/history reconciliation; explicit online and offline states; server-authorized unlink; seven-day offline grace; durable promotion-device identity; Customer and Admin audit visibility; and stale WebView upgrade prevention.
+
+**Complete when:** A verified customer links, refreshes, uses offline grace, receives server changes, unlinks, and relinks a computer without credentials, restart requirements, duplicate promotion access, stale viewer content, or loss of local receipt data.
+
+**Completion verification:** The self-contained Windows build and installer completed successfully; all 187 desktop tests and the Admin and Customer Portal contract suites pass; modified PHP files pass syntax validation; the v0.3.55 installer checksum matches an independent SHA-256 calculation; and rendered package QA verified the License screen, version, device status, Link action, connection-error handling, and absence of browser-console errors.
 
 ### v0.3.15 — Capture, import, export, and replay
 
@@ -913,7 +929,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A privacy-safe screenshot, report, or support attachment contains none of the configured sensitive values while the authorized original receipt remains unchanged and access-controlled.
 
-### v0.3.55 — System tray health and notifications
+### v0.3.62 — System tray health and notifications
 
 **Status:** Planned
 

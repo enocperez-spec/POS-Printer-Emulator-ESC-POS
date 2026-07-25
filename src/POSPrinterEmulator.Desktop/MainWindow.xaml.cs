@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -14,7 +15,10 @@ namespace POSPrinterEmulator.Desktop;
 
 public partial class MainWindow : Window
 {
-    private static readonly Uri ViewerUri = new("http://127.0.0.1:5187");
+    private static readonly string DesktopVersion =
+        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "current";
+    private static readonly Uri ViewerUri =
+        new($"http://127.0.0.1:5187/?appVersion={Uri.EscapeDataString(DesktopVersion)}");
     private static readonly Uri HealthUri = new("http://127.0.0.1:5187/api/status");
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
     private readonly SemaphoreSlim _updateGate = new(1, 1);

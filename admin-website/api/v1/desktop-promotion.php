@@ -141,7 +141,7 @@ try {
     $pdo = database();
     ensure_self_service_commerce_schema($pdo);
     $findInstallation = $pdo->prepare(
-        "SELECT i.id,i.installation_uuid,i.customer_id,i.license_mode,i.license_id,i.portal_deactivated_at,
+        "SELECT i.id,i.installation_uuid,i.device_fingerprint_hash,i.customer_id,i.license_mode,i.license_id,i.portal_deactivated_at,
                 c.email_verified_at,c.status customer_status,
                 a.customer_id portal_customer_id,
                 COALESCE(l.license_tier,'Trial') previous_tier,l.control_state
@@ -186,6 +186,19 @@ try {
     $claimQuery->bindValue(':hash', desktop_promotion_claim_hash('Customer', $customerId), PDO::PARAM_LOB);
     $claimQuery->execute();
     $claimed = (bool)$claimQuery->fetchColumn();
+    if (!$claimed && !empty($installation['device_fingerprint_hash'])) {
+        $deviceClaim = $pdo->prepare(
+            "SELECT 1 FROM portal_promotion_claims
+             WHERE claim_type='Device' AND claim_hash=:hash LIMIT 1"
+        );
+        $deviceClaim->bindValue(
+            ':hash',
+            desktop_promotion_claim_hash('Device', bin2hex((string)$installation['device_fingerprint_hash'])),
+            PDO::PARAM_LOB
+        );
+        $deviceClaim->execute();
+        $claimed = (bool)$deviceClaim->fetchColumn();
+    }
     $hasException = false;
     if ($claimed) {
         $exceptionAvailable = $pdo->prepare(
@@ -259,6 +272,9 @@ try {
         'Account' => $customerId,
         $subjectType => $subjectId,
     ];
+    if (!empty($installation['device_fingerprint_hash'])) {
+        $claimValues['Device'] = bin2hex((string)$installation['device_fingerprint_hash']);
+    }
     $checkClaim = $pdo->prepare(
         'SELECT 1 FROM portal_promotion_claims WHERE claim_type=:type AND claim_hash=:hash LIMIT 1'
     );

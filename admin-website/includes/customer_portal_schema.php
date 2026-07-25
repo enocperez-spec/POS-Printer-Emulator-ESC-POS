@@ -221,6 +221,18 @@ function ensure_customer_portal_schema(PDO $pdo): void
         if (!isset($columns['portal_deactivated_at'])) {
             $pdo->exec('ALTER TABLE installations ADD COLUMN portal_deactivated_at DATETIME(6) NULL AFTER maintenance_expires_at');
         }
+        if (!isset($columns['device_fingerprint_hash'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN device_fingerprint_hash BINARY(32) NULL AFTER device_label');
+        }
+        if (!isset($columns['license_last_sync_at'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN license_last_sync_at DATETIME(6) NULL AFTER last_seen_at');
+        }
+        if (!isset($columns['license_last_sync_status'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN license_last_sync_status VARCHAR(32) NULL AFTER license_last_sync_at');
+        }
+        if (!isset($columns['license_last_sync_error'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN license_last_sync_error VARCHAR(300) NULL AFTER license_last_sync_status');
+        }
 
         $indexes = [];
         foreach ($pdo->query('SHOW INDEX FROM installations')->fetchAll() as $index) {

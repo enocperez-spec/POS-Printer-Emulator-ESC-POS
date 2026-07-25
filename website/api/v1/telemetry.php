@@ -186,6 +186,14 @@ try {
 
     $pdo = database();
     ensure_geography_storage($pdo);
+    $deviceFingerprint = strtolower(trim((string)($body['deviceFingerprint'] ?? '')));
+    if ($deviceFingerprint !== '' && !preg_match('/^[0-9a-f]{64}$/', $deviceFingerprint)) {
+        throw new InvalidArgumentException('Invalid device fingerprint.');
+    }
+    $fingerprintColumn = $pdo->query("SHOW COLUMNS FROM installations LIKE 'device_fingerprint_hash'")->fetch();
+    if (!$fingerprintColumn) {
+        $pdo->exec('ALTER TABLE installations ADD COLUMN device_fingerprint_hash BINARY(32) NULL AFTER device_label');
+    }
     if ($action === 'register') {
         $customerName = required_string($body, 'customerName', 160, true);
         $emailAddress = strtolower(required_string($body, 'emailAddress', 254, true));
@@ -208,9 +216,9 @@ try {
             $maintenance=resolve_maintenance_telemetry($body,$managedLicense);
             $statement = $pdo->prepare(
                 'INSERT INTO installations
-                    (installation_uuid, device_label, token_hash, customer_name, email_address, app_version, windows_version, license_mode, license_id,
+                    (installation_uuid, device_label, device_fingerprint_hash, token_hash, customer_name, email_address, app_version, windows_version, license_mode, license_id,
                      maintenance_status, maintenance_expires_at, country_code, region_code, geo_updated_at)
-                 VALUES (:uuid, :device_label, UNHEX(SHA2(:token, 256)), :customer, :email, :version, :windows_version, :mode, :license_id,
+                 VALUES (:uuid, :device_label, UNHEX(NULLIF(:device_fingerprint,\'\')), UNHEX(SHA2(:token, 256)), :customer, :email, :version, :windows_version, :mode, :license_id,
                          :maintenance_status, :maintenance_expires_at, :country_code, :region_code, UTC_TIMESTAMP(6))');
             $statement->execute([
                 'uuid' => strtolower($installationUuid),
@@ -219,6 +227,7 @@ try {
                 'email' => $emailAddress,
                 'version' => $appVersion,
                 'device_label' => $deviceLabel === '' ? null : $deviceLabel,
+                'device_fingerprint' => $deviceFingerprint,
                 'windows_version' => $windowsVersion === '' ? null : $windowsVersion,
                 'mode' => $managedLicense['mode'],
                 'license_id' => $managedLicense['license_id'],
@@ -314,6 +323,7 @@ try {
             email_address = :email,
             app_version = :version,
             device_label = COALESCE(NULLIF(:device_label,''),device_label),
+            device_fingerprint_hash = COALESCE(UNHEX(NULLIF(:device_fingerprint,'')),device_fingerprint_hash),
             windows_version = COALESCE(NULLIF(:windows_version,''),windows_version),
             license_mode = :mode,
             license_id = :license_id,
@@ -334,6 +344,7 @@ try {
         'email' => $emailAddress,
         'version' => $appVersion,
         'device_label' => $deviceLabel,
+        'device_fingerprint' => $deviceFingerprint,
         'windows_version' => $windowsVersion,
         'mode' => $mode,
         'license_id' => $licenseId,

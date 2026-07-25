@@ -17,6 +17,10 @@ public sealed record AccountLinkStatusResult(
     string Message,
     LicenseStatus? License = null);
 
+public sealed record AccountUnlinkResult(
+    LicenseStatus License,
+    string Message);
+
 public sealed class AccountLinkService
 {
     private readonly HttpClient _httpClient;
@@ -25,6 +29,7 @@ public sealed class AccountLinkService
     private readonly IUsageTelemetry _telemetry;
     private readonly Uri _endpoint;
     private readonly Uri _entitlementEndpoint;
+    private readonly Uri _unlinkEndpoint;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public AccountLinkService(
@@ -54,6 +59,14 @@ public sealed class AccountLinkService
             throw new InvalidOperationException("The secure device licensing service is not configured.");
         }
         _entitlementEndpoint = entitlementEndpoint;
+        var unlinkConfigured = configuration["AccountLink:UnlinkEndpoint"] ??
+                               "https://admin.posprinteremulator.com/api/v1/device-unlink.php";
+        if (!Uri.TryCreate(unlinkConfigured, UriKind.Absolute, out var unlinkEndpoint) ||
+            unlinkEndpoint.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The secure device unlink service is not configured.");
+        }
+        _unlinkEndpoint = unlinkEndpoint;
     }
 
     public async Task<AccountLinkStartResult> StartAsync(CancellationToken cancellationToken)
@@ -110,14 +123,18 @@ public sealed class AccountLinkService
         LicenseStatus activated;
         try
         {
+            _license.BeginSynchronization();
             var deviceEntitlement = await FetchDeviceEntitlementAsync(credentials, cancellationToken);
             activated = ApplyServerEntitlements(
                 deviceEntitlement,
                 deviceEntitlement.CustomerName ?? response.CustomerName,
                 deviceEntitlement.EmailAddress ?? response.EmailAddress);
+            activated = _license.RecordSynchronizationSuccess();
         }
         catch (InvalidOperationException exception)
         {
+            _license.RecordSynchronizationFailure(
+                "The approved account license could not be installed. Start a new link request or contact support.");
             throw new InvalidOperationException(
                 "The Customer Portal approved this computer, but the selected license could not be installed. " +
                 exception.Message,
@@ -131,22 +148,96 @@ public sealed class AccountLinkService
         _telemetry.RecordActivation();
         return new AccountLinkStatusResult(
             "Activated",
-            "This computer is linked to your verified Customer Portal account and the selected license is active.",
+            $"License activated successfully. This computer is now linked to your {activated.Mode} License.",
             activated);
     }
 
     public async Task<LicenseStatus> SynchronizeAsync(CancellationToken cancellationToken)
     {
-        var credentials = await _credentials.GetCredentialsAsync(cancellationToken);
-        var result = await FetchDeviceEntitlementAsync(credentials, cancellationToken);
-        if (string.IsNullOrWhiteSpace(result.CustomerName) ||
-            string.IsNullOrWhiteSpace(result.EmailAddress) ||
-            (string.IsNullOrWhiteSpace(result.DeviceEntitlement) &&
-             string.IsNullOrWhiteSpace(result.PromotionEntitlement)))
+        _license.BeginSynchronization();
+        try
         {
-            throw new InvalidOperationException("The device licensing service returned an incomplete entitlement.");
+            var credentials = await _credentials.GetCredentialsAsync(cancellationToken);
+            var result = await FetchDeviceEntitlementAsync(credentials, cancellationToken);
+            if (string.IsNullOrWhiteSpace(result.CustomerName) ||
+                string.IsNullOrWhiteSpace(result.EmailAddress) ||
+                (string.IsNullOrWhiteSpace(result.DeviceEntitlement) &&
+                 string.IsNullOrWhiteSpace(result.PromotionEntitlement)))
+            {
+                throw new InvalidOperationException("The device licensing service returned an incomplete entitlement.");
+            }
+            ApplyServerEntitlements(result, result.CustomerName, result.EmailAddress);
+            return _license.RecordSynchronizationSuccess();
         }
-        return ApplyServerEntitlements(result, result.CustomerName, result.EmailAddress);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            if (_license.GetStatus().Synchronization.State is not "Revoked" and not "Unlinked")
+            {
+                _license.RecordSynchronizationFailure(
+                    "The licensing service could not be reached. Licensed features remain available during the offline grace period.");
+            }
+            throw new InvalidOperationException(
+                exception is HttpRequestException or TaskCanceledException
+                    ? "The licensing service could not be reached. Licensed features remain available during the offline grace period."
+                    : exception.Message,
+                exception);
+        }
+    }
+
+    public async Task<AccountUnlinkResult> UnlinkAsync(CancellationToken cancellationToken)
+    {
+        var credentials = await _credentials.GetCredentialsAsync(cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, _unlinkEndpoint)
+        {
+            Content = JsonContent.Create(new
+            {
+                installationId = credentials.InstallationId,
+                appVersion = ProductInfo.Version,
+                reason = "Customer unlinked this computer from the installed application.",
+            }),
+        };
+        request.Headers.Add("X-Installation-Token", credentials.Token);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            throw new InvalidOperationException(
+                "This computer could not be unlinked because the licensing service is unavailable. No local license state was changed.",
+                exception);
+        }
+        using (response)
+        {
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        DeviceUnlinkServerResponse? result = null;
+        try
+        {
+            result = JsonSerializer.Deserialize<DeviceUnlinkServerResponse>(body, JsonOptions);
+        }
+        catch (JsonException) { }
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                result?.Error ?? "This computer could not be unlinked. Check the internet connection and try again.");
+        }
+        _license.RemoveDeviceEntitlement();
+        var status = _license.RecordAuthoritativeState(
+            "Unlinked",
+            "This computer is unlinked. Local receipts and settings were preserved.");
+        return new AccountUnlinkResult(
+            status,
+            result?.Message ?? "This computer was unlinked and its license is available for another computer.");
+        }
     }
 
     private LicenseStatus ApplyServerEntitlements(
@@ -196,6 +287,11 @@ public sealed class AccountLinkService
             if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
                 _license.RemoveDeviceEntitlement();
+                _license.RecordAuthoritativeState(
+                    result?.State?.Equals("Revoked", StringComparison.OrdinalIgnoreCase) == true
+                        ? "Revoked"
+                        : "Unlinked",
+                    result?.Error ?? "This computer no longer has an active account license.");
             }
             throw new InvalidOperationException(
                 result?.Error ?? "The approved license could not be synchronized to this computer.");
@@ -288,5 +384,10 @@ public sealed class AccountLinkService
         string? PromotionEntitlement,
         string? CustomerName,
         string? EmailAddress,
+        string? Error);
+
+    private sealed record DeviceUnlinkServerResponse(
+        string? State,
+        string? Message,
         string? Error);
 }

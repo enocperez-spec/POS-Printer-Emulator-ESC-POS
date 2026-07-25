@@ -4,6 +4,17 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.55 — 2026-07-25
+
+- Adds startup, License-page, 15-minute background, and manual account-license synchronization with the last successful synchronization time.
+- Applies linked, changed, revoked, and unlinked account entitlements immediately to receipt history, listener limits, and paid features without an application restart.
+- Adds an explicit license state model for Active, Synchronizing, Connection Error, Offline Grace, Offline Grace Expired, Revoked, and Unlinked conditions.
+- Adds a server-authorized **Unlink This Computer** workflow that releases the license, returns the application to Trial, and preserves local receipts, settings, and saved data.
+- Extends signed offline authorization to seven days while retaining frequent online revocation checks; expired Maintenance and Support never disables permanent purchased features.
+- Adds a durable, privacy-safe Windows device fingerprint to prevent the Five-Day Promotional Trial from being repeated through reinstall, account changes, Windows-user changes, or computer renaming.
+- Adds Customer Portal and Admin audit visibility for the linked computer, masked device identifier, application version, link time, last license synchronization, and link/unlink/rejection history.
+- Prevents stale post-upgrade WebView content with versioned navigation, no-cache HTML responses, immutable hashed assets, and installer cleanup of previous viewer bundles.
+
 ## v0.3.54 — 2026-07-25
 
 - Removes activation-key entry, validation, generation, resend, recovery, display, and copy/paste workflows from the desktop application, Customer Portal, Admin Portal, purchase flow, email content, installer, and public documentation.

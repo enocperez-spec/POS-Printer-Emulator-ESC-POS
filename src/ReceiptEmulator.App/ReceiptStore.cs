@@ -9,6 +9,7 @@ public sealed class ReceiptStore
     private const int HistoryCapacity = 500;
     private readonly object _sync = new();
     private readonly LinkedList<ReceiptJob> _jobs = [];
+    private readonly HashSet<Guid> _sessionJobIds = [];
     private readonly LicenseService _license;
     private readonly string _historyDirectory;
     private readonly string _legacyBackupDirectory;
@@ -54,6 +55,7 @@ public sealed class ReceiptStore
         lock (_sync)
         {
             _jobs.AddFirst(job);
+            _sessionJobIds.Add(job.Id);
             while (_jobs.Count > (HasPersistentHistory ? HistoryCapacity : SessionCapacity))
             {
                 _jobs.RemoveLast();
@@ -98,6 +100,25 @@ public sealed class ReceiptStore
     }
 
     public void EnableProHistory() => EnablePaidHistory();
+
+    public void ReconcileLicenseAccess()
+    {
+        if (HasPersistentHistory)
+        {
+            EnablePaidHistory();
+            return;
+        }
+        lock (_sync)
+        {
+            var retained = _jobs.Where(job => _sessionJobIds.Contains(job.Id)).ToArray();
+            _jobs.Clear();
+            foreach (var job in retained.OrderBy(job => job.ReceivedAt))
+            {
+                _jobs.AddFirst(job);
+            }
+            _historyLoaded = false;
+        }
+    }
 
     public IReadOnlyList<JobSummary> GetSummaries(string? listenerId = null)
     {

@@ -1,5 +1,5 @@
 #define MyAppName "POS Printer Emulator"
-#define MyAppVersion "0.3.54"
+#define MyAppVersion "0.3.55"
 #define MyAppPublisher "EPCOM Ltd."
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
@@ -44,6 +44,11 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "..\artifacts\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "drivers\epson\*"; DestDir: "{app}\drivers\epson"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\artifacts\prerequisites\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: ignoreversion deleteafterinstall
+
+[InstallDelete]
+; Hashed viewer bundles change on every release. Removing the old directory
+; prevents WebView2 from loading a stale JavaScript entry point after upgrade.
+Type: filesandordirs; Name: "{app}\wwwroot\assets"
 
 [Icons]
 Name: "{autoprograms}\POS Printer Emulator"; Filename: "{app}\{#MyDesktopExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyDesktopExeName}"
@@ -304,7 +309,8 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
   RegistrationPath: String;
-  LicensePath: String;
+  DeviceEntitlementPath: String;
+  SynchronizationPath: String;
   MaintenancePath: String;
   PromotionPath: String;
 begin
@@ -329,11 +335,13 @@ begin
   end;
 
   RegistrationPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\registration.json');
-  LicensePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\license.json');
+  DeviceEntitlementPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\device-entitlement.json');
+  SynchronizationPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\license-synchronization.json');
   MaintenancePath := ExpandConstant('{commonappdata}\POSPrinterEmulator\maintenance.json');
   PromotionPath := ExpandConstant('{commonappdata}\POSPrinterEmulator\promotion.json');
   if FileExists(RegistrationPath + '.upgrade-backup') or
-     FileExists(LicensePath + '.upgrade-backup') or
+     FileExists(DeviceEntitlementPath + '.upgrade-backup') or
+     FileExists(SynchronizationPath + '.upgrade-backup') or
      FileExists(MaintenancePath + '.upgrade-backup') or
      FileExists(PromotionPath + '.upgrade-backup') then
   begin
@@ -365,14 +373,23 @@ begin
       end;
       Log('Preserved the existing customer registration for this upgrade.');
     end;
-    if FileExists(LicensePath) then
+    if FileExists(DeviceEntitlementPath) then
     begin
-      if not CopyFile(LicensePath, LicensePath + '.upgrade-backup', True) then
+      if not CopyFile(DeviceEntitlementPath, DeviceEntitlementPath + '.upgrade-backup', True) then
       begin
-        Result := 'Setup could not preserve the existing activation license. Close POS Printer Emulator and run setup again.';
+        Result := 'Setup could not preserve the existing account license. Close POS Printer Emulator and run setup again.';
         exit;
       end;
-      Log('Preserved the existing activation license for this upgrade.');
+      Log('Preserved the existing account license for this upgrade.');
+    end;
+    if FileExists(SynchronizationPath) then
+    begin
+      if not CopyFile(SynchronizationPath, SynchronizationPath + '.upgrade-backup', True) then
+      begin
+        Result := 'Setup could not preserve the existing account synchronization state. Close POS Printer Emulator and run setup again.';
+        exit;
+      end;
+      Log('Preserved the existing account synchronization state for this upgrade.');
     end;
     if FileExists(MaintenancePath) then
     begin
@@ -430,7 +447,8 @@ begin
   DataPath := ExpandConstant('{commonappdata}\POSPrinterEmulator');
   Result :=
     RestorePreservedUpgradeFile(DataPath + '\registration.json') and
-    RestorePreservedUpgradeFile(DataPath + '\license.json') and
+    RestorePreservedUpgradeFile(DataPath + '\device-entitlement.json') and
+    RestorePreservedUpgradeFile(DataPath + '\license-synchronization.json') and
     RestorePreservedUpgradeFile(DataPath + '\maintenance.json') and
     RestorePreservedUpgradeFile(DataPath + '\promotion.json');
 end;
@@ -447,10 +465,16 @@ begin
     Log('Could not remove the completed registration upgrade backup.');
     Result := False;
   end;
-  if FileExists(DataPath + '\license.json.upgrade-backup') and
-     (not DeleteFile(DataPath + '\license.json.upgrade-backup')) then
+  if FileExists(DataPath + '\device-entitlement.json.upgrade-backup') and
+     (not DeleteFile(DataPath + '\device-entitlement.json.upgrade-backup')) then
   begin
-    Log('Could not remove the completed activation upgrade backup.');
+    Log('Could not remove the completed account license upgrade backup.');
+    Result := False;
+  end;
+  if FileExists(DataPath + '\license-synchronization.json.upgrade-backup') and
+     (not DeleteFile(DataPath + '\license-synchronization.json.upgrade-backup')) then
+  begin
+    Log('Could not remove the completed account synchronization upgrade backup.');
     Result := False;
   end;
   if FileExists(DataPath + '\maintenance.json.upgrade-backup') and
@@ -472,7 +496,7 @@ begin
   SetupFailed := True;
   if not RestorePreservedUpgradeState then
     RaiseException(FailureMessage + #13#10 + #13#10 +
-      'Setup also could not restore the protected registration, activation, and maintenance files. The recovery copies were retained.')
+      'Setup also could not restore the protected account registration, device entitlement, synchronization, and maintenance files. The recovery copies were retained.')
   else
     RaiseException(FailureMessage);
 end;

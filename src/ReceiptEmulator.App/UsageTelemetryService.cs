@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using Microsoft.Win32;
 
 namespace ReceiptEmulator;
 
@@ -305,12 +308,34 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry, 
         emailAddress = status.EmailAddress,
         appVersion = ProductInfo.Version,
         deviceLabel = Environment.MachineName,
+        deviceFingerprint = CreateDurableDeviceFingerprint(installationId),
         windowsVersion = RuntimeInformation.OSDescription,
         licenseMode = status.Mode,
         licenseId = status.LicenseId,
         maintenanceStatus = status.Maintenance.State,
         maintenanceExpiresAt = status.Maintenance.ExpiresAt
         };
+    }
+
+    private static string CreateDurableDeviceFingerprint(Guid fallbackInstallationId)
+    {
+        var source = fallbackInstallationId.ToString("N");
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+                source = key?.GetValue("MachineGuid") as string ?? source;
+            }
+            catch
+            {
+                // The installation identifier remains a privacy-safe fallback.
+            }
+        }
+        return Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes($"POS-PRINTER-EMULATOR-DEVICE-V1|{source}")))
+            .ToLowerInvariant();
     }
 
     private TelemetryState? LoadState()

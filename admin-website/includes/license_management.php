@@ -41,6 +41,18 @@ function ensure_license_management_schema(PDO $pdo): void
         if (!isset($installationColumns['maintenance_expires_at'])) {
             $pdo->exec('ALTER TABLE installations ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER maintenance_status');
         }
+        if (!isset($installationColumns['license_last_sync_at'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN license_last_sync_at DATETIME(6) NULL AFTER last_seen_at');
+        }
+        if (!isset($installationColumns['license_last_sync_status'])) {
+            $pdo->exec("ALTER TABLE installations ADD COLUMN license_last_sync_status VARCHAR(32) NULL AFTER license_last_sync_at");
+        }
+        if (!isset($installationColumns['license_last_sync_error'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN license_last_sync_error VARCHAR(300) NULL AFTER license_last_sync_status');
+        }
+        if (!isset($installationColumns['device_fingerprint_hash'])) {
+            $pdo->exec('ALTER TABLE installations ADD COLUMN device_fingerprint_hash BINARY(32) NULL AFTER device_label');
+        }
 
         $columns = [];
         foreach ($pdo->query('SHOW COLUMNS FROM issued_licenses')->fetchAll() as $column) {

@@ -14,6 +14,7 @@ public sealed class LicenseService
     private readonly string _registrationPath;
     private readonly string _activationPath;
     private readonly string _deviceEntitlementPath;
+    private readonly string _synchronizationPath;
     private readonly string _maintenancePath;
     private readonly string _promotionPath;
     private readonly string _publicKeyPem;
@@ -23,6 +24,7 @@ public sealed class LicenseService
     private RegistrationInfo _registration;
     private ActivationRecord? _activation;
     private DeviceEntitlementRecord? _deviceEntitlement;
+    private SynchronizationRecord _synchronization;
     private MaintenanceRecord? _maintenance;
     private PromotionRecord? _promotion;
     private Guid? _installationId;
@@ -49,6 +51,7 @@ public sealed class LicenseService
         _registrationPath = Path.Combine(RootPath, "registration.json");
         _activationPath = Path.Combine(RootPath, "license.json");
         _deviceEntitlementPath = Path.Combine(RootPath, "device-entitlement.json");
+        _synchronizationPath = Path.Combine(RootPath, "license-synchronization.json");
         _maintenancePath = Path.Combine(RootPath, "maintenance.json");
         _promotionPath = Path.Combine(RootPath, "promotion.json");
         _publicKeyPem = environment.IsEnvironment("Testing") &&
@@ -61,6 +64,9 @@ public sealed class LicenseService
         _registration = Load<RegistrationInfo>(_registrationPath) ?? new RegistrationInfo(string.Empty, string.Empty);
         _activation = Load<ActivationRecord>(_activationPath);
         _deviceEntitlement = Load<DeviceEntitlementRecord>(_deviceEntitlementPath);
+        _synchronization = Load<SynchronizationRecord>(_synchronizationPath) ??
+                           new SynchronizationRecord("Unlinked", null, null, null,
+                               "Link this computer to a verified Customer Portal account.");
         _maintenance = Load<MaintenanceRecord>(_maintenancePath);
         _promotion = Load<PromotionRecord>(_promotionPath);
     }
@@ -132,6 +138,7 @@ public sealed class LicenseService
                 _registration.CustomerName,
                 _registration.EmailAddress,
                 license?.LicenseId,
+                GetSynchronizationStatus(license),
                 maintenance,
                 effective.Status,
                 new FeatureStatus(
@@ -331,6 +338,82 @@ public sealed class LicenseService
         }
     }
 
+    public LicenseStatus BeginSynchronization()
+    {
+        lock (_sync)
+        {
+            var now = _utcNow();
+            _synchronization = _synchronization with
+            {
+                State = "Synchronizing",
+                LastAttemptAt = now,
+                Message = "Checking this computer's account license…"
+            };
+            SavePersistedJson(_synchronizationPath, _synchronization);
+            return GetStatus();
+        }
+    }
+
+    public LicenseStatus RecordSynchronizationSuccess()
+    {
+        lock (_sync)
+        {
+            var now = _utcNow();
+            _synchronization = new SynchronizationRecord(
+                "Active",
+                now,
+                now,
+                GetInstalledEntitlementExpiration(),
+                "This computer's account license is active and synchronized.");
+            SavePersistedJson(_synchronizationPath, _synchronization);
+            return GetStatus();
+        }
+    }
+
+    public LicenseStatus RecordSynchronizationFailure(string message)
+    {
+        lock (_sync)
+        {
+            var now = _utcNow();
+            var graceEndsAt = GetInstalledEntitlementExpiration();
+            var state = _deviceEntitlement is null
+                ? "ConnectionError"
+                : graceEndsAt is { } endsAt && endsAt > now
+                    ? (_synchronization.LastSuccessfulAt is { } lastSuccess &&
+                       now - lastSuccess >= TimeSpan.FromHours(24)
+                        ? "OfflineGrace"
+                        : "ConnectionError")
+                    : "OfflineGraceExpired";
+            _synchronization = _synchronization with
+            {
+                State = state,
+                LastAttemptAt = now,
+                OfflineGraceEndsAt = graceEndsAt,
+                Message = state == "OfflineGraceExpired"
+                    ? "The offline grace period ended. Connect to the internet and synchronize this computer."
+                    : message
+            };
+            SavePersistedJson(_synchronizationPath, _synchronization);
+            return GetStatus();
+        }
+    }
+
+    public LicenseStatus RecordAuthoritativeState(string state, string message)
+    {
+        lock (_sync)
+        {
+            var now = _utcNow();
+            _synchronization = new SynchronizationRecord(
+                state,
+                now,
+                _synchronization.LastSuccessfulAt,
+                null,
+                message);
+            SavePersistedJson(_synchronizationPath, _synchronization);
+            return GetStatus();
+        }
+    }
+
     public LicenseStatus InstallPromotionEntitlement(string entitlementToken)
     {
         lock (_sync)
@@ -478,6 +561,7 @@ public sealed class LicenseService
         Directory.CreateDirectory(DefaultRootPath);
         RestoreUpgradeFile("registration.json");
         RestoreUpgradeFile("device-entitlement.json");
+        RestoreUpgradeFile("license-synchronization.json");
         RestoreUpgradeFile("maintenance.json");
         RestoreUpgradeFile("promotion.json");
     }
@@ -486,6 +570,7 @@ public sealed class LicenseService
     {
         DeleteUpgradeFile("registration.json");
         DeleteUpgradeFile("device-entitlement.json");
+        DeleteUpgradeFile("license-synchronization.json");
         DeleteUpgradeFile("maintenance.json");
         DeleteUpgradeFile("promotion.json");
     }
@@ -563,6 +648,52 @@ public sealed class LicenseService
             }
             return GetStatus();
         }
+    }
+
+    private DateTimeOffset? GetInstalledEntitlementExpiration()
+    {
+        if (_deviceEntitlement is null || _installationId is not { } installationId)
+        {
+            return null;
+        }
+        return DeviceEntitlementCodec.TryValidateWithPublicKey(
+                   _deviceEntitlement.EntitlementToken,
+                   installationId,
+                   _publicKeyPem,
+                   out var entitlement,
+                   out _) && entitlement is not null
+            ? entitlement.ValidUntil
+            : null;
+    }
+
+    private LicenseSynchronizationStatus GetSynchronizationStatus(ActivationLicense? license)
+    {
+        var now = _utcNow();
+        var graceEndsAt = GetInstalledEntitlementExpiration() ?? _synchronization.OfflineGraceEndsAt;
+        var state = _synchronization.State;
+        var message = _synchronization.Message;
+        if (license is null && state is "Active" or "ConnectionError" or "OfflineGrace")
+        {
+            state = graceEndsAt is { } endsAt && endsAt <= now ? "OfflineGraceExpired" : state;
+            if (state == "OfflineGraceExpired")
+            {
+                message = "The offline grace period ended. Connect to the internet and synchronize this computer.";
+            }
+        }
+        var deviceIdentifier = "Pending registration";
+        if (_installationId is { } installationId)
+        {
+            var compactInstallationId = installationId.ToString("N");
+            deviceIdentifier = $"••••-{compactInstallationId[^8..]}";
+        }
+        return new LicenseSynchronizationStatus(
+            state,
+            _synchronization.LastAttemptAt,
+            _synchronization.LastSuccessfulAt,
+            graceEndsAt,
+            Environment.MachineName,
+            deviceIdentifier,
+            message);
     }
 
     private static ActivationLicense ToLicense(DeviceEntitlement entitlement) =>
@@ -910,7 +1041,7 @@ public sealed class LicenseService
         }
         catch
         {
-            // Preserve the original save failure for activation diagnostics.
+            // Preserve the original save failure for account-license diagnostics.
         }
     }
 
@@ -959,6 +1090,12 @@ public sealed class LicenseService
     private sealed record TrialState(DateOnly Date, int Used);
     private sealed record ActivationRecord(string ActivationKey, DateTimeOffset ActivatedAt);
     private sealed record DeviceEntitlementRecord(string EntitlementToken, DateTimeOffset InstalledAt);
+    private sealed record SynchronizationRecord(
+        string State,
+        DateTimeOffset? LastAttemptAt,
+        DateTimeOffset? LastSuccessfulAt,
+        DateTimeOffset? OfflineGraceEndsAt,
+        string Message);
     private sealed record MaintenanceRecord(
         string? EntitlementToken,
         DateTimeOffset InstalledAt,
