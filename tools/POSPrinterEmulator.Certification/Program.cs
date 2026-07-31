@@ -1360,10 +1360,16 @@ internal static class CertificationProgram
                 throw new InvalidDataException(
                     "Production publisher readiness enforcement is missing.");
             }
+            if (!publisher.Contains("IsGeneratedReleaseDownload", StringComparison.Ordinal) ||
+                !publisher.Contains(".exe.sha256", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "Website publishing must exclude generated installer downloads from recursive site synchronization.");
+            }
             return Passed(
                 name,
                 "Production readiness",
-                "Validated 18 critical rollout gates, 15 E2E customer journeys, documentation, commands, and production publisher enforcement.");
+                "Validated 18 critical rollout gates, 15 E2E customer journeys, documentation, production publisher enforcement, and generated-download exclusion.");
         }
         catch (Exception exception)
         {

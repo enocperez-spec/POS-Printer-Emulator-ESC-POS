@@ -584,6 +584,7 @@ static void Publish(
         .Where(path => !path.EndsWith("README.md", StringComparison.OrdinalIgnoreCase))
         .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.vite{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
         .Where(path => !IsServerOwnedPrivateFile(localDirectory, path))
+        .Where(path => !IsGeneratedReleaseDownload(localDirectory, path))
         .Order(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
@@ -1298,6 +1299,18 @@ static void ConfigureCustomerPortalFromAdmin(
             File.Delete(temporaryConfigPath);
         }
     }
+}
+
+static bool IsGeneratedReleaseDownload(string localRoot, string path)
+{
+    var relative = Path.GetRelativePath(localRoot, path).Replace('\\', '/');
+    if (!relative.StartsWith("downloads/", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    return relative.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+           relative.EndsWith(".exe.sha256", StringComparison.OrdinalIgnoreCase);
 }
 
 static void ConfigurePurchaseIntegration(
