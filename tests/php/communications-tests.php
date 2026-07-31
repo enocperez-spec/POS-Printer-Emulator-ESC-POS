@@ -215,6 +215,31 @@ $contains("'Product Analytics'", $telemetry, 'Lifecycle analytics must require t
 $contains("!== 'Granted'", $telemetry, 'Lifecycle analytics must fail closed when opt-in is absent.');
 $contains('does not send receipt content', $privacy, 'The privacy notice must disclose prohibited communication data.');
 $contains('configure-communications', $publisher, 'The C# publisher must configure provider secrets without PowerShell.');
+$contains(
+    'communications-cron-status.json',
+    $publisher,
+    'The scheduled communications worker must leave privacy-safe private execution evidence.'
+);
+$contains(
+    'communications-cron-launch.json',
+    $publisher,
+    'The hosting launcher must distinguish scheduler entry from PHP worker completion.'
+);
+$contains(
+    '/usr/local/bin/php8.4 -f',
+    $publisher,
+    'The hosting launcher must use the PHP CLI path reported by the verified IONOS SSH environment.'
+);
+$contains(
+    "getenv('PPE_COMMUNICATIONS_CRON') === '1'",
+    $publisher,
+    'Non-CLI IONOS Cron execution must require the private launcher marker while direct web requests remain denied.'
+);
+$contains(
+    "'error_class' => null",
+    $publisher,
+    'Cron execution evidence must retain only an exception class, not a sensitive error message.'
+);
 $contains('sync-sandbox-communication-template', $publisher, 'The publisher needs a protected sandbox template synchronization command.');
 $contains('require_recent_admin_authentication', $admin, 'Communication mutations and exports must require recent administrator authentication.');
 $contains('Opened · approximate', $admin, 'Open and click analytics must be clearly labeled as approximate.');
@@ -232,6 +257,16 @@ $contains('preview_brevo_template_id', $communications, 'Template activation req
 $contains('preview_warnings_json', $admin, 'Template approval must reject previews with unresolved warnings.');
 $contains('Missing sample data for placeholder', $preview, 'Preview validation must report unresolved placeholders.');
 $contains('Invalid or unapproved link', $preview, 'Preview validation must report invalid links.');
+$contains(
+    "'admin-sandbox.posprinteremulator.com'",
+    $preview,
+    'Sandbox preview validation must be enabled only on the exact Admin sandbox host.'
+);
+$contains(
+    "'userportal-sandbox.posprinteremulator.com'",
+    $preview,
+    'Sandbox email previews must accept the isolated Customer Portal host.'
+);
 $contains("'we_want_to_help'", $communications, 'The 30-day inactivity workflow needs its own approved template.');
 $contains('CUSTOMER_RETURNED', $communications, 'Inactive-user mail must stop when customer activity resumes.');
 $contains('communication_onboarding_template', $communications, 'License events need deterministic tier-aware template routing.');

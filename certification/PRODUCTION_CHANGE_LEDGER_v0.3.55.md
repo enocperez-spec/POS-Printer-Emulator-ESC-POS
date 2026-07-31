@@ -28,7 +28,7 @@ record, evidence, approvals, exact commit, and installer all pass.
 
 | Status | Classification | Requirement | Production verification |
 | --- | --- | --- | --- |
-| [~] | Recreate securely | Production IONOS cron was configured with `/usr/bin/php8.4 -f /homepages/12/d4299934508/htdocs/admin_posprinteremulator/private/communications-cron.php`. Runtime verification is still required. | A newly fulfilled purchase moves from Pending to Sent automatically, without a manual worker run, within the expected schedule. |
+| [ ] | Recreate securely | Replace the production direct-PHP job with `/bin/sh /homepages/12/d4299934508/htdocs/admin_posprinteremulator/private/communications-cron.sh` after the passing rollout gate. Keep delivery policy controls in their approved production state. | A newly fulfilled purchase moves from Pending to Sent automatically, without a manual worker run, within the expected schedule. Private launch/status evidence reports exit code 0 and no error class. |
 | [ ] | Recreate securely | Confirm production communications configuration uses production Brevo mode, approved sender identities, production webhook URL, and production allowlist/policy. | Purchase, license-ready, security, and support messages record provider message IDs and delivery events. |
 | [ ] | Recreate securely | Confirm production PayPal REST configuration uses the live API host and live application credentials. | Preflight rejects the sandbox PayPal host and a controlled live-mode validation succeeds without displaying secrets. |
 | [ ] | Recreate securely | Confirm all production portal, Buy, Admin, Support, documentation, and account-link URLs use production hosts. | No production page or desktop response links to a `*-sandbox` hostname. |
@@ -83,13 +83,38 @@ record, evidence, approvals, exact commit, and installer all pass.
   boundary. No manual worker was invoked. The sandbox cron gate therefore failed and
   remains blocked until the IONOS execution error or schedule is corrected and a
   fresh queue-only record is processed automatically.
+- A second queue-only sandbox service test was created at
+  `2026-07-31 18:08:44 UTC`. It remained `Pending` with zero attempts through
+  multiple `*/5` IONOS boundaries. A verified SSH diagnostic then ran the
+  communications worker successfully; the record moved to `Deferred` with
+  `TEMPLATE_PREVIEW_REQUIRED`, proving the deployed PHP dependencies and worker can
+  execute. The attempt count remained `1` after the next configured IONOS boundary.
+- A temporary one-minute UnixCron proof used `/usr/bin/touch` to create
+  `private/cron-scheduler-proof.txt`, proving that the IONOS scheduler itself runs
+  Unix commands for this webspace. The temporary proof job, an additional four-minute
+  PHP test job, and the proof file were removed after the result was recorded. The
+  remaining fault is therefore isolated to the scheduled PHP communications command
+  or its Cron-only runtime context. Automatic communications processing is not yet
+  certified.
+- A private shell launcher isolated the final Cron-only difference: IONOS launched
+  PHP with a non-CLI SAPI, so the original worker returned through its direct-web
+  guard. The worker now permits only CLI execution or the private launcher marker
+  `PPE_COMMUNICATIONS_CRON=1`; normal web requests remain denied.
+- A fresh non-manual `email_verification` record
+  (`76a3802d-64b3-4a61-bc53-ee186d9958a0`) was queued before the corrected job ran.
+  At `2026-07-31T19:30:15Z`, IONOS launched the worker automatically. The private
+  status record reported `sent=1`, `idle=1`, completion, PHP exit code `0`, and no
+  error class. A privacy-safe database check showed state `Sent`, one attempt, and a
+  provider message identifier. No manual worker or Admin retry was invoked after
+  enqueue.
 - Receipt/invoice and communications contract suites passed after adding the invoice
   number and PayPal capture-reference labels.
 
 ## Open production blockers
 
-- [ ] Configure and prove automatic five-minute communications processing in the
-  sandbox; manual processing is not acceptable release evidence.
+- [x] Capture the scheduled PHP worker error in the sandbox Cron-only runtime,
+  correct it, validate the required template preview, and prove a fresh queue-only
+  message advances automatically on the schedule without manual processing.
 - [ ] Verify the newly configured production cron executes successfully without
   sending a production test message before rollout approval; retain production
   delivery pause/policy controls until the production release is authorized.

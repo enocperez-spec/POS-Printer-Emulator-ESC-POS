@@ -136,18 +136,39 @@ function template_preview_populate(string $content, array $samples, array &$miss
     ) ?? $content;
 }
 
+function template_preview_allowed_hosts(): array
+{
+    $hosts = [
+        'posprinteremulator.com',
+        'www.posprinteremulator.com',
+        'buy.posprinteremulator.com',
+        'userportal.posprinteremulator.com',
+        'github.com',
+    ];
+    $currentHost = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? '')));
+    $currentHost = explode(':', $currentHost, 2)[0];
+    if ($currentHost === 'admin-sandbox.posprinteremulator.com') {
+        $hosts = array_merge($hosts, [
+            'sandbox.posprinteremulator.com',
+            'buy-sandbox.posprinteremulator.com',
+            'userportal-sandbox.posprinteremulator.com',
+            'support-sandbox.posprinteremulator.com',
+            'admin-sandbox.posprinteremulator.com',
+        ]);
+    }
+    return $hosts;
+}
+
 function template_preview_valid_url(string $url): bool
 {
     $parts = parse_url(html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     return is_array($parts)
         && strtolower((string)($parts['scheme'] ?? '')) === 'https'
-        && in_array(strtolower((string)($parts['host'] ?? '')), [
-            'posprinteremulator.com',
-            'www.posprinteremulator.com',
-            'buy.posprinteremulator.com',
-            'userportal.posprinteremulator.com',
-            'github.com',
-        ], true)
+        && in_array(
+            strtolower((string)($parts['host'] ?? '')),
+            template_preview_allowed_hosts(),
+            true
+        )
         && !isset($parts['user'])
         && !isset($parts['pass']);
 }

@@ -69,6 +69,9 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher portal-diagnostics <https-diagnostics-url> <email>");
     Console.WriteLine("  website-publisher run-communications-worker <https-worker-url> [maximum]");
     Console.WriteLine("  website-publisher run-sandbox-communications-cron <admin-sandbox-remote-directory>");
+    Console.WriteLine("  website-publisher diagnose-sandbox-communications-cron <admin-sandbox-remote-directory>");
+    Console.WriteLine("  website-publisher queue-sandbox-communications-test <admin-sandbox-remote-directory> <customer-id> <template-key>");
+    Console.WriteLine("  website-publisher inspect-sandbox-communications-message <admin-sandbox-remote-directory> <message-id>");
     Console.WriteLine("  website-publisher sync-sandbox-communication-template <https-sync-url> <template-key>");
     Console.WriteLine("  website-publisher sandbox-reset-checkout-rate <portal-remote-directory> <email>");
     Console.WriteLine("  website-publisher sync-license-catalog [repository-root]");
@@ -307,6 +310,48 @@ try
                 password,
                 expectedFingerprint,
                 args[1]);
+            break;
+        case "diagnose-sandbox-communications-cron":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException(
+                    "The diagnose-sandbox-communications-cron command requires the Admin sandbox remote directory.");
+            }
+            DiagnoseSandboxCommunicationsCron(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1]);
+            break;
+        case "queue-sandbox-communications-test":
+            if (args.Length < 4)
+            {
+                throw new ArgumentException(
+                    "The queue-sandbox-communications-test command requires the Admin sandbox directory, customer ID, and template key.");
+            }
+            QueueSandboxCommunicationsTest(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2],
+                args[3]);
+            break;
+        case "inspect-sandbox-communications-message":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The inspect-sandbox-communications-message command requires the Admin sandbox directory and message ID.");
+            }
+            InspectSandboxCommunicationsMessage(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2]);
             break;
         case "publish":
             if (args.Length < 2)
@@ -1050,20 +1095,74 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
         <?php
         declare(strict_types=1);
 
-        if (PHP_SAPI !== 'cli') {
+        $scheduledInvocation = getenv('PPE_COMMUNICATIONS_CRON') === '1';
+        if (PHP_SAPI !== 'cli' && !$scheduledInvocation) {
             http_response_code(404);
             exit;
         }
-        require __DIR__ . '/../includes/bootstrap.php';
-        require __DIR__ . '/../includes/communications.php';
-        $pdo = database();
-        communication_schedule_lifecycle($pdo);
-        for ($index = 0; $index < 50; $index++) {
-            $result = communication_worker_process_one($pdo);
-            if ($result['status'] === 'idle') break;
+        $statusPath = __DIR__ . '/communications-cron-status.json';
+        $status = [
+            'version' => 1,
+            'started_at_utc' => gmdate('c'),
+            'completed_at_utc' => null,
+            'completed' => false,
+            'outcomes' => [],
+            'error_class' => null,
+        ];
+        $writeStatus = static function () use (&$status, $statusPath): void {
+            $encoded = json_encode($status, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            file_put_contents($statusPath, $encoded . PHP_EOL, LOCK_EX);
+        };
+        try {
+            $writeStatus();
+            require __DIR__ . '/../includes/bootstrap.php';
+            require __DIR__ . '/../includes/communications.php';
+            $pdo = database();
+            communication_schedule_lifecycle($pdo);
+            for ($index = 0; $index < 50; $index++) {
+                $result = communication_worker_process_one($pdo);
+                $outcome = (string)($result['status'] ?? 'unknown');
+                $status['outcomes'][$outcome] = ($status['outcomes'][$outcome] ?? 0) + 1;
+                if ($outcome === 'idle') break;
+            }
+            $status['completed'] = true;
+            $status['completed_at_utc'] = gmdate('c');
+            $writeStatus();
+        } catch (Throwable $exception) {
+            $status['completed_at_utc'] = gmdate('c');
+            $status['error_class'] = get_class($exception);
+            try {
+                $writeStatus();
+            } catch (Throwable) {
+                // Preserve the original failure for the scheduler exit code.
+            }
+            error_log('POS Printer Emulator communications cron failed: ' . get_class($exception));
+            exit(1);
         }
         """;
     UploadText(client, CombineRemote(privateDirectory, "communications-cron.php"), cron);
+    var cronLauncher = """
+        #!/bin/sh
+        set -eu
+        umask 077
+        private_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+        printf '{"version":1,"launched_at_utc":"%s"}\n' \
+          "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+          > "$private_dir/communications-cron-launch.json"
+        set +e
+        PPE_COMMUNICATIONS_CRON=1 \
+          /usr/local/bin/php8.4 -f "$private_dir/communications-cron.php" >/dev/null 2>/dev/null
+        exit_code=$?
+        set -e
+        printf '{"version":1,"launched_at_utc":"%s","php_exit_code":%s}\n' \
+          "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$exit_code" \
+          > "$private_dir/communications-cron-launch.json"
+        exit "$exit_code"
+        """;
+    UploadText(
+        client,
+        CombineRemote(privateDirectory, "communications-cron.sh"),
+        cronLauncher);
 
     Console.WriteLine("Uploaded protected Brevo communications configuration. Provider credentials were not displayed.");
     Console.WriteLine($"Saved encrypted webhook recovery metadata to {recoveryPath}.");
@@ -2183,6 +2282,233 @@ static void RunSandboxCommunicationsCron(
         Console.WriteLine(
             "Sandbox communications cron completed successfully through the verified SSH host: " +
             JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void QueueSandboxCommunicationsTest(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string customerId,
+    string templateKey)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Communications test enqueue is restricted to the Admin sandbox directory.");
+    }
+    if (!System.Text.RegularExpressions.Regex.IsMatch(
+            customerId,
+            @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            templateKey,
+            @"^[a-z][a-z0-9_]{1,63}$"))
+    {
+        throw new ArgumentException("The customer ID or communication template key is invalid.");
+    }
+
+    var php = $$"""
+        <?php
+        declare(strict_types=1);
+        require 'includes/bootstrap.php';
+        require 'includes/communications.php';
+        $pdo = database();
+        $customerId = '{{customerId.ToLowerInvariant()}}';
+        $templateKey = '{{templateKey}}';
+        $customer = $pdo->prepare(
+            'SELECT display_name FROM customers WHERE customer_id=:id LIMIT 1'
+        );
+        $customer->execute(['id' => $customerId]);
+        $name = $customer->fetchColumn();
+        if (!is_string($name) || $name === '') {
+            throw new RuntimeException('Certification customer was not found.');
+        }
+        $messageId = communication_enqueue(
+            $pdo,
+            $customerId,
+            $templateKey,
+            communication_test_parameters($templateKey, $name),
+            'cron-certification:' . $templateKey . ':' . $customerId . ':' . gmdate('YmdHis'),
+            null,
+            false
+        );
+        echo json_encode(['message_id' => $messageId], JSON_THROW_ON_ERROR);
+        """;
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(php));
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            $"printf '%s' '{encoded}' | base64 -d | /usr/bin/php8.4");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox communications test could not be queued (exit {command.ExitStatus}).");
+        }
+        var jsonOffset = command.Result.IndexOf("{\"message_id\"", StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox communications test did not return a message identifier.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(
+            "Queued sandbox communications test for automatic Cron delivery: " +
+            result.RootElement.GetProperty("message_id").GetString());
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void DiagnoseSandboxCommunicationsCron(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Communications Cron diagnostics are restricted to the Admin sandbox directory.");
+    }
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"root=$(pwd); target=$(readlink -f '{normalizedDirectory}/private/communications-cron.php'); " +
+            "phpbin=$(command -v php8.4); " +
+            "/usr/local/bin/php8.4 -l \"$target\" >/dev/null 2>/dev/null; syntax=$?; " +
+            "printf '{\"working_directory\":\"%s\",\"script_path\":\"%s\",\"php_path\":\"%s\",\"script_readable\":%s,\"syntax_exit_code\":%s}\\n' " +
+            "\"$root\" \"$target\" \"$phpbin\" \"$(test -r \"$target\" && printf true || printf false)\" \"$syntax\"");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox Cron path diagnostic failed (exit {command.ExitStatus}).");
+        }
+        using var result = JsonDocument.Parse(command.Result.Trim());
+        Console.WriteLine(JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void InspectSandboxCommunicationsMessage(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string messageId)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            messageId,
+            @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Communications message inspection is restricted to a valid Admin sandbox record.");
+    }
+
+    var php = $$"""
+        <?php
+        declare(strict_types=1);
+        require 'includes/bootstrap.php';
+        $pdo = database();
+        $statement = $pdo->prepare(
+            "SELECT state,attempts,
+                    provider_message_id IS NOT NULL AS provider_id_present
+             FROM communication_outbox WHERE message_id=:id LIMIT 1"
+        );
+        $statement->execute(['id' => '{{messageId.ToLowerInvariant()}}']);
+        $row = $statement->fetch();
+        if (!$row) throw new RuntimeException('Certification message was not found.');
+        $events = $pdo->prepare(
+            'SELECT COUNT(*) FROM communication_delivery_events WHERE message_id=:id'
+        );
+        $events->execute(['id' => '{{messageId.ToLowerInvariant()}}']);
+        echo json_encode([
+            'state' => (string)$row['state'],
+            'attempt_count' => (int)$row['attempts'],
+            'provider_id_present' => (bool)$row['provider_id_present'],
+            'delivery_event_count' => (int)$events->fetchColumn(),
+        ], JSON_THROW_ON_ERROR);
+        """;
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(php));
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            $"printf '%s' '{encoded}' | base64 -d | /usr/local/bin/php8.4");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox message inspection failed (exit {command.ExitStatus}).");
+        }
+        var jsonOffset = command.Result.IndexOf("{\"state\"", StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox message inspection returned no privacy-safe result.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(JsonSerializer.Serialize(result.RootElement));
     }
     finally
     {
