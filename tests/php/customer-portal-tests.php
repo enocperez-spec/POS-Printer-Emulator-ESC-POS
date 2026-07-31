@@ -146,6 +146,8 @@ $contains("portal_require_account", $receipt, 'Receipt downloads must require an
 $contains("portal_purchase_invoice_number", $receipt, 'Receipts must display the stable invoice number.');
 $contains("portal_purchase_payment_approval_reference", $receipt, 'Receipts must display the verified PayPal capture reference.');
 $contains("Content-Disposition: attachment", $receipt, 'Receipts must support a direct download.');
+$contains('/assets/product-icon.png', $receipt, 'Receipts must visibly include the POS Printer Emulator logo.');
+$contains('alt="POS Printer Emulator logo"', $receipt, 'The receipt logo must have meaningful alternative text.');
 $contains("Payment and account credentials are intentionally excluded", $receipt, 'Receipts must explain their sensitive-data boundary.');
 $notContains("paypal.secret", $receipt, 'Receipt rendering must never contain PayPal credentials.');
 $notContains("activation_key,", $receipt, 'Receipt rendering must never retrieve complete activation keys.');
