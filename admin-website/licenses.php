@@ -266,7 +266,7 @@ $licenseStatus = static function (array $license): string {
   <title>License Manager | POS Printer Emulator</title>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="stylesheet" href="assets/admin.css?v=20260714-2">
-  <link rel="stylesheet" href="assets/licenses.css?v=20260731-complimentary">
+  <link rel="stylesheet" href="assets/licenses.css?v=20260731-complimentary-2">
   <link rel="stylesheet" href="assets/mobile-nav.css?v=20260715-1">
 </head>
 <body>
