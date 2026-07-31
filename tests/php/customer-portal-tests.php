@@ -191,6 +191,16 @@ $notContains(
     'Computer-link approval must not reject canonical license identifiers that do not carry RFC UUID version bits.'
 );
 $contains("license_device_bindings", $portal, 'Computer activation and deactivation must update authoritative license-device bindings.');
+$contains(
+    "license_last_sync_status=\\'Active\\'",
+    $portal,
+    'Computer-link approval must immediately replace stale Unlinked status in the Customer Portal.'
+);
+$contains(
+    "license_last_sync_error=NULL",
+    $portal,
+    'Computer-link approval must clear stale synchronization errors after assigning an eligible license.'
+);
 $notContains("ACTIVATION_KEY_CLAIMED", $portal, 'The portal must not retain a backup-key claim workflow.');
 $contains("binding_state=\\'Active\\'", $portal, 'The portal must enforce active device assignments.');
 $contains("request_token_hash", $accountLinkApi, 'The public account-link API must store only a digest of the request token.');
@@ -235,6 +245,8 @@ $contains(
 );
 $contains("issue_device_entitlement", $deviceEntitlementBackend, 'The protected backend must issue a signed, device-bound entitlement.');
 $contains("entitlement_revision", $deviceEntitlementBackend, 'Device entitlement responses must include the current revision.');
+$contains("maintenance_revoked_at", $deviceEntitlementBackend, 'Device entitlement synchronization must retrieve administrative maintenance revocation.');
+$contains("'maintenanceStatus'", $deviceEntitlementBackend, 'Device entitlement responses must include the authoritative maintenance status.');
 $notContains("activationKey']", $portal, 'The browser-facing portal must never retrieve an activation key.');
 $contains("['MAINTENANCE', 'UPGRADE', 'LICENSE']", $portal, 'Portal commerce must allow a distinct new-license purchase.');
 $contains("Buy Additional", $portal, 'Owned customers must receive an explicitly labeled additional-license option.');

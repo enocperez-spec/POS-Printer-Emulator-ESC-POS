@@ -78,6 +78,64 @@ public sealed class MaintenanceRefreshServiceTests
         }
     }
 
+    [Fact]
+    public async Task RefreshAppliesAndClearsAuthoritativeMaintenanceRevocation()
+    {
+        using var vendorKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "POSPrinterEmulator.Tests",
+            Guid.NewGuid().ToString("N"));
+        var installationId = Guid.NewGuid();
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_810_000_000);
+        var token = DeviceEntitlementCodec.Issue(
+            vendorKey.ExportECPrivateKeyPem(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            installationId,
+            LicenseTier.Pro,
+            now,
+            now.AddYears(1),
+            2);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Data:Root"] = root,
+            ["Licensing:PublicKeyPem"] = vendorKey.ExportSubjectPublicKeyInfoPem(),
+            ["AccountLink:EntitlementEndpoint"] =
+                "https://admin.posprinteremulator.com/api/v1/device-entitlement.php",
+        }).Build();
+        var license = new LicenseService(new TestEnvironment(), configuration, () => now);
+        license.BindInstallationId(installationId);
+        license.InstallDeviceEntitlement("Verified Customer", "verified@example.com", token);
+        var handler = new MaintenanceStateHandler(token);
+        var accountLink = new AccountLinkService(
+            new HttpClient(handler),
+            new CredentialsProvider(installationId),
+            license,
+            new NoOpTelemetry(),
+            configuration);
+
+        try
+        {
+            handler.MaintenanceStatus = "Revoked";
+            var revoked = await accountLink.SynchronizeAsync(CancellationToken.None);
+            Assert.Equal("Pro", revoked.Mode);
+            Assert.Equal("Revoked", revoked.Maintenance.State);
+            Assert.False(revoked.Maintenance.IsActive);
+
+            handler.MaintenanceStatus = "Active";
+            var restored = await accountLink.SynchronizeAsync(CancellationToken.None);
+            Assert.Equal("Pro", restored.Mode);
+            Assert.Equal("Active", restored.Maintenance.State);
+            Assert.True(restored.Maintenance.IsActive);
+            Assert.Equal(now.AddYears(1), restored.Maintenance.ExpiresAt);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
     private sealed class EntitlementHandler(string token) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -91,6 +149,29 @@ public sealed class MaintenanceRefreshServiceTests
                     deviceEntitlement = token,
                     customerName = "Verified Customer",
                     emailAddress = "verified@example.com",
+                }), Encoding.UTF8, "application/json"),
+            });
+    }
+
+    private sealed class MaintenanceStateHandler(string token) : HttpMessageHandler
+    {
+        public string MaintenanceStatus { get; set; } = "Active";
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    state = "Active",
+                    deviceEntitlement = token,
+                    customerName = "Verified Customer",
+                    emailAddress = "verified@example.com",
+                    maintenanceStatus = MaintenanceStatus,
+                    maintenanceExpiresAt = DateTimeOffset.FromUnixTimeSeconds(1_810_000_000)
+                        .AddYears(1)
+                        .ToString("O"),
                 }), Encoding.UTF8, "application/json"),
             });
     }

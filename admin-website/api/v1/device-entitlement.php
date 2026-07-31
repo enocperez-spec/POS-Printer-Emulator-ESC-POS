@@ -38,7 +38,8 @@ try {
     $query = $pdo->prepare(
         "SELECT i.id AS installation_id,i.installation_uuid,i.customer_id,
                 c.display_name,c.canonical_email,
-                l.license_id,l.license_tier,l.control_state,l.license_expires_at,l.maintenance_expires_at,
+                l.license_id,l.license_tier,l.control_state,l.license_expires_at,
+                l.maintenance_expires_at,l.maintenance_revoked_at,
                 l.entitlement_revision,b.binding_id,b.binding_state
          FROM installations i
          INNER JOIN customers c ON c.customer_id=i.customer_id
@@ -138,6 +139,13 @@ try {
         'licenseId' => $paidLicenseActive ? (string)$row['license_id'] : null,
         'licenseTier' => $paidLicenseActive ? (string)$row['license_tier'] : 'Trial',
         'licenseExpiresAt' => $paidLicenseActive ? $row['license_expires_at'] : null,
+        'maintenanceStatus' => $paidLicenseActive
+            ? (!empty($row['maintenance_revoked_at'])
+                ? 'Revoked'
+                : (strtotime((string)$row['maintenance_expires_at'] . ' UTC') > time()
+                    ? 'Active'
+                    : 'Expired'))
+            : 'NotApplicable',
         'maintenanceExpiresAt' => $paidLicenseActive ? (string)$row['maintenance_expires_at'] : null,
         'customerName' => (string)$row['display_name'],
         'emailAddress' => (string)$row['canonical_email'],

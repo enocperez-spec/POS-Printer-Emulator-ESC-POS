@@ -286,9 +286,29 @@ public sealed class AccountLinkService
             _license.RegisterInstallation(customerName, emailAddress);
             status = _license.GetStatus();
         }
-        return !string.IsNullOrWhiteSpace(result.PromotionEntitlement)
+        status = !string.IsNullOrWhiteSpace(result.PromotionEntitlement)
             ? _license.InstallPromotionEntitlement(result.PromotionEntitlement)
             : status;
+        if (!string.IsNullOrWhiteSpace(result.DeviceEntitlement))
+        {
+            if (result.MaintenanceStatus?.Equals("Revoked", StringComparison.OrdinalIgnoreCase) == true ||
+                result.MaintenanceStatus?.Equals("Expired", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                DateTimeOffset? remoteExpiration = DateTimeOffset.TryParse(
+                    result.MaintenanceExpiresAt,
+                    out var parsedExpiration)
+                    ? parsedExpiration
+                    : null;
+                status = _license.RecordMaintenanceUnavailable(
+                    result.MaintenanceStatus,
+                    remoteExpiration);
+            }
+            else if (result.MaintenanceStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                status = _license.RecordMaintenanceAvailable();
+            }
+        }
+        return status;
     }
 
     private async Task<DeviceEntitlementServerResponse> FetchDeviceEntitlementAsync(
@@ -417,6 +437,8 @@ public sealed class AccountLinkService
         string? PromotionEntitlement,
         string? CustomerName,
         string? EmailAddress,
+        string? MaintenanceStatus,
+        string? MaintenanceExpiresAt,
         string? Error);
 
     private sealed record DeviceUnlinkServerResponse(

@@ -275,7 +275,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        WHEN :maintenance_expires_2>=UTC_TIMESTAMP(6) THEN \'Active\'
                        ELSE \'Expired\'
                      END,
-                     maintenance_expires_at=:maintenance_expires_3,portal_deactivated_at=NULL
+                     maintenance_expires_at=:maintenance_expires_3,portal_deactivated_at=NULL,
+                     license_last_sync_at=UTC_TIMESTAMP(6),license_last_sync_status=\'Active\',
+                     license_last_sync_error=NULL
                  WHERE id=:installation_id'
             );
             $updateInstallation->execute([
