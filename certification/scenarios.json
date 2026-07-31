@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "trial-new-install",
+      "license": "Trial",
+      "critical": true,
+      "stages": ["download", "clean-install", "onboarding", "trial-limits", "application-restart", "windows-restart"]
+    },
+    {
+      "id": "trial-to-lite",
+      "license": "Lite",
+      "critical": true,
+      "stages": ["registration", "email-verification", "sandbox-purchase", "license-creation", "computer-link", "license-sync", "feature-validation", "unlink", "relink"]
+    },
+    {
+      "id": "trial-to-pro",
+      "license": "Pro",
+      "critical": true,
+      "stages": ["registration", "email-verification", "sandbox-purchase", "license-creation", "computer-link", "license-sync", "feature-validation", "unlink", "relink"]
+    },
+    {
+      "id": "trial-to-enterprise",
+      "license": "Enterprise",
+      "critical": true,
+      "stages": ["registration", "email-verification", "sandbox-purchase", "license-creation", "computer-link", "license-sync", "enterprise-feature-validation", "unlink", "relink"]
+    },
+    {
+      "id": "lite-to-pro",
+      "license": "Pro",
+      "critical": true,
+      "stages": ["upgrade-purchase", "license-sync", "feature-validation"]
+    },
+    {
+      "id": "lite-to-enterprise",
+      "license": "Enterprise",
+      "critical": true,
+      "stages": ["upgrade-purchase", "license-sync", "enterprise-feature-validation"]
+    },
+    {
+      "id": "pro-to-enterprise",
+      "license": "Enterprise",
+      "critical": true,
+      "stages": ["upgrade-purchase", "license-sync", "enterprise-feature-validation"]
+    },
+    {
+      "id": "maintenance-expiration-renewal",
+      "license": "Paid",
+      "critical": true,
+      "stages": ["expire-maintenance", "permanent-features-remain", "renewal-purchase", "update-access-restored"]
+    },
+    {
+      "id": "payment-failure-recovery",
+      "license": "Paid",
+      "critical": true,
+      "stages": ["declined-payment", "canceled-payment", "delayed-webhook", "retry", "idempotency"]
+    },
+    {
+      "id": "refund-chargeback",
+      "license": "Paid",
+      "critical": true,
+      "stages": ["refund", "chargeback-review", "entitlement-reconciliation", "audit-validation"]
+    },
+    {
+      "id": "device-limit-transfer",
+      "license": "Paid",
+      "critical": true,
+      "stages": ["device-limit", "unlink", "second-device-link", "history-validation"]
+    },
+    {
+      "id": "offline-grace-recovery",
+      "license": "Paid",
+      "critical": true,
+      "stages": ["server-unavailable", "offline-grace", "grace-expiration", "service-restored", "manual-refresh"]
+    },
+    {
+      "id": "upgrade-and-reinstall",
+      "license": "Paid",
+      "critical": true,
+      "stages": ["older-version", "upgrade-install", "rename-computer", "different-windows-user", "uninstall", "reinstall", "license-preserved"]
+    }
+  ]
+}

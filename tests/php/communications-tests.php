@@ -61,6 +61,30 @@ $expect(communication_template_priority('release_announcement') < communication_
 
 $clean = communication_validate_parameters(['customer_name' => 'Example Customer', 'portal_url' => 'https://userportal.posprinteremulator.com/']);
 $expect($clean['customer_name'] === 'Example Customer', 'Approved plain-text parameters changed unexpectedly.');
+$invoiceParameters = communication_validate_parameters([
+    'customer_name' => 'Example Customer',
+    'invoice_number' => 'PPE-INV-20260728-ABCDEF1234',
+    'invoice_date' => 'July 28, 2026',
+    'invoice_description' => 'POS Printer Emulator Lite License',
+    'invoice_amount' => '24.99',
+    'invoice_currency' => 'USD',
+    'payment_status' => 'Paid',
+    'transaction_reference' => 'TESTTRANSACTION123',
+]);
+$invoiceAttachment = communication_invoice_attachment('purchase_confirmation', $invoiceParameters);
+$expect(is_array($invoiceAttachment), 'A complete purchase confirmation must receive an invoice attachment.');
+$invoicePdf = base64_decode((string)$invoiceAttachment['content'], true) ?: '';
+$expect(
+    str_starts_with($invoicePdf, '%PDF-1.4'),
+    'The generated invoice attachment must be a PDF document.'
+);
+$contains('/Logo Do', $invoicePdf, 'The generated PDF invoice must visibly render the product logo.');
+$contains('/Subtype /Image', $invoicePdf, 'The generated PDF invoice must embed its logo instead of relying on a remote image.');
+$contains('PAYPAL APPROVAL REFERENCE', $invoicePdf, 'The generated PDF invoice must label the verified PayPal capture reference.');
+$expect(
+    communication_invoice_attachment('activation_ready', $invoiceParameters) === null,
+    'The invoice must be attached once to the purchase confirmation, not duplicated across onboarding mail.'
+);
 foreach ([
     ['receipt_data' => 'secret'],
     ['customer_name' => 'Activation key PPE1-DO-NOT-SEND'],
@@ -137,6 +161,7 @@ $admin = file_get_contents($root . '/admin-website/communications.php') ?: '';
 $auth = file_get_contents($root . '/admin-website/includes/auth.php') ?: '';
 $bootstrap = file_get_contents($root . '/admin-website/includes/bootstrap.php') ?: '';
 $worker = file_get_contents($root . '/admin-website/api/v1/communications-worker.php') ?: '';
+$templateSync = file_get_contents($root . '/admin-website/api/v1/communications-template-sync.php') ?: '';
 $webhook = file_get_contents($root . '/admin-website/api/v1/brevo-webhook.php') ?: '';
 $scheduler = file_get_contents($root . '/admin-website/api/v1/communications-scheduler.php') ?: '';
 $preview = file_get_contents($root . '/admin-website/api/v1/template-preview.php') ?: '';
@@ -153,6 +178,9 @@ $contains("CURLOPT_PROTOCOLS => CURLPROTO_HTTPS", $communications, 'Brevo delive
 $contains("'api-key: ' . (string)\$config['brevo_api_key']", $communications, 'Brevo REST delivery must authenticate outside the payload.');
 $contains('DeliveryUnknown', $communications, 'Unknown network outcomes must not be retried blindly.');
 $contains('uq_communication_idempotency', $communications, 'The durable outbox requires database-enforced idempotency.');
+$contains('communication_backfill_pending_invoice_parameters', $communications, 'Pending purchase confirmations must receive invoice data during deployment.');
+$contains("o.state IN ('Pending','Deferred')", $communications, 'Invoice backfill must never rewrite already-sent customer messages.');
+$contains("\$payload['attachment']", $communications, 'Purchase confirmation delivery must attach the generated invoice.');
 $contains('communication_policy_decision', $communications, 'Consent and suppression must be checked at delivery time.');
 $contains('communication_reserve_quota', $communications, 'Quota must be reserved atomically before provider delivery.');
 $contains("'hardbounce', 'hard_bounce'", $communications, 'Brevo hard-bounce events must create a global delivery suppression.');
@@ -162,6 +190,9 @@ $contains("require_admin_capability('communications.export')", $admin, 'Communic
 $contains("'communications.manage'", $auth, 'Admin roles are missing communication capabilities.');
 $contains('private/communications.php', $bootstrap, 'Protected communications configuration is not loaded outside public files.');
 $contains('communication_service_authorized()', $worker, 'The worker endpoint must require protected service authentication.');
+$contains('communication_service_authorized()', $templateSync, 'Template synchronization must require protected service authentication.');
+$contains('communication_validate_brevo_template', $templateSync, 'Synchronized provider templates must pass the approved blueprint validation.');
+$contains('COMMUNICATION_TEMPLATE_SYNCHRONIZED', $templateSync, 'Template branding synchronization must be recorded in the audit log.');
 $contains('communication_webhook_authorized()', $webhook, 'The Brevo webhook must require its own protected bearer token.');
 $contains('communication_schedule_lifecycle', $scheduler, 'The authenticated scheduler must run every reviewed lifecycle schedule.');
 $contains('communication_enqueue(', $communications, 'Lifecycle schedules must use the same policy-aware queue.');
@@ -184,6 +215,7 @@ $contains("'Product Analytics'", $telemetry, 'Lifecycle analytics must require t
 $contains("!== 'Granted'", $telemetry, 'Lifecycle analytics must fail closed when opt-in is absent.');
 $contains('does not send receipt content', $privacy, 'The privacy notice must disclose prohibited communication data.');
 $contains('configure-communications', $publisher, 'The C# publisher must configure provider secrets without PowerShell.');
+$contains('sync-sandbox-communication-template', $publisher, 'The publisher needs a protected sandbox template synchronization command.');
 $contains('require_recent_admin_authentication', $admin, 'Communication mutations and exports must require recent administrator authentication.');
 $contains('Opened · approximate', $admin, 'Open and click analytics must be clearly labeled as approximate.');
 $contains('communication_template_tags', $communications, 'Approved templates need normalized multi-tag storage.');

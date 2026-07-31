@@ -17,6 +17,16 @@ if (storageVerificationExitCode is not null)
 }
 
 var builder = WebApplication.CreateBuilder(args);
+var externalServicesOverridePath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+    "POSPrinterEmulator",
+    "external-services.json");
+builder.Configuration
+    .AddJsonFile(externalServicesOverridePath, optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables()
+    .AddEnvironmentVariables("PPE_");
+var externalServices = ExternalServicesOptions.FromConfiguration(builder.Configuration);
+externalServices.Validate();
 var supportLogs = new SupportLogProvider();
 builder.Logging.AddProvider(supportLogs);
 builder.Host.UseWindowsService(options => options.ServiceName = "POS Printer Emulator");
@@ -24,6 +34,7 @@ builder.WebHost.UseUrls(builder.Configuration["Viewer:Url"] ?? "http://127.0.0.1
 
 var printerOptions = builder.Configuration.GetSection("Printer").Get<PrinterOptions>() ?? new PrinterOptions();
 builder.Services.AddSingleton(printerOptions);
+builder.Services.AddSingleton(externalServices);
 builder.Services.AddSingleton<EscPosParser>();
 builder.Services.AddSingleton<ReceiptStore>();
 builder.Services.AddSingleton<LicenseService>();
@@ -59,7 +70,7 @@ builder.Services.AddHttpClient<AccountLinkService>(client =>
 builder.Services.AddHostedService<DeviceEntitlementSyncService>();
 builder.Services.AddHttpClient<PromotionAccessService>(client =>
 {
-    client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
+    client.BaseAddress = externalServices.PromotionBaseUrl;
     client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
     client.Timeout = TimeSpan.FromSeconds(20);
 });
@@ -74,7 +85,7 @@ builder.Services.AddHttpClient<UpdateService>(client =>
 builder.Services.AddTransient<MaintenanceRefreshService>();
 builder.Services.AddHttpClient<SupportRequestService>(client =>
 {
-    client.BaseAddress = new Uri("https://admin.posprinteremulator.com/");
+    client.BaseAddress = externalServices.SupportBaseUrl;
     client.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
@@ -114,7 +125,9 @@ app.MapGet("/api/status", (PrinterListenerManager listeners, LicenseService lice
         status.Listeners.Select(listener => listener.LastConnection).Where(value => value is not null).Max(),
         ProductInfo.Version,
         license.GetStatus(),
-        status.ToSummary());
+        status.ToSummary(),
+        externalServices.Links,
+        externalServices.Profile);
 });
 
 app.MapGet("/api/updates/check", async (bool? force, UpdateService updates, LicenseService license, CancellationToken cancellationToken) =>

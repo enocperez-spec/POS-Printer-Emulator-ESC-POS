@@ -21,19 +21,30 @@ try {
     if (!is_array($order)) {
         json_response(['error' => 'Order not found.'], 404);
     }
+    $correlationId = strtolower(trim((string)($session['correlationId'] ?? '')));
+    if (!hash_equals((string)($order['journey_correlation_id'] ?? ''), $correlationId)) {
+        throw new DomainException('The payment journey could not be verified.');
+    }
     if (in_array((string)$order['status'], ['APPROVED', 'EMAILED', 'EMAIL_FAILED'], true)) {
         json_response(['publicId' => $order['public_id'], 'status' => $order['status'], 'idempotent' => true]);
     }
 
     $paypalPath = '/v2/checkout/orders/' . rawurlencode($paypalId);
     try {
-        $captured = paypal_request('POST', $paypalPath . '/capture', null, 'portal-capture-' . $order['public_id']);
+        paypal_request('POST', $paypalPath . '/capture', null, 'portal-capture-' . $order['public_id']);
     } catch (RuntimeException) {
-        $captured = paypal_request('GET', $paypalPath);
+        // PayPal may report an already-captured order when this endpoint is
+        // retried. The authoritative GET below handles that idempotently.
     }
+    // The immediate capture response can omit purchase-unit metadata such as
+    // custom_id. Always retrieve the authoritative order before verifying the
+    // account-bound correlation, amount, currency, and completed capture.
+    $captured = paypal_request('GET', $paypalPath);
     $capture = $captured['purchase_units'][0]['payments']['captures'][0] ?? null;
+    $providerCorrelationId = strtolower(trim((string)($captured['purchase_units'][0]['custom_id'] ?? '')));
     if (($captured['status'] ?? '') !== 'COMPLETED' || !is_array($capture) ||
         ($capture['status'] ?? '') !== 'COMPLETED' ||
+        !hash_equals($correlationId, $providerCorrelationId) ||
         ($capture['amount']['value'] ?? '') !== $order['amount'] ||
         ($capture['amount']['currency_code'] ?? '') !== $order['currency']) {
         audit((int)$order['id'], 'PORTAL_CAPTURE_REJECTED', json_encode(['status' => $captured['status'] ?? null]));
@@ -68,6 +79,7 @@ try {
     ]);
     audit((int)$order['id'], 'PORTAL_ORDER_FULFILLED', json_encode([
         'intentId' => $session['intentId'],
+        'correlationId' => $correlationId,
         'captureId' => $providerCaptureId,
         'idempotent' => (bool)($fulfilled['idempotent'] ?? false),
     ], JSON_UNESCAPED_SLASHES));

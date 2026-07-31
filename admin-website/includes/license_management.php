@@ -64,9 +64,12 @@ function ensure_license_management_schema(PDO $pdo): void
             'deactivated_at' => 'ALTER TABLE issued_licenses ADD COLUMN deactivated_at DATETIME(6) NULL AFTER control_state',
             'deleted_at' => 'ALTER TABLE issued_licenses ADD COLUMN deleted_at DATETIME(6) NULL AFTER revoked_at',
             'superseded_by_license_id' => 'ALTER TABLE issued_licenses ADD COLUMN superseded_by_license_id CHAR(36) NULL AFTER deleted_at',
-            'license_source' => "ALTER TABLE issued_licenses ADD COLUMN license_source ENUM('Manual', 'Purchase') NOT NULL DEFAULT 'Manual' AFTER superseded_by_license_id",
+            'license_source' => "ALTER TABLE issued_licenses ADD COLUMN license_source ENUM('Manual', 'Purchase', 'Complimentary') NOT NULL DEFAULT 'Manual' AFTER superseded_by_license_id",
             'source_reference' => 'ALTER TABLE issued_licenses ADD COLUMN source_reference VARCHAR(64) NULL AFTER license_source',
-            'maintenance_expires_at' => 'ALTER TABLE issued_licenses ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER source_reference',
+            'license_expires_at' => 'ALTER TABLE issued_licenses ADD COLUMN license_expires_at DATETIME(6) NULL AFTER source_reference',
+            'complimentary_reason' => 'ALTER TABLE issued_licenses ADD COLUMN complimentary_reason VARCHAR(24) NULL AFTER license_expires_at',
+            'complimentary_note' => 'ALTER TABLE issued_licenses ADD COLUMN complimentary_note VARCHAR(500) NULL AFTER complimentary_reason',
+            'maintenance_expires_at' => 'ALTER TABLE issued_licenses ADD COLUMN maintenance_expires_at DATETIME(6) NULL AFTER complimentary_note',
             'maintenance_revoked_at' => 'ALTER TABLE issued_licenses ADD COLUMN maintenance_revoked_at DATETIME(6) NULL AFTER maintenance_expires_at',
             'row_version' => 'ALTER TABLE issued_licenses ADD COLUMN row_version BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER maintenance_revoked_at',
             'updated_at' => 'ALTER TABLE issued_licenses ADD COLUMN updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) AFTER created_at',
@@ -81,6 +84,17 @@ function ensure_license_management_schema(PDO $pdo): void
             if (!isset($columns[$name])) {
                 $pdo->exec($statement);
             }
+        }
+        $licenseSourceColumn = $pdo->query(
+            "SHOW COLUMNS FROM issued_licenses LIKE 'license_source'"
+        )->fetch();
+        if ($licenseSourceColumn &&
+            !str_contains((string)$licenseSourceColumn['Type'], "'Complimentary'")) {
+            $pdo->exec(
+                "ALTER TABLE issued_licenses
+                 MODIFY COLUMN license_source
+                 ENUM('Manual', 'Purchase', 'Complimentary') NOT NULL DEFAULT 'Manual'"
+            );
         }
         $activationKeyColumn = $pdo->query(
             "SHOW COLUMNS FROM issued_licenses LIKE 'activation_key'"
@@ -253,6 +267,57 @@ function canonical_paid_tier(string $value): string
     return $value;
 }
 
+function canonical_complimentary_reason(string $value): string
+{
+    if (!in_array($value, ['Promotional', 'Partner', 'Evaluation', 'Referral', 'Other'], true)) {
+        throw new InvalidArgumentException('Choose Promotional, Partner, Evaluation, Referral, or Other.');
+    }
+    return $value;
+}
+
+function normalize_complimentary_expiration(
+    string $duration,
+    ?string $expirationDate,
+    ?DateTimeImmutable $now = null
+): ?string {
+    if ($duration === 'permanent') {
+        return null;
+    }
+    if ($duration !== 'expires') {
+        throw new InvalidArgumentException('Choose a permanent license or an expiration date.');
+    }
+
+    $expirationDate = trim((string)$expirationDate);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $expirationDate)) {
+        throw new InvalidArgumentException('Choose a valid complimentary license expiration date.');
+    }
+    $utc = new DateTimeZone('UTC');
+    $expiration = DateTimeImmutable::createFromFormat('!Y-m-d', $expirationDate, $utc);
+    if (!$expiration || $expiration->format('Y-m-d') !== $expirationDate) {
+        throw new InvalidArgumentException('Choose a valid complimentary license expiration date.');
+    }
+    $expiration = $expiration->setTime(23, 59, 59, 999999);
+    $now ??= new DateTimeImmutable('now', $utc);
+    if ($expiration <= $now) {
+        throw new InvalidArgumentException('The complimentary license expiration date must be in the future.');
+    }
+    return $expiration->format('Y-m-d H:i:s.u');
+}
+
+function license_entitlement_expired(array $license, ?DateTimeImmutable $now = null): bool
+{
+    $expiresAt = trim((string)($license['license_expires_at'] ?? ''));
+    if ($expiresAt === '') {
+        return false;
+    }
+    $now ??= new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    try {
+        return new DateTimeImmutable($expiresAt, new DateTimeZone('UTC')) < $now;
+    } catch (Throwable) {
+        return true;
+    }
+}
+
 function maintenance_registration_digest(string $customerName, string $emailAddress): string
 {
     $customer = strtoupper(trim(preg_replace('/[ \t\r\n\f\v]+/', ' ', $customerName) ?? '', " \t\r\n\f\v"));
@@ -312,6 +377,7 @@ function record_maintenance_event(
         'source_reference' => $sourceReference !== null ? substr($sourceReference, 0, 80) : null,
         'reason' => $reason !== null ? substr($reason, 0, 500) : null,
         'performed_by' => substr($actor !== '' ? $actor : 'owner', 0, 80),
+        'admin_ip' => license_admin_ip(),
     ]);
 }
 
@@ -343,7 +409,6 @@ function record_license_event(PDO $pdo, array $license, string $eventType, strin
         'reason' => $changes['reason'] ?? null,
         'performed_by' => substr($actor !== '' ? $actor : 'owner', 0, 80),
         'admin_ip' => license_admin_ip(),
-        'admin_ip' => license_admin_ip(),
     ]);
 }
 
@@ -355,9 +420,10 @@ function insert_issued_license(
     ?string $sourceReference = null,
     string $eventType = 'ISSUED',
     string $maintenanceEventType = 'INITIAL_INCLUDED',
-    ?string $maintenanceReason = null
+    ?string $maintenanceReason = null,
+    ?string $eventReason = null
 ): void {
-    if (!in_array($source, ['Manual', 'Purchase'], true)) {
+    if (!in_array($source, ['Manual', 'Purchase', 'Complimentary'], true)) {
         throw new InvalidArgumentException('The license source is invalid.');
     }
     $customerLookup = $pdo->prepare(
@@ -373,11 +439,23 @@ function insert_issued_license(
     $statement = $pdo->prepare(
         'INSERT INTO issued_licenses
             (license_id, customer_id, customer_name, email_address, license_tier, issued_at,
-             created_by, control_state, license_source, source_reference, maintenance_expires_at)
+             created_by, control_state, license_source, source_reference, license_expires_at,
+             complimentary_reason, complimentary_note, maintenance_expires_at)
          VALUES
             (:license_id, :customer_id, :customer_name, :email_address, :license_tier, :issued_at,
-             :created_by, \'Enabled\', :license_source, :source_reference, :maintenance_expires_at)'
+             :created_by, \'Enabled\', :license_source, :source_reference, :license_expires_at,
+             :complimentary_reason, :complimentary_note, :maintenance_expires_at)'
     );
+    $maintenanceExpiresAt = (string)($issued['maintenance_expires_at'] ??
+        (new DateTimeImmutable((string)$issued['issued_at'], new DateTimeZone('UTC')))
+            ->modify('+1 year')->format('Y-m-d H:i:s'));
+    $licenseExpiresAt = isset($issued['license_expires_at']) &&
+        trim((string)$issued['license_expires_at']) !== ''
+        ? (string)$issued['license_expires_at']
+        : null;
+    if ($licenseExpiresAt !== null && $licenseExpiresAt < $maintenanceExpiresAt) {
+        $maintenanceExpiresAt = $licenseExpiresAt;
+    }
     $statement->execute([
         'license_id' => canonical_license_uuid((string)$issued['license_id']),
         'customer_id' => $customerId,
@@ -388,12 +466,19 @@ function insert_issued_license(
         'created_by' => substr($actor !== '' ? $actor : 'owner', 0, 80),
         'license_source' => $source,
         'source_reference' => $sourceReference,
-        'maintenance_expires_at' => (string)($issued['maintenance_expires_at'] ??
-            (new DateTimeImmutable((string)$issued['issued_at'], new DateTimeZone('UTC')))->modify('+1 year')->format('Y-m-d H:i:s')),
+        'license_expires_at' => $licenseExpiresAt,
+        'complimentary_reason' => $source === 'Complimentary'
+            ? canonical_complimentary_reason((string)($issued['complimentary_reason'] ?? 'Other'))
+            : null,
+        'complimentary_note' => $source === 'Complimentary' && trim((string)($issued['complimentary_note'] ?? '')) !== ''
+            ? mb_substr(trim((string)$issued['complimentary_note']), 0, 500)
+            : null,
+        'maintenance_expires_at' => $maintenanceExpiresAt,
     ]);
     record_license_event($pdo, $issued, $eventType, $actor, [
         'new_state' => 'Enabled',
         'new_tier' => (string)$issued['license_tier'],
+        'reason' => $eventReason,
     ]);
     record_maintenance_event(
         $pdo,
@@ -401,8 +486,7 @@ function insert_issued_license(
         $maintenanceEventType,
         $actor,
         null,
-        (string)($issued['maintenance_expires_at'] ??
-            (new DateTimeImmutable((string)$issued['issued_at'], new DateTimeZone('UTC')))->modify('+1 year')->format('Y-m-d H:i:s')),
+        $maintenanceExpiresAt,
         'initial:' . canonical_license_uuid((string)$issued['license_id']),
         $maintenanceReason ?? 'One year of Application Maintenance and Support included with the permanent license.'
     );
@@ -413,7 +497,8 @@ function find_license_for_update(PDO $pdo, string $licenseId): array
     $statement = $pdo->prepare(
         'SELECT license_id, customer_id, customer_name, email_address, license_tier, issued_at,
                 control_state, deactivated_at, revoked_at, deleted_at, superseded_by_license_id,
-                license_source, source_reference, maintenance_expires_at, maintenance_revoked_at, row_version
+                license_source, source_reference, license_expires_at, complimentary_reason, complimentary_note,
+                maintenance_expires_at, maintenance_revoked_at, row_version
          FROM issued_licenses WHERE license_id = :license_id FOR UPDATE'
     );
     $statement->execute(['license_id' => canonical_license_uuid($licenseId)]);

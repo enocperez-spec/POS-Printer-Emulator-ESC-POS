@@ -1,4 +1,4 @@
-import './license-catalog.js';
+import './license-catalog.js?v=20260731-managed-pricing';
 
 const header = document.querySelector('[data-header]');
 const menuButton = document.querySelector('[data-menu-toggle]');

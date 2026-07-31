@@ -28,6 +28,13 @@ const string BrevoSenderNameVariable = "PPE_BREVO_SENDER_NAME";
 const string BrevoReplyToEmailVariable = "PPE_BREVO_REPLY_TO_EMAIL";
 const string BrevoModeVariable = "PPE_BREVO_MODE";
 const string BrevoTestAllowlistVariable = "PPE_BREVO_TEST_ALLOWLIST";
+const string DeploymentProfileVariable = "PPE_DEPLOYMENT_PROFILE";
+const string AdminBaseUrlVariable = "PPE_ADMIN_BASE_URL";
+const string SupportBaseUrlVariable = "PPE_SUPPORT_BASE_URL";
+const string PayPalClientIdVariable = "PPE_PAYPAL_CLIENT_ID";
+const string PayPalSecretVariable = "PPE_PAYPAL_SECRET";
+const string PayPalBaseUrlVariable = "PPE_PAYPAL_BASE_URL";
+const string RolloutReadinessReportVariable = "PPE_ROLLOUT_READINESS_REPORT";
 const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -36,9 +43,14 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher list [remote-directory]");
     Console.WriteLine("  website-publisher download <remote-file> <local-file>");
     Console.WriteLine("  website-publisher upload <local-file> <remote-file>");
+    Console.WriteLine("  website-publisher upload-sandbox <local-file> <remote-file>");
     Console.WriteLine("  website-publisher delete-file <remote-file>");
+    Console.WriteLine("  website-publisher delete-sandbox-file <remote-file>");
+    Console.WriteLine("  website-publisher fetch-sandbox-release <github-release-url> <remote-file>");
     Console.WriteLine("  website-publisher publish <local-directory> [remote-directory]");
+    Console.WriteLine("  website-publisher publish-sandbox <local-directory> <remote-directory>");
     Console.WriteLine("  website-publisher configure <schema-file> [remote-directory]");
+    Console.WriteLine("  website-publisher configure-recovered <schema-file> [remote-directory]");
     Console.WriteLine("  website-publisher upload-schema <schema-file> [remote-directory]");
     Console.WriteLine("  website-publisher upload-protected <local-file> <private/remote-file> [remote-directory]");
     Console.WriteLine("  website-publisher download-protected <private/remote-file> <local-file> [remote-directory]");
@@ -49,12 +61,19 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher migrate-communications <https-migration-url>");
     Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
     Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
+    Console.WriteLine("  website-publisher configure-purchase-integration <admin-remote-directory> <buy-remote-directory>");
     Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-self-service-commerce <https-migration-url>");
+    Console.WriteLine("  website-publisher migrate-schema-recovered <https-setup-url>");
+    Console.WriteLine("  website-publisher seed-certification-recovered <https-setup-url>");
     Console.WriteLine("  website-publisher portal-diagnostics <https-diagnostics-url> <email>");
+    Console.WriteLine("  website-publisher run-communications-worker <https-worker-url> [maximum]");
+    Console.WriteLine("  website-publisher sync-sandbox-communication-template <https-sync-url> <template-key>");
+    Console.WriteLine("  website-publisher sandbox-reset-checkout-rate <portal-remote-directory> <email>");
     Console.WriteLine("  website-publisher sync-license-catalog [repository-root]");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
+    Console.WriteLine($"Production mutations additionally require a passing report in {RolloutReadinessReportVariable}.");
     return 0;
 }
 
@@ -98,6 +117,26 @@ if (args[0].Equals("migrate-self-service-commerce", StringComparison.OrdinalIgno
     await MigrateSelfServiceCommerceAsync(migrationUri);
     return 0;
 }
+if (args[0].Equals("migrate-schema-recovered", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var setupUri) ||
+        setupUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The migrate-schema-recovered command requires an HTTPS setup URL.");
+    }
+    await MigrateSchemaWithRecoveredAdminAsync(setupUri);
+    return 0;
+}
+if (args[0].Equals("seed-certification-recovered", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var setupUri) ||
+        setupUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The seed-certification-recovered command requires an HTTPS setup URL.");
+    }
+    await SeedCertificationWithRecoveredAdminAsync(setupUri);
+    return 0;
+}
 if (args[0].Equals("portal-diagnostics", StringComparison.OrdinalIgnoreCase))
 {
     if (args.Length < 3 || !Uri.TryCreate(args[1], UriKind.Absolute, out var diagnosticsUri) ||
@@ -112,6 +151,53 @@ if (args[0].Equals("sync-license-catalog", StringComparison.OrdinalIgnoreCase))
 {
     SyncLicenseCatalog(args.Length > 1 ? args[1] : Directory.GetCurrentDirectory());
     return 0;
+}
+if (args[0].Equals("run-communications-worker", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 2 || !Uri.TryCreate(args[1], UriKind.Absolute, out var workerUri) ||
+        workerUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("The run-communications-worker command requires an HTTPS worker URL.");
+    }
+    var maximum = args.Length > 2 && int.TryParse(args[2], out var requestedMaximum)
+        ? Math.Clamp(requestedMaximum, 1, 50)
+        : 10;
+    await RunCommunicationsWorkerAsync(workerUri, maximum);
+    return 0;
+}
+if (args[0].Equals("sync-sandbox-communication-template", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 3 || !Uri.TryCreate(args[1], UriKind.Absolute, out var synchronizationUri) ||
+        synchronizationUri.Scheme != Uri.UriSchemeHttps ||
+        !synchronizationUri.Host.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new ArgumentException(
+            "The sync-sandbox-communication-template command requires an HTTPS sandbox URL and template key.");
+    }
+    await SynchronizeSandboxCommunicationTemplateAsync(synchronizationUri, args[2]);
+    return 0;
+}
+
+var productionMutationCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    "upload",
+    "delete-file",
+    "publish",
+    "configure",
+    "configure-recovered",
+    "upload-schema",
+    "upload-protected",
+    "configure-crm-secrets",
+    "configure-communications",
+    "set-communications-test-allowlist",
+    "configure-customer-portal",
+    "configure-customer-portal-from-admin",
+    "configure-purchase-integration"
+};
+if (productionMutationCommands.Contains(args[0]) &&
+    DeploymentProfile().Equals("production", StringComparison.OrdinalIgnoreCase))
+{
+    RequireProductionReadiness();
 }
 
 var host = RequiredEnvironmentVariable(HostVariable);
@@ -156,12 +242,57 @@ try
             }
             UploadFile(client, Path.GetFullPath(args[1]), args[2]);
             break;
+        case "upload-sandbox":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The upload-sandbox command requires a local file and sandbox remote destination.");
+            }
+            UploadSandboxFile(client, Path.GetFullPath(args[1]), args[2]);
+            break;
         case "delete-file":
             if (args.Length < 2)
             {
                 throw new ArgumentException("The delete-file command requires one remote file.");
             }
             DeleteRemoteFile(client, args[1]);
+            break;
+        case "delete-sandbox-file":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The delete-sandbox-file command requires one sandbox remote file.");
+            }
+            DeleteSandboxFile(client, args[1]);
+            break;
+        case "fetch-sandbox-release":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The fetch-sandbox-release command requires a GitHub release URL and sandbox remote file.");
+            }
+            FetchSandboxRelease(
+                client,
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2]);
+            break;
+        case "sandbox-reset-checkout-rate":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The sandbox-reset-checkout-rate command requires a sandbox portal directory and email.");
+            }
+            ResetSandboxCheckoutRate(
+                client,
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2]);
             break;
         case "publish":
             if (args.Length < 2)
@@ -171,9 +302,17 @@ try
 
             var localDirectory = Path.GetFullPath(args[1]);
             var remoteDirectory = args.Length > 2 ? args[2] : ".";
-            Publish(client, localDirectory, remoteDirectory);
+            Publish(client, localDirectory, remoteDirectory, false);
             UploadWebmasterVerification(client, remoteDirectory);
             SubmitIndexNow(localDirectory);
+            break;
+        case "publish-sandbox":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The publish-sandbox command requires local and remote directories.");
+            }
+            Publish(client, Path.GetFullPath(args[1]), args[2], true);
             break;
         case "configure":
             if (args.Length < 2)
@@ -181,6 +320,21 @@ try
                 throw new ArgumentException("The configure command requires a schema file.");
             }
 
+            Configure(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
+            break;
+        case "configure-recovered":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException("The configure-recovered command requires a schema file.");
+            }
+            if (DeploymentProfile().Equals("production", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Recovered configuration is restricted to a named non-production deployment profile.");
+            }
+            var recoveredAdmin = RecoverAdminCredentials();
+            Environment.SetEnvironmentVariable(AdminUserVariable, recoveredAdmin.Username);
+            Environment.SetEnvironmentVariable(AdminPasswordVariable, recoveredAdmin.Password);
             Configure(client, Path.GetFullPath(args[1]), args.Length > 2 ? args[2] : ".");
             break;
         case "upload-schema":
@@ -235,6 +389,14 @@ try
                 args[1],
                 args.Length > 2 ? args[2] : ".");
             break;
+        case "configure-purchase-integration":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The configure-purchase-integration command requires Admin and Buy remote directories.");
+            }
+            ConfigurePurchaseIntegration(client, args[1], args[2]);
+            break;
         default:
             throw new ArgumentException($"Unknown command: {args[0]}");
     }
@@ -250,6 +412,109 @@ static string RequiredEnvironmentVariable(string name) =>
     Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
         ? value
         : throw new InvalidOperationException($"Required environment variable {name} is not set.");
+
+static string DeploymentProfile()
+{
+    var profile = (Environment.GetEnvironmentVariable(DeploymentProfileVariable) ?? "production")
+        .Trim()
+        .ToLowerInvariant();
+    if (!System.Text.RegularExpressions.Regex.IsMatch(profile, "^[a-z0-9][a-z0-9_-]{0,31}$"))
+    {
+        throw new InvalidOperationException(
+            $"{DeploymentProfileVariable} must contain only letters, numbers, underscores, or hyphens.");
+    }
+    return profile;
+}
+
+static string DeploymentRecoveryPath(string fileName)
+{
+    var directory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "POSPrinterEmulator",
+        "deployment-secrets");
+    Directory.CreateDirectory(directory);
+    return Path.Combine(directory, $"{DeploymentProfile()}-{fileName}");
+}
+
+static void RequireProductionReadiness()
+{
+    var reportPath = Environment.GetEnvironmentVariable(RolloutReadinessReportVariable);
+    if (string.IsNullOrWhiteSpace(reportPath))
+    {
+        throw new InvalidOperationException(
+            $"Production changes are blocked until {RolloutReadinessReportVariable} points to a passing rollout-verify report.json.");
+    }
+    reportPath = Path.GetFullPath(reportPath);
+    if (!File.Exists(reportPath))
+    {
+        throw new FileNotFoundException("The production-readiness report was not found.", reportPath);
+    }
+
+    using var document = JsonDocument.Parse(File.ReadAllText(reportPath));
+    var root = document.RootElement;
+    var status = root.GetProperty("Status").GetString();
+    var environment = root.GetProperty("Environment").GetString();
+    var commit = root.GetProperty("RepositoryCommit").GetString();
+    var completedAt = root.GetProperty("CompletedAtUtc").GetDateTimeOffset();
+    if (!string.Equals(status, "Passed", StringComparison.Ordinal) ||
+        !string.Equals(environment, "production-readiness", StringComparison.Ordinal))
+    {
+        throw new InvalidDataException(
+            "The supplied report is not a passing production-readiness report.");
+    }
+    if (DateTimeOffset.UtcNow - completedAt > TimeSpan.FromHours(24) ||
+        completedAt > DateTimeOffset.UtcNow.AddMinutes(5))
+    {
+        throw new InvalidDataException(
+            "The production-readiness report is stale or has an invalid completion time.");
+    }
+    var currentCommit = RunGitValue("rev-parse", "HEAD");
+    if (string.IsNullOrWhiteSpace(commit) ||
+        !string.Equals(commit, currentCommit, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidDataException(
+            "The production-readiness report is bound to a different Git commit.");
+    }
+    var readinessPassed = root.GetProperty("Checks")
+        .EnumerateArray()
+        .Any(check =>
+            check.GetProperty("Name").GetString() == "Sandbox rollout production readiness" &&
+            check.GetProperty("Status").GetString() == "Passed");
+    if (!readinessPassed)
+    {
+        throw new InvalidDataException(
+            "The production-readiness report does not contain a passing rollout check.");
+    }
+    Console.WriteLine(
+        $"Accepted production-readiness report for commit {currentCommit} completed {completedAt:O}.");
+}
+
+static string RunGitValue(params string[] arguments)
+{
+    using var process = new Process
+    {
+        StartInfo = new ProcessStartInfo("git")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        }
+    };
+    process.StartInfo.WorkingDirectory = Directory.GetCurrentDirectory();
+    foreach (var argument in arguments)
+    {
+        process.StartInfo.ArgumentList.Add(argument);
+    }
+    process.Start();
+    var output = process.StandardOutput.ReadToEnd();
+    process.WaitForExit();
+    if (process.ExitCode != 0)
+    {
+        throw new InvalidOperationException("Git repository state could not be determined.");
+    }
+    return output.Trim();
+}
 
 static void SyncLicenseCatalog(string repositoryRoot)
 {
@@ -298,7 +563,11 @@ static void ListDirectory(SftpClient client, string remoteDirectory)
     }
 }
 
-static void Publish(SftpClient client, string localDirectory, string remoteDirectory)
+static void Publish(
+    SftpClient client,
+    string localDirectory,
+    string remoteDirectory,
+    bool sandbox)
 {
     if (!Directory.Exists(localDirectory))
     {
@@ -329,7 +598,7 @@ static void Publish(SftpClient client, string localDirectory, string remoteDirec
         var parent = remoteFile[..remoteFile.LastIndexOf('/')];
         EnsureDirectory(client, parent, createdDirectories);
 
-        using var input = File.OpenRead(localFile);
+        using var input = OpenDeploymentContent(localFile, sandbox);
         var remoteLength = client.Exists(remoteFile) ? client.GetAttributes(remoteFile).Size : 0;
         if (remoteLength == input.Length &&
             (input.Length > 1_000_000 || RemotePrefixMatches(client, remoteFile, input, input.Length)))
@@ -371,13 +640,17 @@ static void Publish(SftpClient client, string localDirectory, string remoteDirec
 
     if (File.Exists(Path.Combine(localDirectory, "sitemap.xml")))
     {
-        PublishExtensionlessHtmlAliases(client, localDirectory, remoteRoot);
+        PublishExtensionlessHtmlAliases(client, localDirectory, remoteRoot, sandbox);
     }
 
     Console.WriteLine($"Published {files.Length} files ({skippedFiles} already current, {uploadedBytes:N0} bytes transferred) to {remoteRoot}.");
 }
 
-static void PublishExtensionlessHtmlAliases(SftpClient client, string localDirectory, string remoteRoot)
+static void PublishExtensionlessHtmlAliases(
+    SftpClient client,
+    string localDirectory,
+    string remoteRoot,
+    bool sandbox)
 {
     foreach (var localFile in Directory.EnumerateFiles(localDirectory, "*.html", SearchOption.TopDirectoryOnly)
                  .Where(path => !Path.GetFileName(path).Equals("index.html", StringComparison.OrdinalIgnoreCase))
@@ -385,7 +658,7 @@ static void PublishExtensionlessHtmlAliases(SftpClient client, string localDirec
     {
         var aliasName = Path.GetFileNameWithoutExtension(localFile);
         var remoteAlias = CombineRemote(remoteRoot, aliasName);
-        using var input = File.OpenRead(localFile);
+        using var input = OpenDeploymentContent(localFile, sandbox);
         var matches = client.Exists(remoteAlias) &&
                       client.GetAttributes(remoteAlias).Size == input.Length &&
                       RemotePrefixMatches(client, remoteAlias, input, input.Length);
@@ -446,6 +719,7 @@ static void Configure(SftpClient client, string schemaPath, string remoteDirecto
         declare(strict_types=1);
 
         return [
+            'environment' => {PhpString(DeploymentProfile())},
             'database' => [
                 'host' => {PhpString(RequiredEnvironmentVariable(DatabaseHostVariable))},
                 'port' => {databasePort},
@@ -463,6 +737,25 @@ static void Configure(SftpClient client, string schemaPath, string remoteDirecto
         """;
 
     UploadText(client, CombineRemote(privateDirectory, "config.php"), config);
+    if (!DeploymentProfile().Equals("production", StringComparison.OrdinalIgnoreCase))
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException(
+                "Non-production Admin credential recovery uses Windows data protection.");
+        }
+        var recovery = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            version = 1,
+            createdAtUtc = DateTimeOffset.UtcNow,
+            profile = DeploymentProfile(),
+            username = RequiredEnvironmentVariable(AdminUserVariable),
+            password = RequiredEnvironmentVariable(AdminPasswordVariable)
+        });
+        File.WriteAllBytes(
+            DeploymentRecoveryPath("admin-access.secrets.bin"),
+            ProtectedData.Protect(recovery, null, DataProtectionScope.CurrentUser));
+    }
     using var schema = File.OpenRead(schemaPath);
     client.UploadFile(schema, CombineRemote(privateDirectory, "schema.sql"), true);
     if (Environment.GetEnvironmentVariable(LicensePrivateKeyPathVariable) is { Length: > 0 } privateKeyPath)
@@ -612,14 +905,9 @@ static void ConfigureCrmSecrets(SftpClient client, string remoteDirectory)
         activationKey
     });
     var protectedRecovery = ProtectedData.Protect(recovery, null, DataProtectionScope.CurrentUser);
-    var recoveryDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "POSPrinterEmulator",
-        "deployment-secrets");
-    Directory.CreateDirectory(recoveryDirectory);
-    var recoveryPath = Path.Combine(recoveryDirectory, "crm-v0.3.42.secrets.bin");
+    var recoveryPath = DeploymentRecoveryPath("crm-v0.3.42.secrets.bin");
     File.WriteAllBytes(recoveryPath, protectedRecovery);
-    var metadataPath = Path.Combine(recoveryDirectory, "crm-v0.3.42.metadata.json");
+    var metadataPath = DeploymentRecoveryPath("crm-v0.3.42.metadata.json");
     File.WriteAllText(metadataPath, JsonSerializer.Serialize(new
     {
         version = 1,
@@ -644,8 +932,14 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
     var privateDirectory = CombineRemote(remoteRoot, "private");
     EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
 
-    var apiKey = RequiredEnvironmentVariable(BrevoApiKeyVariable).Trim();
-    if (apiKey.Length is < 32 or > 256 || apiKey.Any(char.IsWhiteSpace))
+    var mode = (Environment.GetEnvironmentVariable(BrevoModeVariable) ?? "test").Trim().ToLowerInvariant();
+    if (mode is not "test" and not "live" and not "disabled")
+    {
+        throw new InvalidOperationException($"{BrevoModeVariable} must be disabled, test, or live.");
+    }
+    var apiKey = (Environment.GetEnvironmentVariable(BrevoApiKeyVariable) ?? string.Empty).Trim();
+    if (mode != "disabled" &&
+        (apiKey.Length is < 32 or > 256 || apiKey.Any(char.IsWhiteSpace)))
     {
         throw new InvalidOperationException($"{BrevoApiKeyVariable} is not a valid Brevo REST API key.");
     }
@@ -661,11 +955,6 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
     {
         throw new InvalidOperationException($"{BrevoSenderNameVariable} must contain 2 to 100 characters.");
     }
-    var mode = (Environment.GetEnvironmentVariable(BrevoModeVariable) ?? "test").Trim().ToLowerInvariant();
-    if (mode is not "test" and not "live" and not "disabled")
-    {
-        throw new InvalidOperationException($"{BrevoModeVariable} must be disabled, test, or live.");
-    }
     var allowlist = (Environment.GetEnvironmentVariable(BrevoTestAllowlistVariable) ?? string.Empty)
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -679,12 +968,7 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
         throw new InvalidOperationException($"{BrevoTestAllowlistVariable} must contain at least one address in test mode.");
     }
 
-    var recoveryDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "POSPrinterEmulator",
-        "deployment-secrets");
-    Directory.CreateDirectory(recoveryDirectory);
-    var recoveryPath = Path.Combine(recoveryDirectory, "communications-v0.3.45.secrets.bin");
+    var recoveryPath = DeploymentRecoveryPath("communications-v0.3.45.secrets.bin");
     string webhookToken;
     long? webhookId = null;
     if (File.Exists(recoveryPath))
@@ -731,7 +1015,10 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
             ],
         ];
         """;
-    webhookId = ConfigureBrevoWebhook(apiKey, webhookToken, webhookId);
+    if (mode != "disabled")
+    {
+        webhookId = ConfigureBrevoWebhook(apiKey, webhookToken, webhookId);
+    }
     var recovery = JsonSerializer.SerializeToUtf8Bytes(new
     {
         version = 1,
@@ -769,13 +1056,17 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
 
 static long ConfigureBrevoWebhook(string apiKey, string webhookToken, long? existingId)
 {
+    var adminBaseUrl = CanonicalHttpsUrl(
+        Environment.GetEnvironmentVariable(AdminBaseUrlVariable) ??
+        "https://admin.posprinteremulator.com",
+        AdminBaseUrlVariable);
     var endpoint = existingId is > 0
         ? new Uri($"https://api.brevo.com/v3/webhooks/{existingId.Value}")
         : new Uri("https://api.brevo.com/v3/webhooks");
     var payload = JsonSerializer.Serialize(new
     {
         description = "POS Printer Emulator transactional delivery events",
-        url = "https://admin.posprinteremulator.com/api/v1/brevo-webhook.php",
+        url = adminBaseUrl + "/api/v1/brevo-webhook.php",
         events = new[] { "sent", "delivered", "hardBounce", "softBounce", "blocked", "spam", "invalid", "deferred", "click", "opened", "unsubscribed" },
         type = "transactional",
         auth = new { type = "bearer", token = webhookToken },
@@ -817,12 +1108,7 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
     EnsureDirectory(client, privateDirectory, new HashSet<string>(StringComparer.Ordinal));
 
     var serviceToken = RecoverCrmServiceToken();
-    var recoveryDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "POSPrinterEmulator",
-        "deployment-secrets");
-    Directory.CreateDirectory(recoveryDirectory);
-    var recoveryPath = Path.Combine(recoveryDirectory, "customer-portal-v0.3.43.secrets.bin");
+    var recoveryPath = DeploymentRecoveryPath("customer-portal-v0.3.43.secrets.bin");
     string encryptionKey;
     if (File.Exists(recoveryPath))
     {
@@ -873,6 +1159,14 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
     {
         throw new InvalidOperationException($"{BuyBaseUrlVariable} must be a canonical HTTPS URL.");
     }
+    var adminBaseUrl = CanonicalHttpsUrl(
+        Environment.GetEnvironmentVariable(AdminBaseUrlVariable) ??
+        "https://admin.posprinteremulator.com",
+        AdminBaseUrlVariable);
+    var supportBaseUrl = CanonicalHttpsUrl(
+        Environment.GetEnvironmentVariable(SupportBaseUrlVariable) ??
+        "https://www.posprinteremulator.com",
+        SupportBaseUrlVariable);
 
     var config = $"""
         <?php
@@ -891,11 +1185,11 @@ static void ConfigureCustomerPortal(SftpClient client, string remoteDirectory)
                 'encryption_key' => {PhpString(encryptionKey)},
                 'mail_transport' => {PhpString(mailTransport)},
                 'mail_from' => {PhpString(mailFrom)},
-                'support_url' => 'https://www.posprinteremulator.com/how-to-submit-a-support-request',
-                'support_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-support.php',
+                'support_url' => {PhpString(supportBaseUrl + "/how-to-submit-a-support-request")},
+                'support_backend_url' => {PhpString(adminBaseUrl + "/api/v1/portal-support.php")},
                 'support_backend_token' => {PhpString(serviceToken)},
-                'communications_worker_url' => 'https://admin.posprinteremulator.com/api/v1/communications-worker.php?max=5',
-                'promotion_backend_url' => 'https://admin.posprinteremulator.com/api/v1/portal-promotion.php',
+                'communications_worker_url' => {PhpString(adminBaseUrl + "/api/v1/communications-worker.php?max=5")},
+                'promotion_backend_url' => {PhpString(adminBaseUrl + "/api/v1/portal-promotion.php")},
                 'buy_base_url' => {PhpString(buyUri.GetLeftPart(UriPartial.Path).TrimEnd('/'))},
             ],
         ];
@@ -1006,6 +1300,114 @@ static void ConfigureCustomerPortalFromAdmin(
     }
 }
 
+static void ConfigurePurchaseIntegration(
+    SftpClient client,
+    string adminRemoteDirectory,
+    string buyRemoteDirectory)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException(
+            "Purchase integration recovery uses Windows data protection.");
+    }
+    if (!CanonicalHttpsUrl(
+            Environment.GetEnvironmentVariable(PayPalBaseUrlVariable) ??
+            "https://api-m.paypal.com",
+            PayPalBaseUrlVariable).Equals("https://api-m.sandbox.paypal.com", StringComparison.OrdinalIgnoreCase) &&
+        DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Sandbox deployments must use the PayPal Sandbox API host.");
+    }
+
+    var adminBaseUrl = CanonicalHttpsUrl(
+        Environment.GetEnvironmentVariable(AdminBaseUrlVariable) ??
+        "https://admin.posprinteremulator.com",
+        AdminBaseUrlVariable);
+    var buyBaseUrl = CanonicalHttpsUrl(
+        Environment.GetEnvironmentVariable(BuyBaseUrlVariable) ??
+        "https://buy.posprinteremulator.com",
+        BuyBaseUrlVariable);
+    var paypalBaseUrl = CanonicalHttpsUrl(
+        Environment.GetEnvironmentVariable(PayPalBaseUrlVariable) ??
+        "https://api-m.paypal.com",
+        PayPalBaseUrlVariable);
+    var paypalClientId = RequiredEnvironmentVariable(PayPalClientIdVariable);
+    var paypalSecret = RequiredEnvironmentVariable(PayPalSecretVariable);
+    var adminToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+        .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    var maintenanceToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+        .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    var adminRoot = ResolveRemotePath(client, adminRemoteDirectory).TrimEnd('/');
+    if (adminRoot.Length == 0) adminRoot = "/";
+    var buyRoot = ResolveRemotePath(client, buyRemoteDirectory).TrimEnd('/');
+    if (buyRoot.Length == 0) buyRoot = "/";
+    var createdDirectories = new HashSet<string>(StringComparer.Ordinal);
+    EnsureDirectory(client, CombineRemote(adminRoot, "private"), createdDirectories);
+    EnsureDirectory(client, CombineRemote(buyRoot, "private"), createdDirectories);
+
+    var adminConfig = $"""
+        <?php
+        declare(strict_types=1);
+
+        return [
+            'base_url' => {PhpString(buyBaseUrl)},
+            'admin_token' => {PhpString(adminToken)},
+            'maintenance_token' => {PhpString(maintenanceToken)},
+        ];
+        """;
+    var buyConfig = $"""
+        <?php
+        declare(strict_types=1);
+
+        return [
+            'app_url' => {PhpString(buyBaseUrl)},
+            'environment' => {PhpString(DeploymentProfile())},
+            'license' => [
+                'product_name' => 'POS Printer Emulator',
+                'lite_price' => '24.99',
+                'pro_price' => '39.99',
+                'enterprise_price' => '199.99',
+                'currency' => 'USD',
+            ],
+            'maintenance' => [
+                'lite_price' => '9.99',
+                'pro_price' => '19.99',
+                'enterprise_price' => '59.99',
+                'base_url' => {PhpString(adminBaseUrl)},
+                'api_token' => {PhpString(maintenanceToken)},
+            ],
+            'paypal' => [
+                'client_id' => {PhpString(paypalClientId)},
+                'secret' => {PhpString(paypalSecret)},
+                'base_url' => {PhpString(paypalBaseUrl)},
+            ],
+            'admin_api_token' => {PhpString(adminToken)},
+            'mail' => [
+                'from_email' => 'sales@buy.posprinteremulator.com',
+                'from_name' => 'POS Printer Emulator Sandbox',
+                'reply_to' => '',
+            ],
+        ];
+        """;
+
+    UploadText(client, CombineRemote(adminRoot, "private/purchase-site.php"), adminConfig);
+    UploadText(client, CombineRemote(buyRoot, "private/config.php"), buyConfig);
+    var recovery = JsonSerializer.SerializeToUtf8Bytes(new
+    {
+        version = 1,
+        createdAtUtc = DateTimeOffset.UtcNow,
+        profile = DeploymentProfile(),
+        adminToken,
+        maintenanceToken
+    });
+    File.WriteAllBytes(
+        DeploymentRecoveryPath("purchase-integration.secrets.bin"),
+        ProtectedData.Protect(recovery, null, DataProtectionScope.CurrentUser));
+    Console.WriteLine("Uploaded matching protected Admin/Buy sandbox integration configuration.");
+    Console.WriteLine("PayPal and service credentials were not displayed.");
+}
+
 static async Task MigrateCrmAsync(Uri migrationUri)
 {
     var serviceToken = RecoverCrmServiceToken();
@@ -1034,17 +1436,111 @@ static async Task MigrateSelfServiceCommerceAsync(Uri migrationUri)
     Console.WriteLine("Protected self-service commerce migration completed successfully.");
 }
 
+static async Task MigrateSchemaWithRecoveredAdminAsync(Uri setupUri)
+    => await RunRecoveredAdminSetupAsync(setupUri, null, "schema migration");
+
+static async Task SeedCertificationWithRecoveredAdminAsync(Uri setupUri)
+    => await RunRecoveredAdminSetupAsync(setupUri, "seed-certification", "certification seed");
+
+static async Task RunRecoveredAdminSetupAsync(Uri setupUri, string? action, string operation)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException("Admin credential recovery uses Windows data protection.");
+    }
+    var profile = DeploymentProfile();
+    if (profile.Equals("production", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Recovered schema migration is restricted to a named non-production deployment profile.");
+    }
+    if (!setupUri.Host.Contains("sandbox", StringComparison.OrdinalIgnoreCase) &&
+        !setupUri.Host.Contains("staging", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Recovered schema migration requires a sandbox or staging hostname.");
+    }
+
+    var credentials = RecoverAdminCredentials();
+
+    using var request = new HttpRequestMessage(HttpMethod.Post, setupUri);
+    request.Content = new StringContent(
+        JsonSerializer.Serialize(new
+        {
+            username = credentials.Username,
+            password = credentials.Password,
+            action
+        }),
+        System.Text.Encoding.UTF8,
+        "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(3) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        var detail = string.Empty;
+        try
+        {
+            using var error = JsonDocument.Parse(body);
+            if (error.RootElement.TryGetProperty("detail", out var detailElement) &&
+                detailElement.ValueKind == JsonValueKind.String)
+            {
+                detail = detailElement.GetString() ?? string.Empty;
+            }
+        }
+        catch (JsonException)
+        {
+            // The sandbox endpoint did not return a structured diagnostic.
+        }
+        throw new InvalidOperationException(
+            $"Sandbox {operation} failed with HTTP {(int)response.StatusCode}" +
+            (detail.Length > 0 ? $": {detail}" : "."));
+    }
+    using var result = JsonDocument.Parse(body);
+    if (!result.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
+    {
+        throw new InvalidDataException($"The sandbox {operation} response was invalid.");
+    }
+    var statements = result.RootElement.TryGetProperty("statements", out var count)
+        ? count.GetInt32()
+        : 0;
+    Console.WriteLine($"Sandbox {operation} completed successfully ({statements} statements).");
+}
+
+static (string Username, string Password) RecoverAdminCredentials()
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException("Admin credential recovery uses Windows data protection.");
+    }
+    var recoveryPath = DeploymentRecoveryPath("admin-access.secrets.bin");
+    if (!File.Exists(recoveryPath))
+    {
+        throw new FileNotFoundException(
+            "The protected non-production Admin credential recovery file is unavailable.",
+            recoveryPath);
+    }
+    var recovered = ProtectedData.Unprotect(
+        File.ReadAllBytes(recoveryPath),
+        null,
+        DataProtectionScope.CurrentUser);
+    using var document = JsonDocument.Parse(recovered);
+    var username = document.RootElement.GetProperty("username").GetString();
+    var password = document.RootElement.GetProperty("password").GetString();
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+    {
+        throw new InvalidDataException("The protected Admin credentials are incomplete.");
+    }
+    return (username, password);
+}
+
 static string RecoverCrmServiceToken()
 {
     if (!OperatingSystem.IsWindows())
     {
         throw new PlatformNotSupportedException("CRM deployment-secret recovery uses Windows data protection.");
     }
-    var recoveryPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "POSPrinterEmulator",
-        "deployment-secrets",
-        "crm-v0.3.42.secrets.bin");
+    var recoveryPath = DeploymentRecoveryPath("crm-v0.3.42.secrets.bin");
     if (!File.Exists(recoveryPath))
     {
         throw new FileNotFoundException("The protected CRM deployment-secret recovery file is unavailable.", recoveryPath);
@@ -1202,6 +1698,93 @@ static void UploadFile(SftpClient client, string localPath, string remoteFile)
     Console.WriteLine($"Uploaded and size-verified {resolvedFile} ({input.Length:N0} bytes).");
 }
 
+static async Task RunCommunicationsWorkerAsync(Uri workerUri, int maximum)
+{
+    var serviceToken = RecoverCrmServiceToken();
+    var builder = new UriBuilder(workerUri);
+    var existingQuery = builder.Query.TrimStart('?');
+    var maximumQuery = "max=" + maximum.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    builder.Query = string.IsNullOrWhiteSpace(existingQuery)
+        ? maximumQuery
+        : existingQuery + "&" + maximumQuery;
+    using var request = new HttpRequestMessage(HttpMethod.Post, builder.Uri);
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+    request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(
+            $"Communications worker failed with HTTP {(int)response.StatusCode}: {body}");
+    }
+    using var result = JsonDocument.Parse(body);
+    var processed = result.RootElement.TryGetProperty("processed", out var count)
+        ? count.GetInt32()
+        : 0;
+    Console.WriteLine($"Communications worker completed successfully ({processed} messages processed).");
+}
+
+static async Task SynchronizeSandboxCommunicationTemplateAsync(
+    Uri synchronizationUri,
+    string templateKey)
+{
+    if (!System.Text.RegularExpressions.Regex.IsMatch(templateKey, "^[a-z0-9_]{3,64}$"))
+    {
+        throw new ArgumentException("The communication template key is invalid.", nameof(templateKey));
+    }
+    var serviceToken = RecoverCrmServiceToken();
+    using var request = new HttpRequestMessage(HttpMethod.Post, synchronizationUri);
+    request.Headers.Authorization =
+        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+    request.Content = new StringContent(
+        JsonSerializer.Serialize(new { template_key = templateKey, send_test = true }),
+        System.Text.Encoding.UTF8,
+        "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(
+            $"Communication template synchronization failed with HTTP {(int)response.StatusCode}: {body}");
+    }
+    using var result = JsonDocument.Parse(body);
+    var synchronizedKey = result.RootElement.GetProperty("template_key").GetString();
+    var templateId = result.RootElement.GetProperty("template_id").GetInt64();
+    var testSent = result.RootElement.GetProperty("test_sent").GetBoolean();
+    Console.WriteLine(
+        $"Sandbox communication template {synchronizedKey} synchronized and verified " +
+        $"(Brevo ID {templateId}, test sent: {testSent}).");
+}
+
+static void UploadSandboxFile(SftpClient client, string localPath, string remoteFile)
+{
+    if (!File.Exists(localPath))
+    {
+        throw new FileNotFoundException("The local file was not found.", localPath);
+    }
+    if (!remoteFile.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "upload-sandbox requires a remote path containing the sandbox marker.");
+    }
+    var resolvedFile = ResolveRemotePath(client, remoteFile);
+    var separator = resolvedFile.LastIndexOf('/');
+    if (separator > 0)
+    {
+        EnsureDirectory(client, resolvedFile[..separator], new HashSet<string>(StringComparer.Ordinal));
+    }
+    using var input = OpenDeploymentContent(localPath, true);
+    client.UploadFile(input, resolvedFile, true);
+    var remoteLength = client.GetAttributes(resolvedFile).Size;
+    if (remoteLength != input.Length)
+    {
+        throw new IOException($"Sandbox upload size verification failed for {resolvedFile}.");
+    }
+    Console.WriteLine($"Sandbox-transformed and size-verified {resolvedFile} ({input.Length:N0} bytes).");
+}
+
 static void DeleteRemoteFile(SftpClient client, string remoteFile)
 {
     var resolvedFile = ResolveRemotePath(client, remoteFile);
@@ -1227,6 +1810,16 @@ static void DeleteRemoteFile(SftpClient client, string remoteFile)
     Console.WriteLine($"Deleted and verified remote file {resolvedFile}.");
 }
 
+static void DeleteSandboxFile(SftpClient client, string remoteFile)
+{
+    if (!remoteFile.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "delete-sandbox-file requires a remote path containing the sandbox marker.");
+    }
+    DeleteRemoteFile(client, remoteFile);
+}
+
 static void SetCommunicationsTestAllowlist(SftpClient client, string email, string remoteDirectory)
 {
     email = email.Trim().ToLowerInvariant();
@@ -1247,7 +1840,8 @@ static void SetCommunicationsTestAllowlist(SftpClient client, string email, stri
     {
         config = reader.ReadToEnd();
     }
-    var pattern = @"'test_allowlist'\s*=>\s*\[[^\]]*\]";
+    var pattern =
+        @"'test_allowlist'\s*=>\s*(?:\[[^\]]*\]|array\s*\([^)]*\))";
     if (!System.Text.RegularExpressions.Regex.IsMatch(
         config,
         pattern,
@@ -1354,6 +1948,18 @@ static void SubmitIndexNow(string localDirectory)
 static string PhpString(string value) =>
     "'" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal) + "'";
 
+static string CanonicalHttpsUrl(string value, string variableName)
+{
+    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+        uri.Scheme != Uri.UriSchemeHttps ||
+        !string.IsNullOrEmpty(uri.Query) ||
+        !string.IsNullOrEmpty(uri.Fragment))
+    {
+        throw new InvalidOperationException($"{variableName} must be a canonical HTTPS URL.");
+    }
+    return uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
+}
+
 static void EnsureDirectory(SftpClient client, string directory, HashSet<string> createdDirectories)
 {
     if (directory is "" or "/" || !createdDirectories.Add(directory))
@@ -1373,10 +1979,285 @@ static void EnsureDirectory(SftpClient client, string directory, HashSet<string>
 static string CombineRemote(string root, string relative) =>
     root == "/" ? "/" + relative : root + "/" + relative;
 
-static bool RemotePrefixMatches(SftpClient client, string remoteFile, FileStream localFile, long length)
+static void FetchSandboxRelease(
+    SftpClient sftp,
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string releaseUrl,
+    string remoteFile)
+{
+    if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out var uri) ||
+        uri.Scheme != Uri.UriSchemeHttps ||
+        !uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
+        !uri.AbsolutePath.StartsWith(
+            "/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/download/",
+            StringComparison.Ordinal))
+    {
+        throw new ArgumentException(
+            "Only HTTPS release assets from the POS Printer Emulator GitHub repository are allowed.",
+            nameof(releaseUrl));
+    }
+    if (!System.Text.RegularExpressions.Regex.IsMatch(
+            remoteFile,
+            @"^/sandbox_posprinteremulator/downloads/[A-Za-z0-9._-]+$"))
+    {
+        throw new ArgumentException(
+            "The remote release file must stay inside the public sandbox downloads directory.",
+            nameof(remoteFile));
+    }
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" + Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var shellRelativeFile = remoteFile.TrimStart('/');
+        var command = ssh.RunCommand(
+            $"umask 077; curl --fail --location --silent --show-error --output '{shellRelativeFile}' '{uri.AbsoluteUri}'");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox host could not fetch the GitHub release asset (exit {command.ExitStatus}).");
+        }
+        var checksumFile = remoteFile + ".sha256";
+        if (!sftp.Exists(checksumFile))
+        {
+            throw new FileNotFoundException(
+                "The sandbox release checksum must be uploaded before fetching the installer.",
+                checksumFile);
+        }
+        var lastSlash = remoteFile.LastIndexOf('/');
+        var shellDirectory = remoteFile[..lastSlash].TrimStart('/');
+        var checksumName = remoteFile[(lastSlash + 1)..] + ".sha256";
+        var verification = ssh.RunCommand(
+            $"cd '{shellDirectory}' && sed 's/\r$//' '{checksumName}' | sha256sum --check -");
+        if (verification.ExitStatus != 0)
+        {
+            var diagnostic = (verification.Error + " " + verification.Result)
+                .Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Trim();
+            throw new InvalidDataException(
+                "The sandbox release checksum verification failed" +
+                (diagnostic.Length > 0 ? $": {diagnostic}" : "."));
+        }
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+
+    var size = sftp.GetAttributes(remoteFile).Size;
+    if (size <= 0)
+    {
+        throw new IOException("The fetched sandbox release asset is empty.");
+    }
+    Console.WriteLine(
+        $"Sandbox host fetched and checksum-verified {Path.GetFileName(remoteFile)} ({size:N0} bytes).");
+}
+
+static void ResetSandboxCheckoutRate(
+    SftpClient sftp,
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string email)
+{
+    var normalizedDirectory = remoteDirectory.Trim().TrimStart('/');
+    if (!System.Text.RegularExpressions.Regex.IsMatch(
+            normalizedDirectory,
+            @"^[A-Za-z0-9_-]*sandbox[A-Za-z0-9_-]*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+        !normalizedDirectory.Contains("userportal", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new ArgumentException(
+            "The remote directory must be a sandbox Customer Portal webspace directory.",
+            nameof(remoteDirectory));
+    }
+
+    var resetAll = email.Trim().Equals("--all", StringComparison.OrdinalIgnoreCase);
+    var normalizedEmail = resetAll ? string.Empty : email.Trim().ToLowerInvariant();
+    if (!resetAll &&
+        (!System.Net.Mail.MailAddress.TryCreate(normalizedEmail, out var address) ||
+         !address.Address.Equals(normalizedEmail, StringComparison.OrdinalIgnoreCase)))
+    {
+        throw new ArgumentException(
+            "A valid customer email address or --all is required.",
+            nameof(email));
+    }
+
+    var encodedEmail = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedEmail));
+    var php =
+        """
+        require 'includes/bootstrap.php';
+        $config = portal_config();
+        $baseUrl = isset($config['portal']['base_url']) ? (string)$config['portal']['base_url'] : '';
+        if (stripos($baseUrl, 'sandbox') === false) {
+            fwrite(STDERR, 'Refusing to modify a non-sandbox portal.');
+            exit(2);
+        }
+        $resetAll = __RESET_ALL__;
+        $email = strtolower(trim(base64_decode('__EMAIL__', true) ?: ''));
+        $pdo = portal_database();
+        if ($resetAll) {
+            $find = $pdo->prepare(
+                "SELECT customer_id FROM customers
+                 WHERE status='Active'
+                 ORDER BY updated_at DESC LIMIT 500"
+            );
+            $find->execute();
+        } else {
+            $find = $pdo->prepare(
+                "SELECT customer_id FROM customers
+                 WHERE canonical_email=:email AND status='Active'
+                 ORDER BY updated_at DESC LIMIT 5"
+            );
+            $find->execute(['email' => $email]);
+        }
+        $ids = $find->fetchAll(PDO::FETCH_COLUMN);
+        if (count($ids) < 1 || count($ids) > 500) {
+            fwrite(STDERR, 'Expected between one and 500 active sandbox customer records; found ' . count($ids) . '.');
+            exit(3);
+        }
+        $delete = $pdo->prepare('DELETE FROM portal_rate_limits WHERE bucket_hash=:bucket_hash');
+        $removed = 0;
+        foreach ($ids as $customerId) {
+            $bucketHash = hash('sha256', 'checkout|' . (string)$customerId, true);
+            $delete->bindValue('bucket_hash', $bucketHash, PDO::PARAM_LOB);
+            $delete->execute();
+            $removed += $delete->rowCount();
+        }
+        $intentCount = 0;
+        $latest = null;
+        $inspect = $pdo->prepare(
+            "SELECT state,order_type,target_tier,prepared_at
+             FROM portal_checkout_intents
+             WHERE customer_id=:customer_id
+             ORDER BY prepared_at DESC LIMIT 1"
+        );
+        foreach ($ids as $customerId) {
+            $inspect->execute(['customer_id' => $customerId]);
+            $candidate = $inspect->fetch(PDO::FETCH_ASSOC);
+            if (is_array($candidate)) {
+                $intentCount++;
+                if ($latest === null || (string)$candidate['prepared_at'] > (string)$latest['prepared_at']) {
+                    $latest = $candidate;
+                }
+            }
+        }
+        echo 'Sandbox checkout throttle reset completed. Rows removed: ' . $removed .
+             '. Customer records: ' . count($ids) .
+             '. Records with checkout activity: ' . $intentCount .
+             '. Checkout host: ' . (string)($config['portal']['buy_base_url'] ?? 'not configured') . '.';
+        if (is_array($latest)) {
+            echo ' Latest checkout: ' . (string)$latest['state'] . ' ' .
+                 (string)$latest['order_type'] . ' ' . (string)$latest['target_tier'] .
+                 ' at ' . (string)$latest['prepared_at'] . ' UTC.';
+        }
+        """
+        .Replace("__RESET_ALL__", resetAll ? "true" : "false", StringComparison.Ordinal)
+        .Replace("__EMAIL__", encodedEmail, StringComparison.Ordinal);
+    var scriptName = $".ppe-cert-reset-checkout-{Guid.NewGuid():N}.php";
+    var scriptRemotePath = CombineRemote(
+        ResolveRemotePath(sftp, remoteDirectory).TrimEnd('/'),
+        scriptName);
+    using (var scriptStream = new MemoryStream(
+               System.Text.Encoding.UTF8.GetBytes("<?php\n" + php),
+               writable: false))
+    {
+        sftp.UploadFile(scriptStream, scriptRemotePath, true);
+    }
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" + Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            "for php_bin in php8.4-cli php8.3-cli php8.2-cli php8.1-cli php8.0-cli php7.4-cli " +
+            "php8.4 php8.3 php8.2 php8.1 php8.0 php7.4 php; do " +
+            "if command -v \"$php_bin\" >/dev/null 2>&1; then " +
+            $"\"$php_bin\" -d display_errors=1 -d log_errors=0 -f '{scriptName}'; exit $?; fi; done; exit 127");
+        if (command.ExitStatus != 0)
+        {
+            var diagnostic = (command.Error + " " + command.Result)
+                .Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Trim();
+            throw new InvalidOperationException(
+                $"The sandbox checkout throttle reset failed (exit {command.ExitStatus})" +
+                (diagnostic.Length > 0 ? $": {diagnostic}" : "."));
+        }
+        Console.WriteLine(command.Result.Trim());
+    }
+    finally
+    {
+        ssh.Disconnect();
+        if (sftp.Exists(scriptRemotePath))
+        {
+            sftp.DeleteFile(scriptRemotePath);
+        }
+    }
+}
+
+static Stream OpenDeploymentContent(string localFile, bool sandbox)
+{
+    if (!sandbox)
+    {
+        return File.OpenRead(localFile);
+    }
+
+    var textExtensions = new HashSet<string>(
+        [".php", ".html", ".htm", ".js", ".css", ".json", ".xml", ".txt", ".webmanifest"],
+        StringComparer.OrdinalIgnoreCase);
+    if (!textExtensions.Contains(Path.GetExtension(localFile)) &&
+        !Path.GetFileName(localFile).Equals(".htaccess", StringComparison.OrdinalIgnoreCase))
+    {
+        return File.OpenRead(localFile);
+    }
+
+    var content = File.ReadAllText(localFile);
+    foreach (var (production, staging) in new[]
+             {
+                 ("https://userportal.posprinteremulator.com", "https://userportal-sandbox.posprinteremulator.com"),
+                 ("https://admin.posprinteremulator.com", "https://admin-sandbox.posprinteremulator.com"),
+                 ("https://buy.posprinteremulator.com", "https://buy-sandbox.posprinteremulator.com"),
+                 ("https://support.posprinteremulator.com", "https://support-sandbox.posprinteremulator.com"),
+                 ("https://www.posprinteremulator.com", "https://sandbox.posprinteremulator.com"),
+                 ("https://posprinteremulator.com", "https://sandbox.posprinteremulator.com"),
+                 (@"userportal\.posprinteremulator\.com", @"userportal-sandbox\.posprinteremulator\.com"),
+                 (@"admin\.posprinteremulator\.com", @"admin-sandbox\.posprinteremulator\.com"),
+                 (@"buy\.posprinteremulator\.com", @"buy-sandbox\.posprinteremulator\.com"),
+                 (@"support\.posprinteremulator\.com", @"support-sandbox\.posprinteremulator\.com"),
+                 (@"www\.posprinteremulator\.com", @"sandbox\.posprinteremulator\.com")
+             })
+    {
+        content = content.Replace(production, staging, StringComparison.OrdinalIgnoreCase);
+    }
+    return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content), writable: false);
+}
+
+static bool RemotePrefixMatches(SftpClient client, string remoteFile, Stream localFile, long length)
     => RemoteMatchingPrefixLength(client, remoteFile, localFile, length) == length;
 
-static long RemoteMatchingPrefixLength(SftpClient client, string remoteFile, FileStream localFile, long length)
+static long RemoteMatchingPrefixLength(SftpClient client, string remoteFile, Stream localFile, long length)
 {
     using var remoteFileStream = client.OpenRead(remoteFile);
     var localBuffer = new byte[64 * 1024];

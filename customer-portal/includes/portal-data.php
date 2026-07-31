@@ -17,7 +17,8 @@ function portal_customer_snapshot(string $customerId): array
     }
 
     $licenseQuery = $pdo->prepare(
-        "SELECT license_id,license_tier,control_state,issued_at,
+        "SELECT license_id,license_tier,control_state,license_source,issued_at,
+                license_expires_at,complimentary_reason,
                 maintenance_expires_at,maintenance_revoked_at
          FROM issued_licenses
          WHERE customer_id=:customer_id AND control_state<>'Deleted'
@@ -223,6 +224,24 @@ function portal_purchase_display_reference(array $purchase): string
     return str_starts_with($reference, 'portal:') ? strtoupper(substr($reference, 7, 8)) : $reference;
 }
 
+function portal_purchase_invoice_number(array $purchase): string
+{
+    $reference = strtolower(trim((string)($purchase['purchase_reference'] ?? '')));
+    $paidAt = strtotime((string)($purchase['paid_at'] ?? $purchase['updated_at'] ?? ''));
+    $date = $paidAt === false ? gmdate('Ymd') : gmdate('Ymd', $paidAt);
+    return 'PPE-INV-' . $date . '-' . strtoupper(substr(hash('sha256', $reference), 0, 10));
+}
+
+function portal_purchase_payment_approval_reference(array $purchase): string
+{
+    $captureId = trim((string)($purchase['provider_capture_id'] ?? ''));
+    if ($captureId !== '') {
+        return $captureId;
+    }
+    $orderId = trim((string)($purchase['provider_order_id'] ?? ''));
+    return $orderId !== '' ? $orderId : 'Not available';
+}
+
 function portal_purchase_license_label(array $purchase): string
 {
     $tier = (string)($purchase['license_tier'] ?? 'License');
@@ -289,18 +308,44 @@ function portal_primary_installation(array $installations): ?array
 function portal_primary_active_license(array $licenses): ?array
 {
     foreach ($licenses as $license) {
-        if (is_array($license) && strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') === 0) {
+        if (is_array($license) &&
+            strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') === 0 &&
+            !portal_license_expired($license)) {
             return $license;
         }
     }
     return null;
 }
 
+function portal_license_expired(array $license, ?DateTimeImmutable $now = null): bool
+{
+    $expiresAt = trim((string)($license['license_expires_at'] ?? ''));
+    if ($expiresAt === '') {
+        return false;
+    }
+    try {
+        $utc = new DateTimeZone('UTC');
+        $expiration = new DateTimeImmutable($expiresAt, $utc);
+        $current = ($now ?? new DateTimeImmutable('now', $utc))->setTimezone($utc);
+        return $expiration < $current;
+    } catch (Throwable) {
+        return true;
+    }
+}
+
+function portal_license_display_status(array $license): string
+{
+    return portal_license_expired($license)
+        ? 'Expired'
+        : portal_license_status_label((string)($license['control_state'] ?? ''));
+}
+
 function portal_has_active_maintenance(?array $license, ?DateTimeImmutable $now = null): bool
 {
     if (!is_array($license) ||
         !empty($license['maintenance_revoked_at']) ||
-        strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') !== 0) {
+        strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') !== 0 ||
+        portal_license_expired($license, $now)) {
         return false;
     }
     $expiresAt = trim((string)($license['maintenance_expires_at'] ?? ''));

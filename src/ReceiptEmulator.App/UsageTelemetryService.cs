@@ -46,7 +46,11 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry, 
         _httpClient = httpClient;
         _license = license;
         _logger = logger;
-        _statePath = Path.Combine(license.RootPath, "telemetry-state.json");
+        var externalServices = ExternalServicesOptions.FromConfiguration(configuration);
+        var stateFileName = externalServices.Profile.Equals("Production", StringComparison.OrdinalIgnoreCase)
+            ? "telemetry-state.json"
+            : $"telemetry-state-{SanitizeProfile(externalServices.Profile)}.json";
+        _statePath = Path.Combine(license.RootPath, stateFileName);
         _state = LoadState() ?? new TelemetryState(Guid.NewGuid(), null);
         _license.BindInstallationId(_state.InstallationId);
         _events = Channel.CreateBounded<TelemetryEvent>(new BoundedChannelOptions(512)
@@ -58,11 +62,26 @@ public sealed class UsageTelemetryService : BackgroundService, IUsageTelemetry, 
 
         _enabled = !environment.IsEnvironment("Testing") &&
                    configuration.GetValue("Telemetry:Enabled", true) &&
-                   Uri.TryCreate(configuration["Telemetry:Endpoint"], UriKind.Absolute, out _endpoint) &&
+                   Uri.TryCreate(
+                       configuration["ExternalServices:TelemetryEndpoint"] ??
+                       configuration["Telemetry:Endpoint"],
+                       UriKind.Absolute,
+                       out _endpoint) &&
                    _endpoint.Scheme == Uri.UriSchemeHttps;
         _retryDelay = TimeSpan.FromSeconds(Math.Max(0.01, configuration.GetValue("Telemetry:RetryDelaySeconds", 60d)));
         _httpClient.Timeout = TimeSpan.FromSeconds(15);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"POS-Printer-Emulator/{ProductInfo.Version}");
+    }
+
+    internal string StatePath => _statePath;
+
+    private static string SanitizeProfile(string profile)
+    {
+        var sanitized = new string(profile
+            .Where(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "isolated" : sanitized;
     }
 
     public void RecordPrintJob()

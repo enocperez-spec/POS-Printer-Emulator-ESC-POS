@@ -1,0 +1,36 @@
+{
+  "environment": "staging",
+  "allowProductionHosts": false,
+  "urls": {
+    "website": "https://sandbox.posprinteremulator.com",
+    "customerPortal": "https://userportal-sandbox.posprinteremulator.com",
+    "adminPortal": "https://admin-sandbox.posprinteremulator.com",
+    "buyWebsite": "https://buy-sandbox.posprinteremulator.com",
+    "supportPortal": "https://support-sandbox.posprinteremulator.com",
+    "licensingService": "https://admin-sandbox.posprinteremulator.com/api/v1",
+    "paypalApi": "https://api-m.sandbox.paypal.com"
+  },
+  "webspaceDirectories": {
+    "website": "sandbox_posprinteremulator",
+    "customerPortal": "userportal-sandbox-posprinteremulator",
+    "adminPortal": "admin_sandbox_posprinteremulator",
+    "buyWebsite": "buy_sandbox_posprinteremulator",
+    "supportPortal": "support_sandbox_posprinteremulator"
+  },
+  "requiredEnvironmentVariables": [
+    "PPE_CERT_DB_HOST",
+    "PPE_CERT_DB_PORT",
+    "PPE_CERT_DB_NAME",
+    "PPE_CERT_DB_USER",
+    "PPE_CERT_DB_PASSWORD",
+    "PPE_CERT_PAYPAL_CLIENT_ID",
+    "PPE_CERT_PAYPAL_SECRET",
+    "PPE_CERT_EMAIL_API_KEY",
+    "PPE_CERT_EMAIL_TEST_RECIPIENT",
+    "PPE_ENVIRONMENT",
+    "PPE_STAGING_DATABASE_LABEL",
+    "PPE_STAGING_ALLOWED_HOST",
+    "PPE_STAGING_RESET_CONFIRM",
+    "PPE_STAGING_EMAIL_DOMAIN"
+  ]
+}

@@ -34,7 +34,7 @@ try {
     $body = json_decode(file_get_contents('php://input') ?: '', true, 8, JSON_THROW_ON_ERROR);
     $installationUuid = strtolower(trim((string)($body['installationId'] ?? '')));
     $reason = trim((string)($body['reason'] ?? 'Customer unlinked this computer from the application.'));
-    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $installationUuid) ||
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $installationUuid) ||
         $reason === '' || mb_strlen($reason) > 300) {
         device_unlink_response(['error' => 'Invalid unlink request.'], 422);
     }

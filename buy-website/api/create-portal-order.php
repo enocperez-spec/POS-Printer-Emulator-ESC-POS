@@ -17,6 +17,10 @@ try {
     if (!preg_match('/^[0-9a-f-]{36}$/i', $intentId)) {
         throw new RuntimeException('The checkout session could not be verified.');
     }
+    $correlationId = strtolower(trim((string)($session['correlationId'] ?? '')));
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $correlationId)) {
+        throw new RuntimeException('The checkout journey could not be traced.');
+    }
     $existing = db()->prepare('SELECT paypal_order_id,status FROM orders WHERE portal_intent_id=? LIMIT 1');
     $existing->execute([$intentId]);
     $existingOrder = $existing->fetch();
@@ -46,6 +50,7 @@ try {
         'intent' => 'CAPTURE',
         'purchase_units' => [[
             'reference_id' => $publicId,
+            'custom_id' => $correlationId,
             'description' => $description,
             'amount' => ['currency_code' => $currency, 'value' => $amount],
         ]],
@@ -66,14 +71,16 @@ try {
         'action' => 'provider-created',
         'checkoutToken' => $token,
         'providerOrderId' => $paypalOrderId,
+        'correlationId' => $correlationId,
         'amount' => $amount,
         'currency' => $currency,
     ]);
     $insert = db()->prepare(
         'INSERT INTO orders
             (public_id,customer_name,email,order_type,license_tier,renewal_license_id,paypal_order_id,
-             amount,currency,status,created_at,maintenance_previous_expires_at,portal_intent_id)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+             amount,currency,status,created_at,maintenance_previous_expires_at,portal_intent_id,
+             journey_correlation_id)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
     );
     $insert->execute([
         $publicId,
@@ -89,10 +96,12 @@ try {
         now_utc(),
         $session['maintenanceExpiresAt'] ?: null,
         $intentId,
+        $correlationId,
     ]);
     $orderId = (int)db()->lastInsertId();
     audit($orderId, 'PORTAL_ORDER_CREATED', json_encode([
         'intentId' => $intentId,
+        'correlationId' => $correlationId,
         'paypalOrderId' => $paypalOrderId,
         'orderType' => $orderType,
         'currentTier' => $session['currentTier'],

@@ -19,6 +19,7 @@ public sealed class LicenseService
     private readonly string _promotionPath;
     private readonly string _publicKeyPem;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly ExternalServicesOptions _externalServices;
     private readonly bool _allowLegacyTestActivation;
     private TrialState _trialState;
     private RegistrationInfo _registration;
@@ -41,6 +42,8 @@ public sealed class LicenseService
         Func<DateTimeOffset> utcNow)
     {
         var configuredRoot = configuration?["Data:Root"];
+        _externalServices = ExternalServicesOptions.FromConfiguration(
+            configuration ?? new ConfigurationBuilder().Build());
         RootPath = !string.IsNullOrWhiteSpace(configuredRoot)
             ? Path.GetFullPath(configuredRoot)
             : environment.IsEnvironment("Testing")
@@ -736,7 +739,7 @@ public sealed class LicenseService
         }
         var active = !authoritativeUnavailable && _utcNow() <= expiration;
         var expirationDate = expiration.UtcDateTime.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture);
-        var renewalUrl = $"https://buy.posprinteremulator.com/?product=maintenance&tier={license.Tier}";
+        var renewalUrl = _externalServices.MaintenanceRenewalUrl(license.Tier.ToString());
         var state = recordMatches &&
                     _maintenance?.RemoteStatus?.Equals("revoked", StringComparison.OrdinalIgnoreCase) == true
             ? "Revoked"

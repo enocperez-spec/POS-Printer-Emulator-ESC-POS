@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     $body = json_decode(file_get_contents('php://input') ?: '', true, 8, JSON_THROW_ON_ERROR);
     $installationUuid = strtolower(trim((string)($body['installationId'] ?? '')));
-    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $installationUuid)) {
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $installationUuid)) {
         device_entitlement_response(['error' => 'Invalid entitlement request.'], 422);
     }
     $installationToken = trim((string)($_SERVER['HTTP_X_INSTALLATION_TOKEN'] ?? ''));
@@ -38,7 +38,7 @@ try {
     $query = $pdo->prepare(
         "SELECT i.id AS installation_id,i.installation_uuid,i.customer_id,
                 c.display_name,c.canonical_email,
-                l.license_id,l.license_tier,l.control_state,l.maintenance_expires_at,
+                l.license_id,l.license_tier,l.control_state,l.license_expires_at,l.maintenance_expires_at,
                 l.entitlement_revision,b.binding_id,b.binding_state
          FROM installations i
          INNER JOIN customers c ON c.customer_id=i.customer_id
@@ -66,7 +66,8 @@ try {
     $deviceToken = null;
     $paidLicenseActive = !empty($row['license_id']) &&
         (string)$row['control_state'] === 'Enabled' &&
-        (string)$row['binding_state'] === 'Active';
+        (string)$row['binding_state'] === 'Active' &&
+        !license_entitlement_expired($row);
     if ($paidLicenseActive) {
         $deviceToken = issue_device_entitlement(
             (string)$row['license_id'],
@@ -117,7 +118,7 @@ try {
         );
         $failedSync->execute(['installation_id' => (int)$row['installation_id']]);
         device_entitlement_response([
-            'error' => 'No active paid or promotional license is assigned to this computer.',
+            'error' => 'No active license or promotional access is assigned to this computer.',
             'state' => 'Trial',
         ], 409);
     }
@@ -136,6 +137,7 @@ try {
         'promotionEntitlement' => $promotionToken,
         'licenseId' => $paidLicenseActive ? (string)$row['license_id'] : null,
         'licenseTier' => $paidLicenseActive ? (string)$row['license_tier'] : 'Trial',
+        'licenseExpiresAt' => $paidLicenseActive ? $row['license_expires_at'] : null,
         'maintenanceExpiresAt' => $paidLicenseActive ? (string)$row['maintenance_expires_at'] : null,
         'customerName' => (string)$row['display_name'],
         'emailAddress' => (string)$row['canonical_email'],

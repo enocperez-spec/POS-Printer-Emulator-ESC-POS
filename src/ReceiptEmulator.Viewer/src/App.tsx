@@ -298,7 +298,12 @@ function App() {
   }, [checkForUpdates, status.license.features.updates])
 
   useEffect(() => {
-    if (!selectedId) {
+    if (!statusReady || !selectedId) {
+      setJob(undefined)
+      return
+    }
+    if (!jobs.some(item => item.id === selectedId)) {
+      setSelectedId(jobs[0]?.id)
       setJob(undefined)
       return
     }
@@ -308,7 +313,7 @@ function App() {
       .then(nextJob => { if (!cancelled) setJob(nextJob) })
       .catch(cause => { if (!cancelled) setError(cause.message) })
     return () => { cancelled = true }
-  }, [job?.id, selectedId])
+  }, [job?.id, jobs, selectedId, statusReady])
 
   const filteredJobs = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -497,6 +502,7 @@ function App() {
           )}
           <PreviewPane job={job} zoom={zoom} onZoom={setZoom} onSample={renderSample} license={status.license} storedGraphics={storedGraphics}
             listenerEndpoint={status.listener}
+            buyUrl={status.externalLinks?.buy}
             onReplay={replayJob} replaying={captureBusy} onDownload={downloadJob} exporting={exporting} />
           {inspectorCollapsed ? (
             <CollapsedSide side="right" label="Inspector" onExpand={() => setInspectorCollapsed(false)} />
@@ -869,7 +875,7 @@ function ActivityRail({ jobs, totalJobs, selectedId, query, onQuery, listenerEnd
   )
 }
 
-function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, listenerEndpoint, onReplay, replaying, onDownload, exporting }: {
+function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, listenerEndpoint, buyUrl, onReplay, replaying, onDownload, exporting }: {
   job?: ReceiptJob
   zoom: number
   onZoom: (value: number) => void
@@ -877,6 +883,7 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
   license: ServiceStatus['license']
   storedGraphics: StoredGraphic[]
   listenerEndpoint: string
+  buyUrl?: string
   onReplay: () => void
   replaying: boolean
   onDownload: (format: 'text' | 'raw' | 'capture') => void
@@ -1027,7 +1034,7 @@ function PreviewPane({ job, zoom, onZoom, onSample, license, storedGraphics, lis
         {imageError && <div className="receipt-image-notice error" role="alert"><AlertTriangle size={16} />{imageError}</div>}
         {job ? (
           <>
-            {job.origin === 'Trial Limit' && <div className="trial-limit-banner" role="status"><AlertTriangle size={17} /><div><strong>Trial Limit Reached</strong><span>The original bytes and receipt content after line 10 were permanently discarded. Upgrade for unlimited complete jobs.</span></div><a href="https://buy.posprinteremulator.com/" target="_blank" rel="noreferrer">View licenses</a></div>}
+            {job.origin === 'Trial Limit' && <div className="trial-limit-banner" role="status"><AlertTriangle size={17} /><div><strong>Trial Limit Reached</strong><span>The original bytes and receipt content after line 10 were permanently discarded. Upgrade for unlimited complete jobs.</span></div><a href={buyUrl ?? 'https://buy.posprinteremulator.com/'} target="_blank" rel="noreferrer">View licenses</a></div>}
             <div className="paper-wrap" style={{ transform: `scale(${zoom / 100})`, width: `${Math.round(364 * job.profilePaperWidthMm / 80)}px` }}>
               <ReceiptPaper articleRef={receiptRef} lines={job.lines} watermark={license.features.watermark} storedGraphics={storedGraphicMap} paperWidthMm={job.profilePaperWidthMm} />
             </div>
@@ -1159,7 +1166,7 @@ function SettingsDialog({ status, initialSection, updateStatus, onCheckUpdates, 
           <div className="settings-content">
             {section === 'license' && <LicenseSettings status={status} onActivated={onActivated} />}
             {section === 'printer' && <PrinterSetupWizard onCancel={onClose} trialMode={status.license.mode === 'Trial'} />}
-            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings canManage={multipleListenersEnabled} licenseMode={status.license.mode} maximumListeners={status.license.maximumListeners} onOpenSetup={() => setSection('printer')} onChanged={onListenersChanged} /></Suspense>}
+            {section === 'listeners' && <Suspense fallback={<div className="listener-loading"><RefreshCw className="spin" size={17} /> Loading Printer Listeners…</div>}><PrinterListenersSettings canManage={multipleListenersEnabled} licenseMode={status.license.mode} maximumListeners={status.license.maximumListeners} pricingUrl={status.externalLinks?.pricing} onOpenSetup={() => setSection('printer')} onChanged={onListenersChanged} /></Suspense>}
             {section === 'profiles' && features.printerProfiles && <PrinterProfilesSettings />}
             {section === 'logos' && features.storedLogos && <StoredGraphicsSettings graphics={storedGraphics} onChanged={onStoredGraphicsChanged} />}
             {section === 'state' && features.printerState && <PrinterStateSettings listeners={listeners} multipleListeners={multipleListenersEnabled} />}
@@ -1505,7 +1512,7 @@ function LicenseSettings({ status, onActivated }: {
           {promotionMessage && <div className="maintenance-message" role="status">{promotionMessage}</div>}
           {(status.license.promotion.isActive || promotionOffer?.state === 'Used') && (
             <div className="maintenance-actions">
-              <a href={promotionOffer?.purchaseUrl ?? `https://buy.posprinteremulator.com/?tier=${status.license.promotion.grantedTier ?? ''}`} target="_blank" rel="noreferrer">
+              <a href={promotionOffer?.purchaseUrl ?? `${status.externalLinks?.buy ?? 'https://buy.posprinteremulator.com/'}?tier=${status.license.promotion.grantedTier ?? ''}`} target="_blank" rel="noreferrer">
                 <ExternalLink size={15} /> Purchase {status.license.promotion.grantedTier ?? 'a license edition'}
               </a>
             </div>
@@ -1543,7 +1550,7 @@ function LicenseSettings({ status, onActivated }: {
           <div><span>Registered to</span><strong>{status.license.customerName}</strong></div>
           <div><span>Email</span><strong>{status.license.emailAddress}</strong></div>
           <p className="settings-note">{upgradeGuidance}</p>
-          <a className="secondary-action" href="https://userportal.posprinteremulator.com/portal.php?page=licenses" target="_blank" rel="noreferrer"><ExternalLink size={16} /> Manage or upgrade license</a>
+          <a className="secondary-action" href={status.externalLinks?.customerPortalLicenses ?? 'https://userportal.posprinteremulator.com/portal.php?page=licenses'} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Manage or upgrade license</a>
           <p className="settings-note">License ownership and computer assignments are managed through your verified Customer Portal account.</p>
         </div>
       ) : null}
@@ -1841,7 +1848,7 @@ function SupportSettings({ status, selectedJobId, onOpenPrinterWizard }: { statu
             </button>
           </article>
         </div>
-        {!diagnosticReportsAllowed && <div className="enterprise-feature-message"><strong>Enterprise Feature</strong><p>Diagnostic PDF Reports expose detailed receipt, ESC/POS, configuration, and log information only after server-side license authorization.</p><a href="https://www.posprinteremulator.com/pricing.html" target="_blank" rel="noreferrer">View Enterprise features <ExternalLink size={13} /></a></div>}
+        {!diagnosticReportsAllowed && <div className="enterprise-feature-message"><strong>Enterprise Feature</strong><p>Diagnostic PDF Reports expose detailed receipt, ESC/POS, configuration, and log information only after server-side license authorization.</p><a href={status.externalLinks?.pricing ?? 'https://www.posprinteremulator.com/pricing'} target="_blank" rel="noreferrer">View Enterprise features <ExternalLink size={13} /></a></div>}
         {diagnosticReportsAllowed && !selectedJobId && <div className="diagnostic-message">Close Settings, select a receipt in Activity, then return here to create a report for that job.</div>}
         {pdfMessage && <div className="diagnostic-message" role="status">{pdfMessage}</div>}
         {(showAdvancedPdf || showStandardPdf) && diagnosticReportsAllowed && selectedJobId && !pdfPreview && <form className="diagnostic-pdf-form" onSubmit={event => reviewDiagnosticPdf(event, showAdvancedPdf ? 'Advanced' : 'Standard')}>

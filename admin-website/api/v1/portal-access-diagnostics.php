@@ -93,7 +93,9 @@ try {
     $customers = $pdo->prepare(
         "SELECT c.customer_id,c.status,c.email_verified_at,c.merged_into_customer_id,
                 a.customer_id AS portal_account_id,a.locked_until,a.failed_login_count,
-                a.last_login_at,a.password_changed_at
+                a.last_login_at,a.password_changed_at,a.mfa_enabled,
+                (SELECT COUNT(*) FROM portal_recovery_codes r
+                 WHERE r.customer_id=c.customer_id AND r.used_at IS NULL) unused_recovery_code_count
          FROM customers c
          LEFT JOIN portal_accounts a ON a.customer_id=c.customer_id
          WHERE c.email_hash=UNHEX(SHA2(:email,256))
@@ -125,6 +127,21 @@ try {
          WHERE o.customer_id=:customer_id
            AND o.template_key IN ('email_verification','password_recovery')
          ORDER BY o.created_at DESC LIMIT 10"
+    );
+    $purchaseQueue = $pdo->prepare(
+        "SELECT o.template_key,o.state,o.attempts,o.last_error_code,o.last_error_detail,o.created_at,o.sent_at,
+                (SELECT d.event_type FROM communication_delivery_events d
+                 WHERE d.message_id=o.message_id ORDER BY d.occurred_at DESC,d.id DESC LIMIT 1) latest_delivery_event,
+                (SELECT d.occurred_at FROM communication_delivery_events d
+                 WHERE d.message_id=o.message_id ORDER BY d.occurred_at DESC,d.id DESC LIMIT 1) latest_delivery_at
+         FROM communication_outbox o
+         WHERE o.customer_id=:customer_id
+           AND o.template_key IN (
+             'purchase_confirmation','activation_ready',
+             'welcome_lite_purchase','welcome_pro_purchase','welcome_enterprise_purchase',
+             'welcome_lite_upgrade','welcome_pro_upgrade','welcome_enterprise_upgrade'
+           )
+         ORDER BY o.created_at DESC LIMIT 20"
     );
     $licenses = $pdo->prepare(
         "SELECT license_tier,control_state,maintenance_expires_at
@@ -167,6 +184,7 @@ try {
         $verification->execute(['customer_id' => $customerId]);
         $reset->execute(['customer_id' => $customerId]);
         $queue->execute(['customer_id' => $customerId]);
+        $purchaseQueue->execute(['customer_id' => $customerId]);
         $licenses->execute(['customer_id' => $customerId]);
         $purchases->execute(['customer_id' => $customerId]);
         $purchaseRecords = $purchases->fetchAll();
@@ -184,9 +202,12 @@ try {
             'failedLoginCount' => (int)($match['failed_login_count'] ?? 0),
             'lastLoginAt' => $match['last_login_at'],
             'passwordChangedAt' => $match['password_changed_at'],
+            'mfaEnabled' => !empty($match['mfa_enabled']),
+            'unusedRecoveryCodeCount' => (int)($match['unused_recovery_code_count'] ?? 0),
             'latestVerification' => $verification->fetch() ?: null,
             'latestPasswordReset' => $reset->fetch() ?: null,
             'securityEmailQueue' => $queue->fetchAll(),
+            'purchaseEmailQueue' => $purchaseQueue->fetchAll(),
             'licenses' => $licenses->fetchAll(),
             'billing' => [
                 'purchaseCount' => count($purchaseRecords),

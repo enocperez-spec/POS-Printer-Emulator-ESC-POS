@@ -25,6 +25,7 @@ type Props = {
   canManage: boolean
   licenseMode: LicenseStatus['mode']
   maximumListeners: number
+  pricingUrl?: string
   onOpenSetup?: () => void
   onChanged?: (listeners: PrinterListener[]) => void
 }
@@ -68,7 +69,7 @@ function numberLabel(value: number | undefined) {
   return (value ?? 0).toLocaleString()
 }
 
-export function PrinterListenersSettings({ canManage, licenseMode, maximumListeners, onOpenSetup, onChanged }: Props) {
+export function PrinterListenersSettings({ canManage, licenseMode, maximumListeners, pricingUrl, onOpenSetup, onChanged }: Props) {
   const [collection, setCollection] = useState<PrinterListenerCollection>()
   const [profiles, setProfiles] = useState<PrinterProfile[]>([])
   const [editingId, setEditingId] = useState<string | 'new'>()
@@ -219,6 +220,7 @@ export function PrinterListenersSettings({ canManage, licenseMode, maximumListen
         loading={!collection}
         error={error}
         copied={copiedId !== undefined}
+        pricingUrl={pricingUrl}
         onCopy={listener => void copyDetails(listener)}
         onOpenSetup={onOpenSetup}
       />
@@ -288,13 +290,14 @@ export function PrinterListenersSettings({ canManage, licenseMode, maximumListen
   )
 }
 
-function SingleListenerReadOnlyPanel({ licenseMode, maximumListeners, listener, loading, error, copied, onCopy, onOpenSetup }: {
+function SingleListenerReadOnlyPanel({ licenseMode, maximumListeners, listener, loading, error, copied, pricingUrl, onCopy, onOpenSetup }: {
   licenseMode: LicenseStatus['mode']
   maximumListeners: number
   listener?: PrinterListener
   loading: boolean
   error?: string
   copied: boolean
+  pricingUrl?: string
   onCopy: (listener: PrinterListener) => void
   onOpenSetup?: () => void
 }) {
@@ -348,12 +351,12 @@ function SingleListenerReadOnlyPanel({ licenseMode, maximumListeners, listener, 
         <div className="listener-empty"><Server size={28} /><strong>The included listener could not be found</strong><span>Open the Printer Setup Wizard to restore the default Trial printer configuration.</span></div>
       )}
 
-      <MultipleListenerUpgradePanel licenseMode={licenseMode} maximumListeners={maximumListeners} compact />
+      <MultipleListenerUpgradePanel licenseMode={licenseMode} maximumListeners={maximumListeners} pricingUrl={pricingUrl} compact />
     </div>
   )
 }
 
-function MultipleListenerUpgradePanel({ licenseMode, maximumListeners, compact = false }: { licenseMode: LicenseStatus['mode']; maximumListeners: number; compact?: boolean }) {
+function MultipleListenerUpgradePanel({ licenseMode, maximumListeners, pricingUrl, compact = false }: { licenseMode: LicenseStatus['mode']; maximumListeners: number; pricingUrl?: string; compact?: boolean }) {
   return (
     <div className={`settings-panel enterprise-upgrade-panel ${compact ? 'is-compact' : ''}`}>
       <div className="enterprise-upgrade-icon"><Crown size={30} /></div>
@@ -365,7 +368,7 @@ function MultipleListenerUpgradePanel({ licenseMode, maximumListeners, compact =
         <li><Check size={15} /> Independent state, queue, counters, and failure handling</li>
         <li><Check size={15} /> Filter Activity and diagnostics by printer</li>
       </ul>
-      <a className="enterprise-upgrade-action" href="https://www.posprinteremulator.com/pricing" target="_blank" rel="noreferrer"><Crown size={16} /> Compare license options</a>
+      <a className="enterprise-upgrade-action" href={pricingUrl ?? 'https://www.posprinteremulator.com/pricing'} target="_blank" rel="noreferrer"><Crown size={16} /> Compare license options</a>
       <small>License upgrades are applied automatically after this computer synchronizes with the verified Customer Portal account.</small>
     </div>
   )

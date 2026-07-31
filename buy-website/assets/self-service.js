@@ -1,10 +1,16 @@
 const body = document.body;
 const errorBox = document.querySelector('#form-error');
 const button = document.querySelector('#paypal-button');
+const restartLink = document.querySelector('#checkout-restart');
 
-const showError = (message) => {
+const showError = (message, requiresRestart = false) => {
   errorBox.textContent = message;
   errorBox.hidden = false;
+  if (restartLink) restartLink.hidden = !requiresRestart;
+  if (requiresRestart && button) {
+    button.setAttribute('disabled', '');
+    button.setAttribute('aria-disabled', 'true');
+  }
 };
 
 const post = async (path, payload) => {
@@ -14,7 +20,11 @@ const post = async (path, payload) => {
     body: JSON.stringify(payload),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'The secure checkout request failed.');
+  if (!response.ok) {
+    const error = new Error(data.error || 'The secure checkout request failed.');
+    error.status = response.status;
+    throw error;
+  }
   return data;
 };
 
@@ -51,12 +61,17 @@ try {
   button.addEventListener('click', async () => {
     errorBox.hidden = true;
     try {
-      const order = post('/api/create-portal-order.php', {
+      const orderIdPromise = post('/api/create-portal-order.php', {
         checkoutToken: body.dataset.checkoutToken,
-      }).then((result) => result.orderId);
-      await session.start({ presentationMode: 'auto' }, order);
+      }).then((result) => {
+        if (typeof result.orderId !== 'string' || result.orderId.length === 0) {
+          throw new Error('PayPal did not return a valid order ID.');
+        }
+        return { orderId: result.orderId };
+      });
+      await session.start({ presentationMode: 'modal' }, orderIdPromise);
     } catch (error) {
-      showError(error?.message || 'Could not start checkout.');
+      showError(error?.message || 'Could not start checkout.', error?.status === 410);
     }
   });
 } catch (error) {

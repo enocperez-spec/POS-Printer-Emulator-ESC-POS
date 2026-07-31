@@ -177,13 +177,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $submittedCode = preg_replace('/[^A-Z0-9]/', '', $submittedCode) ?? '';
             $licenseId = strtolower(trim((string)($_POST['license_id'] ?? '')));
             if (!preg_match('/^[A-Z0-9]{8}$/', $submittedCode) ||
-                !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $licenseId)) {
+                !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $licenseId)) {
                 throw new DomainException('Enter a valid computer link code and choose an eligible license.');
             }
             $pdo = portal_database();
             $pdo->beginTransaction();
             $findLink = $pdo->prepare(
                 'SELECT r.link_id,r.installation_id,r.status,r.expires_at,r.selected_license_id,
+                        r.journey_correlation_id,
                         i.installation_uuid,i.device_label,i.app_version,i.windows_version
                  FROM portal_computer_link_requests r
                  INNER JOIN installations i ON i.id=r.installation_id
@@ -207,14 +208,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new DomainException('That computer link code expired. Start a new request from the application.');
             }
             $findLicense = $pdo->prepare(
-                'SELECT license_id,license_tier,control_state,maintenance_expires_at,customer_id
+                'SELECT license_id,license_tier,control_state,license_expires_at,maintenance_expires_at,customer_id
                  FROM issued_licenses
                  WHERE license_id=:license_id AND customer_id=:customer_id
                  LIMIT 1 FOR UPDATE'
             );
             $findLicense->execute(['license_id' => $licenseId, 'customer_id' => $customerId]);
             $license = $findLicense->fetch();
-            if (!is_array($license) || (string)$license['control_state'] !== 'Enabled') {
+            if (!is_array($license) ||
+                (string)$license['control_state'] !== 'Enabled' ||
+                portal_license_expired($license)) {
                 throw new DomainException('That license is not eligible or is owned by another Customer Portal account.');
             }
             $activationMethod = 'PortalLink';
@@ -248,9 +251,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $bindingId = portal_uuid();
                 $insertBinding = $pdo->prepare(
                     'INSERT INTO license_device_bindings(
-                        binding_id,license_id,customer_id,installation_id,binding_state,activation_method,activated_at
+                        binding_id,license_id,customer_id,installation_id,binding_state,activation_method,
+                        journey_correlation_id,activated_at
                      ) VALUES(
-                        :binding_id,:license_id,:customer_id,:installation_id,\'Active\',:activation_method,UTC_TIMESTAMP(6)
+                        :binding_id,:license_id,:customer_id,:installation_id,\'Active\',:activation_method,
+                        :correlation_id,UTC_TIMESTAMP(6)
                      )'
                 );
                 $insertBinding->execute([
@@ -259,6 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'customer_id' => $customerId,
                     'installation_id' => $linkRequest['installation_id'],
                     'activation_method' => $activationMethod,
+                    'correlation_id' => $linkRequest['journey_correlation_id'],
                 ]);
             }
             $updateInstallation = $pdo->prepare(
@@ -294,10 +300,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $activationEvent = $pdo->prepare(
                 'INSERT INTO license_activation_events(
-                    customer_id,license_id,installation_id,link_id,event_type,outcome,activation_method,event_summary
+                    customer_id,license_id,installation_id,link_id,event_type,outcome,activation_method,
+                    event_summary,journey_correlation_id
                  ) VALUES(
                     :customer_id,:license_id,:installation_id,:link_id,
-                    :event_type,\'Succeeded\',:activation_method,:summary
+                    :event_type,\'Succeeded\',:activation_method,:summary,:correlation_id
                  )'
             );
             $activationEvent->execute([
@@ -308,6 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'event_type' => 'COMPUTER_LINK_APPROVED',
                 'activation_method' => $activationMethod,
                 'summary' => 'Customer approved a verified portal account link for a computer.',
+                'correlation_id' => $linkRequest['journey_correlation_id'],
             ]);
             $pdo->commit();
             unset($_SESSION['computer_link_code']);
@@ -316,10 +324,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $customerId,
                 'Portal Computer Link Approved',
                 'Customer linked a computer and selected an eligible license.',
-                (string)$linkRequest['installation_uuid']
+                (string)$linkRequest['installation_uuid'],
+                (string)$linkRequest['journey_correlation_id']
             );
             $notice = 'Computer approved. Return to POS Printer Emulator; account licensing will synchronize automatically.';
         } elseif ($action === 'deactivate-device') {
+            $correlationId = portal_correlation_id(null, true);
             $fresh = portal_current_account();
             if (!is_array($fresh) || !portal_recently_reauthenticated($fresh)) {
                 throw new DomainException('Confirm your password first. Reauthentication is valid for five minutes.');
@@ -368,10 +378,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($installation['license_id'])) {
                 $deactivationEvent = $pdo->prepare(
                     'INSERT INTO license_activation_events(
-                        customer_id,license_id,installation_id,event_type,outcome,activation_method,event_summary
+                        customer_id,license_id,installation_id,event_type,outcome,activation_method,event_summary,
+                        journey_correlation_id
                      ) VALUES(
                         :customer_id,:license_id,:installation_id,
-                        \'COMPUTER_DEACTIVATED\',\'Succeeded\',\'PortalLink\',:summary
+                        \'COMPUTER_DEACTIVATED\',\'Succeeded\',\'PortalLink\',:summary,:correlation_id
                      )'
                 );
                 $deactivationEvent->execute([
@@ -379,15 +390,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'license_id' => $installation['license_id'],
                     'installation_id' => $installationId,
                     'summary' => 'Customer deactivated a computer and released its license assignment.',
+                    'correlation_id' => $correlationId,
                 ]);
             }
             $actionInsert = $pdo->prepare(
-                'INSERT INTO portal_device_actions(customer_id,installation_id,action,reason)
-                 VALUES(:customer_id,:installation_id,\'Deactivate\',:reason)'
+                'INSERT INTO portal_device_actions(
+                    customer_id,installation_id,action,reason,journey_correlation_id
+                 ) VALUES(
+                    :customer_id,:installation_id,\'Deactivate\',:reason,:correlation_id
+                 )'
             );
-            $actionInsert->execute(['customer_id' => $customerId, 'installation_id' => $installationId, 'reason' => $reason]);
+            $actionInsert->execute([
+                'customer_id' => $customerId,
+                'installation_id' => $installationId,
+                'reason' => $reason,
+                'correlation_id' => $correlationId,
+            ]);
             $pdo->commit();
-            portal_audit($customerId, 'Portal Device Deactivated', 'Customer deactivated an old computer.', (string)$installation['installation_uuid']);
+            portal_audit(
+                $customerId,
+                'Portal Device Deactivated',
+                'Customer deactivated an old computer.',
+                (string)$installation['installation_uuid'],
+                $correlationId
+            );
             $notice = 'The selected computer was deactivated. Open the application on the replacement computer to activate it.';
         } elseif ($action === 'prepare-checkout') {
             $fresh = portal_current_account();
@@ -424,6 +450,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "SELECT license_tier
                      FROM issued_licenses
                      WHERE customer_id=:customer_id AND control_state='Enabled'
+                       AND (license_expires_at IS NULL OR license_expires_at>UTC_TIMESTAMP(6))
                      ORDER BY issued_at DESC LIMIT 1"
                 );
                 $findCurrent->execute(['customer_id' => $customerId]);
@@ -436,14 +463,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new DomainException('The selected license is invalid.');
                 }
                 $find = $pdo->prepare(
-                    "SELECT license_id,license_tier,control_state,maintenance_expires_at,maintenance_revoked_at
+                    "SELECT license_id,license_tier,control_state,license_expires_at,
+                            maintenance_expires_at,maintenance_revoked_at
                      FROM issued_licenses
                      WHERE license_id=:license_id AND customer_id=:customer_id
                      LIMIT 1"
                 );
                 $find->execute(['license_id' => $licenseId, 'customer_id' => $customerId]);
                 $license = $find->fetch();
-                if (!is_array($license) || (string)$license['control_state'] !== 'Enabled') {
+                if (!is_array($license) ||
+                    (string)$license['control_state'] !== 'Enabled' ||
+                    portal_license_expired($license)) {
                     throw new DomainException('The selected permanent license is not eligible.');
                 }
                 if (!empty($license['maintenance_revoked_at'])) {
@@ -479,12 +509,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $token = portal_token();
             $intentId = portal_uuid();
+            $correlationId = portal_correlation_id(null, true);
             $pdo->beginTransaction();
             $insert = $pdo->prepare(
                 'INSERT INTO portal_checkout_intents
-                    (intent_id,customer_id,license_id,installation_id,checkout_token_hash,order_type,
+                    (intent_id,customer_id,license_id,installation_id,checkout_token_hash,journey_correlation_id,order_type,
                      current_tier,target_tier,maintenance_previous_expires_at,expires_at)
-                 VALUES(:intent_id,:customer_id,:license_id,:installation_id,UNHEX(SHA2(:token,256)),:order_type,
+                 VALUES(:intent_id,:customer_id,:license_id,:installation_id,UNHEX(SHA2(:token,256)),:correlation_id,:order_type,
                         :current_tier,:target_tier,:maintenance_previous_expires_at,
                         DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 20 MINUTE))'
             );
@@ -494,22 +525,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'license_id' => $ownedLicenseId,
                 'installation_id' => $ownedInstallationId,
                 'token' => $token,
+                'correlation_id' => $correlationId,
                 'order_type' => $orderType,
                 'current_tier' => $currentTier,
                 'target_tier' => $targetTier,
                 'maintenance_previous_expires_at' => $previousMaintenance,
             ]);
             $event = $pdo->prepare(
-                'INSERT INTO portal_checkout_events(intent_id,event_type,actor,event_summary)
-                 VALUES(:intent_id,\'PREPARED\',\'Customer\',\'Verified customer prepared a short-lived checkout session.\')'
+                'INSERT INTO portal_checkout_events(
+                    intent_id,event_type,actor,event_summary,journey_correlation_id
+                 ) VALUES(
+                    :intent_id,\'PREPARED\',\'Customer\',
+                    \'Verified customer prepared a short-lived checkout session.\',:correlation_id
+                 )'
             );
-            $event->execute(['intent_id' => $intentId]);
+            $event->execute(['intent_id' => $intentId, 'correlation_id' => $correlationId]);
             $pdo->commit();
             portal_audit(
                 $customerId,
                 'Portal Checkout Prepared',
                 "{$orderType} checkout prepared from {$currentTier} to {$targetTier}.",
-                $intentId
+                $intentId,
+                $correlationId
             );
             header('Location: ' . portal_checkout_url($token), true, 303);
             exit;
@@ -765,8 +802,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $snapshot = portal_customer_snapshot($customerId);
 $licenses = $snapshot['licenses'];
-$primaryLicense = $licenses[0] ?? null;
 $primaryActiveLicense = portal_primary_active_license($licenses);
+$primaryLicense = $primaryActiveLicense ?? ($licenses[0] ?? null);
 $maintenanceReminder = portal_maintenance_reminder(
     is_array($primaryLicense) ? (string)($primaryLicense['maintenance_expires_at'] ?? '') : null
 );
@@ -775,7 +812,7 @@ $pendingComputerLink = null;
 if ($computerLinkCode !== '') {
     $compactLinkCode = str_replace('-', '', $computerLinkCode);
     $linkQuery = portal_database()->prepare(
-        'SELECT r.link_id,r.status,r.expires_at,r.selected_license_id,
+        'SELECT r.link_id,r.status,r.expires_at,r.selected_license_id,r.journey_correlation_id,
                 i.installation_uuid,i.device_label,i.app_version,i.windows_version
          FROM portal_computer_link_requests r
          INNER JOIN installations i ON i.id=r.installation_id
@@ -865,7 +902,7 @@ function portal_nav_icon(string $name): string
     <h1>Welcome back, <?= portal_e(portal_customer_display_name((string)($account['display_name'] ?? ''))) ?></h1>
     <?php if (is_array($primaryLicense)): ?>
       <section class="license-hero">
-        <div><span class="hero-symbol" aria-hidden="true">✓</span><div><h2><?= portal_e((string)$primaryLicense['license_tier']) ?> License</h2><p class="status active">● <?= portal_e(portal_license_status_label((string)$primaryLicense['control_state'])) ?></p><p><span class="maintenance-label">Maintenance and Support Until:</span> <strong><?= portal_e(portal_long_date($primaryLicense['maintenance_expires_at'])) ?></strong></p></div></div>
+        <div><span class="hero-symbol" aria-hidden="true">✓</span><div><h2><?= portal_e((string)$primaryLicense['license_tier']) ?> License</h2><p class="status active">● <?= portal_e(portal_license_display_status($primaryLicense)) ?></p><p><span class="maintenance-label">Maintenance and Support Until:</span> <strong><?= portal_e(portal_long_date($primaryLicense['maintenance_expires_at'])) ?></strong></p></div></div>
         <?php if ($versionStatus['updateAvailable'] === true && $maintenanceActive): ?>
           <a class="button update-download" href="/portal.php?page=downloads">Download Latest Version</a>
         <?php elseif (!$maintenanceActive): ?>
@@ -907,7 +944,7 @@ function portal_nav_icon(string $name): string
     <?php endif; ?>
     <div class="overview-grid">
       <div class="main-column">
-        <section class="data-section"><header><h2>Licenses</h2><a href="/portal.php?page=licenses">View details</a></header><div class="table-wrap"><table><thead><tr><th>License</th><th>Status</th><th>Tier</th><th>Listener allowance</th><th>Maintenance and Support Until</th></tr></thead><tbody><?php foreach (array_slice($licenses, 0, 3) as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><span class="status-dot"></span><?= portal_e(portal_license_status_label((string)$license['control_state'])) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="5">No paid licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
+        <section class="data-section"><header><h2>Licenses</h2><a href="/portal.php?page=licenses">View details</a></header><div class="table-wrap"><table><thead><tr><th>License</th><th>Status</th><th>Tier</th><th>Listener allowance</th><th>Maintenance and Support Until</th></tr></thead><tbody><?php foreach (array_slice($licenses, 0, 3) as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><span class="status-dot"></span><?= portal_e(portal_license_display_status($license)) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="5">No licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
         <section class="data-section"><header><h2>Installed computers</h2><a href="/portal.php?page=computers">Manage computers</a></header><div class="table-wrap"><table><thead><tr><th>Computer</th><th>Windows</th><th>App version</th><th>Last seen</th><th>Status</th></tr></thead><tbody><?php foreach (array_slice($installations, 0, 5) as $installation): ?><tr><td><?= portal_e((string)($installation['device_label'] ?: 'Computer ' . substr((string)$installation['installation_uuid'], -6))) ?></td><td><?= portal_e((string)($installation['windows_version'] ?: 'Windows device')) ?></td><td><?= portal_e((string)$installation['app_version']) ?></td><td><?= portal_e(portal_datetime($installation['last_seen_at'])) ?></td><td><?= $installation['portal_deactivated_at'] ? 'Deactivated' : 'Active' ?></td></tr><?php endforeach; ?><?php if ($installations === []): ?><tr><td colspan="5">No computers have checked in yet.</td></tr><?php endif; ?></tbody></table></div></section>
         <section class="data-section"><header><h2>Recent support requests</h2><a href="/portal.php?page=support">View all</a></header><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Subject</th><th>Status</th><th>Created</th></tr></thead><tbody><?php foreach (array_slice($snapshot['support'], 0, 4) as $request): ?><tr><td><code><?= portal_e((string)$request['reference_code']) ?></code></td><td><?= portal_e((string)$request['subject']) ?></td><td><?= portal_e((string)$request['state']) ?></td><td><?= portal_e(portal_date($request['created_at'])) ?></td></tr><?php endforeach; ?><?php if ($snapshot['support'] === []): ?><tr><td colspan="4">No support requests yet.</td></tr><?php endif; ?></tbody></table></div></section>
       </div>
@@ -919,7 +956,7 @@ function portal_nav_icon(string $name): string
     </div>
   <?php elseif ($page === 'licenses'): ?>
     <div class="page-heading"><div><h1>Licenses</h1><p>Licenses belong to your verified account and are applied automatically after you approve a registered computer.</p></div><a class="button primary" href="/portal.php?page=plans">Plans &amp; maintenance</a></div>
-    <section class="data-section"><div class="table-wrap"><table><thead><tr><th>License</th><th>Tier</th><th>Status</th><th>Issued</th><th>Maintenance and Support Until</th><th>Listeners</th><th>Computer assignment</th></tr></thead><tbody><?php foreach ($licenses as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e(portal_license_status_label((string)$license['control_state'])) ?></td><td><?= portal_e(portal_date($license['issued_at'])) ?></td><td><strong><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></strong></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><a href="/portal.php?page=computers">Manage computers</a></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="7">No paid licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
+    <section class="data-section"><div class="table-wrap"><table><thead><tr><th>License</th><th>Tier</th><th>Source / term</th><th>Status</th><th>Issued</th><th>Maintenance and Support Until</th><th>Listeners</th><th>Computer assignment</th></tr></thead><tbody><?php foreach ($licenses as $license): ?><tr><td><?= portal_masked_license($license) ?></td><td><?= portal_e((string)$license['license_tier']) ?></td><td><?= portal_e((string)($license['license_source'] ?? 'Paid')) ?><?= empty($license['license_expires_at']) ? ' · Permanent' : ' · Expires ' . portal_e(portal_date((string)$license['license_expires_at'])) ?></td><td><?= portal_e(portal_license_display_status($license)) ?></td><td><?= portal_e(portal_date($license['issued_at'])) ?></td><td><strong><?= portal_e(portal_long_date($license['maintenance_expires_at'])) ?></strong></td><td><?= portal_e(portal_listener_allowance((string)$license['license_tier'])) ?></td><td><a href="/portal.php?page=computers">Manage computers</a></td></tr><?php endforeach; ?><?php if ($licenses === []): ?><tr><td colspan="8">No licenses are linked to this customer record.</td></tr><?php endif; ?></tbody></table></div></section>
     <section class="info-band"><h2>POS Printer Emulator License with optional annual maintenance</h2><p>Your purchased version keeps working when maintenance expires. Use Plans &amp; maintenance to renew coverage, upgrade a license, or purchase an additional license. No subscription is created.</p></section>
   <?php elseif ($page === 'plans'): ?>
     <?php
@@ -998,7 +1035,7 @@ function portal_nav_icon(string $name): string
       ));
       $renewalCount = $purchaseCount - $licensePurchaseCount;
     ?>
-    <div class="page-heading"><div><p class="eyebrow">Account records</p><h1>Purchase &amp; Billing</h1><p>Review licenses, upgrades, Maintenance and Support renewals, payment status, and downloadable receipts.</p></div><a class="button primary" href="/portal.php?page=plans">Purchase or renew</a></div>
+    <div class="page-heading"><div><p class="eyebrow">Account records</p><h1>Purchase &amp; Billing</h1><p>Review licenses, upgrades, Maintenance and Support renewals, payment status, receipts, and invoices.</p></div><a class="button primary" href="/portal.php?page=plans">Purchase or renew</a></div>
     <section class="billing-summary" aria-label="Billing summary">
       <article><span>Total transactions</span><strong><?= $purchaseCount ?></strong></article>
       <article><span>Paid transactions</span><strong><?= $paidPurchaseCount ?></strong></article>
@@ -1011,7 +1048,7 @@ function portal_nav_icon(string $name): string
         <div class="billing-empty"><h3>No transactions yet</h3><p>License purchases and Maintenance and Support renewals will appear here after payment is completed.</p><a class="button primary" href="/portal.php?page=plans">View licenses</a></div>
       <?php else: ?>
         <div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Purchase</th><th>Associated license</th><th>Status</th><th>Amount</th><th>Transaction reference</th><th>Receipt</th></tr></thead>
+          <thead><tr><th>Date</th><th>Purchase</th><th>Associated license</th><th>Status</th><th>Amount</th><th>Transaction reference</th><th>Documents</th></tr></thead>
           <tbody>
           <?php foreach ($snapshot['purchases'] as $purchase): ?>
             <?php $purchaseStatus = portal_purchase_status_label((string)$purchase['purchase_status']); ?>
@@ -1022,7 +1059,7 @@ function portal_nav_icon(string $name): string
               <td><span class="payment-status <?= portal_e(strtolower($purchaseStatus)) ?>"><?= portal_e($purchaseStatus) ?></span></td>
               <td><strong><?= portal_e((string)$purchase['currency']) ?> <?= number_format((float)$purchase['amount'], 2) ?></strong></td>
               <td><code><?= portal_e(portal_purchase_display_reference($purchase)) ?></code></td>
-              <td><a class="button secondary compact" href="/receipt.php?reference=<?= rawurlencode((string)$purchase['purchase_reference']) ?>">View receipt</a></td>
+              <td><div class="billing-documents"><a class="button secondary compact" href="/receipt.php?reference=<?= rawurlencode((string)$purchase['purchase_reference']) ?>">View receipt</a></div></td>
             </tr>
           <?php endforeach; ?>
           </tbody>
@@ -1059,7 +1096,9 @@ function portal_nav_icon(string $name): string
           $eligibleLinkLicenses = [];
           $eligibleLinkLicenses = array_values(array_filter(
               $licenses,
-              static fn(array $license): bool => (string)$license['control_state'] === 'Enabled'
+              static fn(array $license): bool =>
+                  (string)$license['control_state'] === 'Enabled' &&
+                  !portal_license_expired($license)
           ));
         ?>
         <?php if ($eligibleLinkLicenses === []): ?>

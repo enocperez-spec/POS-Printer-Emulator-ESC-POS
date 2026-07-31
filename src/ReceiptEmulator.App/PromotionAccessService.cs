@@ -9,15 +9,19 @@ public sealed class PromotionAccessService
     private readonly IInstallationCredentialsProvider _credentials;
     private readonly LicenseService _license;
     private readonly string _pendingPath;
+    private readonly ExternalServicesOptions _externalServices;
 
     public PromotionAccessService(
         HttpClient httpClient,
         IInstallationCredentialsProvider credentials,
-        LicenseService license)
+        LicenseService license,
+        ExternalServicesOptions? externalServices = null)
     {
         _httpClient = httpClient;
         _credentials = credentials;
         _license = license;
+        _externalServices = externalServices ?? ExternalServicesOptions.FromConfiguration(
+            new ConfigurationBuilder().Build());
         _pendingPath = Path.Combine(license.RootPath, "promotion-request.json");
     }
 
@@ -26,6 +30,8 @@ public sealed class PromotionAccessService
         var response = await SendAsync(
             new PromotionServerRequest("status", null, null),
             cancellationToken);
+        _externalServices.ValidateReturnedUrl("promotion purchase URL", response.PurchaseUrl);
+        _externalServices.ValidateReturnedUrl("promotion verification URL", response.VerificationUrl);
         return response.ToOffer();
     }
 

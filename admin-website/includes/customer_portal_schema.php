@@ -199,6 +199,45 @@ function ensure_customer_portal_schema(PDO $pdo): void
         foreach ($statements as $statement) {
             $pdo->exec($statement);
         }
+        $pdo->exec(
+            'ALTER TABLE portal_password_resets
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER token_hash,
+             ADD INDEX IF NOT EXISTS ix_portal_password_reset_journey (journey_correlation_id,requested_at)'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_device_actions
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER reason,
+             ADD INDEX IF NOT EXISTS ix_portal_device_journey (journey_correlation_id,created_at)'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_computer_link_requests
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER user_code_hash,
+             ADD INDEX IF NOT EXISTS ix_portal_link_journey (journey_correlation_id,created_at)'
+        );
+        $pdo->exec(
+            'UPDATE portal_computer_link_requests
+             SET journey_correlation_id=link_id
+             WHERE journey_correlation_id IS NULL'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_computer_link_requests
+             MODIFY journey_correlation_id CHAR(36) NOT NULL'
+        );
+        $pdo->exec(
+            'ALTER TABLE license_device_bindings
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER activation_method,
+             ADD INDEX IF NOT EXISTS ix_license_binding_journey (journey_correlation_id,created_at)'
+        );
+        $pdo->exec(
+            'ALTER TABLE license_activation_events
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER event_summary,
+             ADD INDEX IF NOT EXISTS ix_activation_event_journey (journey_correlation_id,created_at)'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_mail_outbox
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER text_body,
+             ADD INDEX IF NOT EXISTS ix_portal_mail_journey (journey_correlation_id,created_at)'
+        );
         $portalAccountColumns = crm_table_columns($pdo, 'portal_accounts');
         if (!isset($portalAccountColumns['mfa_reenrollment_required'])) {
             $pdo->exec(

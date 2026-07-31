@@ -1,0 +1,15 @@
+{
+  "ExternalServices": {
+    "Profile": "Certification",
+    "TelemetryEndpoint": "https://sandbox.posprinteremulator.com/api/v1/telemetry.php",
+    "AccountLinkEndpoint": "https://sandbox.posprinteremulator.com/api/v1/account-link.php",
+    "DeviceEntitlementEndpoint": "https://admin-sandbox.posprinteremulator.com/api/v1/device-entitlement.php",
+    "DeviceUnlinkEndpoint": "https://admin-sandbox.posprinteremulator.com/api/v1/device-unlink.php",
+    "PromotionBaseUrl": "https://admin-sandbox.posprinteremulator.com/",
+    "SupportBaseUrl": "https://admin-sandbox.posprinteremulator.com/",
+    "BuyBaseUrl": "https://buy-sandbox.posprinteremulator.com/",
+    "CustomerPortalBaseUrl": "https://userportal-sandbox.posprinteremulator.com/",
+    "WebsiteBaseUrl": "https://sandbox.posprinteremulator.com/",
+    "SupportWebsiteBaseUrl": "https://support-sandbox.posprinteremulator.com/"
+  }
+}

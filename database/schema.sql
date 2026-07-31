@@ -81,8 +81,11 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     revoked_at DATETIME(6) NULL,
     deleted_at DATETIME(6) NULL,
     superseded_by_license_id CHAR(36) NULL,
-    license_source ENUM('Manual', 'Purchase') NOT NULL DEFAULT 'Manual',
+    license_source ENUM('Manual', 'Purchase', 'Complimentary') NOT NULL DEFAULT 'Manual',
     source_reference VARCHAR(64) NULL,
+    license_expires_at DATETIME(6) NULL,
+    complimentary_reason VARCHAR(24) NULL,
+    complimentary_note VARCHAR(500) NULL,
     maintenance_expires_at DATETIME(6) NULL,
     maintenance_revoked_at DATETIME(6) NULL,
     row_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
@@ -193,6 +196,7 @@ CREATE TABLE IF NOT EXISTS customer_purchases (
     order_type ENUM('LICENSE','MAINTENANCE') NOT NULL,
     license_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
     purchase_status VARCHAR(40) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     amount DECIMAL(10,2) NOT NULL,
     currency CHAR(3) NOT NULL,
     paid_at DATETIME(6) NULL,
@@ -200,6 +204,7 @@ CREATE TABLE IF NOT EXISTS customer_purchases (
     PRIMARY KEY (id),
     UNIQUE KEY uq_customer_purchase_reference (purchase_reference),
     KEY ix_customer_purchases_customer (customer_id, paid_at),
+    KEY ix_customer_purchases_journey (journey_correlation_id, updated_at),
     CONSTRAINT fk_customer_purchases_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -211,10 +216,12 @@ CREATE TABLE IF NOT EXISTS customer_events (
     source_reference VARCHAR(96) NULL,
     actor VARCHAR(80) NOT NULL,
     event_summary VARCHAR(500) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     occurred_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     KEY ix_customer_events_customer (customer_id, occurred_at),
     KEY ix_customer_events_type (event_type, occurred_at),
+    KEY ix_customer_events_journey (journey_correlation_id, occurred_at),
     CONSTRAINT fk_customer_events_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -251,12 +258,14 @@ CREATE TABLE IF NOT EXISTS customer_email_verifications (
     customer_id CHAR(36) NOT NULL,
     email_hash BINARY(32) NOT NULL,
     token_hash BINARY(32) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     requested_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     expires_at DATETIME(6) NOT NULL,
     used_at DATETIME(6) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_customer_verification_token (token_hash),
     KEY ix_customer_verification_customer (customer_id, expires_at),
+    KEY ix_customer_verification_journey (journey_correlation_id, requested_at),
     CONSTRAINT fk_customer_verification_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -269,10 +278,12 @@ CREATE TABLE IF NOT EXISTS customer_admin_audit (
     object_type VARCHAR(40) NOT NULL,
     object_reference VARCHAR(96) NULL,
     reason VARCHAR(500) NULL,
+    journey_correlation_id CHAR(36) NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     KEY ix_customer_audit_customer (customer_id, created_at),
-    KEY ix_customer_audit_action (action, created_at)
+    KEY ix_customer_audit_action (action, created_at),
+    KEY ix_customer_audit_journey (journey_correlation_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_api_rate_limits (
@@ -366,6 +377,7 @@ CREATE TABLE IF NOT EXISTS communication_outbox (
     recipient_hash BINARY(32) NOT NULL,
     parameters_json TEXT NOT NULL,
     idempotency_key VARCHAR(160) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     state ENUM('Pending','Processing','Deferred','Sent','Failed','DeliveryUnknown','Cancelled') NOT NULL DEFAULT 'Pending',
     attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,
     available_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -381,6 +393,7 @@ CREATE TABLE IF NOT EXISTS communication_outbox (
     KEY ix_communication_outbox_ready (state, priority, available_at),
     KEY ix_communication_outbox_customer (customer_id, created_at),
     KEY ix_communication_outbox_template (template_key, state, created_at),
+    KEY ix_communication_outbox_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_communication_outbox_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
     CONSTRAINT fk_communication_outbox_template FOREIGN KEY (template_key) REFERENCES communication_templates(template_key),
     CONSTRAINT fk_communication_outbox_campaign FOREIGN KEY (campaign_id) REFERENCES communication_campaigns(campaign_id)
@@ -393,12 +406,14 @@ CREATE TABLE IF NOT EXISTS communication_delivery_events (
     provider_message_id VARCHAR(160) NULL,
     event_type VARCHAR(40) NOT NULL,
     event_summary VARCHAR(240) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     occurred_at DATETIME(6) NOT NULL,
     received_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     UNIQUE KEY uq_communication_provider_event (provider_event_key),
     KEY ix_communication_delivery_message (message_id, occurred_at),
     KEY ix_communication_delivery_type (event_type, occurred_at),
+    KEY ix_communication_delivery_journey (journey_correlation_id, occurred_at),
     CONSTRAINT fk_communication_delivery_message FOREIGN KEY (message_id) REFERENCES communication_outbox(message_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -617,12 +632,14 @@ CREATE TABLE IF NOT EXISTS portal_password_resets (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id CHAR(36) NOT NULL,
     token_hash BINARY(32) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     requested_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     expires_at DATETIME(6) NOT NULL,
     used_at DATETIME(6) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_portal_password_reset_token (token_hash),
     KEY ix_portal_password_reset_customer (customer_id, expires_at),
+    KEY ix_portal_password_reset_journey (journey_correlation_id, requested_at),
     CONSTRAINT fk_portal_password_reset_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -668,10 +685,12 @@ CREATE TABLE IF NOT EXISTS portal_device_actions (
     installation_id BIGINT UNSIGNED NOT NULL,
     action ENUM('Deactivate') NOT NULL,
     reason VARCHAR(300) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     KEY ix_portal_device_customer (customer_id, created_at),
     KEY ix_portal_device_installation (installation_id, created_at),
+    KEY ix_portal_device_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_portal_device_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
     CONSTRAINT fk_portal_device_installation FOREIGN KEY (installation_id) REFERENCES installations(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -681,6 +700,7 @@ CREATE TABLE IF NOT EXISTS portal_computer_link_requests (
     installation_id BIGINT UNSIGNED NOT NULL,
     request_token_hash BINARY(32) NOT NULL,
     user_code_hash BINARY(32) NOT NULL,
+    journey_correlation_id CHAR(36) NOT NULL,
     status ENUM('Pending','Approved','Rejected','Expired','Consumed') NOT NULL DEFAULT 'Pending',
     approved_customer_id CHAR(36) NULL,
     selected_license_id CHAR(36) NULL,
@@ -695,6 +715,7 @@ CREATE TABLE IF NOT EXISTS portal_computer_link_requests (
     KEY ix_portal_link_installation (installation_id, status, expires_at),
     KEY ix_portal_link_customer (approved_customer_id, created_at),
     KEY ix_portal_link_license (selected_license_id, created_at),
+    KEY ix_portal_link_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_portal_link_installation FOREIGN KEY (installation_id) REFERENCES installations(id),
     CONSTRAINT fk_portal_link_customer FOREIGN KEY (approved_customer_id) REFERENCES customers(customer_id),
     CONSTRAINT fk_portal_link_license FOREIGN KEY (selected_license_id) REFERENCES issued_licenses(license_id)
@@ -707,6 +728,7 @@ CREATE TABLE IF NOT EXISTS license_device_bindings (
     installation_id BIGINT UNSIGNED NOT NULL,
     binding_state ENUM('Pending','Active','Deactivated','Revoked') NOT NULL DEFAULT 'Pending',
     activation_method ENUM('PortalLink','AdminRecovery','LegacyMigration') NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     activated_at DATETIME(6) NULL,
     deactivated_at DATETIME(6) NULL,
     deactivation_reason VARCHAR(300) NULL,
@@ -718,6 +740,7 @@ CREATE TABLE IF NOT EXISTS license_device_bindings (
     KEY ix_license_binding_customer (customer_id, binding_state, activated_at),
     KEY ix_license_binding_installation (installation_id, binding_state, activated_at),
     KEY ix_license_binding_transfer (transfer_reference),
+    KEY ix_license_binding_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_license_binding_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
     CONSTRAINT fk_license_binding_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
     CONSTRAINT fk_license_binding_installation FOREIGN KEY (installation_id) REFERENCES installations(id)
@@ -733,6 +756,7 @@ CREATE TABLE IF NOT EXISTS license_activation_events (
     outcome ENUM('Succeeded','Rejected','Failed') NOT NULL,
     activation_method VARCHAR(40) NOT NULL,
     event_summary VARCHAR(500) NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     source_ip_digest BINARY(32) NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
@@ -741,6 +765,7 @@ CREATE TABLE IF NOT EXISTS license_activation_events (
     KEY ix_activation_event_installation (installation_id, created_at),
     KEY ix_activation_event_link (link_id, created_at),
     KEY ix_activation_event_outcome (outcome, created_at),
+    KEY ix_activation_event_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_activation_event_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
     CONSTRAINT fk_activation_event_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
     CONSTRAINT fk_activation_event_installation FOREIGN KEY (installation_id) REFERENCES installations(id),
@@ -754,6 +779,7 @@ CREATE TABLE IF NOT EXISTS portal_mail_outbox (
     recipient_email VARCHAR(254) NOT NULL,
     subject VARCHAR(180) NOT NULL,
     text_body TEXT NOT NULL,
+    journey_correlation_id CHAR(36) NULL,
     state ENUM('Pending','Sent','Failed') NOT NULL DEFAULT 'Pending',
     attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,
     available_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -763,6 +789,7 @@ CREATE TABLE IF NOT EXISTS portal_mail_outbox (
     PRIMARY KEY (id),
     KEY ix_portal_mail_state (state, available_at),
     KEY ix_portal_mail_customer (customer_id, created_at),
+    KEY ix_portal_mail_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_portal_mail_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -772,6 +799,7 @@ CREATE TABLE IF NOT EXISTS portal_checkout_intents (
     license_id CHAR(36) NULL,
     installation_id BIGINT UNSIGNED NULL,
     checkout_token_hash BINARY(32) NOT NULL,
+    journey_correlation_id CHAR(36) NOT NULL,
     order_type ENUM('MAINTENANCE','UPGRADE','LICENSE') NOT NULL,
     current_tier ENUM('Trial','Lite','Pro','Enterprise') NOT NULL,
     target_tier ENUM('Lite','Pro','Enterprise') NOT NULL,
@@ -795,6 +823,7 @@ CREATE TABLE IF NOT EXISTS portal_checkout_intents (
     KEY ix_portal_checkout_customer (customer_id, prepared_at),
     KEY ix_portal_checkout_license (license_id, prepared_at),
     KEY ix_portal_checkout_installation (installation_id, prepared_at),
+    KEY ix_portal_checkout_journey (journey_correlation_id, prepared_at),
     CONSTRAINT fk_portal_checkout_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
     CONSTRAINT fk_portal_checkout_license FOREIGN KEY (license_id) REFERENCES issued_licenses(license_id),
     CONSTRAINT fk_portal_checkout_installation FOREIGN KEY (installation_id) REFERENCES installations(id)
@@ -807,9 +836,11 @@ CREATE TABLE IF NOT EXISTS portal_checkout_events (
     actor VARCHAR(80) NOT NULL,
     event_summary VARCHAR(500) NOT NULL,
     event_data JSON NULL,
+    journey_correlation_id CHAR(36) NOT NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     KEY ix_portal_checkout_events (intent_id, created_at),
+    KEY ix_portal_checkout_event_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_portal_checkout_event_intent FOREIGN KEY (intent_id)
         REFERENCES portal_checkout_intents(intent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -913,11 +944,13 @@ CREATE TABLE IF NOT EXISTS issued_license_events (
     reason VARCHAR(500) NULL,
     performed_by VARCHAR(80) NOT NULL,
     admin_ip VARCHAR(45) NULL,
+    journey_correlation_id CHAR(36) NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
     KEY ix_license_events_license_id (license_id),
     KEY ix_license_events_created_at (created_at),
-    KEY ix_license_events_event_type (event_type)
+    KEY ix_license_events_event_type (event_type),
+    KEY ix_license_events_journey (journey_correlation_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS development_roadmap (

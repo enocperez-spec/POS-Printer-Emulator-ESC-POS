@@ -79,8 +79,12 @@ function account_link_event(
 ): void {
     $insert = $pdo->prepare(
         'INSERT INTO license_activation_events
-            (customer_id,license_id,installation_id,link_id,event_type,outcome,activation_method,event_summary)
-         VALUES(:customer_id,:license_id,:installation_id,:link_id,:event_type,:outcome,\'PortalLink\',:summary)'
+            (customer_id,license_id,installation_id,link_id,event_type,outcome,activation_method,
+             event_summary,journey_correlation_id)
+         VALUES(
+            :customer_id,:license_id,:installation_id,:link_id,:event_type,:outcome,
+            \'PortalLink\',:summary,:correlation_id
+         )'
     );
     $insert->execute([
         'customer_id' => $customerId,
@@ -90,6 +94,7 @@ function account_link_event(
         'event_type' => $eventType,
         'outcome' => $outcome,
         'summary' => $summary,
+        'correlation_id' => $linkId,
     ]);
 }
 
@@ -133,15 +138,17 @@ try {
         $expirePrevious->execute(['installation_id' => $installationId]);
         $insert = $pdo->prepare(
             'INSERT INTO portal_computer_link_requests
-                (link_id,installation_id,request_token_hash,user_code_hash,expires_at)
+                (link_id,installation_id,request_token_hash,user_code_hash,journey_correlation_id,expires_at)
              VALUES(:link_id,:installation_id,UNHEX(SHA2(:request_token,256)),
-                    UNHEX(SHA2(:user_code,256)),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 10 MINUTE))'
+                    UNHEX(SHA2(:user_code,256)),:correlation_id,
+                    DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 10 MINUTE))'
         );
         $insert->execute([
             'link_id' => $linkId,
             'installation_id' => $installationId,
             'request_token' => $requestToken,
             'user_code' => str_replace('-', '', $userCode),
+            'correlation_id' => $linkId,
         ]);
         account_link_event(
             $pdo,
@@ -156,6 +163,7 @@ try {
         $pdo->commit();
         json_response([
             'state' => 'Pending',
+            'correlationId' => $linkId,
             'linkId' => $linkId,
             'requestToken' => $requestToken,
             'userCode' => $userCode,
@@ -174,6 +182,7 @@ try {
     $pdo->beginTransaction();
     $query = $pdo->prepare(
         "SELECT r.link_id,r.status,r.expires_at,r.approved_customer_id,r.selected_license_id,
+                r.journey_correlation_id,
                 c.display_name,c.canonical_email,
                 l.license_tier,l.control_state,l.maintenance_expires_at,
                 b.binding_id,b.binding_state
@@ -228,7 +237,11 @@ try {
             'The approved account license was saved by the linked desktop application.'
         );
         $pdo->commit();
-        json_response(['state' => 'Consumed', 'message' => 'This computer is linked and activated.']);
+        json_response([
+            'state' => 'Consumed',
+            'correlationId' => (string)$link['journey_correlation_id'],
+            'message' => 'This computer is linked and activated.',
+        ]);
     }
 
     $pdo->commit();
@@ -236,6 +249,7 @@ try {
     if ($state !== 'Approved') {
         json_response([
             'state' => $state,
+            'correlationId' => (string)$link['journey_correlation_id'],
             'message' => match ($state) {
                 'Pending' => 'Waiting for approval in the Customer Portal.',
                 'Rejected' => 'The customer rejected this computer-link request.',
@@ -253,6 +267,7 @@ try {
     }
     json_response([
         'state' => 'Approved',
+        'correlationId' => (string)$link['journey_correlation_id'],
         'customerName' => (string)$link['display_name'],
         'emailAddress' => (string)$link['canonical_email'],
         'licenseId' => (string)$link['selected_license_id'],

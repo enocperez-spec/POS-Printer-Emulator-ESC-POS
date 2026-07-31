@@ -109,6 +109,30 @@ try {
     }
 
     $pdo = database();
+    if (($body['action'] ?? '') === 'seed-certification') {
+        $environment = strtolower((string)(private_config()['environment'] ?? 'production'));
+        if (!in_array($environment, ['sandbox', 'staging'], true)) {
+            throw new RuntimeException('Certification seed is restricted to a sandbox or staging environment.');
+        }
+        $seed = file_get_contents(__DIR__ . '/private/certification-seed.sql');
+        if ($seed === false) {
+            throw new RuntimeException('Certification seed file is unavailable.');
+        }
+        $statements = split_sql_statements($seed);
+        $pdo->beginTransaction();
+        try {
+            foreach ($statements as $statement) {
+                $pdo->exec($statement);
+            }
+            $pdo->commit();
+        } catch (Throwable $seedException) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $seedException;
+        }
+        respond(['ok' => true, 'statements' => count($statements)]);
+    }
     if (($body['action'] ?? '') === 'cleanup-license-smoke-test') {
         ensure_license_management_schema($pdo);
         $licenseId = (string)($body['licenseId'] ?? '');
@@ -193,5 +217,10 @@ try {
         $pdo->rollBack();
     }
     error_log('POS Printer Emulator admin setup failure: ' . $exception->getMessage());
-    respond(['error' => 'Database setup failed.'], 500);
+    $databaseName = (string)(private_config()['database']['name'] ?? '');
+    $isNonProduction = preg_match('/(^|[_-])(sandbox|staging)([_-]|$)/i', $databaseName) === 1;
+    respond([
+        'error' => 'Database setup failed.',
+        'detail' => $isNonProduction ? $exception->getMessage() : null,
+    ], 500);
 }

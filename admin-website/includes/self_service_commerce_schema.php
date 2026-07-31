@@ -135,6 +135,35 @@ function ensure_self_service_commerce_schema(PDO $pdo): void
             $pdo->exec($statement);
         }
         $pdo->exec(
+            'ALTER TABLE portal_checkout_intents
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER checkout_token_hash,
+             ADD INDEX IF NOT EXISTS ix_portal_checkout_journey (journey_correlation_id,prepared_at)'
+        );
+        $pdo->exec(
+            'UPDATE portal_checkout_intents
+             SET journey_correlation_id=intent_id
+             WHERE journey_correlation_id IS NULL'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_checkout_intents
+             MODIFY journey_correlation_id CHAR(36) NOT NULL'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_checkout_events
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER event_data,
+             ADD INDEX IF NOT EXISTS ix_portal_checkout_event_journey (journey_correlation_id,created_at)'
+        );
+        $pdo->exec(
+            'UPDATE portal_checkout_events e
+             INNER JOIN portal_checkout_intents i ON i.intent_id=e.intent_id
+             SET e.journey_correlation_id=i.journey_correlation_id
+             WHERE e.journey_correlation_id IS NULL'
+        );
+        $pdo->exec(
+            'ALTER TABLE portal_checkout_events
+             MODIFY journey_correlation_id CHAR(36) NOT NULL'
+        );
+        $pdo->exec(
             "ALTER TABLE portal_promotion_claims
              MODIFY claim_type ENUM('Customer','Account','License','Installation','Device') NOT NULL"
         );
