@@ -1366,10 +1366,16 @@ internal static class CertificationProgram
                 throw new InvalidDataException(
                     "Website publishing must exclude generated installer downloads from recursive site synchronization.");
             }
+            if (!publisher.Contains("run-sandbox-communications-cron", StringComparison.Ordinal) ||
+                !publisher.Contains("admin_sandbox_posprinteremulator", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "Verified-host sandbox communications cron diagnostics are missing.");
+            }
             return Passed(
                 name,
                 "Production readiness",
-                "Validated 18 critical rollout gates, 15 E2E customer journeys, documentation, production publisher enforcement, and generated-download exclusion.");
+                "Validated 18 critical rollout gates, 15 E2E customer journeys, documentation, production publisher enforcement, generated-download exclusion, and verified-host sandbox cron diagnostics.");
         }
         catch (Exception exception)
         {

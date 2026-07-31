@@ -68,6 +68,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher seed-certification-recovered <https-setup-url>");
     Console.WriteLine("  website-publisher portal-diagnostics <https-diagnostics-url> <email>");
     Console.WriteLine("  website-publisher run-communications-worker <https-worker-url> [maximum]");
+    Console.WriteLine("  website-publisher run-sandbox-communications-cron <admin-sandbox-remote-directory>");
     Console.WriteLine("  website-publisher sync-sandbox-communication-template <https-sync-url> <template-key>");
     Console.WriteLine("  website-publisher sandbox-reset-checkout-rate <portal-remote-directory> <email>");
     Console.WriteLine("  website-publisher sync-license-catalog [repository-root]");
@@ -293,6 +294,19 @@ try
                 expectedFingerprint,
                 args[1],
                 args[2]);
+            break;
+        case "run-sandbox-communications-cron":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException(
+                    "The run-sandbox-communications-cron command requires the Admin sandbox remote directory.");
+            }
+            RunSandboxCommunicationsCron(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1]);
             break;
         case "publish":
             if (args.Length < 2)
@@ -2075,6 +2089,105 @@ static void FetchSandboxRelease(
     }
     Console.WriteLine(
         $"Sandbox host fetched and checksum-verified {Path.GetFileName(remoteFile)} ({size:N0} bytes).");
+}
+
+static void RunSandboxCommunicationsCron(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "The communications cron diagnostic is restricted to the Admin sandbox directory.");
+    }
+    if (!DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "The communications cron diagnostic requires PPE_DEPLOYMENT_PROFILE=sandbox.");
+    }
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        const string diagnosticScript = """
+            <?php
+            declare(strict_types=1);
+            require 'includes/bootstrap.php';
+            require 'includes/communications.php';
+            $pdo = database();
+            $snapshot = static function (PDO $pdo): array {
+                $row = $pdo->query(
+                    "SELECT
+                        SUM(state='Pending') AS pending_count,
+                        SUM(state='Deferred') AS deferred_count,
+                        SUM(state IN ('Pending','Deferred') AND available_at<=UTC_TIMESTAMP(6)) AS due_count,
+                        SUM(state='Sent') AS sent_count
+                     FROM communication_outbox"
+                )->fetch();
+                return [
+                    'pending' => (int)($row['pending_count'] ?? 0),
+                    'deferred' => (int)($row['deferred_count'] ?? 0),
+                    'due' => (int)($row['due_count'] ?? 0),
+                    'sent' => (int)($row['sent_count'] ?? 0),
+                ];
+            };
+            $before = $snapshot($pdo);
+            $outcomes = [];
+            for ($index = 0; $index < 50; $index++) {
+                $result = communication_worker_process_one($pdo);
+                $status = (string)($result['status'] ?? 'unknown');
+                $outcomes[$status] = ($outcomes[$status] ?? 0) + 1;
+                if ($status === 'idle') break;
+            }
+            echo json_encode([
+                'before' => $before,
+                'outcomes' => $outcomes,
+                'after' => $snapshot($pdo),
+            ], JSON_THROW_ON_ERROR);
+            """;
+        var encodedScript = Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes(diagnosticScript));
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            "test -f private/communications-cron.php && " +
+            $"printf '%s' '{encodedScript}' | base64 -d | /usr/bin/php8.4");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox communications cron failed with exit status {command.ExitStatus}.");
+        }
+        var jsonOffset = command.Result.IndexOf(
+            "{\"before\"",
+            StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox communications cron did not return its privacy-safe diagnostic result.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(
+            "Sandbox communications cron completed successfully through the verified SSH host: " +
+            JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
 }
 
 static void ResetSandboxCheckoutRate(
