@@ -10,12 +10,18 @@ public sealed record AccountLinkStartResult(
     string UserCode,
     int ExpiresInSeconds,
     string VerificationUrl,
-    string Message);
+    string Message)
+{
+    public Guid CorrelationId { get; init; }
+}
 
 public sealed record AccountLinkStatusResult(
     string State,
     string Message,
-    LicenseStatus? License = null);
+    LicenseStatus? License = null)
+{
+    public Guid? CorrelationId { get; init; }
+}
 
 public sealed record AccountUnlinkResult(
     LicenseStatus License,
@@ -30,6 +36,7 @@ public sealed class AccountLinkService
     private readonly Uri _endpoint;
     private readonly Uri _entitlementEndpoint;
     private readonly Uri _unlinkEndpoint;
+    private readonly ExternalServicesOptions _externalServices;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public AccountLinkService(
@@ -43,7 +50,9 @@ public sealed class AccountLinkService
         _credentials = credentials;
         _license = license;
         _telemetry = telemetry;
-        var configured = configuration["AccountLink:Endpoint"] ??
+        _externalServices = ExternalServicesOptions.FromConfiguration(configuration);
+        var configured = configuration["ExternalServices:AccountLinkEndpoint"] ??
+                         configuration["AccountLink:Endpoint"] ??
                          "https://www.posprinteremulator.com/api/v1/account-link.php";
         if (!Uri.TryCreate(configured, UriKind.Absolute, out var endpoint) ||
             endpoint.Scheme != Uri.UriSchemeHttps)
@@ -51,7 +60,8 @@ public sealed class AccountLinkService
             throw new InvalidOperationException("The secure Customer Portal link service is not configured.");
         }
         _endpoint = endpoint;
-        var entitlementConfigured = configuration["AccountLink:EntitlementEndpoint"] ??
+        var entitlementConfigured = configuration["ExternalServices:DeviceEntitlementEndpoint"] ??
+                                    configuration["AccountLink:EntitlementEndpoint"] ??
                                     "https://admin.posprinteremulator.com/api/v1/device-entitlement.php";
         if (!Uri.TryCreate(entitlementConfigured, UriKind.Absolute, out var entitlementEndpoint) ||
             entitlementEndpoint.Scheme != Uri.UriSchemeHttps)
@@ -59,7 +69,8 @@ public sealed class AccountLinkService
             throw new InvalidOperationException("The secure device licensing service is not configured.");
         }
         _entitlementEndpoint = entitlementEndpoint;
-        var unlinkConfigured = configuration["AccountLink:UnlinkEndpoint"] ??
+        var unlinkConfigured = configuration["ExternalServices:DeviceUnlinkEndpoint"] ??
+                               configuration["AccountLink:UnlinkEndpoint"] ??
                                "https://admin.posprinteremulator.com/api/v1/device-unlink.php";
         if (!Uri.TryCreate(unlinkConfigured, UriKind.Absolute, out var unlinkEndpoint) ||
             unlinkEndpoint.Scheme != Uri.UriSchemeHttps)
@@ -83,6 +94,10 @@ public sealed class AccountLinkService
         {
             throw new InvalidOperationException("The secure link service returned an incomplete request. Try again.");
         }
+        var correlationId = Guid.TryParse(response.CorrelationId, out var parsedCorrelationId)
+            ? parsedCorrelationId
+            : linkId;
+        _externalServices.ValidateReturnedUrl("account-link verification URL", response.VerificationUrl);
         return new AccountLinkStartResult(
             response.State ?? "Pending",
             linkId,
@@ -90,7 +105,10 @@ public sealed class AccountLinkService
             response.UserCode,
             Math.Max(1, response.ExpiresInSeconds ?? 600),
             response.VerificationUrl,
-            response.Message ?? "Approve this computer in the Customer Portal.");
+            response.Message ?? "Approve this computer in the Customer Portal.")
+        {
+            CorrelationId = correlationId,
+        };
     }
 
     public async Task<AccountLinkStatusResult> CheckAsync(
@@ -112,7 +130,12 @@ public sealed class AccountLinkService
         {
             return new AccountLinkStatusResult(
                 state,
-                response.Message ?? "Waiting for Customer Portal approval.");
+                response.Message ?? "Waiting for Customer Portal approval.")
+            {
+                CorrelationId = Guid.TryParse(response.CorrelationId, out var pendingCorrelationId)
+                    ? pendingCorrelationId
+                    : linkId,
+            };
         }
         if (string.IsNullOrWhiteSpace(response.CustomerName) ||
             string.IsNullOrWhiteSpace(response.EmailAddress))
@@ -149,7 +172,12 @@ public sealed class AccountLinkService
         return new AccountLinkStatusResult(
             "Activated",
             $"License activated successfully. This computer is now linked to your {activated.Mode} License.",
-            activated);
+            activated)
+        {
+            CorrelationId = Guid.TryParse(response.CorrelationId, out var correlationId)
+                ? correlationId
+                : linkId,
+        };
     }
 
     public async Task<LicenseStatus> SynchronizeAsync(CancellationToken cancellationToken)
@@ -316,6 +344,10 @@ public sealed class AccountLinkService
             }),
         };
         request.Headers.Add("X-Installation-Token", credentials.Token);
+        if (payload.LinkId is Guid correlationId && correlationId != Guid.Empty)
+        {
+            request.Headers.Add("X-PPE-Correlation-ID", correlationId.ToString("D"));
+        }
         HttpResponseMessage response;
         try
         {
@@ -365,6 +397,7 @@ public sealed class AccountLinkService
 
     private sealed record AccountLinkServerResponse(
         string? State,
+        string? CorrelationId,
         string? LinkId,
         string? RequestToken,
         string? UserCode,

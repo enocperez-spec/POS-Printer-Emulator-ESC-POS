@@ -5,7 +5,6 @@ header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
 header('Cache-Control: no-store, max-age=0');
 header('Pragma: no-cache');
 
@@ -31,6 +30,24 @@ function portal_config(): array
     $config = $loaded;
     return $config;
 }
+
+$portalFormActions = "'self'";
+try {
+    $portalBuyBaseUrl = rtrim((string)(portal_config()['portal']['buy_base_url'] ?? ''), '/');
+    if (preg_match('#^https://[A-Za-z0-9.-]+$#', $portalBuyBaseUrl)) {
+        // CSP form-action is enforced across form-submission redirects. Permit only
+        // the configured checkout origin so the portal's 303 handoff can complete.
+        $portalFormActions .= ' ' . $portalBuyBaseUrl;
+    }
+} catch (Throwable) {
+    // Configuration errors are reported by the normal portal bootstrap path.
+}
+header(
+    "Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; " .
+    "script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; " .
+    'form-action ' . $portalFormActions
+);
+unset($portalFormActions, $portalBuyBaseUrl);
 
 function portal_database(): PDO
 {
@@ -115,6 +132,37 @@ function portal_token(int $bytes = 32): string
     return rtrim(strtr(base64_encode(random_bytes($bytes)), '+/', '-_'), '=');
 }
 
+function portal_correlation_id(?string $candidate = null, bool $rotate = false): string
+{
+    $header = trim((string)($_SERVER['HTTP_X_PPE_CORRELATION_ID'] ?? ''));
+    $sessionValue = session_status() === PHP_SESSION_ACTIVE
+        ? trim((string)($_SESSION['journey_correlation_id'] ?? ''))
+        : '';
+    $selected = $rotate ? '' : trim((string)($candidate ?? ''));
+    if ($selected === '') {
+        $selected = $header !== '' ? $header : $sessionValue;
+    }
+    if (!preg_match(
+        '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+        $selected
+    )) {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        $hex = bin2hex($bytes);
+        $selected = substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-' .
+            substr($hex, 12, 4) . '-' . substr($hex, 16, 4) . '-' . substr($hex, 20);
+    }
+    $selected = strtolower($selected);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION['journey_correlation_id'] = $selected;
+    }
+    if (!headers_sent()) {
+        header('X-PPE-Correlation-ID: ' . $selected);
+    }
+    return $selected;
+}
+
 function portal_hash(string $value): string
 {
     return hash('sha256', $value, true);
@@ -175,17 +223,27 @@ function portal_configured_base_url(): string
     return $url;
 }
 
-function portal_audit(string $customerId, string $type, string $summary, ?string $reference = null): void
+function portal_audit(
+    string $customerId,
+    string $type,
+    string $summary,
+    ?string $reference = null,
+    ?string $correlationId = null
+): void
 {
     $statement = portal_database()->prepare(
-        'INSERT INTO customer_events(customer_id,event_type,source,source_reference,actor,event_summary)
-         VALUES(:customer_id,:event_type,\'Customer Portal\',:reference,\'Customer\',:summary)'
+        'INSERT INTO customer_events(
+            customer_id,event_type,source,source_reference,actor,event_summary,journey_correlation_id
+         ) VALUES(
+            :customer_id,:event_type,\'Customer Portal\',:reference,\'Customer\',:summary,:correlation_id
+         )'
     );
     $statement->execute([
         'customer_id' => $customerId,
         'event_type' => mb_substr($type, 0, 64),
         'reference' => $reference === null ? null : mb_substr($reference, 0, 96),
         'summary' => mb_substr($summary, 0, 500),
+        'correlation_id' => portal_correlation_id($correlationId),
     ]);
 }
 

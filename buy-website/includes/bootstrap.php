@@ -98,6 +98,7 @@ function db(): PDO
         'maintenance_new_expires_at' => 'ALTER TABLE orders ADD COLUMN maintenance_new_expires_at TEXT',
         'maintenance_token' => 'ALTER TABLE orders ADD COLUMN maintenance_token TEXT',
         'portal_intent_id' => 'ALTER TABLE orders ADD COLUMN portal_intent_id TEXT',
+        'journey_correlation_id' => 'ALTER TABLE orders ADD COLUMN journey_correlation_id TEXT',
     ];
     foreach ($orderAdditions as $column => $statement) {
         if (!in_array($column,$orderColumnNames,true)) $db->exec($statement);

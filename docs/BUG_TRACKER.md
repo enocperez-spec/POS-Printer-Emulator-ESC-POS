@@ -29,7 +29,8 @@ GitHub Issues and GitHub Projects are the official working system for bug report
 
 | Bug ID | Severity | Summary | Affected version(s) | Target | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
-There are no open bugs currently assigned to the v0.3.41 release.
+| BUG-017 | Low | Reinstalling or upgrading with retained desktop WebView state can display `Request failed (404)` at first launch when the previously selected receipt no longer exists. | v0.3.55 | Next release | Fixed locally | The viewer now waits for the refreshed job list and removes a saved selection that no longer exists before requesting receipt details. Installer upgrade verification remains required. |
+| BUG-018 | High | The installed release cannot be safely redirected to the complete sandbox service family: Link This Computer opened the production Customer Portal, while telemetry, promotion, support, entitlement, and unlink services retain production endpoints in configuration or code. | v0.3.55 certification workflow | Next release | Fixed locally | A single external-services profile now covers every desktop API and customer-facing link. Certification startup and returned URLs fail closed against an exact sandbox allowlist. The Windows service reads a ProgramData override, and each non-production profile uses isolated installation credentials so production registration state cannot cross environments. Rebuilt-installer E2E remains required. |
 
 ## Resolved bugs
 

@@ -25,6 +25,13 @@ if (!preg_match('/^[A-Za-z0-9_-]{43}$/', $token)) {
 }
 $ready = is_array($session) && is_array($offer) && (float)$offer['price'] > 0 &&
     !str_starts_with((string)config('paypal.client_id'), 'REPLACE_');
+$paypalSdkUrl = str_contains(strtolower((string)config('paypal.base_url')), 'sandbox')
+    ? 'https://www.sandbox.paypal.com/web-sdk/v6/core'
+    : 'https://www.paypal.com/web-sdk/v6/core';
+$portalBaseUrl = str_contains(strtolower((string)config('paypal.base_url')), 'sandbox')
+    ? 'https://userportal-sandbox.posprinteremulator.com'
+    : 'https://userportal.posprinteremulator.com';
+$plansUrl = $portalBaseUrl . '/portal.php?page=plans';
 $maintenance = is_array($session) && strtoupper((string)$session['orderType']) === 'MAINTENANCE';
 $newLicense = is_array($session) && strtoupper((string)$session['orderType']) === 'LICENSE';
 $effective = 'Immediately after PayPal confirms payment';
@@ -45,7 +52,7 @@ if ($maintenance) {
   <link rel="icon" type="image/png" href="/assets/favicon.png">
   <link rel="stylesheet" href="/assets/site.css?v=4">
   <link rel="stylesheet" href="/assets/self-service.css?v=1">
-  <?php if ($ready): ?><script src="https://www.paypal.com/web-sdk/v6/core" async></script><?php endif; ?>
+  <?php if ($ready): ?><script src="<?= htmlspecialchars($paypalSdkUrl) ?>" async></script><?php endif; ?>
 </head>
 <body class="self-service" data-client-id="<?= htmlspecialchars((string)config('paypal.client_id')) ?>"
       data-currency="<?= htmlspecialchars((string)($offer['currency'] ?? 'USD')) ?>"
@@ -54,7 +61,7 @@ if ($maintenance) {
 <a class="skip" href="#order-review">Skip to order review</a>
 <header>
   <a class="brand" href="https://posprinteremulator.com/"><img src="/assets/logo.png" alt="POS Printer Emulator"></a>
-  <a class="back" href="https://userportal.posprinteremulator.com/portal.php?page=plans">← Customer Portal</a>
+  <a class="back" href="<?= htmlspecialchars($plansUrl) ?>">← Customer Portal</a>
 </header>
 <main class="service-shell">
   <section class="service-heading">
@@ -67,7 +74,7 @@ if ($maintenance) {
   <aside class="service-review" id="order-review">
     <?php if ($error !== ''): ?>
       <div class="service-error" role="alert"><strong>Checkout unavailable</strong><p><?= htmlspecialchars($error) ?></p></div>
-      <a class="service-button secondary" href="https://userportal.posprinteremulator.com/portal.php?page=plans">Return to Customer Portal</a>
+      <a class="service-button secondary" href="<?= htmlspecialchars($plansUrl) ?>">Return to Customer Portal</a>
     <?php else: ?>
       <div class="review-label"><?= $maintenance ? 'Annual Maintenance and Support' : ($newLicense ? 'POS Printer Emulator License' : 'POS Printer Emulator License upgrade') ?></div>
       <h2><?= $newLicense ? 'New ' : htmlspecialchars((string)$session['currentTier']) . ' <span aria-hidden="true">→</span> ' ?><?= htmlspecialchars((string)$session['targetTier']) ?> License</h2>
@@ -83,6 +90,7 @@ if ($maintenance) {
         <p>License purchases and upgrades are fulfilled immediately after verified capture. Refunds and chargebacks require review and may revoke the affected entitlement. Optional Maintenance and Support is not a subscription.</p>
       </div>
       <div id="form-error" class="error" role="alert" hidden></div>
+      <a id="checkout-restart" class="service-button secondary" href="<?= htmlspecialchars($plansUrl) ?>" hidden>Return to Customer Portal</a>
       <?php if ($ready): ?>
         <paypal-button id="paypal-button" type="pay"></paypal-button>
       <?php else: ?>
@@ -93,6 +101,6 @@ if ($maintenance) {
   </aside>
 </main>
 <footer><span>© 2026 POS Printer Emulator</span><nav><a href="https://posprinteremulator.com/privacy.html">Privacy</a><a href="mailto:support@posprinteremulator.com">Support</a></nav></footer>
-<?php if ($ready): ?><script src="/assets/self-service.js?v=1" type="module"></script><?php endif; ?>
+<?php if ($ready): ?><script src="/assets/self-service.js?v=5" type="module"></script><?php endif; ?>
 </body>
 </html>

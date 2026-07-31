@@ -54,6 +54,23 @@ foreach (['Lite', 'Pro', 'Enterprise'] as $tier) {
     $expectSame($tier, canonical_paid_tier($tier), "{$tier} must be accepted by License Manager.");
 }
 $expectThrows(static fn(): string => canonical_paid_tier('Trial'), 'Trial must not be accepted as an issued paid tier.');
+foreach (['Promotional', 'Partner', 'Evaluation', 'Referral', 'Other'] as $reason) {
+    $expectSame($reason, canonical_complimentary_reason($reason), "{$reason} must be accepted as a complimentary reason.");
+}
+$expectThrows(static fn(): string => canonical_complimentary_reason('Purchase'), 'Purchase must not be accepted as a complimentary reason.');
+$complimentaryNow = new DateTimeImmutable('2026-07-31 12:00:00', new DateTimeZone('UTC'));
+$expectSame(null, normalize_complimentary_expiration('permanent', null, $complimentaryNow), 'Permanent complimentary licenses must not expire.');
+$expectSame(
+    '2026-08-15 23:59:59.999999',
+    normalize_complimentary_expiration('expires', '2026-08-15', $complimentaryNow),
+    'Dated complimentary licenses must remain valid through the selected UTC date.'
+);
+$expectThrows(
+    static fn(): ?string => normalize_complimentary_expiration('expires', '2026-07-30', $complimentaryNow),
+    'Complimentary licenses must reject elapsed expiration dates.'
+);
+$expectSame(false, license_entitlement_expired(['license_expires_at' => null], $complimentaryNow), 'A permanent entitlement must remain active.');
+$expectSame(true, license_entitlement_expired(['license_expires_at' => '2026-07-30 23:59:59'], $complimentaryNow), 'An elapsed entitlement must be expired.');
 $expectSame('2028-08-15 00:00:00',calculate_maintenance_renewal_expiration('2027-08-15 00:00:00','2027-07-20 00:00:00'),'Early renewal must add one year to current coverage.');
 $expectSame('2028-07-20 00:00:00',calculate_maintenance_renewal_expiration('2027-01-01 00:00:00','2027-07-20 00:00:00'),'Lapsed renewal must start at captured-payment time.');
 $expectSame('active',maintenance_status(['control_state'=>'Enabled','maintenance_expires_at'=>'2030-01-01 00:00:00','maintenance_revoked_at'=>null],new DateTimeImmutable('2029-01-01',new DateTimeZone('UTC'))),'Covered maintenance should be active.');
@@ -88,6 +105,10 @@ $expectContains('revoke_maintenance',$licensesPage,'License Manager is missing m
 $expectContains('data-prepare-action="restore_maintenance"',$licensesPage,'License Manager is missing confirmed maintenance restoration controls.');
 $expectContains("name=\"action\" value=\"promotion_exception\"",$licensesPage,'License Manager is missing confirmed promotion exception controls.');
 $expectContains('portal_promotion_exceptions',$licensesPage,'License Manager must audit promotional exceptions.');
+$expectContains('name="action" value="issue_complimentary"', $licensesPage, 'License Manager is missing its separate complimentary issuance action.');
+$expectContains('name="license_duration"', $licensesPage, 'Complimentary issuance is missing permanent or expiring term selection.');
+$expectContains('name="complimentary_reason"', $licensesPage, 'Complimentary issuance is missing its audited reason.');
+$expectSame(false, str_contains($licensesPage, 'INSERT INTO customer_purchases'), 'Complimentary issuance must not create a revenue or purchase record.');
 $managementCode=file_get_contents($root.'/admin-website/includes/license_management.php')?:'';
 $expectContains("if (!empty(\$license['maintenance_revoked_at']))",$managementCode,'Paid renewal must not bypass an Admin maintenance revocation.');
 $expectContains('Restore maintenance before changing this license level.',$managementCode,'Tier replacement must not silently clear an Admin maintenance revocation.');
@@ -96,6 +117,8 @@ $expectContains('entitlement_revision=entitlement_revision+1',$managementCode,'L
 $expectContains("'idempotent'=>true",$managementCode,'A repeated renewal application must return its existing expiration idempotently.');
 $expectContains("ALTER TABLE installations ADD COLUMN maintenance_status",$managementCode,'License Manager schema assurance must migrate installation maintenance status.');
 $expectContains("ALTER TABLE installations ADD COLUMN maintenance_expires_at",$managementCode,'License Manager schema assurance must migrate installation maintenance expiration.');
+$expectContains("['Manual', 'Purchase', 'Complimentary']", $managementCode, 'License Manager must preserve paid sources while accepting Complimentary.');
+$expectContains("'admin_ip' => license_admin_ip()", $managementCode, 'Maintenance and license audit records must bind the administrator IP parameter.');
 $expectContains("require __DIR__ . '/includes/license_management.php';",$dashboardPage,'Admin dashboard must load shared license-management schema assurance.');
 $expectContains('ensure_license_management_schema($pdo);',$dashboardPage,'Admin dashboard must assure maintenance columns before querying them.');
 $expectContains("ENUM('Trial', 'Pro', 'Enterprise', 'Lite')", $setupPage, 'Admin setup is missing the append-only installation ENUM migration.');
@@ -121,6 +144,9 @@ $expectContains("license_mode ENUM('Trial', 'Pro', 'Enterprise', 'Lite')", $sche
 $expectContains("license_tier ENUM('Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Pro'", $schema, 'Fresh database schema must preserve paid-tier ordering and Pro as the legacy default.');
 $expectContains("MODIFY license_tier ENUM('Pro', 'Enterprise', 'Lite') NOT NULL DEFAULT 'Pro'", $migration, 'Lite migration must append Lite while preserving existing paid-tier ordering and the Pro default.');
 $expectContains("maintenance_expires_at DATETIME(6)",$schema,'Fresh database schema is missing maintenance expiration persistence.');
+$expectContains("license_source ENUM('Manual', 'Purchase', 'Complimentary')", $schema, 'Fresh database schema is missing the Complimentary license source.');
+$expectContains('license_expires_at DATETIME(6)', $schema, 'Fresh database schema is missing optional complimentary expiration.');
+$expectContains('complimentary_reason VARCHAR(24)', $schema, 'Fresh database schema is missing complimentary audit classification.');
 $expectContains('license_maintenance_events',$schema,'Fresh database schema is missing maintenance history.');
 $expectContains('download_events_daily',$schema,'Fresh database schema is missing daily download geography aggregates.');
 $expectContains('country_code CHAR(2)',$schema,'Fresh database schema is missing coarse installation country data.');
@@ -189,8 +215,9 @@ foreach ($futureReleases as $version => [$title, $issue]) {
     $expectContains($expectedRow, $schema, "Fresh database schema is missing {$status} {$version} {$title}.");
     $expectContains("WHEN '{$version}' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/{$issue}'", $devSupport, "Admin Dev Support is missing the {$version} GitHub issue link.");
 }
-$expectContains("('v0.3.55', 'v0.3.55', 'Release', 'Reliable Account License Synchronization', 'In Progress'", $devSupport, 'Admin Dev Support must identify v0.3.55 as in progress.');
-$expectContains("('v0.3.55', 'v0.3.55', 'Release', 'Reliable Account License Synchronization', 'In Progress'", $schema, 'Fresh database schema must identify v0.3.55 as in progress.');
+$expectContains("('v0.3.55', 'v0.3.55', 'Release', 'Reliable Account License Synchronization', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.55 as released.');
+$expectContains("('v0.3.55', 'v0.3.55', 'Release', 'Reliable Account License Synchronization', 'Released'", $schema, 'Fresh database schema must identify v0.3.55 as released.');
+$expectContains("WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.55'", $devSupport, 'Admin Dev Support is missing the v0.3.55 GitHub release link.');
 $expectContains("('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released'", $devSupport, 'Admin Dev Support must identify v0.3.46 as released.');
 $expectContains("('v0.3.46', 'v0.3.46', 'Release', 'Accessibility and keyboard usability', 'Released'", $schema, 'Fresh database schema must identify v0.3.46 as released.');
 $expectContains("WHEN 'v0.3.46' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.46'", $devSupport, 'Admin Dev Support is missing the v0.3.46 GitHub release link.');

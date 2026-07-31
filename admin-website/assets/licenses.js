@@ -32,6 +32,20 @@
   });
 
   const issueForm = document.getElementById('license-issue-form');
+  const complimentaryDuration = document.getElementById('complimentary-duration');
+  const complimentaryExpirationField = document.getElementById('complimentary-expiration-field');
+  const complimentaryExpiration = document.getElementById('complimentary-expiration');
+  const updateComplimentaryExpiration = () => {
+    const expires = complimentaryDuration?.value === 'expires';
+    if (complimentaryExpirationField) complimentaryExpirationField.hidden = !expires;
+    if (complimentaryExpiration) {
+      complimentaryExpiration.required = expires;
+      if (!expires) complimentaryExpiration.value = '';
+    }
+  };
+  complimentaryDuration?.addEventListener('change', updateComplimentaryExpiration);
+  updateComplimentaryExpiration();
+
   issueForm?.addEventListener('submit', () => {
     const submit = issueForm.querySelector('button[type="submit"]');
     if (!submit) return;

@@ -9,10 +9,12 @@ function portal_queue_mail(
     string $type,
     string $subject,
     string $body,
-    array $templateParameters = []
+    array $templateParameters = [],
+    ?string $correlationId = null
 ): void
 {
     $pdo = portal_database();
+    $correlationId = portal_correlation_id($correlationId);
     $templateKey = match ($type) {
         'Portal Enrollment' => 'email_verification',
         'Password Reset' => 'password_recovery',
@@ -26,14 +28,16 @@ function portal_queue_mail(
         $recipient,
         $templateKey,
         $templateParameters,
-        hash('sha256', $type . '|' . $customerId . '|' . $body)
+        hash('sha256', $type . '|' . $customerId . '|' . $body),
+        $correlationId
     )) {
         portal_kick_communication_worker();
         return;
     }
     $insert = $pdo->prepare(
-        'INSERT INTO portal_mail_outbox(customer_id,message_type,recipient_email,subject,text_body)
-         VALUES(:customer_id,:type,:recipient,:subject,:body)'
+        'INSERT INTO portal_mail_outbox(
+            customer_id,message_type,recipient_email,subject,text_body,journey_correlation_id
+         ) VALUES(:customer_id,:type,:recipient,:subject,:body,:correlation_id)'
     );
     $insert->execute([
         'customer_id' => $customerId,
@@ -41,6 +45,7 @@ function portal_queue_mail(
         'recipient' => $recipient,
         'subject' => mb_substr($subject, 0, 180),
         'body' => $body,
+        'correlation_id' => $correlationId,
     ]);
 
     $transport = strtolower((string)(portal_config()['portal']['mail_transport'] ?? 'outbox'));
@@ -77,9 +82,16 @@ function portal_kick_communication_worker(): bool
     $url = trim((string)($portal['communications_worker_url'] ?? ''));
     $token = trim((string)($portal['support_backend_token'] ?? ''));
     $parts = parse_url($url);
+    $supportBackendParts = parse_url(trim((string)($portal['support_backend_url'] ?? '')));
+    $workerHost = strtolower((string)($parts['host'] ?? ''));
+    $supportBackendHost = strtolower((string)($supportBackendParts['host'] ?? ''));
     if (!is_array($parts) ||
         ($parts['scheme'] ?? '') !== 'https' ||
-        strtolower((string)($parts['host'] ?? '')) !== 'admin.posprinteremulator.com' ||
+        !is_array($supportBackendParts) ||
+        ($supportBackendParts['scheme'] ?? '') !== 'https' ||
+        $workerHost === '' ||
+        $workerHost !== $supportBackendHost ||
+        preg_match('/^admin(?:-sandbox)?\.posprinteremulator\.com$/', $workerHost) !== 1 ||
         strlen($token) < 43) {
         return false;
     }
@@ -113,7 +125,8 @@ function portal_try_communication_outbox(
     string $recipient,
     string $templateKey,
     array $parameters,
-    string $idempotencyDigest
+    string $idempotencyDigest,
+    ?string $correlationId = null
 ): bool {
     $parameters = array_replace($parameters, portal_mail_global_parameters($pdo));
     $allowedKeys = [
@@ -152,9 +165,9 @@ function portal_try_communication_outbox(
         $insert = $pdo->prepare(
             'INSERT IGNORE INTO communication_outbox
                 (message_id,customer_id,template_key,message_class,essential,manual_send,priority,recipient_hash,
-                 parameters_json,idempotency_key)
+                 parameters_json,idempotency_key,journey_correlation_id)
              VALUES(:message_id,:customer_id,:template_key,\'Service\',:essential,0,:priority,
-                    UNHEX(SHA2(:recipient,256)),:parameters,:idempotency_key)'
+                    UNHEX(SHA2(:recipient,256)),:parameters,:idempotency_key,:correlation_id)'
         );
         $insert->execute([
             'message_id' => $messageId,
@@ -165,6 +178,7 @@ function portal_try_communication_outbox(
             'recipient' => portal_normalize_email($recipient),
             'parameters' => json_encode($clean, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             'idempotency_key' => 'portal:' . $templateKey . ':' . $idempotencyDigest,
+            'correlation_id' => portal_correlation_id($correlationId),
         ]);
         // A duplicate is already durably queued, so it is also a successful handoff.
         return true;
@@ -247,6 +261,8 @@ function portal_mail_url_is_allowed(string $url): bool
         && in_array(strtolower((string)($parts['host'] ?? '')), [
             'www.posprinteremulator.com',
             'userportal.posprinteremulator.com',
+            'sandbox.posprinteremulator.com',
+            'userportal-sandbox.posprinteremulator.com',
         ], true)
         && !isset($parts['user'])
         && !isset($parts['pass']);

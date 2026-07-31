@@ -4,6 +4,11 @@
 #define MyAppExeName "ReceiptEmulator.exe"
 #define MyDesktopExeName "POSPrinterEmulator.Desktop.exe"
 #define ServiceName "ReceiptLab"
+#ifdef CertificationProfile
+#define InstallerSuffix "-certification-rc1"
+#else
+#define InstallerSuffix ""
+#endif
 
 [Setup]
 AppId={{8F35B578-3D18-4B8D-9A4F-B8E2C7639275}
@@ -15,7 +20,7 @@ DefaultGroupName=POS Printer Emulator
 DisableProgramGroupPage=yes
 DisableDirPage=auto
 OutputDir=..\artifacts\installer
-OutputBaseFilename=POSPrinterEmulatorSetup-{#MyAppVersion}-win-x64
+OutputBaseFilename=POSPrinterEmulatorSetup-{#MyAppVersion}{#InstallerSuffix}-win-x64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -44,11 +49,15 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "..\artifacts\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "drivers\epson\*"; DestDir: "{app}\drivers\epson"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\artifacts\prerequisites\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: ignoreversion deleteafterinstall
+#ifdef CertificationProfile
+Source: "..\certification\desktop-external-services.example.json"; DestDir: "{commonappdata}\POSPrinterEmulator"; DestName: "external-services.json"; Flags: ignoreversion
+#endif
 
 [InstallDelete]
 ; Hashed viewer bundles change on every release. Removing the old directory
 ; prevents WebView2 from loading a stale JavaScript entry point after upgrade.
 Type: filesandordirs; Name: "{app}\wwwroot\assets"
+Type: files; Name: "{commonappdata}\POSPrinterEmulator\external-services.json"
 
 [Icons]
 Name: "{autoprograms}\POS Printer Emulator"; Filename: "{app}\{#MyDesktopExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyDesktopExeName}"

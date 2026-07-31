@@ -19,7 +19,9 @@ const COMMUNICATION_PARAMETER_KEYS = [
     'support_url', 'verification_url', 'reset_url', 'release_summary',
     'setup_url', 'troubleshooting_url', 'contact_support_url', 'event_label',
     'feature_summary', 'preview_text', 'documentation_url', 'help_center_url',
-    'support_request_url', 'no_reply_notice',
+    'support_request_url', 'no_reply_notice', 'invoice_number', 'invoice_date',
+    'invoice_description', 'invoice_amount', 'invoice_currency', 'payment_status',
+    'transaction_reference',
 ];
 const COMMUNICATION_FORBIDDEN_REPLY_LANGUAGE = [
     'reply to this email',
@@ -249,6 +251,16 @@ function ensure_communication_schema(PDO $pdo): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $pdo->exec(
+            'ALTER TABLE communication_outbox
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER idempotency_key,
+             ADD INDEX IF NOT EXISTS ix_communication_outbox_journey (journey_correlation_id,created_at)'
+        );
+        $pdo->exec(
+            'ALTER TABLE communication_delivery_events
+             ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER event_summary,
+             ADD INDEX IF NOT EXISTS ix_communication_delivery_journey (journey_correlation_id,occurred_at)'
+        );
+        $pdo->exec(
             "CREATE TABLE IF NOT EXISTS communication_quota_daily (
                 quota_date DATE NOT NULL,
                 provider_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
@@ -299,10 +311,59 @@ function ensure_communication_schema(PDO $pdo): void
                 ('no_reply_notice','Please do not reply to this email. This inbox is not monitored.','system')"
         );
         communication_seed_template_tags($pdo);
+        communication_backfill_pending_invoice_parameters($pdo);
         $ready = true;
     } finally {
         $pdo->query("SELECT RELEASE_LOCK('ppe_communication_schema_v1')")->fetchColumn();
     }
+}
+
+function communication_backfill_pending_invoice_parameters(PDO $pdo): void
+{
+    $table = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema=DATABASE() AND table_name='portal_checkout_intents'"
+    );
+    $table->execute();
+    if ((int)$table->fetchColumn() !== 1) {
+        return;
+    }
+    $pdo->exec(
+        "UPDATE communication_outbox o
+         INNER JOIN portal_checkout_intents i
+           ON o.idempotency_key=CONCAT('purchase:portal:',i.intent_id)
+         SET o.parameters_json=JSON_SET(
+             o.parameters_json,
+             '$.invoice_number',
+               CONCAT(
+                 'PPE-INV-',DATE_FORMAT(i.captured_at,'%Y%m%d'),'-',
+                 UPPER(SUBSTRING(SHA2(CONCAT('portal:',LOWER(i.intent_id)),256),1,10))
+               ),
+             '$.invoice_date',DATE_FORMAT(i.captured_at,'%M %e, %Y'),
+             '$.invoice_description',
+               CASE i.order_type
+                 WHEN 'MAINTENANCE' THEN CONCAT(
+                   'POS Printer Emulator ',i.target_tier,
+                   ' Annual Maintenance and Support Renewal'
+                 )
+                 WHEN 'UPGRADE' THEN CONCAT(
+                   'POS Printer Emulator ',i.target_tier,' License Upgrade'
+                 )
+                 ELSE CONCAT('POS Printer Emulator ',i.target_tier,' License')
+               END,
+             '$.invoice_amount',CAST(i.amount AS CHAR),
+             '$.invoice_currency',UPPER(i.currency),
+             '$.payment_status','Paid',
+             '$.transaction_reference',i.provider_capture_id
+         )
+         WHERE o.template_key='purchase_confirmation'
+           AND o.state IN ('Pending','Deferred')
+           AND i.state='Fulfilled'
+           AND i.captured_at IS NOT NULL
+           AND i.provider_capture_id IS NOT NULL
+           AND JSON_VALID(o.parameters_json)=1
+           AND JSON_EXTRACT(o.parameters_json,'$.invoice_number') IS NULL"
+    );
 }
 
 function communication_seed_template_tags(PDO $pdo): void
@@ -493,6 +554,45 @@ function communication_sync_brevo_template_sender(
         );
     }
     return ['changed' => $changed, 'sender' => $sender];
+}
+
+function communication_sync_brevo_template_activation(
+    PDO $pdo,
+    string $templateKey,
+    int $templateId,
+    bool $enabled,
+    string $actor
+): array {
+    if ($templateId < 1) {
+        throw new InvalidArgumentException('A mapped Brevo template ID is required.');
+    }
+    $provider = communication_brevo_request('GET', '/smtp/templates/' . $templateId);
+    $current = (bool)($provider['isActive'] ?? false);
+    if ($current !== $enabled) {
+        communication_brevo_request('PUT', '/smtp/templates/' . $templateId, [
+            'isActive' => $enabled,
+        ]);
+    }
+    $verified = communication_brevo_request('GET', '/smtp/templates/' . $templateId);
+    if ((bool)($verified['isActive'] ?? false) !== $enabled) {
+        throw new DomainException(
+            'Brevo did not retain the approved template activation state.'
+        );
+    }
+    if ($current !== $enabled) {
+        crm_record_admin_audit(
+            $pdo,
+            null,
+            $enabled
+                ? 'COMMUNICATION_PROVIDER_TEMPLATE_ENABLED'
+                : 'COMMUNICATION_PROVIDER_TEMPLATE_DISABLED',
+            $actor,
+            'Communication Template',
+            $templateKey . ':' . $templateId,
+            'Synchronized the approved registry activation state with Brevo.'
+        );
+    }
+    return ['changed' => $current !== $enabled, 'active' => $enabled];
 }
 
 function communication_seed_managed_lifecycle_mappings(PDO $pdo): void
@@ -968,7 +1068,7 @@ function communication_template_html(array $blueprint): string
     return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">' .
         '<style>body{margin:0;background:#eef4f8;color:#10233d;font:16px/1.55 Arial,sans-serif}.wrap{padding:28px 14px}' .
         '.card{max-width:640px;margin:auto;background:#fff;border:1px solid #d9e6ef;border-radius:14px;overflow:hidden}' .
-        '.header{background:#071d35;padding:22px 28px}.header img{display:block;width:220px;max-width:100%;height:auto}' .
+        '.header{background:#fff;border-bottom:5px solid #16b9dc;padding:18px 28px}.header img{display:block;width:280px;max-width:100%;height:auto}' .
         '.content{padding:32px 28px}.content h1{margin:0 0 16px;font-size:27px;line-height:1.2}.content p{margin:0 0 18px}' .
         '.actions{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.button{display:inline-block;padding:12px 18px;border-radius:8px;background:#16b9dc;color:#031526!important;font-weight:700;text-decoration:none}' .
         '.button.secondary{background:#e8f4f8}.help{padding-top:18px;border-top:1px solid #d9e6ef;font-size:14px}.help a{color:#087fa3}' .
@@ -1211,15 +1311,40 @@ function communication_create_and_map_template(
             communication_test_parameters($templateKey, 'Alex Morgan'),
             communication_global_parameters($pdo)
         );
-        communication_brevo_request('POST', '/smtp/email', [
-            'to' => [['email' => $allowlist[0], 'name' => 'POS Printer Emulator Test Recipient']],
-            'templateId' => $candidateId,
-            'params' => $parameters,
-            'headers' => [
-                'X-Mailin-custom' => 'ppe-template-validation|' . $templateKey,
-                'Idempotency-Key' => hash('sha256', 'template-validation|' . $templateKey . '|' . $candidateId),
-            ],
-        ]);
+        communication_sync_brevo_template_activation(
+            $pdo,
+            $templateKey,
+            $candidateId,
+            true,
+            $actor
+        );
+        try {
+            $testDelivery = communication_brevo_request('POST', '/smtp/email', [
+                'to' => [['email' => $allowlist[0], 'name' => 'POS Printer Emulator Test Recipient']],
+                'templateId' => $candidateId,
+                'params' => $parameters,
+                'headers' => [
+                    'X-Mailin-custom' => 'ppe-template-validation|' . $templateKey,
+                    'Idempotency-Key' => hash(
+                        'sha256',
+                        'template-validation|' . $templateKey . '|' . $candidateId
+                    ),
+                ],
+            ]);
+            if (trim((string)($testDelivery['messageId'] ?? '')) === '') {
+                throw new RuntimeException(
+                    'Brevo did not confirm the controlled test message.'
+                );
+            }
+        } finally {
+            communication_sync_brevo_template_activation(
+                $pdo,
+                $templateKey,
+                $candidateId,
+                false,
+                $actor
+            );
+        }
         crm_record_admin_audit(
             $pdo, null, 'COMMUNICATION_TEMPLATE_TEST_SENT', $actor,
             'Communication Template', $templateKey . ':' . $candidateId, $reason
@@ -1341,7 +1466,13 @@ function communication_validate_parameters(array $parameters): array
         }
         if (str_ends_with($key, '_url')) {
             $parts = parse_url($text);
-            $trustedHosts = ['www.posprinteremulator.com', 'userportal.posprinteremulator.com', 'github.com'];
+            $trustedHosts = [
+                'www.posprinteremulator.com',
+                'userportal.posprinteremulator.com',
+                'sandbox.posprinteremulator.com',
+                'userportal-sandbox.posprinteremulator.com',
+                'github.com',
+            ];
             if (!is_array($parts) || strtolower((string)($parts['scheme'] ?? '')) !== 'https' ||
                 !in_array(strtolower((string)($parts['host'] ?? '')), $trustedHosts, true) ||
                 isset($parts['user']) || isset($parts['pass'])) {
@@ -1361,7 +1492,8 @@ function communication_enqueue(
     string $idempotencyKey,
     ?string $campaignId = null,
     bool $manualSend = false,
-    ?DateTimeImmutable $availableAt = null
+    ?DateTimeImmutable $availableAt = null,
+    ?string $correlationId = null
 ): string {
     ensure_communication_schema($pdo);
     $customer = $pdo->prepare(
@@ -1420,13 +1552,18 @@ function communication_enqueue(
         throw new InvalidArgumentException('A valid idempotency key is required.');
     }
     $messageId = crm_uuid();
+    $correlationId = is_string($correlationId) &&
+        preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $correlationId)
+        ? strtolower($correlationId)
+        : null;
     $availableAt ??= new DateTimeImmutable('now', new DateTimeZone('UTC'));
     $insert = $pdo->prepare(
         'INSERT INTO communication_outbox
-            (message_id,customer_id,template_key,campaign_id,message_class,essential,manual_send,priority,recipient_hash,parameters_json,idempotency_key,available_at)
+            (message_id,customer_id,template_key,campaign_id,message_class,essential,manual_send,priority,
+             recipient_hash,parameters_json,idempotency_key,journey_correlation_id,available_at)
          VALUES
             (:message_id,:customer_id,:template_key,:campaign_id,:message_class,:essential,:manual_send,:priority,
-             UNHEX(SHA2(:recipient_email,256)),:parameters,:idempotency_key,:available_at)'
+             UNHEX(SHA2(:recipient_email,256)),:parameters,:idempotency_key,:correlation_id,:available_at)'
     );
     try {
         $insert->execute([
@@ -1441,6 +1578,7 @@ function communication_enqueue(
             'recipient_email' => crm_normalize_email((string)$customerRow['canonical_email']),
             'parameters' => json_encode($clean, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             'idempotency_key' => $idempotencyKey,
+            'correlation_id' => $correlationId,
             'available_at' => $availableAt->format('Y-m-d H:i:s.u'),
         ]);
     } catch (PDOException $exception) {
@@ -1706,7 +1844,13 @@ function communication_worker_process_one(PDO $pdo): array
         }
         return ['status' => $result['status'], 'message_id' => $messageId];
     } catch (Throwable $exception) {
-        communication_finish_message($pdo, $messageId, 'DeliveryUnknown', 'WORKER_EXCEPTION', 'Delivery outcome requires review.');
+        $configuration = communication_config();
+        $detail = (string)($configuration['mode'] ?? 'disabled') === 'test'
+            ? communication_sanitize_provider_error(
+                get_class($exception) . ': ' . $exception->getMessage()
+            )
+            : 'Delivery outcome requires review.';
+        communication_finish_message($pdo, $messageId, 'DeliveryUnknown', 'WORKER_EXCEPTION', $detail);
         error_log('Communication worker exception for message ' . $messageId . ': ' . get_class($exception));
         return ['status' => 'unknown', 'message_id' => $messageId];
     }
@@ -1723,14 +1867,20 @@ function communication_send_brevo(
         return ['status' => 'failed', 'retryable' => false, 'code' => 'CURL_UNAVAILABLE', 'detail' => 'The secure HTTP client is unavailable.'];
     }
     $parameters = json_decode((string)$message['parameters_json'], true, 20, JSON_THROW_ON_ERROR);
+    $validatedParameters = communication_validate_parameters(is_array($parameters) ? $parameters : []);
     $payload = [
         'sender' => ['email' => (string)$sender['email'], 'name' => (string)$sender['name']],
         'to' => [['email' => $email]],
         'templateId' => (int)$message['brevo_template_id'],
-        'params' => communication_validate_parameters(is_array($parameters) ? $parameters : []),
+        'params' => $validatedParameters,
         'tags' => ['ppe', strtolower((string)$message['message_class'])],
         'headers' => ['X-PPE-Message-ID' => (string)$message['message_id']],
     ];
+    $invoice = communication_invoice_attachment((string)$message['template_key'], $validatedParameters);
+    if (is_array($invoice)) {
+        $payload['attachment'] = [$invoice];
+        $payload['tags'][] = 'invoice';
+    }
     if ((bool)($config['inbox_monitored'] ?? false) && trim((string)$config['reply_to_email']) !== '') {
         $payload['replyTo'] = ['email' => $config['reply_to_email'], 'name' => $config['reply_to_name']];
     }
@@ -1769,6 +1919,159 @@ function communication_send_brevo(
         'code' => 'BREVO_HTTP_' . $httpStatus,
         'detail' => communication_sanitize_provider_error($detail),
     ];
+}
+
+function communication_invoice_attachment(string $templateKey, array $parameters): ?array
+{
+    if ($templateKey !== 'purchase_confirmation') {
+        return null;
+    }
+    foreach ([
+        'customer_name', 'invoice_number', 'invoice_date', 'invoice_description',
+        'invoice_amount', 'invoice_currency', 'payment_status', 'transaction_reference',
+    ] as $required) {
+        if (trim((string)($parameters[$required] ?? '')) === '') {
+            return null;
+        }
+    }
+    $safeNumber = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string)$parameters['invoice_number']) ?: 'invoice';
+    return [
+        'name' => 'POS-Printer-Emulator-Invoice-' . $safeNumber . '.pdf',
+        'content' => base64_encode(communication_invoice_pdf($parameters)),
+    ];
+}
+
+function communication_invoice_pdf(array $parameters): string
+{
+    $ascii = static function (string $value): string {
+        $converted = function_exists('iconv') ? iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) : false;
+        $value = is_string($converted) ? $converted : $value;
+        $value = preg_replace('/[^\x20-\x7E]/', ' ', $value) ?? '';
+        return trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    };
+    $escape = static fn(string $value): string => str_replace(
+        ['\\', '(', ')'],
+        ['\\\\', '\\(', '\\)'],
+        $ascii($value)
+    );
+    $money = strtoupper($ascii((string)$parameters['invoice_currency'])) . ' ' .
+        number_format((float)$parameters['invoice_amount'], 2, '.', ',');
+    $rows = [
+        ['Invoice number', (string)$parameters['invoice_number']],
+        ['Invoice date', (string)$parameters['invoice_date']],
+        ['Payment status', (string)$parameters['payment_status']],
+        ['PayPal approval reference', (string)$parameters['transaction_reference']],
+    ];
+    $logo = communication_invoice_logo_image();
+    $content = "q 0.027 0.114 0.208 rg 0 704 612 88 re f Q\n";
+    $content .= "BT /F2 25 Tf 1 1 1 rg 54 748 Td (POS Printer Emulator) Tj ET\n";
+    $content .= "BT /F1 12 Tf 0.75 0.85 0.94 rg 54 726 Td (Invoice from EPCOM Ltd.) Tj ET\n";
+    if (is_array($logo)) {
+        $content .= "q 150 0 0 75 408 711 cm /Logo Do Q\n";
+    }
+    $content .= "BT /F2 28 Tf 0.04 0.12 0.23 rg 54 654 Td (INVOICE) Tj ET\n";
+    $content .= "BT /F1 11 Tf 0.22 0.31 0.43 rg 54 626 Td (EPCOM Ltd. - Georgia, United States) Tj ET\n";
+    $content .= "BT /F1 11 Tf 0.22 0.31 0.43 rg 54 608 Td (posprinteremulator.com) Tj ET\n";
+    $content .= "BT /F2 12 Tf 0.04 0.12 0.23 rg 54 566 Td (BILLED TO) Tj ET\n";
+    $content .= "BT /F1 12 Tf 0.10 0.18 0.29 rg 54 546 Td (" . $escape((string)$parameters['customer_name']) . ") Tj ET\n";
+    $y = 566;
+    foreach ($rows as [$label, $value]) {
+        $content .= "BT /F1 9 Tf 0.35 0.43 0.53 rg 340 {$y} Td (" . $escape(strtoupper($label)) . ") Tj ET\n";
+        $content .= "BT /F2 10 Tf 0.04 0.12 0.23 rg 340 " . ($y - 16) . " Td (" . $escape($value) . ") Tj ET\n";
+        $y -= 48;
+    }
+    $content .= "q 0.86 0.90 0.94 RG 54 438 m 558 438 l S Q\n";
+    $content .= "BT /F2 11 Tf 0.04 0.12 0.23 rg 54 414 Td (DESCRIPTION) Tj ET\n";
+    $content .= "BT /F2 11 Tf 0.04 0.12 0.23 rg 476 414 Td (AMOUNT) Tj ET\n";
+    $content .= "BT /F1 12 Tf 0.10 0.18 0.29 rg 54 380 Td (" . $escape((string)$parameters['invoice_description']) . ") Tj ET\n";
+    $content .= "BT /F1 10 Tf 0.35 0.43 0.53 rg 54 360 Td (Quantity 1) Tj ET\n";
+    $content .= "BT /F2 12 Tf 0.10 0.18 0.29 rg 476 380 Td (" . $escape($money) . ") Tj ET\n";
+    $content .= "q 0.86 0.90 0.94 RG 54 330 m 558 330 l S Q\n";
+    $content .= "BT /F2 15 Tf 0.04 0.12 0.23 rg 390 292 Td (TOTAL PAID) Tj ET\n";
+    $content .= "BT /F2 15 Tf 0.04 0.12 0.23 rg 474 264 Td (" . $escape($money) . ") Tj ET\n";
+    $content .= "BT /F1 10 Tf 0.35 0.43 0.53 rg 54 180 Td (Thank you for choosing POS Printer Emulator.) Tj ET\n";
+    $content .= "BT /F1 9 Tf 0.35 0.43 0.53 rg 54 152 Td (This invoice records a completed transaction. Payment credentials are not stored or displayed.) Tj ET\n";
+    $xObject = is_array($logo) ? ' /XObject << /Logo 7 0 R >>' : '';
+    $objects = [
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >>' . $xObject . ' >> /Contents 6 0 R >>',
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+        "<< /Length " . strlen($content) . " >>\nstream\n" . $content . "endstream",
+    ];
+    if (is_array($logo)) {
+        $objects[] = '<< /Type /XObject /Subtype /Image /Width ' . $logo['width'] .
+            ' /Height ' . $logo['height'] .
+            ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode' .
+            ' /DecodeParms << /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns ' .
+            $logo['width'] . ' >> /Length ' . strlen($logo['content']) .
+            " >>\nstream\n" . $logo['content'] . "\nendstream";
+    }
+    $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+    $offsets = [0];
+    foreach ($objects as $index => $object) {
+        $offsets[] = strlen($pdf);
+        $pdf .= ($index + 1) . " 0 obj\n" . $object . "\nendobj\n";
+    }
+    $xref = strlen($pdf);
+    $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
+    $pdf .= "0000000000 65535 f \n";
+    for ($index = 1; $index <= count($objects); $index++) {
+        $pdf .= sprintf("%010d 00000 n \n", $offsets[$index]);
+    }
+    return $pdf . "trailer\n<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\nstartxref\n{$xref}\n%%EOF\n";
+}
+
+function communication_invoice_logo_image(): ?array
+{
+    $paths = [
+        dirname(__DIR__) . '/assets/invoice-logo.png',
+        dirname(__DIR__, 2) . '/assets/branding/pos-printer-emulator-logo.png',
+    ];
+    foreach ($paths as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+        $png = file_get_contents($path);
+        if (!is_string($png) || !str_starts_with($png, "\x89PNG\r\n\x1a\n") || strlen($png) < 33) {
+            continue;
+        }
+        $width = unpack('N', substr($png, 16, 4))[1] ?? 0;
+        $height = unpack('N', substr($png, 20, 4))[1] ?? 0;
+        $bitDepth = ord($png[24]);
+        $colorType = ord($png[25]);
+        $compression = ord($png[26]);
+        $filter = ord($png[27]);
+        $interlace = ord($png[28]);
+        if ($width < 1 || $height < 1 || $bitDepth !== 8 || $colorType !== 2 ||
+            $compression !== 0 || $filter !== 0 || $interlace !== 0) {
+            continue;
+        }
+        $offset = 8;
+        $imageData = '';
+        $length = strlen($png);
+        while ($offset + 12 <= $length) {
+            $chunkLength = unpack('N', substr($png, $offset, 4))[1] ?? -1;
+            $chunkType = substr($png, $offset + 4, 4);
+            $chunkStart = $offset + 8;
+            if ($chunkLength < 0 || $chunkStart + $chunkLength + 4 > $length) {
+                $imageData = '';
+                break;
+            }
+            if ($chunkType === 'IDAT') {
+                $imageData .= substr($png, $chunkStart, $chunkLength);
+            }
+            $offset = $chunkStart + $chunkLength + 4;
+            if ($chunkType === 'IEND') {
+                break;
+            }
+        }
+        if ($imageData !== '') {
+            return ['width' => $width, 'height' => $height, 'content' => $imageData];
+        }
+    }
+    return null;
 }
 
 function communication_defer_message(PDO $pdo, string $messageId, string $code, string $detail, int $delaySeconds): void
@@ -1823,11 +2126,24 @@ function communication_process_webhook(PDO $pdo, array $event): array
         $messageId = is_string($found) ? $found : '';
     }
     if ($messageId !== '' && !preg_match('/^[0-9a-f-]{36}$/', $messageId)) $messageId = '';
+    $correlationId = null;
+    if ($messageId !== '') {
+        $correlation = $pdo->prepare(
+            'SELECT journey_correlation_id FROM communication_outbox WHERE message_id=:message_id LIMIT 1'
+        );
+        $correlation->execute(['message_id' => $messageId]);
+        $foundCorrelation = $correlation->fetchColumn();
+        $correlationId = is_string($foundCorrelation) ? $foundCorrelation : null;
+    }
 
     $insert = $pdo->prepare(
         'INSERT IGNORE INTO communication_delivery_events
-            (provider_event_key,message_id,provider_message_id,event_type,event_summary,occurred_at)
-         VALUES(UNHEX(SHA2(:event_key,256)),:message_id,:provider_message_id,:event_type,:summary,:occurred_at)'
+            (provider_event_key,message_id,provider_message_id,event_type,event_summary,
+             journey_correlation_id,occurred_at)
+         VALUES(
+            UNHEX(SHA2(:event_key,256)),:message_id,:provider_message_id,:event_type,:summary,
+            :correlation_id,:occurred_at
+         )'
     );
     $insert->execute([
         'event_key' => $eventKeySource,
@@ -1835,6 +2151,7 @@ function communication_process_webhook(PDO $pdo, array $event): array
         'provider_message_id' => $providerMessageId !== '' ? crm_text_slice($providerMessageId, 0, 160) : null,
         'event_type' => crm_text_slice($eventType, 0, 40),
         'summary' => 'Brevo delivery event: ' . crm_text_slice($eventType, 0, 40),
+        'correlation_id' => $correlationId,
         'occurred_at' => gmdate('Y-m-d H:i:s', max(0, $occurred)),
     ]);
     if ($insert->rowCount() === 0) return ['status' => 'duplicate'];

@@ -71,6 +71,14 @@ export type ServiceStatus = {
   version: string
   license: LicenseStatus
   listenerSummary?: ListenerSummary
+  externalServicesProfile?: string
+  externalLinks?: {
+    buy: string
+    customerPortalLicenses: string
+    pricing: string
+    documentation: string
+    support: string
+  }
 }
 
 export type ListenerOverflowBehavior = 'RejectNewest' | 'DropOldest'

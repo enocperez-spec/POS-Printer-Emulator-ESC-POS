@@ -124,6 +124,29 @@ Open Windows **Settings → Apps → Installed apps**, find **POS Printer Emulat
 
 Uninstall removes the Windows Service, firewall rules, service-owned application data, shortcuts, and installed application files.
 
+## Release certification
+
+Run the repeatable source certification gate before preparing a release candidate:
+
+```text
+dotnet run --project tools/POSPrinterEmulator.Certification --configuration Release -- local-gate
+```
+
+The gate builds all customer-facing application components, runs the C# and PHP test
+suites, checks release metadata and SEO, validates the customer-journey matrix, scans
+customer surfaces for retired activation-key language, and writes redacted JSON and HTML
+evidence under `artifacts/certification/`.
+
+See [docs/RELEASE_CERTIFICATION.md](docs/RELEASE_CERTIFICATION.md) for isolated staging,
+PayPal sandbox, email testing, Windows 11 Pro journey testing, and release-blocking
+requirements. Complete the
+[sandbox-first rollout checklist](certification/SANDBOX_ROLLOUT_CHECKLIST.md) for every
+release before deploying to production. Use the
+[rollout automation](certification/ROLLOUT_AUTOMATION.md) to record evidence,
+approvals, and generate the production-readiness report required by the publisher.
+Every production rollout also requires the
+[end-to-end customer-experience gateway](certification/E2E_CUSTOMER_EXPERIENCE_CHECKLIST.md).
+
 ## Development requirements
 
 - .NET SDK 8 or newer

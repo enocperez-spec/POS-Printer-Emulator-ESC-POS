@@ -307,13 +307,17 @@ function portal_request_enrollment(
         $customerId = portal_customer_uuid();
         $insertCustomer = portal_database()->prepare(
             "INSERT INTO customers(customer_id,display_name,company_name,canonical_email,email_hash,status)
-             VALUES(:customer_id,:display_name,:company_name,:email,UNHEX(SHA2(:email,256)),'Active')"
+             VALUES(
+                :customer_id,:display_name,:company_name,:email,
+                UNHEX(SHA2(:email_hash_source,256)),'Active'
+             )"
         );
         $insertCustomer->execute([
             'customer_id' => $customerId,
             'display_name' => $displayName,
             'company_name' => $companyName === '' ? null : $companyName,
             'email' => $email,
+            'email_hash_source' => $email,
         ]);
         $matches = [[
             'customer_id' => $customerId,
@@ -332,11 +336,21 @@ function portal_request_enrollment(
     }
     $customer = $matches[0];
     $token = portal_token();
+    $correlationId = portal_correlation_id();
     $insert = portal_database()->prepare(
-        'INSERT INTO customer_email_verifications(customer_id,email_hash,token_hash,expires_at)
-         VALUES(:customer_id,UNHEX(SHA2(:email,256)),UNHEX(SHA2(:token,256)),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 30 MINUTE))'
+        'INSERT INTO customer_email_verifications(
+            customer_id,email_hash,token_hash,journey_correlation_id,expires_at
+         ) VALUES(
+            :customer_id,UNHEX(SHA2(:email,256)),UNHEX(SHA2(:token,256)),:correlation_id,
+            DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 30 MINUTE)
+         )'
     );
-    $insert->execute(['customer_id' => $customer['customer_id'], 'email' => $email, 'token' => $token]);
+    $insert->execute([
+        'customer_id' => $customer['customer_id'],
+        'email' => $email,
+        'token' => $token,
+        'correlation_id' => $correlationId,
+    ]);
     $link = portal_configured_base_url() . '/verify.php?purpose=enroll&token=' . rawurlencode($token);
     if ($purchaseTier !== '') {
         $link .= '&purchase=' . rawurlencode($purchaseTier);
@@ -353,7 +367,8 @@ function portal_request_enrollment(
         'Portal Enrollment',
         'Verify your POS Printer Emulator customer account',
         "Use this one-time link within 30 minutes to create your Customer Portal password:\n\n{$link}\n\nIf you did not request this, no action is required.",
-        ['customer_name' => (string)$customer['display_name'], 'verification_url' => $link]
+        ['customer_name' => (string)$customer['display_name'], 'verification_url' => $link],
+        $correlationId
     );
 }
 
@@ -367,11 +382,19 @@ function portal_request_password_reset(string $email): void
         return;
     }
     $token = portal_token();
+    $correlationId = portal_correlation_id(null, true);
     $insert = portal_database()->prepare(
-        'INSERT INTO portal_password_resets(customer_id,token_hash,expires_at)
-         VALUES(:customer_id,UNHEX(SHA2(:token,256)),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 30 MINUTE))'
+        'INSERT INTO portal_password_resets(customer_id,token_hash,journey_correlation_id,expires_at)
+         VALUES(
+            :customer_id,UNHEX(SHA2(:token,256)),:correlation_id,
+            DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 30 MINUTE)
+         )'
     );
-    $insert->execute(['customer_id' => $account['customer_id'], 'token' => $token]);
+    $insert->execute([
+        'customer_id' => $account['customer_id'],
+        'token' => $token,
+        'correlation_id' => $correlationId,
+    ]);
     $link = portal_configured_base_url() . '/verify.php?purpose=reset&token=' . rawurlencode($token);
     portal_queue_mail(
         (string)$account['customer_id'],
@@ -379,7 +402,8 @@ function portal_request_password_reset(string $email): void
         'Password Reset',
         'Reset your POS Printer Emulator Customer Portal password',
         "Use this one-time link within 30 minutes to reset your Customer Portal password:\n\n{$link}\n\nIf you did not request this, no action is required.",
-        ['customer_name' => (string)$account['display_name'], 'reset_url' => $link]
+        ['customer_name' => (string)$account['display_name'], 'reset_url' => $link],
+        $correlationId
     );
 }
 

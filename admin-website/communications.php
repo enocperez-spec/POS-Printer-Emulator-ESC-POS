@@ -163,12 +163,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $pdo->commit();
             if ($templateId !== null) {
-                communication_sync_brevo_template_sender(
-                    $pdo,
-                    $key,
-                    $templateId,
-                    $actor
-                );
+                try {
+                    communication_sync_brevo_template_sender(
+                        $pdo,
+                        $key,
+                        $templateId,
+                        $actor
+                    );
+                    communication_sync_brevo_template_activation(
+                        $pdo,
+                        $key,
+                        $templateId,
+                        $enabled,
+                        $actor
+                    );
+                } catch (Throwable $providerException) {
+                    if ($enabled) {
+                        $disable = $pdo->prepare(
+                            'UPDATE communication_templates
+                             SET enabled=0,updated_by=:actor
+                             WHERE template_key=:key'
+                        );
+                        $disable->execute(['actor' => $actor, 'key' => $key]);
+                    }
+                    throw $providerException;
+                }
             }
             crm_record_admin_audit($pdo, null, 'COMMUNICATION_TEMPLATE_UPDATED', $actor, 'Communication Template', $key, $reason);
             $_SESSION['communications_flash'] = [

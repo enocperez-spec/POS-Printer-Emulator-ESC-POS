@@ -15,6 +15,8 @@ if (!is_array($purchase)) {
 }
 
 $displayReference = portal_purchase_display_reference($purchase);
+$invoiceNumber = portal_purchase_invoice_number($purchase);
+$paymentApprovalReference = portal_purchase_payment_approval_reference($purchase);
 $download = (string)($_GET['download'] ?? '') === '1';
 $safeFileReference = preg_replace('/[^A-Za-z0-9_-]+/', '-', $displayReference) ?: 'receipt';
 
@@ -65,6 +67,8 @@ $maintenanceNew = portal_long_date($purchase['maintenance_new_expires_at'] ?? nu
       <div><dt>Purchase</dt><dd><?= portal_e($purchaseType) ?></dd></div>
       <div><dt>License</dt><dd><?= portal_e($license) ?></dd></div>
       <div><dt>Payment status</dt><dd><?= portal_e($status) ?></dd></div>
+      <div><dt>Invoice number</dt><dd><?= portal_e($invoiceNumber) ?></dd></div>
+      <div><dt>PayPal approval reference</dt><dd><?= portal_e($paymentApprovalReference) ?></dd></div>
       <?php if ((string)($purchase['checkout_order_type'] ?? '') === 'MAINTENANCE'): ?>
         <div><dt>Previous coverage date</dt><dd><?= portal_e($maintenancePrevious) ?></dd></div>
         <div><dt>New coverage date</dt><dd><?= portal_e($maintenanceNew) ?></dd></div>
@@ -72,7 +76,7 @@ $maintenanceNew = portal_long_date($purchase['maintenance_new_expires_at'] ?? nu
     </dl>
     <div class="total"><strong>Total paid</strong><strong><?= portal_e((string)$purchase['currency']) ?> <?= number_format((float)$purchase['amount'], 2) ?></strong></div>
   </main>
-  <footer>This receipt records a completed POS Printer Emulator transaction. Payment and account credentials are intentionally excluded.</footer>
+  <footer>The PayPal approval reference is the verified capture ID returned for this payment. Payment and account credentials are intentionally excluded.</footer>
 </article>
 </body>
 </html>

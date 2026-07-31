@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "environment": "sandbox",
+  "runId": "e2e-00000000",
+  "correlationId": "11111111-1111-4111-8111-111111111111",
+  "productVersion": "0.0.0",
+  "repositoryCommit": "0000000000000000000000000000000000000000",
+  "installerSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "startedAtUtc": "2000-01-01T00:00:00Z",
+  "completedAtUtc": null,
+  "firstTimeTester": "",
+  "testCoordinator": "",
+  "windows11ProBuild": "",
+  "browser": "",
+  "testInbox": "",
+  "paypalSandboxBuyer": "",
+  "journeys": [
+    { "id": "discover-license", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "account-verification", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "account-security", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "install-trial", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "trial-usage", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "paid-purchases", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "computer-link", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "tier-validation", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "upgrade-transfer-reinstall", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "maintenance-updates", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "support-communications", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "failure-recovery", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "accessibility-responsive", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "admin-reconciliation", "status": "Pending", "evidence": [], "notes": "" },
+    { "id": "first-time-comprehension", "status": "Pending", "evidence": [], "notes": "" }
+  ],
+  "approvals": {
+    "firstTimeTester": null,
+    "testCoordinator": null,
+    "releaseOwner": null
+  }
+}

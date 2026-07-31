@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__, 2) . '/includes/bootstrap.php';
-require dirname(__DIR__, 2) . '/includes/communications.php';
-require dirname(__DIR__, 2) . '/includes/customer_crm.php';
-require dirname(__DIR__, 2) . '/includes/license_keys.php';
-require dirname(__DIR__, 2) . '/includes/license_management.php';
-require dirname(__DIR__, 2) . '/includes/purchase_site.php';
-require dirname(__DIR__, 2) . '/includes/self_service_commerce_schema.php';
+require_once dirname(__DIR__, 2) . '/includes/bootstrap.php';
+require_once dirname(__DIR__, 2) . '/includes/communications.php';
+require_once dirname(__DIR__, 2) . '/includes/customer_crm.php';
+require_once dirname(__DIR__, 2) . '/includes/license_keys.php';
+require_once dirname(__DIR__, 2) . '/includes/license_management.php';
+require_once dirname(__DIR__, 2) . '/includes/purchase_site.php';
+require_once dirname(__DIR__, 2) . '/includes/self_service_commerce_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -53,6 +53,12 @@ function commerce_token(array $body): string
     return $token;
 }
 
+function commerce_invoice_number(string $intentId, DateTimeImmutable $paidAt): string
+{
+    return 'PPE-INV-' . $paidAt->format('Ymd') . '-' .
+        strtoupper(substr(hash('sha256', 'portal:' . strtolower(trim($intentId))), 0, 10));
+}
+
 function commerce_intent(PDO $pdo, string $token): ?array
 {
     $query = $pdo->prepare(
@@ -76,14 +82,20 @@ function commerce_event(
     array $data = []
 ): void {
     $insert = $pdo->prepare(
-        'INSERT INTO portal_checkout_events(intent_id,event_type,actor,event_summary,event_data)
-         VALUES(:intent_id,:event_type,\'Buy Service\',:summary,:event_data)'
+        'INSERT INTO portal_checkout_events(
+            intent_id,event_type,actor,event_summary,event_data,journey_correlation_id
+         )
+         SELECT
+            :intent_id,:event_type,\'Buy Service\',:summary,:event_data,journey_correlation_id
+         FROM portal_checkout_intents
+         WHERE intent_id=:intent_id_lookup'
     );
     $insert->execute([
         'intent_id' => $intentId,
         'event_type' => $type,
         'summary' => $summary,
         'event_data' => $data === [] ? null : json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        'intent_id_lookup' => $intentId,
     ]);
 }
 
@@ -121,6 +133,7 @@ try {
         commerce_response([
             'ok' => true,
             'intentId' => (string)$intent['intent_id'],
+            'correlationId' => (string)$intent['journey_correlation_id'],
             'state' => (string)$intent['state'],
             'orderType' => strtolower((string)$intent['order_type']),
             'currentTier' => (string)$intent['current_tier'],
@@ -353,10 +366,12 @@ try {
         if (!empty($fulfillment['licenseId'])) {
             $linkCustomer = $pdo->prepare(
                 'UPDATE issued_licenses SET customer_id=:customer_id
-                 WHERE license_id=:license_id AND (customer_id IS NULL OR customer_id=:customer_id)'
+                 WHERE license_id=:license_id
+                   AND (customer_id IS NULL OR customer_id=:expected_customer_id)'
             );
             $linkCustomer->execute([
                 'customer_id' => $intent['customer_id'],
+                'expected_customer_id' => $intent['customer_id'],
                 'license_id' => $fulfillment['licenseId'],
             ]);
             if ($linkCustomer->rowCount() < 1) {
@@ -391,15 +406,24 @@ try {
         }
         $purchase = $pdo->prepare(
             'INSERT INTO customer_purchases
-                (customer_id,purchase_reference,order_type,license_tier,purchase_status,amount,currency,paid_at)
-             VALUES(:customer_id,:reference,:order_type,:tier,\'FULFILLED\',:amount,:currency,:paid_at)
-             ON DUPLICATE KEY UPDATE purchase_status=\'FULFILLED\',paid_at=VALUES(paid_at),updated_at=UTC_TIMESTAMP(6)'
+                (customer_id,purchase_reference,order_type,license_tier,purchase_status,
+                 journey_correlation_id,amount,currency,paid_at)
+             VALUES(
+                :customer_id,:reference,:order_type,:tier,\'FULFILLED\',:correlation_id,
+                :amount,:currency,:paid_at
+             )
+             ON DUPLICATE KEY UPDATE
+                purchase_status=\'FULFILLED\',
+                journey_correlation_id=VALUES(journey_correlation_id),
+                paid_at=VALUES(paid_at),
+                updated_at=UTC_TIMESTAMP(6)'
         );
         $purchase->execute([
             'customer_id' => $intent['customer_id'],
             'reference' => $sourceReference,
             'order_type' => (string)$intent['order_type'] === 'MAINTENANCE' ? 'MAINTENANCE' : 'LICENSE',
             'tier' => $intent['target_tier'],
+            'correlation_id' => $intent['journey_correlation_id'],
             'amount' => $intent['amount'],
             'currency' => $intent['currency'],
             'paid_at' => $captureTime->format('Y-m-d H:i:s.u'),
@@ -414,16 +438,35 @@ try {
             $customer->execute(['customer_id' => $intent['customer_id']]);
             $displayName = $customer->fetchColumn();
             if (is_string($displayName)) {
+                $invoiceDescription = match ((string)$intent['order_type']) {
+                    'MAINTENANCE' => 'POS Printer Emulator ' . (string)$intent['target_tier'] .
+                        ' Annual Maintenance and Support Renewal',
+                    'UPGRADE' => 'POS Printer Emulator ' . (string)$intent['target_tier'] . ' License Upgrade',
+                    default => 'POS Printer Emulator ' . (string)$intent['target_tier'] . ' License',
+                };
+                $invoiceParameters = [
+                    'invoice_number' => commerce_invoice_number((string)$intent['intent_id'], $captureTime),
+                    'invoice_date' => $captureTime->format('F j, Y'),
+                    'invoice_description' => $invoiceDescription,
+                    'invoice_amount' => number_format((float)$intent['amount'], 2, '.', ''),
+                    'invoice_currency' => strtoupper((string)$intent['currency']),
+                    'payment_status' => 'Paid',
+                    'transaction_reference' => $providerCaptureId,
+                ];
                 communication_enqueue(
                     $pdo,
                     (string)$intent['customer_id'],
                     'purchase_confirmation',
-                    [
+                    array_merge([
                         'customer_name' => $displayName,
                         'license_tier' => (string)$intent['target_tier'],
                         'portal_url' => 'https://userportal.posprinteremulator.com/',
-                    ],
-                    'purchase:' . $sourceReference
+                    ], $invoiceParameters),
+                    'purchase:' . $sourceReference,
+                    null,
+                    false,
+                    null,
+                    (string)$intent['journey_correlation_id']
                 );
                 if ((string)$intent['order_type'] !== 'MAINTENANCE') {
                     $onboardingEvent = (string)$intent['order_type'] === 'UPGRADE' ? 'upgrade' : 'purchase';
@@ -443,7 +486,11 @@ try {
                             'setup_url' => communication_setup_url((string)$intent['target_tier']),
                             'contact_support_url' => 'https://userportal.posprinteremulator.com/',
                         ],
-                        'onboarding:' . $sourceReference
+                        'onboarding:' . $sourceReference,
+                        null,
+                        false,
+                        null,
+                        (string)$intent['journey_correlation_id']
                     );
                     communication_enqueue(
                         $pdo,
@@ -454,7 +501,11 @@ try {
                             'license_tier' => (string)$intent['target_tier'],
                             'portal_url' => 'https://userportal.posprinteremulator.com/',
                         ],
-                        'activation-ready:' . $sourceReference
+                        'activation-ready:' . $sourceReference,
+                        null,
+                        false,
+                        null,
+                        (string)$intent['journey_correlation_id']
                     );
                 }
             }

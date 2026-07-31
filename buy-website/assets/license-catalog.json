@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sourceOfTruth": {
-    "applicationVersion": "0.3.54",
+    "applicationVersion": "0.3.55",
     "featureFlags": "src/ReceiptEmulator.App/LicenseService.cs",
     "listenerLimits": "src/ReceiptEmulator.App/LicenseService.cs",
     "diagnosticAuthorization": "src/ReceiptEmulator.App/DiagnosticPdfService.cs"
@@ -51,12 +51,12 @@
     },
     "Pro": {
       "listenerLimit": 2,
-      "purchasePrice": null,
+      "purchasePrice": 39.99,
       "permanent": true
     },
     "Enterprise": {
       "listenerLimit": 15,
-      "purchasePrice": null,
+      "purchasePrice": 199.99,
       "permanent": true
     }
   },

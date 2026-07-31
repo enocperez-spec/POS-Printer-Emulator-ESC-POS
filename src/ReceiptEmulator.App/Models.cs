@@ -211,4 +211,6 @@ public sealed record ServiceStatus(
     DateTimeOffset? LastConnection,
     string Version,
     LicenseStatus License,
-    PrinterListenerSummary? ListenerSummary = null);
+    PrinterListenerSummary? ListenerSummary = null,
+    ExternalServiceLinks? ExternalLinks = null,
+    string ExternalServicesProfile = "Production");

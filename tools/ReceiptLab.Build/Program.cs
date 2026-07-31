@@ -41,7 +41,14 @@ internal static class ReceiptLabBuild
                     break;
                 case "installer":
                 case "all":
-                    await InstallerAsync(arguments.Skip(1).Contains("--skip-publish", StringComparer.OrdinalIgnoreCase));
+                    await InstallerAsync(
+                        arguments.Skip(1).Contains("--skip-publish", StringComparer.OrdinalIgnoreCase),
+                        certificationProfile: false);
+                    break;
+                case "certification-installer":
+                    await InstallerAsync(
+                        arguments.Skip(1).Contains("--skip-publish", StringComparer.OrdinalIgnoreCase),
+                        certificationProfile: true);
                     break;
                 case "send-sample":
                     await SendSampleAsync(arguments.Skip(1).ToArray());
@@ -149,7 +156,7 @@ internal static class ReceiptLabBuild
         Console.WriteLine($"Self-contained Windows publish created at {PublishDirectory}");
     }
 
-    private static async Task InstallerAsync(bool skipPublish)
+    private static async Task InstallerAsync(bool skipPublish, bool certificationProfile)
     {
         if (!skipPublish)
         {
@@ -164,13 +171,20 @@ internal static class ReceiptLabBuild
         var compiler = FindInnoSetupCompiler();
         var installerDefinition = Path.Combine(Root, "installer", "ReceiptLab.iss");
         ValidateInstallerBranding(installerDefinition);
-        Console.WriteLine("Compiling the POS Printer Emulator Windows installer...");
-        await RunProcessAsync(compiler, [installerDefinition], Root);
+        Console.WriteLine(certificationProfile
+            ? "Compiling the sandbox-locked POS Printer Emulator certification installer..."
+            : "Compiling the POS Printer Emulator Windows installer...");
+        var compilerArguments = certificationProfile
+            ? new[] { "/DCertificationProfile", installerDefinition }
+            : new[] { installerDefinition };
+        await RunProcessAsync(compiler, compilerArguments, Root);
 
         var installerDirectory = Path.Combine(Root, "artifacts", "installer");
         var installerPath = Path.Combine(
             installerDirectory,
-            $"POSPrinterEmulatorSetup-{ReadProductVersion()}-win-x64.exe");
+            certificationProfile
+                ? $"POSPrinterEmulatorSetup-{ReadProductVersion()}-certification-rc1-win-x64.exe"
+                : $"POSPrinterEmulatorSetup-{ReadProductVersion()}-win-x64.exe");
         if (!File.Exists(installerPath))
         {
             throw new InvalidOperationException($"The expected installer was not created: {installerPath}");
@@ -807,6 +821,8 @@ internal static class ReceiptLabBuild
               publish                       Create the self-contained win-x64 application
               installer                     Build the complete Windows installer
               installer --skip-publish      Repackage the existing publish output
+              certification-installer       Build a sandbox-locked certification installer (never publish)
+              certification-installer --skip-publish
               sync-release                  Promote ProductInfo.Version after verifying Admin Dev Support, then update public website metadata
               sync-release --check          Verify Admin Dev Support and website pages against website/release.json
               check-seo                     Validate canonical URLs, metadata, structured data, sitemap, and performance assets

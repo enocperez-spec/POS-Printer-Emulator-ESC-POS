@@ -212,6 +212,26 @@ function ensure_customer_crm_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
     $pdo->exec(
+        'ALTER TABLE customer_purchases
+         ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER purchase_status,
+         ADD INDEX IF NOT EXISTS ix_customer_purchases_journey (journey_correlation_id,updated_at)'
+    );
+    $pdo->exec(
+        'ALTER TABLE customer_events
+         ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER event_summary,
+         ADD INDEX IF NOT EXISTS ix_customer_events_journey (journey_correlation_id,occurred_at)'
+    );
+    $pdo->exec(
+        'ALTER TABLE customer_email_verifications
+         ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER token_hash,
+         ADD INDEX IF NOT EXISTS ix_customer_verification_journey (journey_correlation_id,requested_at)'
+    );
+    $pdo->exec(
+        'ALTER TABLE customer_admin_audit
+         ADD COLUMN IF NOT EXISTS journey_correlation_id CHAR(36) NULL AFTER reason,
+         ADD INDEX IF NOT EXISTS ix_customer_audit_journey (journey_correlation_id,created_at)'
+    );
+    $pdo->exec(
         "CREATE TABLE IF NOT EXISTS customer_api_rate_limits (
             bucket_hash BINARY(32) NOT NULL,
             hits INT UNSIGNED NOT NULL,

@@ -96,14 +96,149 @@
   width: 16.5%;
 }
 
+.pricing-page .article-layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 52px;
+}
+
+.pricing-page .article-content {
+  max-width: none;
+}
+
+.purchase-price-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 28px 0 16px;
+}
+
+.purchase-price-card {
+  position: relative;
+  min-width: 0;
+  padding: 22px 18px;
+  border: 1px solid #d5e2eb;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fff, #f6fafc);
+  box-shadow: 0 10px 25px rgba(6, 30, 54, 0.06);
+}
+
+.purchase-price-card.is-featured {
+  border: 2px solid #0b8bff;
+  box-shadow: 0 14px 32px rgba(11, 139, 255, 0.14);
+}
+
+.purchase-price-card h3 {
+  margin: 0 0 7px;
+  font-size: 20px;
+}
+
+.purchase-price-card p.purchase-price-listeners {
+  min-height: 42px;
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.purchase-price-card strong {
+  display: block;
+  color: var(--ink);
+  font-size: clamp(25px, 3vw, 34px);
+  letter-spacing: -0.04em;
+}
+
+.purchase-price-card small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.purchase-price-badge {
+  display: inline-block;
+  margin-bottom: 13px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: #0b78e3;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.purchase-price-note {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.pricing-sync-note {
+  margin: 0 0 38px;
+  color: #087b4b !important;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pricing-license-comparison .license-table-scroll {
+  overflow-x: visible;
+}
+
+.pricing-license-comparison .license-comparison-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 12.5px;
+}
+
+.pricing-license-comparison .license-comparison-table th,
+.pricing-license-comparison .license-comparison-table td {
+  padding: 11px 9px;
+  overflow-wrap: anywhere;
+}
+
+.pricing-license-comparison .license-comparison-table th:first-child {
+  width: 32%;
+  min-width: 0;
+}
+
+.pricing-license-comparison .license-comparison-table th:not(:first-child) {
+  width: 17%;
+}
+
+.pricing-license-comparison .license-purchase-price-row td {
+  color: var(--ink);
+  background: #edf8fb;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .purchase-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .pricing-page .article-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 600px) {
-  .documentation-license-comparison .license-comparison-table {
+  .purchase-price-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .purchase-price-card p.purchase-price-listeners {
+    min-height: 0;
+  }
+
+  .documentation-license-comparison .license-comparison-table,
+  .pricing-license-comparison .license-comparison-table {
     border-collapse: separate;
     border-spacing: 0 14px;
     font-size: 14px;
   }
 
-  .documentation-license-comparison .license-comparison-table thead {
+  .documentation-license-comparison .license-comparison-table thead,
+  .pricing-license-comparison .license-comparison-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -117,26 +252,33 @@
   .documentation-license-comparison .license-comparison-table tbody,
   .documentation-license-comparison .license-comparison-table tr,
   .documentation-license-comparison .license-comparison-table th,
-  .documentation-license-comparison .license-comparison-table td {
+  .documentation-license-comparison .license-comparison-table td,
+  .pricing-license-comparison .license-comparison-table tbody,
+  .pricing-license-comparison .license-comparison-table tr,
+  .pricing-license-comparison .license-comparison-table th,
+  .pricing-license-comparison .license-comparison-table td {
     display: block;
     width: 100%;
   }
 
-  .documentation-license-comparison .license-comparison-table tr {
+  .documentation-license-comparison .license-comparison-table tr,
+  .pricing-license-comparison .license-comparison-table tr {
     overflow: hidden;
     border: 1px solid var(--line);
     border-radius: 12px;
     background: #fff;
   }
 
-  .documentation-license-comparison .license-comparison-table th[scope="row"] {
+  .documentation-license-comparison .license-comparison-table th[scope="row"],
+  .pricing-license-comparison .license-comparison-table th[scope="row"] {
     width: 100%;
     min-width: 0;
     padding: 14px;
     border: 0;
   }
 
-  .documentation-license-comparison .license-comparison-table td {
+  .documentation-license-comparison .license-comparison-table td,
+  .pricing-license-comparison .license-comparison-table td {
     display: grid;
     grid-template-columns: 88px minmax(0, 1fr);
     gap: 12px;
@@ -145,24 +287,29 @@
     border-top: 1px solid var(--line);
   }
 
-  .documentation-license-comparison .license-comparison-table td::before {
+  .documentation-license-comparison .license-comparison-table td::before,
+  .pricing-license-comparison .license-comparison-table td::before {
     color: var(--ink);
     font-weight: 800;
   }
 
-  .documentation-license-comparison .license-comparison-table td:nth-child(2)::before {
+  .documentation-license-comparison .license-comparison-table td:nth-child(2)::before,
+  .pricing-license-comparison .license-comparison-table td:nth-child(2)::before {
     content: "Trial";
   }
 
-  .documentation-license-comparison .license-comparison-table td:nth-child(3)::before {
+  .documentation-license-comparison .license-comparison-table td:nth-child(3)::before,
+  .pricing-license-comparison .license-comparison-table td:nth-child(3)::before {
     content: "Lite";
   }
 
-  .documentation-license-comparison .license-comparison-table td:nth-child(4)::before {
+  .documentation-license-comparison .license-comparison-table td:nth-child(4)::before,
+  .pricing-license-comparison .license-comparison-table td:nth-child(4)::before {
     content: "Pro";
   }
 
-  .documentation-license-comparison .license-comparison-table td:nth-child(5)::before {
+  .documentation-license-comparison .license-comparison-table td:nth-child(5)::before,
+  .pricing-license-comparison .license-comparison-table td:nth-child(5)::before {
     content: "Enterprise";
   }
 }

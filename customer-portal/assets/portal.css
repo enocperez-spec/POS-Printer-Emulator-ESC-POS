@@ -241,6 +241,7 @@ td small.block { color: var(--muted); display: block; margin-top: 3px; }
 .billing-history > header p { color: var(--muted); font-size: 13px; margin: 0; }
 .billing-history td { vertical-align: middle; }
 .billing-history code { font-size: 12px; white-space: nowrap; }
+.billing-documents { display: flex; flex-wrap: wrap; gap: 8px; }
 .payment-status { background: var(--surface-soft); border: 1px solid var(--line); border-radius: 999px; display: inline-block; font-size: 12px; font-weight: 750; padding: 4px 9px; }
 .payment-status.paid { background: var(--green-100); border-color: #93d7aa; color: #136c38; }
 .payment-status.refunded, .payment-status.canceled { background: #fff8e8; border-color: #e8b84f; color: var(--amber-700); }

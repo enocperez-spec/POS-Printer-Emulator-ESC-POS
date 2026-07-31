@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>POS Printer Emulator Pricing | Permanent Licenses and Maintenance</title>
+    <title>POS Printer Emulator Pricing | Lite, Pro, and Enterprise</title>
     <meta
       name="description"
-      content="Compare permanent POS Printer Emulator Lite, Pro, and Enterprise licenses, included first-year maintenance, optional renewals, and printer-listener allowances."
+      content="Compare current one-time POS Printer Emulator purchase prices for Lite, Pro, and Enterprise, with one year of Maintenance and Support included."
     />
     <link rel="canonical" href="https://www.posprinteremulator.com/pricing" />
     <link rel="icon" href="assets/favicon.png" />
@@ -17,9 +17,9 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css?v=20260719-tiers" />
-    <link rel="stylesheet" href="seo-pages.css?v=20260715" />
+    <link rel="stylesheet" href="seo-pages.css?v=20260731-managed-pricing" />
   </head>
-  <body>
+  <body class="pricing-page">
     <header class="site-header">
       <div class="shell header-inner">
         <a class="brand" href="/"
@@ -67,8 +67,17 @@
                 promotional key.
               </p>
             </div>
-            <h2>Compare editions</h2>
-            <div data-license-comparison>
+            <h2>One-time license purchase prices</h2>
+            <p>
+              These are the software purchase prices—not annual renewal
+              prices. Every paid license is a one-time purchase and includes
+              its first year of Maintenance and Support.
+            </p>
+            <div data-license-purchase-pricing>
+              <p>Loading current license purchase prices…</p>
+            </div>
+            <h2>Compare included features</h2>
+            <div class="pricing-license-comparison" data-license-comparison>
               <p>Loading the application-verified license comparison…</p>
             </div>
             <p>
@@ -91,9 +100,11 @@
                 Evaluate it in Trial Mode with up to five print jobs per day.
               </li>
               <li>
-                Choose Lite, Pro, or Enterprise. Lite is $24.99; current Pro and
-                Enterprise prices are administered centrally and shown on the
-                secure Buy page.
+                Choose Lite for <span data-license-price="Lite">$24.99</span>,
+                Pro for <span data-license-price="Pro">$39.99</span>, or
+                Enterprise for
+                <span data-license-price="Enterprise">$199.99</span>. Each is a
+                one-time software purchase.
               </li>
               <li>
                 The license is assigned to your verified Customer Portal account.
@@ -144,8 +155,10 @@
           <aside class="sidebar-card">
             <h2>Choose your license</h2>
             <p>
-      Lite is $24.99. Current Pro and Enterprise prices are shown
-      in the secure Customer Portal.
+              Lite is <span data-license-price="Lite">$24.99</span>, Pro is
+              <span data-license-price="Pro">$39.99</span>, and Enterprise is
+              <span data-license-price="Enterprise">$199.99</span>. Each
+              license is a one-time purchase with no automatic billing.
             </p>
             <a
               class="button button-primary"
@@ -184,6 +197,6 @@
         ><span>Local tools for better receipt testing.</span>
       </div>
     </footer>
-    <script src="script.js" type="module"></script>
+    <script src="script.js?v=20260731-managed-pricing" type="module"></script>
   </body>
 </html>

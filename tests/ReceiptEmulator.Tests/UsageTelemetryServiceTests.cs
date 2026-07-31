@@ -12,6 +12,51 @@ namespace ReceiptEmulator.Tests;
 public sealed class UsageTelemetryServiceTests
 {
     [Fact]
+    public void CertificationProfileUsesSeparateInstallationCredentials()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));
+        var productionConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Data:Root"] = root,
+            ["Telemetry:Enabled"] = "false",
+        }).Build();
+        var certificationConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Data:Root"] = root,
+            ["Telemetry:Enabled"] = "false",
+            ["ExternalServices:Profile"] = "Certification",
+            ["ExternalServices:TelemetryEndpoint"] =
+                "https://sandbox.posprinteremulator.com/api/v1/telemetry.php",
+        }).Build();
+        var production = new UsageTelemetryService(
+            new HttpClient(),
+            new LicenseService(new ProductionEnvironment(), productionConfiguration),
+            productionConfiguration,
+            new ProductionEnvironment(),
+            NullLogger<UsageTelemetryService>.Instance);
+        var certification = new UsageTelemetryService(
+            new HttpClient(),
+            new LicenseService(new ProductionEnvironment(), certificationConfiguration),
+            certificationConfiguration,
+            new ProductionEnvironment(),
+            NullLogger<UsageTelemetryService>.Instance);
+
+        try
+        {
+            Assert.EndsWith("telemetry-state.json", production.StatePath, StringComparison.OrdinalIgnoreCase);
+            Assert.EndsWith(
+                "telemetry-state-certification.json",
+                certification.StatePath,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.NotEqual(production.StatePath, certification.StatePath);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public async Task RetriesFailedPrintJobBatchWithoutDroppingTheCount()
     {
         var root = Path.Combine(Path.GetTempPath(), "POSPrinterEmulator.Tests", Guid.NewGuid().ToString("N"));

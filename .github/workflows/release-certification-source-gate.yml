@@ -1,0 +1,54 @@
+name: Release certification source gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-certification:
+    name: Source certification
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Configure PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, openssl, pdo_mysql
+
+      - name: Run source certification
+        run: >
+          dotnet run
+          --project tools/POSPrinterEmulator.Certification
+          --configuration Release
+          --
+          local-gate
+          --report-directory artifacts/certification/source-gate
+
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-certification-${{ github.run_id }}
+          path: artifacts/certification/source-gate
+          if-no-files-found: error
+          retention-days: 30
