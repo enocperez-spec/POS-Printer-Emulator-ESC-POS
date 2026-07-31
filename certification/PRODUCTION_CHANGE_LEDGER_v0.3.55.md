@@ -23,6 +23,8 @@ record, evidence, approvals, exact commit, and installer all pass.
 | [ ] | Distinguish PayPal capture and order references on the portal invoice compatibility page. | `/userportal_sandbox_posprinteremulator/invoice.php` | `/userportal_posprinteremulator/invoice.php` | Capture and order references match the provider record. |
 | [ ] | Keep only **View Receipt** in Customer Portal Billing while retaining internal invoice generation for email attachments and historical links. | `/userportal_sandbox_posprinteremulator/portal.php` | `/userportal_posprinteremulator/portal.php` | Billing shows one document action and the receipt contains the invoice fields. |
 | [ ] | Label the verified capture ID as **PayPal approval reference** in the branded PDF invoice. | `/admin_sandbox_posprinteremulator/includes/communications.php` | `/admin_posprinteremulator/includes/communications.php` | Purchase-confirmation email contains exactly one logo-branded PDF with matching invoice and capture references. |
+| [ ] | Clear stale computer synchronization errors immediately after the Customer Portal approves an eligible account license. | `/userportal_sandbox_posprinteremulator/portal.php` | `/userportal_posprinteremulator/portal.php` | A newly approved computer displays **Active** without retaining an earlier Unlinked error. |
+| [ ] | Synchronize authoritative Active, Expired, and Revoked Maintenance and Support states to linked desktops while preserving the permanent paid license. | `/admin_sandbox_posprinteremulator/api/v1/device-entitlement.php` plus the v0.3.55 desktop | `/admin_posprinteremulator/api/v1/device-entitlement.php` plus the signed production desktop installer | Admin revocation disables updates/support after refresh but Pro features remain; restoration returns maintenance to Active. |
 
 ## Production configuration and infrastructure
 
@@ -109,6 +111,12 @@ record, evidence, approvals, exact commit, and installer all pass.
   enqueue.
 - Receipt/invoice and communications contract suites passed after adding the invoice
   number and PayPal capture-reference labels.
+- A fresh Pro computer link and relink reconciled the same active device, entitlement,
+  and maintenance date across the desktop, Customer Portal, and Admin Portal.
+- Live maintenance revocation correctly remained server-side but exposed that the
+  device-entitlement response omitted the revocation status. The API and desktop
+  contract were corrected, regression tested, and deployed only to sandbox. The
+  certification entitlement was restored after the test.
 
 ## Open production blockers
 
@@ -118,13 +126,14 @@ record, evidence, approvals, exact commit, and installer all pass.
 - [ ] Verify the newly configured production cron executes successfully without
   sending a production test message before rollout approval; retain production
   delivery pause/policy controls until the production release is authorized.
-- [ ] Update the active E2E record with completed Lite purchase, Pro upgrade, account
+- [x] Update the active E2E record with completed Lite purchase, Pro upgrade, account
   linking, restart persistence, invoice delivery, and current defects.
 - [ ] Complete the remaining Trial, Pro, Enterprise, maintenance, transfer/recovery,
   PayPal failure/refund/idempotency, support, security, accessibility, uninstall, and
   reinstall journeys.
-- [ ] Freeze a clean release-candidate commit and rebuild the installer.
-- [ ] Run the complete source gate and first-time customer gateway against that exact
-  commit and installer.
+- [x] Freeze a clean release-candidate commit and rebuild the installer.
+- [x] Run the complete source gate against that exact commit and installer.
+- [ ] Run the independent first-time customer gateway against that exact commit and
+  installer.
 - [ ] Record all rollout gates and obtain release-owner, test-owner, and rollback-owner
   approvals.
