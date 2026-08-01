@@ -34,6 +34,7 @@ const string SupportBaseUrlVariable = "PPE_SUPPORT_BASE_URL";
 const string PayPalClientIdVariable = "PPE_PAYPAL_CLIENT_ID";
 const string PayPalSecretVariable = "PPE_PAYPAL_SECRET";
 const string PayPalBaseUrlVariable = "PPE_PAYPAL_BASE_URL";
+const string PayPalWebhookIdVariable = "PPE_PAYPAL_WEBHOOK_ID";
 const string RolloutReadinessReportVariable = "PPE_ROLLOUT_READINESS_REPORT";
 const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
@@ -62,6 +63,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
     Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
     Console.WriteLine("  website-publisher configure-purchase-integration <admin-remote-directory> <buy-remote-directory>");
+    Console.WriteLine("  website-publisher reconcile-sandbox-paypal-reversal <https-admin-url> <event-id> <event-type> <refund|chargeback> <order-id|-> <capture-id|->");
     Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-self-service-commerce <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-schema-recovered <https-setup-url>");
@@ -74,6 +76,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher inspect-sandbox-communications-message <admin-sandbox-remote-directory> <message-id>");
     Console.WriteLine("  website-publisher sync-sandbox-communication-template <https-sync-url> <template-key>");
     Console.WriteLine("  website-publisher sandbox-reset-checkout-rate <portal-remote-directory> <email>");
+    Console.WriteLine("  website-publisher sandbox-set-maintenance-expiration <admin-sandbox-remote-directory> <license-id> <yyyy-MM-dd|yyyy-MM-ddTHH:mm:ss>");
     Console.WriteLine("  website-publisher sync-license-catalog [repository-root]");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
@@ -119,6 +122,23 @@ if (args[0].Equals("migrate-self-service-commerce", StringComparison.OrdinalIgno
         throw new ArgumentException("The migrate-self-service-commerce command requires an HTTPS migration URL.");
     }
     await MigrateSelfServiceCommerceAsync(migrationUri);
+    return 0;
+}
+if (args[0].Equals("reconcile-sandbox-paypal-reversal", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 7 || !Uri.TryCreate(args[1], UriKind.Absolute, out var adminUri) ||
+        adminUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException(
+            "The sandbox PayPal reconciliation command requires an HTTPS Admin URL and complete event identifiers.");
+    }
+    await ReconcileSandboxPayPalReversalAsync(
+        adminUri,
+        args[2],
+        args[3],
+        args[4],
+        args[5] == "-" ? string.Empty : args[5],
+        args[6] == "-" ? string.Empty : args[6]);
     return 0;
 }
 if (args[0].Equals("migrate-schema-recovered", StringComparison.OrdinalIgnoreCase))
@@ -297,6 +317,21 @@ try
                 expectedFingerprint,
                 args[1],
                 args[2]);
+            break;
+        case "sandbox-set-maintenance-expiration":
+            if (args.Length < 4)
+            {
+                throw new ArgumentException(
+                    "The sandbox-set-maintenance-expiration command requires the Admin sandbox directory, license ID, and UTC date or timestamp.");
+            }
+            SetSandboxMaintenanceExpiration(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2],
+                args[3]);
             break;
         case "run-sandbox-communications-cron":
             if (args.Length < 2)
@@ -1459,6 +1494,7 @@ static void ConfigurePurchaseIntegration(
         PayPalBaseUrlVariable);
     var paypalClientId = RequiredEnvironmentVariable(PayPalClientIdVariable);
     var paypalSecret = RequiredEnvironmentVariable(PayPalSecretVariable);
+    var paypalWebhookId = RequiredEnvironmentVariable(PayPalWebhookIdVariable);
     var adminToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
         .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     var maintenanceToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
@@ -1506,6 +1542,7 @@ static void ConfigurePurchaseIntegration(
             'paypal' => [
                 'client_id' => {PhpString(paypalClientId)},
                 'secret' => {PhpString(paypalSecret)},
+                'webhook_id' => {PhpString(paypalWebhookId)},
                 'base_url' => {PhpString(paypalBaseUrl)},
             ],
             'admin_api_token' => {PhpString(adminToken)},
@@ -1560,6 +1597,91 @@ static async Task MigrateSelfServiceCommerceAsync(Uri migrationUri)
     var serviceToken = RecoverCrmServiceToken();
     await RunProtectedMigrationAsync(migrationUri, serviceToken, "self-service commerce");
     Console.WriteLine("Protected self-service commerce migration completed successfully.");
+}
+
+static async Task ReconcileSandboxPayPalReversalAsync(
+    Uri adminUri,
+    string eventId,
+    string eventType,
+    string reversalType,
+    string providerOrderId,
+    string providerCaptureId)
+{
+    if (!adminUri.Host.Contains("sandbox", StringComparison.OrdinalIgnoreCase) &&
+        !adminUri.Host.Contains("staging", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "PayPal event replay is restricted to a sandbox or staging Admin hostname.");
+    }
+    if (!DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase) &&
+        !DeploymentProfile().Equals("staging", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "PayPal event replay requires a sandbox or staging deployment profile.");
+    }
+    var token = RecoverPurchaseMaintenanceToken();
+    using var request = new HttpRequestMessage(
+        HttpMethod.Post,
+        new Uri(adminUri, "/api/v1/portal-commerce.php"));
+    request.Headers.Add("X-PPE-Admin-Token", token);
+    request.Content = new StringContent(
+        JsonSerializer.Serialize(new
+        {
+            action = "record-provider-reversal",
+            eventId,
+            eventType,
+            reversalType,
+            providerOrderId,
+            providerCaptureId,
+            reason = "Verified PayPal Sandbox event replayed by the release-certification operator."
+        }),
+        System.Text.Encoding.UTF8,
+        "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(
+            $"Sandbox PayPal reconciliation failed with HTTP {(int)response.StatusCode}.");
+    }
+    using var result = JsonDocument.Parse(body);
+    var root = result.RootElement;
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        ok = root.TryGetProperty("ok", out var ok) && ok.GetBoolean(),
+        state = root.TryGetProperty("state", out var state) ? state.GetString() : null,
+        idempotent = root.TryGetProperty("idempotent", out var idempotent) && idempotent.GetBoolean(),
+        reviewRequired = root.TryGetProperty("reviewRequired", out var review) && review.GetBoolean()
+    }));
+}
+
+static string RecoverPurchaseMaintenanceToken()
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException(
+            "Purchase-integration recovery uses Windows data protection.");
+    }
+    var recoveryPath = DeploymentRecoveryPath("purchase-integration.secrets.bin");
+    if (!File.Exists(recoveryPath))
+    {
+        throw new FileNotFoundException(
+            "The protected purchase-integration recovery file is unavailable.",
+            recoveryPath);
+    }
+    var recovery = ProtectedData.Unprotect(
+        File.ReadAllBytes(recoveryPath),
+        null,
+        DataProtectionScope.CurrentUser);
+    using var document = JsonDocument.Parse(recovery);
+    var token = document.RootElement.GetProperty("maintenanceToken").GetString();
+    if (string.IsNullOrWhiteSpace(token) || token.Length < 32)
+    {
+        throw new InvalidDataException(
+            "The protected purchase-integration maintenance token is unavailable.");
+    }
+    return token;
 }
 
 static async Task MigrateSchemaWithRecoveredAdminAsync(Uri setupUri)
@@ -2506,6 +2628,186 @@ static void InspectSandboxCommunicationsMessage(
         {
             throw new InvalidDataException(
                 "The sandbox message inspection returned no privacy-safe result.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void SetSandboxMaintenanceExpiration(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string licenseId,
+    string expirationDate)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals("admin_sandbox_posprinteremulator", StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Maintenance date certification is restricted to the Admin sandbox directory.");
+    }
+    if (!Guid.TryParse(licenseId, out var parsedLicenseId) ||
+        !DateTime.TryParseExact(
+            expirationDate,
+            ["yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm:ss"],
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal |
+            System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var parsedExpiration))
+    {
+        throw new ArgumentException(
+            "A license UUID and yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss UTC expiration are required.");
+    }
+
+    var earliest = DateTime.UtcNow.Date.AddDays(-7);
+    var latest = DateTime.UtcNow.Date.AddYears(2).AddDays(1).AddTicks(-1);
+    if (parsedExpiration < earliest || parsedExpiration > latest)
+    {
+        throw new InvalidOperationException(
+            $"Certification maintenance dates must be between {earliest:yyyy-MM-dd} and {latest:yyyy-MM-dd}.");
+    }
+
+    var expectedDatabaseHost = RequiredEnvironmentVariable("PPE_CERT_DB_HOST").Trim();
+    var expectedDatabaseName = RequiredEnvironmentVariable("PPE_CERT_DB_NAME").Trim();
+    var stagingDatabaseLabel = RequiredEnvironmentVariable("PPE_STAGING_DATABASE_LABEL").Trim();
+    var stagingAllowedHost = RequiredEnvironmentVariable("PPE_STAGING_ALLOWED_HOST").Trim();
+    if (!RequiredEnvironmentVariable("PPE_ENVIRONMENT").Equals(
+            "staging",
+            StringComparison.OrdinalIgnoreCase) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            stagingDatabaseLabel,
+            @"(^|[_-])(staging|sandbox)([_-]|$)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+        !stagingAllowedHost.Equals(expectedDatabaseHost, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "The certification database safety variables do not identify the approved sandbox.");
+    }
+
+    var php = $$"""
+        <?php
+        declare(strict_types=1);
+        require 'includes/bootstrap.php';
+        $licenseId = '{{parsedLicenseId:D}}';
+        $newExpiration = '{{(expirationDate.Length == 10 ? parsedExpiration.Date.AddDays(1).AddSeconds(-1) : parsedExpiration):yyyy-MM-dd HH:mm:ss}}.000000';
+        $expectedDatabaseHost = {{PhpString(expectedDatabaseHost)}};
+        $expectedDatabaseName = {{PhpString(expectedDatabaseName)}};
+        $pdo = null;
+        try {
+            $config = private_config();
+            $configuredDatabaseHost = trim((string)($config['database']['host'] ?? ''));
+            if (!hash_equals(strtolower($expectedDatabaseHost), strtolower($configuredDatabaseHost))) {
+                throw new RuntimeException('The remote database host does not match the approved sandbox host.');
+            }
+            $pdo = database();
+            $databaseName = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+            if (!hash_equals($expectedDatabaseName, $databaseName)) {
+                throw new RuntimeException('The selected database does not match the approved sandbox database.');
+            }
+            $pdo->beginTransaction();
+            $find = $pdo->prepare(
+                "SELECT control_state,maintenance_expires_at
+                 FROM issued_licenses WHERE license_id=:license_id FOR UPDATE"
+            );
+            $find->execute(['license_id' => $licenseId]);
+            $license = $find->fetch();
+            if (!is_array($license) || (string)$license['control_state'] !== 'Enabled') {
+                throw new RuntimeException('An enabled sandbox license was not found.');
+            }
+            $previousExpiration = $license['maintenance_expires_at'];
+            $update = $pdo->prepare(
+                "UPDATE issued_licenses
+                 SET maintenance_expires_at=:expiration,maintenance_revoked_at=NULL,
+                     row_version=row_version+1,entitlement_revision=entitlement_revision+1
+                 WHERE license_id=:license_id"
+            );
+            $update->execute(['expiration' => $newExpiration, 'license_id' => $licenseId]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('The sandbox maintenance date was not updated.');
+            }
+            $installations = $pdo->prepare(
+                "UPDATE installations
+                 SET maintenance_status=IF(:expiration>=UTC_TIMESTAMP(6),'Active','Expired'),
+                     maintenance_expires_at=:expiration_2
+                 WHERE license_id=:license_id AND portal_deactivated_at IS NULL"
+            );
+            $installations->execute([
+                'expiration' => $newExpiration,
+                'expiration_2' => $newExpiration,
+                'license_id' => $licenseId,
+            ]);
+            $audit = $pdo->prepare(
+                "INSERT INTO license_maintenance_events
+                    (license_id,event_type,previous_expires_at,new_expires_at,source_reference,
+                     reason,performed_by,admin_ip)
+                 VALUES
+                    (:license_id,'CERTIFICATION_EXPIRATION_SET',:previous_expiration,:new_expiration,
+                     :source_reference,
+                     'Temporary sandbox date used for the Maintenance and Support release gate.',
+                     'certification-tool',NULL)"
+            );
+            $audit->execute([
+                'license_id' => $licenseId,
+                'previous_expiration' => $previousExpiration,
+                'new_expiration' => $newExpiration,
+                'source_reference' => 'certification-date:' . gmdate('YmdHisv'),
+            ]);
+            $pdo->commit();
+            echo json_encode([
+                'licenseId' => $licenseId,
+                'previousExpiration' => $previousExpiration,
+                'newExpiration' => $newExpiration,
+                'linkedInstallations' => $installations->rowCount(),
+            ], JSON_THROW_ON_ERROR);
+        } catch (Throwable $exception) {
+            if ($pdo instanceof PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            echo 'CERTIFICATION_ERROR:' . $exception->getMessage();
+            exit(3);
+        }
+        """;
+    var encodedScript = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(php));
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            $"printf '%s' '{encodedScript}' | base64 -d | " +
+            $"/usr/bin/php8.4 -d display_errors=stderr -d display_startup_errors=1");
+        if (command.ExitStatus != 0)
+        {
+            var diagnostic = (command.Error + " " + command.Result)
+                .Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Trim();
+            throw new InvalidOperationException(
+                $"The sandbox maintenance date change failed (exit {command.ExitStatus})" +
+                (diagnostic.Length > 0 ? $": {diagnostic}" : "."));
+        }
+        var jsonOffset = command.Result.IndexOf("{\"licenseId\"", StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox maintenance date change returned no verification result.");
         }
         using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
         Console.WriteLine(JsonSerializer.Serialize(result.RootElement));

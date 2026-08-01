@@ -59,10 +59,64 @@ $expectSame('19.99',$maintenanceOffers['Pro']['price']??null,'Pro maintenance fa
 $expectSame('59.99',$maintenanceOffers['Enterprise']['price']??null,'Enterprise maintenance fallback must be $59.99.');
 $expectSame(false,is_file(dirname(__DIR__,2).'/buy-website/includes/license_keys.php'),'The Buy website must not retain an activation-key generator.');
 
+$refundEvent = paypal_reversal_event([
+    'id' => 'WH-REFUND-12345678',
+    'event_type' => 'PAYMENT.CAPTURE.REFUNDED',
+    'resource' => [
+        'supplementary_data' => [
+            'related_ids' => [
+                'order_id' => '54P31732R3501353M',
+                'capture_id' => '5YY727363P031880X',
+            ],
+        ],
+    ],
+]);
+$expectSame('refund', $refundEvent['reversalType'] ?? null, 'A verified refund event must map to refund reconciliation.');
+$expectSame('54P31732R3501353M', $refundEvent['providerOrderId'] ?? null, 'Refund reconciliation lost the PayPal order ID.');
+$expectSame('5YY727363P031880X', $refundEvent['providerCaptureId'] ?? null, 'Refund reconciliation lost the PayPal capture ID.');
+$linkedRefundEvent = paypal_reversal_event([
+    'id' => 'WH-LINKED-12345678',
+    'event_type' => 'PAYMENT.CAPTURE.REFUNDED',
+    'resource' => [
+        'id' => '0AB40423VK1090813',
+        'links' => [
+            [
+                'href' => 'https://api.sandbox.paypal.com/v2/payments/captures/9CA92542VH120702K',
+                'rel' => 'up',
+                'method' => 'GET',
+            ],
+        ],
+    ],
+]);
+$expectSame('9CA92542VH120702K', $linkedRefundEvent['providerCaptureId'] ?? null, 'PayPal refund up-links must resolve the original capture ID.');
+$legacyRefundEvent = paypal_reversal_event([
+    'id' => 'WH-LEGACY-12345678',
+    'event_type' => 'PAYMENT.CAPTURE.REFUNDED',
+    'resource' => ['sale_id' => '9CA92542VH120702K'],
+]);
+$expectSame('9CA92542VH120702K', $legacyRefundEvent['providerCaptureId'] ?? null, 'Legacy PayPal refund resources must resolve the original transaction ID.');
+$disputeEvent = paypal_reversal_event([
+    'id' => 'WH-DISPUTE-12345678',
+    'event_type' => 'CUSTOMER.DISPUTE.CREATED',
+    'resource' => [
+        'disputed_transactions' => [
+            ['seller_transaction_id' => '5YY727363P031880X'],
+        ],
+    ],
+]);
+$expectSame('chargeback', $disputeEvent['reversalType'] ?? null, 'A customer dispute must enter chargeback review.');
+$expectSame('5YY727363P031880X', $disputeEvent['providerCaptureId'] ?? null, 'Dispute reconciliation lost the seller transaction ID.');
+$expectSame(null, paypal_reversal_event([
+    'id' => 'WH-IGNORED-12345678',
+    'event_type' => 'CHECKOUT.ORDER.APPROVED',
+]), 'Unrelated PayPal events must be acknowledged without changing commerce state.');
+
 $captureEndpoint=file_get_contents(dirname(__DIR__,2).'/buy-website/api/capture-order.php')?:'';
 $portalOrderCreate=file_get_contents(dirname(__DIR__,2).'/buy-website/api/create-portal-order.php')?:'';
 $portalOrderCapture=file_get_contents(dirname(__DIR__,2).'/buy-website/api/capture-portal-order.php')?:'';
+$paypalWebhook=file_get_contents(dirname(__DIR__,2).'/buy-website/api/paypal-webhook.php')?:'';
 $portalCommerce=file_get_contents(dirname(__DIR__,2).'/admin-website/api/v1/portal-commerce.php')?:'';
+$buyBootstrap=file_get_contents(dirname(__DIR__,2).'/buy-website/includes/bootstrap.php')?:'';
 $expectSame(true,str_contains($portalOrderCreate,'custom_id'),'Account checkout must pass the journey correlation ID to PayPal.');
 $expectSame(true,str_contains($portalOrderCapture,'hash_equals($correlationId, $providerCorrelationId)'),'Capture must reject a mismatched PayPal correlation ID.');
 $expectSame(true,str_contains($portalOrderCapture,'$captured = paypal_request(\'GET\', $paypalPath);'),'Capture verification must use PayPal’s authoritative order response.');
@@ -70,9 +124,20 @@ $expectSame(true,str_contains($portalCommerce,'customer_id=:expected_customer_id
 $expectSame(true,str_contains($portalCommerce,"'expected_customer_id' => \$intent['customer_id']"),'License linking must bind the distinct customer guard parameter.');
 $expectSame(true,str_contains($captureEndpoint,"['create_time']"),'Renewal coverage must use PayPal capture time instead of local retry time.');
 $expectSame(true,str_contains($captureEndpoint,"paypal_request('GET',\$paypalPath)"),'A lost capture response must be reconcilable without charging again.');
+$expectSame(true,str_contains($paypalWebhook,'paypal_verify_webhook($event)'),'PayPal reversals must pass provider signature verification.');
+$expectSame(true,str_contains($paypalWebhook,"'record-provider-reversal'"),'Verified PayPal reversals must use the protected Admin reconciliation channel.');
+$expectSame(true,str_contains($buyBootstrap,"'/v1/notifications/verify-webhook-signature'"),'PayPal webhook verification must use the provider verification API.');
+$expectSame(true,str_contains($buyBootstrap,"preg_match('/(?:^|\\.)paypal\\.com$/i'"),'Webhook certificate URLs must be restricted to PayPal HTTPS hosts.');
+$expectSame(true,str_contains($buyBootstrap,"\$environment !== 'sandbox'"),'PayPal negative testing must be restricted to the sandbox environment.');
+$expectSame(true,str_contains($buyBootstrap,"https://api-m.sandbox.paypal.com"),'PayPal negative testing must be restricted to the sandbox API host.');
+$expectSame(true,str_contains($buyBootstrap,'PayPal-Mock-Response:'),'The sandbox certification path must use PayPal’s official negative-testing header.');
+$expectSame(true,str_contains($portalOrderCreate,"'retryable' => true"),'A provider create failure must return a safe retry response.');
+$expectSame(true,str_contains($portalOrderCreate,'No payment was taken'),'A provider create failure must explicitly reassure the customer that no payment was taken.');
+$expectSame(true,str_contains($portalOrderCapture,'PORTAL_PROVIDER_FAILURE'),'A provider capture failure must be recorded for audit review.');
+$expectSame(true,str_contains($portalOrderCapture,'Do not submit another payment'),'A capture uncertainty must warn the customer not to pay twice.');
 $configExample=file_get_contents(dirname(__DIR__,2).'/buy-website/private/config.example.php')?:'';
 $expectSame(true,str_contains($configExample,'REPLACE_WITH_DISTINCT_MAINTENANCE_SERVICE_TOKEN'),'The Buy-to-Admin maintenance credential must be explicitly distinct.');
-$buyBootstrap=file_get_contents(dirname(__DIR__,2).'/buy-website/includes/bootstrap.php')?:'';
+$expectSame(true,str_contains($configExample,'REPLACE_WITH_PAYPAL_WEBHOOK_ID'),'PayPal webhook registration must expose its deployment-specific identifier.');
 $expectSame(true,str_contains($buyBootstrap,"if (\$orderType === 'LICENSE')"),'The secure checkout must accept a distinct new-license order.');
 $expectSame(true,str_contains($buyBootstrap,'return license_offer($targetTier);'),'A new or additional license must use its full configured price.');
 $purchasePage=file_get_contents(dirname(__DIR__,2).'/buy-website/index.php')?:'';

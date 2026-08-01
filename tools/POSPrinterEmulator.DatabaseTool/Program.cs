@@ -34,7 +34,9 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  database-tool staging-inspect");
     Console.WriteLine("  database-tool staging-customer-status <email>");
     Console.WriteLine("  database-tool staging-license-status <email>");
+    Console.WriteLine("  database-tool staging-commerce-status <provider-order-or-capture-id>");
     Console.WriteLine("  database-tool staging-reset-checkout-rate <email>");
+    Console.WriteLine("  database-tool staging-set-maintenance-expiration <license-id> <yyyy-MM-dd|yyyy-MM-ddTHH:mm:ss>");
     Console.WriteLine("  database-tool remote-apply <https-setup-url>");
     Console.WriteLine("  database-tool smoke-test <https-telemetry-url> <https-setup-url>");
     Console.WriteLine();
@@ -56,7 +58,9 @@ var isStagingCommand = command is
     "staging-inspect" or
     "staging-customer-status" or
     "staging-license-status" or
-    "staging-reset-checkout-rate";
+    "staging-commerce-status" or
+    "staging-reset-checkout-rate" or
+    "staging-set-maintenance-expiration";
 if (command == "validate-schema")
 {
     if (args.Length < 2)
@@ -182,7 +186,9 @@ if (command is
     "staging-inspect" or
     "staging-customer-status" or
     "staging-license-status" or
-    "staging-reset-checkout-rate")
+    "staging-commerce-status" or
+    "staging-reset-checkout-rate" or
+    "staging-set-maintenance-expiration")
 {
     builder.Database = RequiredEnvironmentVariable(
         isStagingCommand ? CertificationDatabaseVariable : DatabaseVariable);
@@ -248,6 +254,15 @@ switch (command)
 
         await ShowStagingLicenseStatusAsync(connection, args[1]);
         break;
+    case "staging-commerce-status":
+        if (args.Length < 2 || string.IsNullOrWhiteSpace(args[1]))
+        {
+            throw new ArgumentException(
+                "The staging-commerce-status command requires a PayPal order or capture identifier.");
+        }
+
+        await ShowStagingCommerceStatusAsync(connection, args[1]);
+        break;
     case "staging-reset-checkout-rate":
         if (args.Length < 2 || string.IsNullOrWhiteSpace(args[1]))
         {
@@ -255,6 +270,27 @@ switch (command)
         }
 
         await ResetStagingCheckoutRateAsync(connection, args[1]);
+        break;
+    case "staging-set-maintenance-expiration":
+        if (args.Length < 3 ||
+            !Guid.TryParse(args[1], out var maintenanceLicenseId) ||
+            !DateTime.TryParseExact(
+                args[2],
+                ["yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm:ss"],
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal |
+                System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out var maintenanceExpirationDate))
+        {
+            throw new ArgumentException(
+                "The staging-set-maintenance-expiration command requires a license UUID and UTC date or timestamp.");
+        }
+
+        await SetStagingMaintenanceExpirationAsync(
+            connection,
+            maintenanceLicenseId,
+            maintenanceExpirationDate,
+            args[2].Length == 10);
         break;
     default:
         throw new ArgumentException($"Unknown command: {args[0]}");
@@ -458,6 +494,84 @@ static async Task ShowStagingLicenseStatusAsync(MySqlConnection connection, stri
     }
 }
 
+static async Task ShowStagingCommerceStatusAsync(MySqlConnection connection, string providerIdentifier)
+{
+    var identifier = providerIdentifier.Trim();
+    if (!System.Text.RegularExpressions.Regex.IsMatch(identifier, "^[A-Za-z0-9]{8,64}$"))
+    {
+        throw new ArgumentException("The PayPal order or capture identifier is invalid.");
+    }
+
+    const string intentSql =
+        """
+        SELECT intent_id, state, provider_order_id, provider_capture_id, order_type,
+               target_tier, amount, currency, prepared_at, captured_at, updated_at
+        FROM portal_checkout_intents
+        WHERE provider_order_id = @provider_identifier
+           OR provider_capture_id = @provider_identifier
+        ORDER BY prepared_at DESC
+        LIMIT 10
+        """;
+
+    var intentIds = new List<string>();
+    await using (var intentCommand = new MySqlCommand(intentSql, connection))
+    {
+        intentCommand.Parameters.AddWithValue("@provider_identifier", identifier);
+        await using var intentReader = await intentCommand.ExecuteReaderAsync();
+        while (await intentReader.ReadAsync())
+        {
+            var intentId = intentReader.GetString("intent_id");
+            intentIds.Add(intentId);
+            Console.WriteLine(
+                $"Checkout {MaskIdentifier(intentId)}: " +
+                $"{intentReader.GetString("order_type")} {intentReader.GetString("target_tier")}; " +
+                $"state {intentReader.GetString("state")}; " +
+                $"{intentReader.GetDecimal(intentReader.GetOrdinal("amount")):0.00} " +
+                $"{intentReader.GetString("currency")}; " +
+                $"order {FormatNullableString(intentReader, "provider_order_id")}; " +
+                $"capture {FormatNullableString(intentReader, "provider_capture_id")}; " +
+                $"captured {FormatNullableDate(intentReader, "captured_at")}; " +
+                $"updated {GetDateTime(intentReader, "updated_at"):O} UTC.");
+        }
+    }
+
+    Console.WriteLine($"Matching staging checkout intents: {intentIds.Count}.");
+    if (intentIds.Count == 0)
+    {
+        return;
+    }
+
+    const string providerEventSql =
+        """
+        SELECT provider_event_id, event_type, reversal_type, provider_order_id,
+               provider_capture_id, created_at, processed_at
+        FROM portal_provider_events
+        WHERE intent_id = @intent_id
+        ORDER BY created_at DESC
+        LIMIT 20
+        """;
+    foreach (var intentId in intentIds)
+    {
+        await using var eventCommand = new MySqlCommand(providerEventSql, connection);
+        eventCommand.Parameters.AddWithValue("@intent_id", intentId);
+        await using var eventReader = await eventCommand.ExecuteReaderAsync();
+        var eventCount = 0;
+        while (await eventReader.ReadAsync())
+        {
+            eventCount++;
+            Console.WriteLine(
+                $"Provider event {MaskIdentifier(eventReader.GetString("provider_event_id"))}: " +
+                $"{eventReader.GetString("event_type")}; " +
+                $"{eventReader.GetString("reversal_type")}; " +
+                $"order {FormatNullableString(eventReader, "provider_order_id")}; " +
+                $"capture {FormatNullableString(eventReader, "provider_capture_id")}; " +
+                $"processed {FormatNullableDate(eventReader, "processed_at")}.");
+        }
+        Console.WriteLine(
+            $"Provider reversal events for checkout {MaskIdentifier(intentId)}: {eventCount}.");
+    }
+}
+
 static string MaskIdentifier(string value) =>
     value.Length <= 8 ? value : $"{value[..8]}…";
 
@@ -508,6 +622,127 @@ static async Task ResetStagingCheckoutRateAsync(MySqlConnection connection, stri
     delete.Parameters.Add("@bucket_hash", MySqlDbType.Binary, 32).Value = bucketHash;
     var deleted = await delete.ExecuteNonQueryAsync();
     Console.WriteLine($"Staging checkout throttle reset completed. Matching rate-limit rows removed: {deleted}.");
+}
+
+static async Task SetStagingMaintenanceExpirationAsync(
+    MySqlConnection connection,
+    Guid licenseId,
+    DateTime expirationDate,
+    bool useEndOfDay)
+{
+    var earliest = DateTime.UtcNow.Date.AddDays(-7);
+    var latest = DateTime.UtcNow.Date.AddYears(2).AddDays(1).AddTicks(-1);
+    if (expirationDate < earliest || expirationDate > latest)
+    {
+        throw new InvalidOperationException(
+            $"Certification maintenance dates must be between {earliest:yyyy-MM-dd} and {latest:yyyy-MM-dd}.");
+    }
+
+    await using var transaction = await connection.BeginTransactionAsync();
+    string? previousExpiration;
+    string controlState;
+    await using (var select = new MySqlCommand(
+        """
+        SELECT control_state, maintenance_expires_at
+        FROM issued_licenses
+        WHERE license_id = @license_id
+        FOR UPDATE
+        """,
+        connection,
+        transaction))
+    {
+        select.Parameters.AddWithValue("@license_id", licenseId.ToString());
+        await using var reader = await select.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            throw new InvalidOperationException("The requested staging license was not found.");
+        }
+
+        var controlStateOrdinal = reader.GetOrdinal("control_state");
+        var expirationOrdinal = reader.GetOrdinal("maintenance_expires_at");
+        controlState = reader.GetString(controlStateOrdinal);
+        previousExpiration = reader.IsDBNull(expirationOrdinal)
+            ? null
+            : reader.GetDateTime(expirationOrdinal)
+                .ToString("yyyy-MM-dd HH:mm:ss.ffffff", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    if (!controlState.Equals("Enabled", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            $"Maintenance expiration can be changed only for an enabled staging license; current state is {controlState}.");
+    }
+
+    var newExpiration = (useEndOfDay
+            ? expirationDate.Date.AddDays(1).AddSeconds(-1)
+            : expirationDate)
+        .ToString("yyyy-MM-dd HH:mm:ss.ffffff", System.Globalization.CultureInfo.InvariantCulture);
+
+    await using (var update = new MySqlCommand(
+        """
+        UPDATE issued_licenses
+        SET maintenance_expires_at = @expiration,
+            maintenance_revoked_at = NULL,
+            row_version = row_version + 1,
+            entitlement_revision = entitlement_revision + 1
+        WHERE license_id = @license_id
+        """,
+        connection,
+        transaction))
+    {
+        update.Parameters.AddWithValue("@expiration", newExpiration);
+        update.Parameters.AddWithValue("@license_id", licenseId.ToString());
+        if (await update.ExecuteNonQueryAsync() != 1)
+        {
+            throw new InvalidOperationException("The staging maintenance expiration was not updated.");
+        }
+    }
+
+    await using (var synchronize = new MySqlCommand(
+        """
+        UPDATE installations
+        SET maintenance_status =
+                CASE WHEN @expiration >= UTC_TIMESTAMP(6) THEN 'Active' ELSE 'Expired' END,
+            maintenance_expires_at = @expiration
+        WHERE license_id = @license_id AND portal_deactivated_at IS NULL
+        """,
+        connection,
+        transaction))
+    {
+        synchronize.Parameters.AddWithValue("@expiration", newExpiration);
+        synchronize.Parameters.AddWithValue("@license_id", licenseId.ToString());
+        await synchronize.ExecuteNonQueryAsync();
+    }
+
+    await using (var audit = new MySqlCommand(
+        """
+        INSERT INTO license_maintenance_events
+            (license_id,event_type,previous_expires_at,new_expires_at,source_reference,
+             reason,performed_by,admin_ip)
+        VALUES
+            (@license_id,'CERTIFICATION_EXPIRATION_SET',@previous_expiration,@new_expiration,
+             @source_reference,'Temporary sandbox date used for the Maintenance and Support release gate.',
+             @performed_by,NULL)
+        """,
+        connection,
+        transaction))
+    {
+        audit.Parameters.AddWithValue("@license_id", licenseId.ToString());
+        audit.Parameters.AddWithValue(
+            "@previous_expiration",
+            previousExpiration is null ? DBNull.Value : previousExpiration);
+        audit.Parameters.AddWithValue("@new_expiration", newExpiration);
+        audit.Parameters.AddWithValue(
+            "@source_reference",
+            $"certification-date:{DateTime.UtcNow:yyyyMMddHHmmssfff}");
+        audit.Parameters.AddWithValue("@performed_by", Environment.UserName);
+        await audit.ExecuteNonQueryAsync();
+    }
+
+    await transaction.CommitAsync();
+    Console.WriteLine(
+        $"Staging maintenance expiration changed for {licenseId}: " +
+        $"{previousExpiration ?? "NULL"} -> {newExpiration}.");
 }
 
 

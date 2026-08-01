@@ -23,7 +23,10 @@ return [
     'paypal' => [
         'client_id' => 'REPLACE_WITH_PAYPAL_CLIENT_ID',
         'secret' => 'REPLACE_WITH_PAYPAL_SECRET',
+        'webhook_id' => 'REPLACE_WITH_PAYPAL_WEBHOOK_ID',
         'base_url' => 'https://api-m.paypal.com',
+        // Sandbox certification only. Keep empty in production.
+        'mock_application_code' => '',
     ],
     'admin_api_token' => 'REPLACE_WITH_RANDOM_32_BYTE_TOKEN',
     'mail' => [

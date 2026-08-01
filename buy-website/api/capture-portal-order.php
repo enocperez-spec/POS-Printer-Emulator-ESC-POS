@@ -102,4 +102,18 @@ try {
     json_response(['error' => $exception->getMessage()], 422);
 } catch (DomainException $exception) {
     json_response(['error' => $exception->getMessage()], 409);
+} catch (RuntimeException $exception) {
+    if (isset($order) && is_array($order) && isset($order['id'])) {
+        $failed = db()->prepare('UPDATE orders SET last_error=? WHERE id=?');
+        $failed->execute(['PayPal capture verification was temporarily unavailable.', $order['id']]);
+        audit((int)$order['id'], 'PORTAL_PROVIDER_FAILURE', json_encode([
+            'retryable' => true,
+            'stage' => 'capture-or-verification',
+        ], JSON_UNESCAPED_SLASHES));
+    }
+    error_log('POS Printer Emulator PayPal capture failed: ' . get_class($exception));
+    json_response([
+        'error' => 'PayPal could not verify the payment. Do not submit another payment. Please retry this checkout.',
+        'retryable' => true,
+    ], 503);
 }

@@ -61,6 +61,31 @@ $expect(communication_template_priority('release_announcement') < communication_
 
 $clean = communication_validate_parameters(['customer_name' => 'Example Customer', 'portal_url' => 'https://userportal.posprinteremulator.com/']);
 $expect($clean['customer_name'] === 'Example Customer', 'Approved plain-text parameters changed unexpectedly.');
+$maintenanceConfirmation = communication_purchase_confirmation_parameters(
+    'MAINTENANCE',
+    'Pro',
+    'https://userportal-sandbox.posprinteremulator.com/'
+);
+$expect(
+    $maintenanceConfirmation['order_label'] === 'maintenance renewal' &&
+    str_contains($maintenanceConfirmation['confirmation_headline'], 'renewed') &&
+    str_ends_with($maintenanceConfirmation['portal_url'], '/portal.php?page=billing'),
+    'A maintenance receipt email must use renewal-specific wording and direct the customer to Billing.'
+);
+$upgradeConfirmation = communication_purchase_confirmation_parameters(
+    'UPGRADE',
+    'Enterprise',
+    'https://userportal.posprinteremulator.com/'
+);
+$expect(
+    $upgradeConfirmation['order_label'] === 'license upgrade' &&
+    str_contains($upgradeConfirmation['confirmation_intro'], 'upgrade to the Enterprise License'),
+    'An upgrade receipt email must describe the upgraded entitlement.'
+);
+$purchaseBlueprint = communication_template_blueprint('purchase_confirmation');
+$contains('{{ params.order_label }}', $purchaseBlueprint['subject'], 'The purchase-confirmation subject must identify the transaction type.');
+$contains('{{ params.confirmation_headline }}', $purchaseBlueprint['html'], 'The purchase-confirmation body must use the transaction-specific headline.');
+$contains('{{ params.confirmation_detail }}', $purchaseBlueprint['html'], 'The purchase-confirmation body must use transaction-specific guidance.');
 $invoiceParameters = communication_validate_parameters([
     'customer_name' => 'Example Customer',
     'invoice_number' => 'PPE-INV-20260728-ABCDEF1234',
@@ -167,6 +192,7 @@ $scheduler = file_get_contents($root . '/admin-website/api/v1/communications-sch
 $preview = file_get_contents($root . '/admin-website/api/v1/template-preview.php') ?: '';
 $communicationsJs = file_get_contents($root . '/admin-website/assets/communications.js') ?: '';
 $portalMailer = file_get_contents($root . '/customer-portal/includes/mailer.php') ?: '';
+$purchaseMailer = file_get_contents($root . '/buy-website/includes/mailer.php') ?: '';
 $schema = file_get_contents($root . '/database/schema.sql') ?: '';
 $telemetry = file_get_contents($root . '/website/api/v1/telemetry.php') ?: '';
 $privacy = file_get_contents($root . '/website/privacy.html') ?: '';
@@ -179,6 +205,11 @@ $contains("'api-key: ' . (string)\$config['brevo_api_key']", $communications, 'B
 $contains('DeliveryUnknown', $communications, 'Unknown network outcomes must not be retried blindly.');
 $contains('uq_communication_idempotency', $communications, 'The durable outbox requires database-enforced idempotency.');
 $contains('communication_backfill_pending_invoice_parameters', $communications, 'Pending purchase confirmations must receive invoice data during deployment.');
+$contains('communication_recover_recent_purchase_confirmations', $communications, 'Recent fulfilled purchases need an idempotent receipt recovery path.');
+$contains("o.idempotency_key=CONCAT('purchase:portal:',i.intent_id)", $communications, 'Receipt recovery must skip purchases that already have an outbox record.');
+$contains('INTERVAL 48 HOUR', $communications, 'Receipt recovery must remain narrowly scoped to recent transactions.');
+$contains('communication_apply_transactional_receipt_policy', $communications, 'Purchase receipts require a managed migration that removes customer-level frequency suppression.');
+$contains("frequency_cap_hours=0", $communications, 'Every distinct paid transaction must be eligible for its own purchase confirmation.');
 $contains("o.state IN ('Pending','Deferred')", $communications, 'Invoice backfill must never rewrite already-sent customer messages.');
 $contains("\$payload['attachment']", $communications, 'Purchase confirmation delivery must attach the generated invoice.');
 $contains('communication_policy_decision', $communications, 'Consent and suppression must be checked at delivery time.');
@@ -193,6 +224,8 @@ $contains('communication_service_authorized()', $worker, 'The worker endpoint mu
 $contains('communication_service_authorized()', $templateSync, 'Template synchronization must require protected service authentication.');
 $contains('communication_validate_brevo_template', $templateSync, 'Synchronized provider templates must pass the approved blueprint validation.');
 $contains('COMMUNICATION_TEMPLATE_SYNCHRONIZED', $templateSync, 'Template branding synchronization must be recorded in the audit log.');
+$contains("last_error_code='TEMPLATE_PREVIEW_REQUIRED'", $templateSync, 'Successful template validation must release messages deferred only for a stale preview.');
+$contains('mapping_test_sent_at=UTC_TIMESTAMP(6)', $templateSync, 'The controlled provider test must be recorded before template activation.');
 $contains('communication_webhook_authorized()', $webhook, 'The Brevo webhook must require its own protected bearer token.');
 $contains('communication_schedule_lifecycle', $scheduler, 'The authenticated scheduler must run every reviewed lifecycle schedule.');
 $contains('communication_enqueue(', $communications, 'Lifecycle schedules must use the same policy-aware queue.');
@@ -201,6 +234,11 @@ $contains('portal_mail_uuid', $portalMailer, 'Customer Portal mail intents need 
 $contains('portal_mail_global_parameters', $portalMailer, 'Customer Portal security messages must receive the centrally managed help links and no-reply notice.');
 $contains('portal_mail_support_footer', $portalMailer, 'The PHP mail fallback must direct customers to documentation and the support-request process.');
 $expect(!str_contains($portalMailer, 'Reply-To:'), 'The Customer Portal must not add a reply header for an unmonitored inbox.');
+$contains('Content-Type: text/html; charset=UTF-8', $purchaseMailer, 'The immediate purchase notice must use branded HTML.');
+$contains('logo-web.png', $purchaseMailer, 'The immediate purchase notice must include the company logo.');
+$contains('userportal-sandbox.posprinteremulator.com', $purchaseMailer, 'Sandbox purchase notices must remain inside the sandbox Customer Portal.');
+$contains('Please do not reply to this email. This inbox is not monitored.', $purchaseMailer, 'The purchase notice must identify its unmonitored sender.');
+$expect(!str_contains($purchaseMailer, 'Content-Type: text/plain'), 'The immediate purchase notice must not regress to plain text.');
 $contains("'email_verification'", $portalMailer, 'Customer Portal enrollment must map to the approved verification template.');
 $contains("'password_recovery'", $portalMailer, 'Customer Portal recovery must map to the approved password template.');
 $contains("'mfa_disabled_notification'", $portalMailer, 'Customer MFA changes must map to an approved security notification.');
@@ -284,6 +322,11 @@ $contains('/smtp/templates', $communications, 'The registry workflow must create
 $contains("'isActive' => false", $communications, 'New Brevo templates must be created inactive.');
 $contains('mapping_test_sent_at', $communications, 'Template activation must retain test-send evidence.');
 $contains("'PUT', '/smtp/templates/'", $communications, 'An existing Brevo ID needs a guarded synchronization path before revalidation.');
+$contains(
+    "\$active = (int)(\$template['enabled'] ?? 0) === 1;",
+    $templateSync,
+    'Template synchronization must apply the approved registry activation state instead of preserving a stale disabled provider state.'
+);
 $contains('COMMUNICATION_TEMPLATE_REVALIDATED', $communications, 'Existing Brevo mappings must record successful revalidation.');
 $contains('COMMUNICATION_TEMPLATE_MAPPING_FAILED', $communications, 'Template mapping failures must be recorded in the audit log.');
 $contains('map_missing_templates', $admin, 'Administrators need a batch action for approved unmapped templates.');

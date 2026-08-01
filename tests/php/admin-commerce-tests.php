@@ -110,6 +110,8 @@ $expectContains('name="license_duration"', $licensesPage, 'Complimentary issuanc
 $expectContains('name="complimentary_reason"', $licensesPage, 'Complimentary issuance is missing its audited reason.');
 $expectSame(false, str_contains($licensesPage, 'INSERT INTO customer_purchases'), 'Complimentary issuance must not create a revenue or purchase record.');
 $managementCode=file_get_contents($root.'/admin-website/includes/license_management.php')?:'';
+$commerceCode=file_get_contents($root.'/admin-website/api/v1/portal-commerce.php')?:'';
+$commerceSchema=file_get_contents($root.'/admin-website/includes/self_service_commerce_schema.php')?:'';
 $expectContains("if (!empty(\$license['maintenance_revoked_at']))",$managementCode,'Paid renewal must not bypass an Admin maintenance revocation.');
 $expectContains('Restore maintenance before changing this license level.',$managementCode,'Tier replacement must not silently clear an Admin maintenance revocation.');
 $expectContains('Restore maintenance before extending its coverage period.',$managementCode,'Manual extension must not silently clear an Admin maintenance revocation.');
@@ -119,6 +121,11 @@ $expectContains("ALTER TABLE installations ADD COLUMN maintenance_status",$manag
 $expectContains("ALTER TABLE installations ADD COLUMN maintenance_expires_at",$managementCode,'License Manager schema assurance must migrate installation maintenance expiration.');
 $expectContains("['Manual', 'Purchase', 'Complimentary']", $managementCode, 'License Manager must preserve paid sources while accepting Complimentary.');
 $expectContains("'admin_ip' => license_admin_ip()", $managementCode, 'Maintenance and license audit records must bind the administrator IP parameter.');
+$expectContains("if (\$action === 'record-provider-reversal')", $commerceCode, 'Verified provider reversals must have a protected token-only reconciliation path.');
+$expectContains('portal_provider_events', $commerceCode, 'Provider event processing must persist idempotency evidence.');
+$expectContains("purchase_status=:purchase_status", $commerceCode, 'Refund and chargeback reconciliation must update customer billing status.');
+$expectContains('requires administrative review', $commerceCode, 'Reversals must create an explicit entitlement-review audit event.');
+$expectContains('PRIMARY KEY (provider_event_id)', $commerceSchema, 'Provider reversal event IDs must be unique for idempotency.');
 $expectContains("require __DIR__ . '/includes/license_management.php';",$dashboardPage,'Admin dashboard must load shared license-management schema assurance.');
 $expectContains('ensure_license_management_schema($pdo);',$dashboardPage,'Admin dashboard must assure maintenance columns before querying them.');
 $expectContains("ENUM('Trial', 'Pro', 'Enterprise', 'Lite')", $setupPage, 'Admin setup is missing the append-only installation ENUM migration.');

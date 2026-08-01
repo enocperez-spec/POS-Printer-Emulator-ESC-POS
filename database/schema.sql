@@ -483,7 +483,7 @@ VALUES
     ('password_recovery','Password recovery','Service',1,0,1,'Recover access to the Customer Portal.'),
     ('mfa_disabled_notification','Two-factor authentication disabled','Service',1,0,1,'Notify a customer after they disable two-factor authentication and all portal sessions are revoked.'),
     ('mfa_admin_reset_notification','Two-factor authentication administrator reset','Service',1,0,1,'Notify a customer after an authorized administrator resets MFA and requires enrollment at next sign-in.'),
-    ('purchase_confirmation','Purchase confirmation','Service',1,0,1,'Confirm a completed purchase without including an activation key.'),
+    ('purchase_confirmation','Purchase confirmation','Service',1,0,0,'Confirm every completed purchase without including an activation key.'),
     ('activation_ready','Activation ready','Service',1,0,1,'Direct the customer to the secure portal for activation delivery.'),
     ('support_confirmation','Support request confirmation','Service',1,0,1,'Confirm a submitted support request and reference number.'),
     ('maintenance_reminder','Maintenance reminder','Service',0,0,168,'Remind an eligible customer before maintenance coverage ends.'),
@@ -842,6 +842,24 @@ CREATE TABLE IF NOT EXISTS portal_checkout_events (
     KEY ix_portal_checkout_events (intent_id, created_at),
     KEY ix_portal_checkout_event_journey (journey_correlation_id, created_at),
     CONSTRAINT fk_portal_checkout_event_intent FOREIGN KEY (intent_id)
+        REFERENCES portal_checkout_intents(intent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portal_provider_events (
+    provider_event_id VARCHAR(128) NOT NULL,
+    intent_id CHAR(36) NOT NULL,
+    event_type VARCHAR(80) NOT NULL,
+    reversal_type ENUM('Refund','Chargeback') NOT NULL,
+    provider_order_id VARCHAR(64) NULL,
+    provider_capture_id VARCHAR(64) NULL,
+    event_data JSON NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    processed_at DATETIME(6) NULL,
+    PRIMARY KEY (provider_event_id),
+    KEY ix_portal_provider_event_intent (intent_id, created_at),
+    KEY ix_portal_provider_event_order (provider_order_id),
+    KEY ix_portal_provider_event_capture (provider_capture_id),
+    CONSTRAINT fk_portal_provider_event_intent FOREIGN KEY (intent_id)
         REFERENCES portal_checkout_intents(intent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

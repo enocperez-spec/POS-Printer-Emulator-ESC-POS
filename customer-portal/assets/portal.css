@@ -245,6 +245,7 @@ td small.block { color: var(--muted); display: block; margin-top: 3px; }
 .payment-status { background: var(--surface-soft); border: 1px solid var(--line); border-radius: 999px; display: inline-block; font-size: 12px; font-weight: 750; padding: 4px 9px; }
 .payment-status.paid { background: var(--green-100); border-color: #93d7aa; color: #136c38; }
 .payment-status.refunded, .payment-status.canceled { background: #fff8e8; border-color: #e8b84f; color: var(--amber-700); }
+.payment-status.payment-under-review { background: #fff0f0; border-color: #f29a9a; color: #8d2018; }
 .payment-status.failed { background: var(--red-100); border-color: #ffb4ad; color: #8d2018; }
 .billing-empty { padding: 42px 24px; text-align: center; }
 .billing-empty h3 { margin: 0 0 6px; }
@@ -404,6 +405,21 @@ td small.block { color: var(--muted); display: block; margin-top: 3px; }
 .maintenance-panel > div:first-child, .promotion-panel > div:first-child { max-width: 650px; }
 .maintenance-action { display: grid; gap: 12px; min-width: 240px; }
 .maintenance-action span { color: var(--muted); }
+.maintenance-license-list { display: grid; gap: 12px; min-width: min(560px, 100%); width: min(680px, 100%); }
+.maintenance-license {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 16px;
+}
+.maintenance-license > div { display: grid; gap: 5px; }
+.maintenance-license strong { color: var(--ink); font-size: 15px; }
+.maintenance-license small { color: var(--muted); }
+.maintenance-license form { flex: 0 0 auto; }
 .promotion-delivery {
   background: #effcf6;
   border: 1px solid #8ed8bb;
@@ -505,6 +521,8 @@ td small.block { color: var(--muted); display: block; margin-top: 3px; }
   .side-column { grid-template-columns: 1fr; }
   .side-column .security { grid-column: auto; }
   .maintenance-panel, .promotion-panel { align-items: stretch; flex-direction: column; }
+  .maintenance-license { align-items: stretch; flex-direction: column; }
+  .maintenance-license form .button { width: 100%; }
   .mfa-setup-grid { grid-template-columns: 1fr; }
   .mfa-qr-card { justify-self: stretch; }
   .release-version-grid { grid-template-columns: 1fr; }

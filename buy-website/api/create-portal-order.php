@@ -112,4 +112,10 @@ try {
     json_response(['error' => $exception->getMessage()], 422);
 } catch (DomainException $exception) {
     json_response(['error' => $exception->getMessage()], 409);
+} catch (RuntimeException $exception) {
+    error_log('POS Printer Emulator PayPal order creation failed: ' . get_class($exception));
+    json_response([
+        'error' => 'PayPal could not start checkout. No payment was taken. Please try again.',
+        'retryable' => true,
+    ], 503);
 }
