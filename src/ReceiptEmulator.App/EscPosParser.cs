@@ -7,6 +7,14 @@ public sealed class EscPosParser
     private const byte Esc = 0x1B;
     private const byte Gs = 0x1D;
 
+    private sealed record BufferedRasterGraphic(
+        int WidthDots,
+        int HeightDots,
+        int ScaleX,
+        int ScaleY,
+        byte[] Data,
+        string Alignment);
+
     public ParsedReceipt Parse(ReadOnlySpan<byte> payload, int defaultCodePage = 437)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -30,6 +38,8 @@ public sealed class EscPosParser
         var qrModel = 2;
         var qrModuleSize = 3;
         var qrErrorCorrection = 48;
+        BufferedRasterGraphic? bufferedRasterGraphic = null;
+        var absolutePrintPositionDots = 0;
 
         void FlushLine(string kind = "text", string? data = null)
         {
@@ -98,10 +108,17 @@ public sealed class EscPosParser
             if (value == Esc && i + 1 < payload.Length)
             {
                 var command = payload[i + 1];
+                if (i + 2 < payload.Length && command == (byte)'=')
+                {
+                    AddCommand(i, payload.Slice(i, 3), "Select peripheral device", $"Output destination {payload[i + 2]}");
+                    i += 3;
+                    continue;
+                }
                 if (command == (byte)'@')
                 {
                     alignment = "left"; bold = false; underline = false; width = 1; height = 1; codePage = defaultCodePage;
                     inverted = false; rotated = false; upsideDown = false; color = "black"; font = "A";
+                    bufferedRasterGraphic = null; absolutePrintPositionDots = 0;
                     AddCommand(i, payload.Slice(i, 2), "Initialize printer", "ESC @");
                     i += 2;
                     continue;
@@ -151,6 +168,24 @@ public sealed class EscPosParser
                     i += 3;
                     continue;
                 }
+                if (command == (byte)'2')
+                {
+                    AddCommand(i, payload.Slice(i, 2), "Set default line spacing", "1/6 inch");
+                    i += 2;
+                    continue;
+                }
+                if (i + 2 < payload.Length && command == (byte)'R')
+                {
+                    AddCommand(i, payload.Slice(i, 3), "Select international character set", $"Set {payload[i + 2]}");
+                    i += 3;
+                    continue;
+                }
+                if (i + 3 < payload.Length && command == (byte)'c' && payload[i + 2] is (byte)'0' or (byte)'1' or (byte)'3')
+                {
+                    AddCommand(i, payload.Slice(i, 4), "Configure paper sensors", $"ESC c {(char)payload[i + 2]} = {payload[i + 3]}");
+                    i += 4;
+                    continue;
+                }
                 if (i + 2 < payload.Length && command is (byte)'J' or (byte)'d')
                 {
                     AddCommand(i, payload.Slice(i, 3), "Feed paper", $"{payload[i + 2]} {(command == (byte)'d' ? "lines" : "units")}");
@@ -193,6 +228,9 @@ public sealed class EscPosParser
                     var current = line.Sum(span => span.Text.Length);
                     if (command == (byte)'$' && columns > current) AddText(new string(' ', columns - current));
                     if (command == (byte)'\\' && columns > 0) AddText(new string(' ', columns));
+                    absolutePrintPositionDots = command == (byte)'$'
+                        ? rawPosition
+                        : Math.Max(0, absolutePrintPositionDots + rawPosition);
                     AddCommand(i, payload.Slice(i, 4), command == (byte)'$' ? "Set absolute print position" : "Set relative print position", $"{rawPosition} motion units (~{columns} columns)");
                     i += 4;
                     continue;
@@ -256,6 +294,49 @@ public sealed class EscPosParser
             if (value == Gs && i + 1 < payload.Length)
             {
                 var command = payload[i + 1];
+                if (i + 6 < payload.Length && command == (byte)'8' && payload[i + 2] == (byte)'L')
+                {
+                    var bodyLength = (uint)payload[i + 3]
+                        | ((uint)payload[i + 4] << 8)
+                        | ((uint)payload[i + 5] << 16)
+                        | ((uint)payload[i + 6] << 24);
+                    var declaredLength = 7UL + bodyLength;
+                    var availableLength = payload.Length - i;
+                    var total = (int)Math.Min((ulong)availableLength, declaredLength);
+                    var complete = declaredLength <= (ulong)availableLength;
+
+                    if (complete)
+                    {
+                        var body = payload.Slice(i + 7, (int)bodyLength);
+                        var function = body.Length >= 2 ? body[1] : (byte)0;
+                        var details = $"Function {function}; {bodyLength} data bytes";
+                        if (function == 112 && TryReadBufferedRaster(body, out var raster, out details))
+                        {
+                            var imageAlignment = IsCenteredAtCommonReceiptWidth(
+                                absolutePrintPositionDots,
+                                raster.WidthDots * raster.ScaleX)
+                                ? "center"
+                                : alignment;
+                            bufferedRasterGraphic = raster with { Alignment = imageAlignment };
+                            AddCommand(i, payload.Slice(i, total), "Store raster image", details);
+                        }
+                        else
+                        {
+                            if (function == 112) bufferedRasterGraphic = null;
+                            AddCommand(i, payload.Slice(i, total), "Graphics command",
+                                function == 112 ? details : $"Function {function}; {bodyLength} data bytes", false);
+                        }
+                    }
+                    else
+                    {
+                        bufferedRasterGraphic = null;
+                        AddCommand(i, payload.Slice(i, total), "Graphics command",
+                            $"Truncated extended graphics command; expected {declaredLength} bytes", false);
+                    }
+
+                    i += total;
+                    continue;
+                }
                 if (i + 7 < payload.Length && command == (byte)'v' && payload[i + 2] == (byte)'0')
                 {
                     var mode = payload[i + 3];
@@ -307,7 +388,51 @@ public sealed class EscPosParser
                     var complete = total == declaredLength;
                     var function = bodyLength >= 2 && i + 6 < payload.Length ? payload[i + 6] : (byte)0;
 
-                    if (complete && function == 69 && bodyLength >= 6)
+                    if (complete && function == 112)
+                    {
+                        var body = payload.Slice(i + 5, bodyLength);
+                        if (TryReadBufferedRaster(body, out var raster, out var details))
+                        {
+                            var imageAlignment = IsCenteredAtCommonReceiptWidth(
+                                absolutePrintPositionDots,
+                                raster.WidthDots * raster.ScaleX)
+                                ? "center"
+                                : alignment;
+                            bufferedRasterGraphic = raster with { Alignment = imageAlignment };
+                            AddCommand(i, payload.Slice(i, total), "Store raster image", details);
+                        }
+                        else
+                        {
+                            bufferedRasterGraphic = null;
+                            AddCommand(i, payload.Slice(i, total), "Graphics command", details, false);
+                        }
+                    }
+                    else if (complete && function is 2 or 50)
+                    {
+                        if (bufferedRasterGraphic is not null)
+                        {
+                            if (line.Count > 0)
+                            {
+                                if (line.All(span => string.IsNullOrWhiteSpace(span.Text))) line.Clear();
+                                else FlushLine();
+                            }
+
+                            result.Lines.Add(new ReceiptLine(
+                                bufferedRasterGraphic.Alignment,
+                                [],
+                                "image",
+                                $"raster-v1:{bufferedRasterGraphic.WidthDots}:{bufferedRasterGraphic.HeightDots}:{bufferedRasterGraphic.ScaleX}:{bufferedRasterGraphic.ScaleY}:{Convert.ToBase64String(bufferedRasterGraphic.Data)}"));
+                            AddCommand(i, payload.Slice(i, total), "Print raster image",
+                                $"{bufferedRasterGraphic.WidthDots} x {bufferedRasterGraphic.HeightDots} dots, {bufferedRasterGraphic.ScaleX}x width, {bufferedRasterGraphic.ScaleY}x height; Epson graphics buffer");
+                            bufferedRasterGraphic = null;
+                            absolutePrintPositionDots = 0;
+                        }
+                        else
+                        {
+                            AddCommand(i, payload.Slice(i, total), "Print raster image", "No graphics data is stored in the print buffer");
+                        }
+                    }
+                    else if (complete && function == 69 && bodyLength >= 6)
                     {
                         var keyCode = Encoding.ASCII.GetString(payload.Slice(i + 7, 2));
                         var scaleX = payload[i + 9];
@@ -339,6 +464,12 @@ public sealed class EscPosParser
                 {
                     inverted = (payload[i + 2] & 1) != 0;
                     AddCommand(i, payload.Slice(i, 3), "Reverse print mode", inverted ? "White on black" : "Off");
+                    i += 3;
+                    continue;
+                }
+                if (i + 2 < payload.Length && command == (byte)'b')
+                {
+                    AddCommand(i, payload.Slice(i, 3), "Smoothing", payload[i + 2] == 0 ? "Off" : "On");
                     i += 3;
                     continue;
                 }
@@ -426,6 +557,20 @@ public sealed class EscPosParser
                     i += total;
                     continue;
                 }
+                if (i + 4 < payload.Length && command == (byte)'(')
+                {
+                    var bodyLength = payload[i + 3] + payload[i + 4] * 256;
+                    var declaredLength = 5 + bodyLength;
+                    var total = Math.Min(payload.Length - i, declaredLength);
+                    var complete = total == declaredLength;
+                    AddCommand(i, payload.Slice(i, total), "Unsupported length-prefixed GS command",
+                        complete
+                            ? $"GS ( {(char)payload[i + 2]}; {bodyLength} data bytes"
+                            : $"Truncated GS ( {(char)payload[i + 2]}; expected {declaredLength} bytes",
+                        false);
+                    i += total;
+                    continue;
+                }
 
                 var unknownLength = Math.Min(3, payload.Length - i);
                 AddCommand(i, payload.Slice(i, unknownLength), "Unsupported GS command", $"Byte offset {i}", false);
@@ -449,5 +594,68 @@ public sealed class EscPosParser
 
         if (line.Count > 0) FlushLine();
         return result;
+    }
+
+    private static bool TryReadBufferedRaster(
+        ReadOnlySpan<byte> body,
+        out BufferedRasterGraphic raster,
+        out string details)
+    {
+        raster = new BufferedRasterGraphic(0, 0, 1, 1, [], "left");
+        if (body.Length < 10)
+        {
+            details = $"Function 112 is incomplete; expected at least 10 parameter bytes, received {body.Length}";
+            return false;
+        }
+
+        var mode = body[0];
+        var function = body[1];
+        var tone = body[2];
+        var scaleX = body[3];
+        var scaleY = body[4];
+        var color = body[5];
+        var widthDots = body[6] + body[7] * 256;
+        var heightDots = body[8] + body[9] * 256;
+        var rowBytes = (widthDots + 7L) / 8L;
+        var expectedDataLength = rowBytes * heightDots;
+        var availableDataLength = body.Length - 10L;
+
+        if (mode != 48 || function != 112)
+        {
+            details = $"Unsupported graphics header m={mode}, fn={function}";
+            return false;
+        }
+        if (tone != 48 || color != 49)
+        {
+            details = $"Unsupported graphics tone {tone} or color {color}; monochrome color 1 is required";
+            return false;
+        }
+        if (scaleX is < 1 or > 2 || scaleY is < 1 or > 2 || widthDots <= 0 || heightDots <= 0)
+        {
+            details = $"Invalid raster dimensions or scale ({widthDots} x {heightDots} dots, {scaleX}x width, {scaleY}x height)";
+            return false;
+        }
+        if (expectedDataLength > int.MaxValue || availableDataLength != expectedDataLength)
+        {
+            details = $"Raster data length mismatch; expected {expectedDataLength} bytes, received {availableDataLength}";
+            return false;
+        }
+
+        raster = new BufferedRasterGraphic(
+            widthDots,
+            heightDots,
+            scaleX,
+            scaleY,
+            body.Slice(10, (int)expectedDataLength).ToArray(),
+            "left");
+        details = $"{widthDots} x {heightDots} dots, {scaleX}x width, {scaleY}x height; Epson graphics buffer";
+        return true;
+    }
+
+    private static bool IsCenteredAtCommonReceiptWidth(int horizontalOffsetDots, int renderedWidthDots)
+    {
+        if (horizontalOffsetDots <= 0 || renderedWidthDots <= 0) return false;
+        var inferredWidth = horizontalOffsetDots * 2L + renderedWidthDots;
+        return inferredWidth is 512 or 576;
     }
 }

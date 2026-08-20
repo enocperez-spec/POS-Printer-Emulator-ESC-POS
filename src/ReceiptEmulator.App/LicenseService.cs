@@ -499,6 +499,32 @@ public sealed class LicenseService
         }
     }
 
+    public LicenseStatus RecordMaintenanceAvailable()
+    {
+        lock (_sync)
+        {
+            var license = GetValidatedLicense()
+                ?? throw new InvalidOperationException("Activate a Lite, Pro, or Enterprise License before refreshing maintenance.");
+            var expiration = license.MaintenanceExpiresAt ?? GrandfatheredMaintenanceExpiresAt;
+            if (expiration <= _utcNow())
+            {
+                throw new InvalidOperationException(
+                    "The licensing service reported active maintenance with an expired coverage date.");
+            }
+            var record = new MaintenanceRecord(
+                null,
+                _utcNow(),
+                RemoteStatus: "active",
+                RemoteCheckedAt: _utcNow(),
+                RemoteExpiresAt: expiration,
+                LicenseId: license.LicenseId,
+                Tier: license.Tier);
+            SavePersistedJson(_maintenancePath, record);
+            _maintenance = record;
+            return GetStatus();
+        }
+    }
+
     public void RegisterInstallation(string customerName, string emailAddress)
     {
         lock (_sync)

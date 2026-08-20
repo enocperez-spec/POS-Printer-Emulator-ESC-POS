@@ -4,6 +4,14 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 For the current release status, scheduled versions, future backlog, and release-completion checklist, see the [release tracker](docs/RELEASE_TRACKER.md). Reported, fixed, and released defects are indexed in the [bug tracker](docs/BUG_TRACKER.md).
 
+## v0.3.56 — 2026-08-19
+
+- Adds Epson `GS 8 L` buffered-raster storage and `GS ( L` print-buffer support used by Windows printer-driver Test Pages.
+- Renders the captured Test Page as seven correctly aligned raster strips instead of treating binary image payloads as receipt text.
+- Safely consumes unsupported length-prefixed graphics commands so binary bytes cannot leak into the receipt preview.
+- Recognizes common Epson driver preamble commands while preserving the existing 576-dot printer-profile behavior.
+- Adds regression fixtures for buffered graphics, alignment, command parsing, truncated data, and unknown length-prefixed graphics functions.
+
 ## v0.3.55 — 2026-07-25
 
 - Adds startup, License-page, 15-minute background, and manual account-license synchronization with the last successful synchronization time.

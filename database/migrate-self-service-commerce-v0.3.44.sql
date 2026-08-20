@@ -45,6 +45,24 @@ CREATE TABLE IF NOT EXISTS portal_checkout_events (
     CONSTRAINT fk_portal_checkout_event_intent FOREIGN KEY (intent_id) REFERENCES portal_checkout_intents(intent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS portal_provider_events (
+    provider_event_id VARCHAR(128) NOT NULL,
+    intent_id CHAR(36) NOT NULL,
+    event_type VARCHAR(80) NOT NULL,
+    reversal_type ENUM('Refund','Chargeback') NOT NULL,
+    provider_order_id VARCHAR(64) NULL,
+    provider_capture_id VARCHAR(64) NULL,
+    event_data JSON NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    processed_at DATETIME(6) NULL,
+    PRIMARY KEY (provider_event_id),
+    KEY ix_portal_provider_event_intent (intent_id, created_at),
+    KEY ix_portal_provider_event_order (provider_order_id),
+    KEY ix_portal_provider_event_capture (provider_capture_id),
+    CONSTRAINT fk_portal_provider_event_intent FOREIGN KEY (intent_id)
+        REFERENCES portal_checkout_intents(intent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS portal_promotion_exceptions (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     customer_id CHAR(36) NOT NULL,

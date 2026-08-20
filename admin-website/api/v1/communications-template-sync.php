@@ -51,8 +51,7 @@ try {
         $templateKey,
         (string)$template['message_class']
     );
-    $provider = communication_brevo_request('GET', '/smtp/templates/' . $templateId);
-    $active = (bool)($provider['isActive'] ?? false);
+    $active = (int)($template['enabled'] ?? 0) === 1;
     communication_brevo_request('PUT', '/smtp/templates/' . $templateId, [
         'sender' => ['name' => $sender['name'], 'email' => $sender['email']],
         'subject' => (string)$blueprint['subject'],
@@ -73,7 +72,7 @@ try {
         throw new DomainException(implode(' ', $warnings));
     }
     if ((bool)($verified['isActive'] ?? false) !== $active) {
-        throw new DomainException('Brevo did not preserve the approved activation state.');
+        throw new DomainException('Brevo did not retain the registry activation state.');
     }
 
     $update = $pdo->prepare(
@@ -112,15 +111,23 @@ try {
             communication_global_parameters($pdo)
         );
         if ($templateKey === 'purchase_confirmation') {
-            $parameters = array_replace($parameters, [
+            $parameters = array_replace(
+                $parameters,
+                communication_purchase_confirmation_parameters(
+                    'MAINTENANCE',
+                    'Pro',
+                    'https://userportal-sandbox.posprinteremulator.com/'
+                ),
+                [
                 'invoice_number' => 'PPE-INV-TEST-' . gmdate('Ymd-His'),
                 'invoice_date' => gmdate('F j, Y'),
-                'invoice_description' => 'POS Printer Emulator Pro License - Branded Invoice Test',
-                'invoice_amount' => '39.99',
+                'invoice_description' => 'POS Printer Emulator Pro Annual Maintenance and Support Renewal',
+                'invoice_amount' => '19.99',
                 'invoice_currency' => 'USD',
                 'payment_status' => 'Test - No Charge',
                 'transaction_reference' => 'SANDBOX-LOGO-TEST',
-            ]);
+                ]
+            );
         }
         $payload = [
             'to' => [['email' => $allowlist[0], 'name' => 'POS Printer Emulator Test Recipient']],
@@ -146,13 +153,29 @@ try {
             $templateKey . ':' . $templateId,
             'Sent a controlled sandbox branding and attachment verification message.'
         );
+        $testVerified = $pdo->prepare(
+            "UPDATE communication_templates
+             SET mapping_test_sent_at=UTC_TIMESTAMP(6),updated_by='service-sync'
+             WHERE template_key=:key AND brevo_template_id=:template_id"
+        );
+        $testVerified->execute(['key' => $templateKey, 'template_id' => $templateId]);
     }
+    $requeue = $pdo->prepare(
+        "UPDATE communication_outbox
+         SET state='Pending',available_at=UTC_TIMESTAMP(6),last_error_code=NULL,
+             last_error_detail=NULL,locked_at=NULL
+         WHERE template_key=:template_key
+           AND state='Deferred'
+           AND last_error_code='TEMPLATE_PREVIEW_REQUIRED'"
+    );
+    $requeue->execute(['template_key' => $templateKey]);
     communications_template_sync_response([
         'ok' => true,
         'template_key' => $templateKey,
         'template_id' => $templateId,
         'active' => $active,
         'test_sent' => $testSent,
+        'requeued' => $requeue->rowCount(),
         'warnings' => [],
     ]);
 } catch (InvalidArgumentException | DomainException $exception) {

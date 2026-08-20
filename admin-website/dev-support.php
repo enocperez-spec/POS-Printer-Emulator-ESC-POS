@@ -856,7 +856,12 @@ $releaseSync = database()->prepare(
          'Health-state tray icon; Open, Test Receipt, status, Diagnostics, and Exit actions; configurable local fault, conflict, rejection, Trial, maintenance, and update notifications; deduplication; rate limiting; expiry; recovery clearing; and Focus Assist support.',
          'Background awareness reduces missed faults and unnecessary support requests after core licensing and privacy controls are established.',
          'One actionable privacy-safe notification represents a background fault and clears with the tray state after verified recovery.', NULL),
-        ('v0.3.56', 'v0.3.56', 'Release', 'Character and code-page assistant', 'Planned', 356,
+        ('v0.3.56', 'v0.3.56', 'Release', 'Windows Test Page Graphics Compatibility', 'Released', 356,
+         'Render Epson Windows printer-driver Test Pages correctly without changing normal POS receipt behavior.',
+         'Epson GS 8 L buffered-raster storage; GS ( L buffered-graphics printing; safe consumption of unknown length-prefixed graphics functions; Epson driver preamble recognition; profile-aware alignment; captured Test Page regression coverage.',
+         'A real Windows Test Page exposed a high-impact compatibility gap where image payload bytes could be interpreted as receipt text.',
+         'The captured 82,332-byte Windows Test Page renders seven raster strips with no binary image payload displayed as text, malformed commands fail safely, existing 576-dot receipts remain unchanged, and the complete automated suite passes.', UTC_TIMESTAMP(6)),
+        ('v0.3.63', 'v0.3.63', 'Release', 'Character and code-page assistant', 'Planned', 363,
          'Help customers correct garbled symbols, accents, currencies, and multilingual receipt text.',
          'Encoding mismatch detection; byte and command tracing; compatible code-page previews; mid-job change explanations; profile recommendations with explicit preview; international golden fixtures; and immutable original captures.',
          'Profiles, privacy, and projects make encoding recommendations safe and prepare deterministic inputs for later comparison.',
@@ -1024,12 +1029,13 @@ database()->prepare(
          WHEN 'v0.3.54' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.54'
          WHEN 'v0.3.55' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.55'
          WHEN 'v0.3.62' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/35'
-         WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
+         WHEN 'v0.3.56' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.56'
          WHEN 'v0.3.57' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/37'
          WHEN 'v0.3.58' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/21'
          WHEN 'v0.3.59' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/40'
          WHEN 'v0.3.60' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/32'
          WHEN 'v0.3.61' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/34'
+         WHEN 'v0.3.63' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/36'
          WHEN 'v0.3.30' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.30'
          WHEN 'v0.3.31' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.31'
          WHEN 'v0.3.32' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/releases/tag/v0.3.32'
@@ -1037,7 +1043,7 @@ database()->prepare(
          WHEN 'BACKLOG-008' THEN 'https://github.com/enocperez-spec/POS-Printer-Emulator-ESC-POS/issues/12'
          ELSE NULL
      END
-     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'v0.3.61', 'v0.3.62', 'BACKLOG-007', 'BACKLOG-008')"
+     WHERE item_key IN ('v0.3.20', 'v0.3.21', 'v0.3.22', 'v0.3.23', 'v0.3.24', 'v0.3.25', 'v0.3.26', 'v0.3.30', 'v0.3.31', 'v0.3.32', 'v0.3.33', 'v0.3.34', 'v0.3.35', 'v0.3.36', 'v0.3.37', 'v0.3.38', 'v0.3.39', 'v0.3.40', 'v0.3.41', 'v0.3.42', 'v0.3.43', 'v0.3.44', 'v0.3.45', 'v0.3.46', 'v0.3.47', 'v0.3.48', 'v0.3.49', 'v0.3.50', 'v0.3.51', 'v0.3.52', 'v0.3.53', 'v0.3.54', 'v0.3.55', 'v0.3.56', 'v0.3.57', 'v0.3.58', 'v0.3.59', 'v0.3.60', 'v0.3.61', 'v0.3.62', 'v0.3.63', 'BACKLOG-007', 'BACKLOG-008')"
 )->execute();
 $bugSync = database()->prepare(
     "INSERT INTO development_bugs
@@ -1139,6 +1145,14 @@ $bugSync = database()->prepare(
          'The same square PNG was assigned to both the square header image and Inno Setup tall wizard image, so the wizard stretched it to fill a 164:314 panel.',
          'Open the v0.3.40 installer and compare the welcome or completion banner with the official square product icon.',
          'A separate 656x1256 banner preserves the logo proportions; the square header remains independent; build validation rejects an invalid ratio; and Inno Setup 6.7.1 compiles the corrected installer.',
+         UTC_TIMESTAMP(6)),
+        ('BUG-019', 'Epson Windows Test Page graphics rendered incorrectly',
+         'High', 'Released', 'v0.3.55 and earlier parser behavior', 'v0.3.56', 'v0.3.56',
+         'Windows printer-driver Test Pages could display broken graphics and binary image bytes as receipt text.',
+         'Buffered Epson raster graphics should render as images without changing normal POS receipt output.',
+         'The parser did not implement GS 8 L buffered-raster storage or GS ( L buffered-graphics printing and could fall through into text decoding.',
+         'Send the captured Epson Windows Test Page through the emulator and inspect the receipt preview and parsed commands.',
+         'The captured 82,332-byte Test Page renders seven raster strips, no binary payload appears as text, malformed commands fail safely, existing 576-dot profile output remains unchanged, and parser regression tests pass.',
          UTC_TIMESTAMP(6))
      ON DUPLICATE KEY UPDATE
         status = IF(status IN ('Reported', 'Confirmed', 'In progress', 'Fixed locally'), VALUES(status), status),

@@ -74,6 +74,37 @@ function commerce_intent(PDO $pdo, string $token): ?array
     return is_array($intent) ? $intent : null;
 }
 
+function commerce_intent_by_provider(
+    PDO $pdo,
+    string $providerOrderId,
+    string $providerCaptureId
+): ?array {
+    $conditions = [];
+    $parameters = [];
+    if ($providerOrderId !== '') {
+        $conditions[] = 'i.provider_order_id=:provider_order_id';
+        $parameters['provider_order_id'] = $providerOrderId;
+    }
+    if ($providerCaptureId !== '') {
+        $conditions[] = 'i.provider_capture_id=:provider_capture_id';
+        $parameters['provider_capture_id'] = $providerCaptureId;
+    }
+    if ($conditions === []) {
+        return null;
+    }
+    $query = $pdo->prepare(
+        "SELECT i.*,c.display_name,c.canonical_email,ins.installation_uuid
+         FROM portal_checkout_intents i
+         INNER JOIN customers c ON c.customer_id=i.customer_id
+         LEFT JOIN installations ins ON ins.id=i.installation_id
+         WHERE " . implode(' OR ', $conditions) . '
+         ORDER BY i.prepared_at DESC LIMIT 1'
+    );
+    $query->execute($parameters);
+    $intent = $query->fetch();
+    return is_array($intent) ? $intent : null;
+}
+
 function commerce_event(
     PDO $pdo,
     string $intentId,
@@ -99,18 +130,152 @@ function commerce_event(
     ]);
 }
 
+function commerce_record_provider_reversal(PDO $pdo, array $body): never
+{
+    $eventId = trim((string)($body['eventId'] ?? ''));
+    $eventType = strtoupper(trim((string)($body['eventType'] ?? '')));
+    $reversalType = strtolower(trim((string)($body['reversalType'] ?? '')));
+    $providerOrderId = trim((string)($body['providerOrderId'] ?? ''));
+    $providerCaptureId = trim((string)($body['providerCaptureId'] ?? ''));
+    $reason = trim((string)($body['reason'] ?? 'Provider reversal requires administrative review.'));
+    if (!preg_match('/^[A-Za-z0-9_.:-]{8,128}$/', $eventId) ||
+        !preg_match('/^[A-Z0-9_.]{8,80}$/', $eventType) ||
+        !in_array($reversalType, ['refund', 'chargeback'], true) ||
+        ($providerOrderId !== '' && !preg_match('/^[A-Za-z0-9]{8,64}$/', $providerOrderId)) ||
+        ($providerCaptureId !== '' && !preg_match('/^[A-Za-z0-9]{8,64}$/', $providerCaptureId)) ||
+        ($providerOrderId === '' && $providerCaptureId === '') ||
+        $reason === '' || mb_strlen($reason) > 500) {
+        commerce_response(['error' => 'The verified provider reversal details are invalid.'], 422);
+    }
+    $intent = commerce_intent_by_provider($pdo, $providerOrderId, $providerCaptureId);
+    if (!is_array($intent)) {
+        commerce_response(['error' => 'The provider payment has not been reconciled yet.'], 404);
+    }
+    if ($providerOrderId !== '' && !hash_equals((string)$intent['provider_order_id'], $providerOrderId)) {
+        commerce_response(['error' => 'The provider order does not match the captured payment.'], 409);
+    }
+    if ($providerCaptureId !== '' &&
+        !hash_equals((string)$intent['provider_capture_id'], $providerCaptureId)) {
+        commerce_response(['error' => 'The provider capture does not match the captured payment.'], 409);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $existing = $pdo->prepare(
+            'SELECT intent_id,event_type,reversal_type,processed_at
+             FROM portal_provider_events WHERE provider_event_id=:event_id LIMIT 1 FOR UPDATE'
+        );
+        $existing->execute(['event_id' => $eventId]);
+        $recorded = $existing->fetch();
+        if (is_array($recorded)) {
+            if (!hash_equals((string)$intent['intent_id'], (string)$recorded['intent_id']) ||
+                !hash_equals($eventType, (string)$recorded['event_type']) ||
+                !hash_equals(ucfirst($reversalType), (string)$recorded['reversal_type'])) {
+                $pdo->rollBack();
+                commerce_response(['error' => 'The provider event identifier is already bound to another event.'], 409);
+            }
+            $pdo->commit();
+            commerce_response([
+                'ok' => true,
+                'idempotent' => true,
+                'state' => (string)$intent['state'],
+                'reviewRequired' => true,
+            ]);
+        }
+        if (!in_array((string)$intent['state'], ['Captured', 'Fulfilled', 'Refunded', 'ChargebackReview'], true)) {
+            $pdo->rollBack();
+            commerce_response(['error' => 'The payment is not in a reversible state.'], 409);
+        }
+        $targetState = $reversalType === 'chargeback' ||
+            (string)$intent['state'] === 'ChargebackReview'
+            ? 'ChargebackReview'
+            : 'Refunded';
+        $eventData = json_encode([
+            'reason' => $reason,
+            'previousState' => (string)$intent['state'],
+            'newState' => $targetState,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $insert = $pdo->prepare(
+            'INSERT INTO portal_provider_events(
+                provider_event_id,intent_id,event_type,reversal_type,
+                provider_order_id,provider_capture_id,event_data,processed_at
+             ) VALUES(
+                :event_id,:intent_id,:event_type,:reversal_type,
+                :provider_order_id,:provider_capture_id,:event_data,UTC_TIMESTAMP(6)
+             )'
+        );
+        $insert->execute([
+            'event_id' => $eventId,
+            'intent_id' => $intent['intent_id'],
+            'event_type' => $eventType,
+            'reversal_type' => ucfirst($reversalType),
+            'provider_order_id' => $providerOrderId !== '' ? $providerOrderId : null,
+            'provider_capture_id' => $providerCaptureId !== '' ? $providerCaptureId : null,
+            'event_data' => $eventData,
+        ]);
+        $updateIntent = $pdo->prepare(
+            "UPDATE portal_checkout_intents SET state=:state
+             WHERE intent_id=:intent_id
+               AND state IN ('Captured','Fulfilled','Refunded','ChargebackReview')"
+        );
+        $updateIntent->execute([
+            'state' => $targetState,
+            'intent_id' => $intent['intent_id'],
+        ]);
+        $purchaseStatus = $targetState === 'Refunded' ? 'REFUNDED' : 'CHARGEBACK_REVIEW';
+        $updatePurchase = $pdo->prepare(
+            "UPDATE customer_purchases
+             SET purchase_status=:purchase_status,updated_at=UTC_TIMESTAMP(6)
+             WHERE customer_id=:customer_id AND purchase_reference=:purchase_reference"
+        );
+        $updatePurchase->execute([
+            'purchase_status' => $purchaseStatus,
+            'customer_id' => $intent['customer_id'],
+            'purchase_reference' => 'portal:' . (string)$intent['intent_id'],
+        ]);
+        commerce_event(
+            $pdo,
+            (string)$intent['intent_id'],
+            'PAYMENT_REVERSAL_RECORDED',
+            'Verified PayPal reversal recorded; the associated entitlement requires administrative review.',
+            [
+                'providerEventId' => $eventId,
+                'providerEventType' => $eventType,
+                'state' => $targetState,
+                'reason' => $reason,
+                'licenseId' => $intent['replacement_license_id'] ?: $intent['license_id'],
+            ]
+        );
+        $pdo->commit();
+        commerce_response([
+            'ok' => true,
+            'idempotent' => false,
+            'state' => $targetState,
+            'reviewRequired' => true,
+        ]);
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     commerce_response(['error' => 'Not found.'], 404);
 }
 require_commerce_service_token();
 $body = commerce_body();
 $action = strtolower(trim((string)($body['action'] ?? '')));
-$token = commerce_token($body);
 
 try {
     $pdo = database();
     ensure_license_management_schema($pdo);
     ensure_self_service_commerce_schema($pdo);
+    if ($action === 'record-provider-reversal') {
+        commerce_record_provider_reversal($pdo, $body);
+    }
+    $token = commerce_token($body);
     $intent = commerce_intent($pdo, $token);
     if (!is_array($intent)) {
         commerce_response(['error' => 'The checkout session was not found.'], 404);
@@ -453,6 +618,14 @@ try {
                     'payment_status' => 'Paid',
                     'transaction_reference' => $providerCaptureId,
                 ];
+                $portalUrl = str_contains(strtolower((string)($_SERVER['HTTP_HOST'] ?? '')), 'sandbox')
+                    ? 'https://userportal-sandbox.posprinteremulator.com/'
+                    : 'https://userportal.posprinteremulator.com/';
+                $confirmationParameters = communication_purchase_confirmation_parameters(
+                    (string)$intent['order_type'],
+                    (string)$intent['target_tier'],
+                    $portalUrl
+                );
                 communication_enqueue(
                     $pdo,
                     (string)$intent['customer_id'],
@@ -460,8 +633,7 @@ try {
                     array_merge([
                         'customer_name' => $displayName,
                         'license_tier' => (string)$intent['target_tier'],
-                        'portal_url' => 'https://userportal.posprinteremulator.com/',
-                    ], $invoiceParameters),
+                    ], $confirmationParameters, $invoiceParameters),
                     'purchase:' . $sourceReference,
                     null,
                     false,
@@ -484,7 +656,7 @@ try {
                             'event_label' => ucfirst($onboardingEvent),
                             'feature_summary' => communication_tier_features((string)$intent['target_tier']),
                             'setup_url' => communication_setup_url((string)$intent['target_tier']),
-                            'contact_support_url' => 'https://userportal.posprinteremulator.com/',
+                            'contact_support_url' => $portalUrl,
                         ],
                         'onboarding:' . $sourceReference,
                         null,
@@ -499,7 +671,7 @@ try {
                         [
                             'customer_name' => $displayName,
                             'license_tier' => (string)$intent['target_tier'],
-                            'portal_url' => 'https://userportal.posprinteremulator.com/',
+                            'portal_url' => $portalUrl,
                         ],
                         'activation-ready:' . $sourceReference,
                         null,

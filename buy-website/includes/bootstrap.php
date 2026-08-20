@@ -27,6 +27,10 @@ function config(?string $path = null): mixed
         $config['admin_api_token'] = secret_config_value('PPE_ADMIN_API_TOKEN', $config['admin_api_token'] ?? null);
         $config['maintenance']['api_token'] = secret_config_value('PPE_MAINTENANCE_API_TOKEN', $config['maintenance']['api_token'] ?? null);
         $config['paypal']['secret'] = secret_config_value('PPE_PAYPAL_SECRET', $config['paypal']['secret'] ?? null);
+        $config['paypal']['webhook_id'] = secret_config_value(
+            'PPE_PAYPAL_WEBHOOK_ID',
+            $config['paypal']['webhook_id'] ?? null
+        );
     }
     if ($path === null) return $config;
     $value = $config;
@@ -492,10 +496,31 @@ function paypal_access_token(): string
     return $data['access_token'];
 }
 
+function paypal_mock_application_code(): string
+{
+    $environment = strtolower(trim((string)config('environment')));
+    $baseUrl = strtolower(rtrim((string)config('paypal.base_url'), '/'));
+    $code = strtoupper(trim((string)config('paypal.mock_application_code')));
+    if ($environment !== 'sandbox' || $baseUrl !== 'https://api-m.sandbox.paypal.com' || $code === '') {
+        return '';
+    }
+    if (!preg_match('/^[A-Z][A-Z0-9_]{2,63}$/', $code)) {
+        throw new RuntimeException('The PayPal sandbox negative-test code is invalid.');
+    }
+    return $code;
+}
+
 function paypal_request(string $method, string $path, ?array $payload = null, ?string $requestId = null): array
 {
     $headers = ['Authorization: Bearer ' . paypal_access_token(), 'Content-Type: application/json', 'Accept: application/json'];
     if ($requestId) $headers[] = 'PayPal-Request-Id: ' . $requestId;
+    $mockApplicationCode = paypal_mock_application_code();
+    if ($mockApplicationCode !== '') {
+        $headers[] = 'PayPal-Mock-Response: ' . json_encode(
+            ['mock_application_codes' => $mockApplicationCode],
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES
+        );
+    }
     $ch = curl_init(rtrim((string) config('paypal.base_url'), '/') . $path);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => $method, CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => 30]);
     if ($payload !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
@@ -503,6 +528,132 @@ function paypal_request(string $method, string $path, ?array $payload = null, ?s
     $data = json_decode((string) $body, true);
     if ($code < 200 || $code >= 300 || !is_array($data)) throw new RuntimeException('PayPal request failed (' . $code . '). ' . $error);
     return $data;
+}
+
+function paypal_webhook_header(string $name): string
+{
+    $serverName = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    return trim((string)($_SERVER[$serverName] ?? ''));
+}
+
+function paypal_webhook_url(): string
+{
+    return rtrim((string)config('app_url'), '/') . '/api/paypal-webhook.php';
+}
+
+function paypal_webhook_id(): string
+{
+    $configured = trim((string)config('paypal.webhook_id'));
+    if (!preg_match('/^[A-Za-z0-9_-]{8,128}$/', $configured)) {
+        throw new RuntimeException('The PayPal webhook identifier is not configured.');
+    }
+    return $configured;
+}
+
+function paypal_verify_webhook(array $event): bool
+{
+    $transmissionId = paypal_webhook_header('PayPal-Transmission-Id');
+    $transmissionTime = paypal_webhook_header('PayPal-Transmission-Time');
+    $transmissionSignature = paypal_webhook_header('PayPal-Transmission-Sig');
+    $certificateUrl = paypal_webhook_header('PayPal-Cert-Url');
+    $algorithm = paypal_webhook_header('PayPal-Auth-Algo');
+    $certificate = parse_url($certificateUrl);
+    if ($transmissionId === '' || $transmissionTime === '' || $transmissionSignature === '' ||
+        $algorithm === '' || !is_array($certificate) ||
+        strtolower((string)($certificate['scheme'] ?? '')) !== 'https' ||
+        !preg_match('/(?:^|\.)paypal\.com$/i', (string)($certificate['host'] ?? ''))) {
+        return false;
+    }
+    $verification = paypal_request('POST', '/v1/notifications/verify-webhook-signature', [
+        'auth_algo' => $algorithm,
+        'cert_url' => $certificateUrl,
+        'transmission_id' => $transmissionId,
+        'transmission_sig' => $transmissionSignature,
+        'transmission_time' => $transmissionTime,
+        'webhook_id' => paypal_webhook_id(),
+        'webhook_event' => $event,
+    ]);
+    return hash_equals('SUCCESS', strtoupper(trim((string)($verification['verification_status'] ?? ''))));
+}
+
+function paypal_reversal_event(array $event): ?array
+{
+    $eventId = trim((string)($event['id'] ?? ''));
+    $eventType = strtoupper(trim((string)($event['event_type'] ?? '')));
+    if (!preg_match('/^[A-Za-z0-9_.:-]{8,128}$/', $eventId)) {
+        throw new InvalidArgumentException('The PayPal event identifier is invalid.');
+    }
+    $supported = [
+        'PAYMENT.CAPTURE.REFUNDED' => 'refund',
+        'PAYMENT.CAPTURE.REVERSED' => 'chargeback',
+        'CUSTOMER.DISPUTE.CREATED' => 'chargeback',
+        'CUSTOMER.DISPUTE.UPDATED' => 'chargeback',
+    ];
+    if (!isset($supported[$eventType])) {
+        return null;
+    }
+    $resource = is_array($event['resource'] ?? null) ? $event['resource'] : [];
+    $supplementary = is_array($resource['supplementary_data'] ?? null)
+        ? $resource['supplementary_data']
+        : [];
+    $related = is_array($supplementary['related_ids'] ?? null)
+        ? $supplementary['related_ids']
+        : [];
+    $providerOrderId = trim((string)($related['order_id'] ?? ''));
+    $providerCaptureId = trim((string)($related['capture_id'] ?? ''));
+    if ($providerCaptureId === '' && $eventType === 'PAYMENT.CAPTURE.REFUNDED') {
+        foreach (['capture_id', 'parent_capture_id', 'sale_id'] as $captureField) {
+            $candidate = trim((string)($resource[$captureField] ?? ''));
+            if (preg_match('/^[A-Za-z0-9]{8,64}$/', $candidate)) {
+                $providerCaptureId = $candidate;
+                break;
+            }
+        }
+        $links = is_array($resource['links'] ?? null) ? $resource['links'] : [];
+        foreach ($providerCaptureId === '' ? $links : [] as $link) {
+            if (!is_array($link) || strcasecmp(trim((string)($link['rel'] ?? '')), 'up') !== 0) {
+                continue;
+            }
+            $path = parse_url(trim((string)($link['href'] ?? '')), PHP_URL_PATH);
+            if (is_string($path)) {
+                $segments = array_values(array_filter(explode('/', trim($path, '/')), 'strlen'));
+                $candidate = (string)($segments[count($segments) - 1] ?? '');
+                if (preg_match('/^[A-Za-z0-9]{8,64}$/', $candidate)) {
+                    $providerCaptureId = $candidate;
+                    break;
+                }
+            }
+        }
+        if ($providerCaptureId === '' &&
+            strcasecmp(trim((string)($event['resource_type'] ?? '')), 'capture') === 0) {
+            $providerCaptureId = trim((string)($resource['id'] ?? ''));
+        }
+    }
+    if ($providerCaptureId === '' && str_starts_with($eventType, 'CUSTOMER.DISPUTE.')) {
+        $transactions = is_array($resource['disputed_transactions'] ?? null)
+            ? $resource['disputed_transactions']
+            : [];
+        $first = is_array($transactions[0] ?? null) ? $transactions[0] : [];
+        $providerCaptureId = trim((string)($first['seller_transaction_id'] ?? ''));
+    }
+    if ($providerCaptureId === '' && $eventType === 'PAYMENT.CAPTURE.REVERSED') {
+        $providerCaptureId = trim((string)($resource['id'] ?? ''));
+    }
+    if (($providerOrderId !== '' && !preg_match('/^[A-Za-z0-9]{8,64}$/', $providerOrderId)) ||
+        ($providerCaptureId !== '' && !preg_match('/^[A-Za-z0-9]{8,64}$/', $providerCaptureId)) ||
+        ($providerOrderId === '' && $providerCaptureId === '')) {
+        throw new InvalidArgumentException('The PayPal reversal does not identify a valid order or capture.');
+    }
+    return [
+        'eventId' => $eventId,
+        'eventType' => $eventType,
+        'reversalType' => $supported[$eventType],
+        'providerOrderId' => $providerOrderId,
+        'providerCaptureId' => $providerCaptureId,
+        'reason' => $eventType === 'PAYMENT.CAPTURE.REFUNDED'
+            ? 'PayPal reported a completed refund.'
+            : 'PayPal reported a payment reversal or customer dispute requiring administrative review.',
+    ];
 }
 
 set_exception_handler(function (Throwable $e): void {

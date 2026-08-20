@@ -34,6 +34,7 @@ const string SupportBaseUrlVariable = "PPE_SUPPORT_BASE_URL";
 const string PayPalClientIdVariable = "PPE_PAYPAL_CLIENT_ID";
 const string PayPalSecretVariable = "PPE_PAYPAL_SECRET";
 const string PayPalBaseUrlVariable = "PPE_PAYPAL_BASE_URL";
+const string PayPalWebhookIdVariable = "PPE_PAYPAL_WEBHOOK_ID";
 const string RolloutReadinessReportVariable = "PPE_ROLLOUT_READINESS_REPORT";
 const string WebsiteBaseUrl = "https://www.posprinteremulator.com";
 
@@ -62,14 +63,20 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
     Console.WriteLine("  website-publisher configure-customer-portal [remote-directory]");
     Console.WriteLine("  website-publisher configure-customer-portal-from-admin <admin-remote-directory> [portal-remote-directory]");
     Console.WriteLine("  website-publisher configure-purchase-integration <admin-remote-directory> <buy-remote-directory>");
+    Console.WriteLine("  website-publisher reconcile-sandbox-paypal-reversal <https-admin-url> <event-id> <event-type> <refund|chargeback> <order-id|-> <capture-id|->");
     Console.WriteLine("  website-publisher migrate-customer-portal <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-self-service-commerce <https-migration-url>");
     Console.WriteLine("  website-publisher migrate-schema-recovered <https-setup-url>");
     Console.WriteLine("  website-publisher seed-certification-recovered <https-setup-url>");
     Console.WriteLine("  website-publisher portal-diagnostics <https-diagnostics-url> <email>");
     Console.WriteLine("  website-publisher run-communications-worker <https-worker-url> [maximum]");
+    Console.WriteLine("  website-publisher run-sandbox-communications-cron <admin-sandbox-remote-directory>");
+    Console.WriteLine("  website-publisher diagnose-sandbox-communications-cron <admin-sandbox-remote-directory>");
+    Console.WriteLine("  website-publisher queue-sandbox-communications-test <admin-sandbox-remote-directory> <customer-id> <template-key>");
+    Console.WriteLine("  website-publisher inspect-sandbox-communications-message <admin-sandbox-remote-directory> <message-id>");
     Console.WriteLine("  website-publisher sync-sandbox-communication-template <https-sync-url> <template-key>");
     Console.WriteLine("  website-publisher sandbox-reset-checkout-rate <portal-remote-directory> <email>");
+    Console.WriteLine("  website-publisher sandbox-set-maintenance-expiration <admin-sandbox-remote-directory> <license-id> <yyyy-MM-dd|yyyy-MM-ddTHH:mm:ss>");
     Console.WriteLine("  website-publisher sync-license-catalog [repository-root]");
     Console.WriteLine();
     Console.WriteLine($"Credentials are read from {HostVariable}, {UserVariable}, {PasswordVariable}, and {FingerprintVariable}.");
@@ -115,6 +122,23 @@ if (args[0].Equals("migrate-self-service-commerce", StringComparison.OrdinalIgno
         throw new ArgumentException("The migrate-self-service-commerce command requires an HTTPS migration URL.");
     }
     await MigrateSelfServiceCommerceAsync(migrationUri);
+    return 0;
+}
+if (args[0].Equals("reconcile-sandbox-paypal-reversal", StringComparison.OrdinalIgnoreCase))
+{
+    if (args.Length < 7 || !Uri.TryCreate(args[1], UriKind.Absolute, out var adminUri) ||
+        adminUri.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException(
+            "The sandbox PayPal reconciliation command requires an HTTPS Admin URL and complete event identifiers.");
+    }
+    await ReconcileSandboxPayPalReversalAsync(
+        adminUri,
+        args[2],
+        args[3],
+        args[4],
+        args[5] == "-" ? string.Empty : args[5],
+        args[6] == "-" ? string.Empty : args[6]);
     return 0;
 }
 if (args[0].Equals("migrate-schema-recovered", StringComparison.OrdinalIgnoreCase))
@@ -287,6 +311,76 @@ try
             }
             ResetSandboxCheckoutRate(
                 client,
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2]);
+            break;
+        case "sandbox-set-maintenance-expiration":
+            if (args.Length < 4)
+            {
+                throw new ArgumentException(
+                    "The sandbox-set-maintenance-expiration command requires the Admin sandbox directory, license ID, and UTC date or timestamp.");
+            }
+            SetSandboxMaintenanceExpiration(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2],
+                args[3]);
+            break;
+        case "run-sandbox-communications-cron":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException(
+                    "The run-sandbox-communications-cron command requires the Admin sandbox remote directory.");
+            }
+            RunSandboxCommunicationsCron(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1]);
+            break;
+        case "diagnose-sandbox-communications-cron":
+            if (args.Length < 2)
+            {
+                throw new ArgumentException(
+                    "The diagnose-sandbox-communications-cron command requires the Admin sandbox remote directory.");
+            }
+            DiagnoseSandboxCommunicationsCron(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1]);
+            break;
+        case "queue-sandbox-communications-test":
+            if (args.Length < 4)
+            {
+                throw new ArgumentException(
+                    "The queue-sandbox-communications-test command requires the Admin sandbox directory, customer ID, and template key.");
+            }
+            QueueSandboxCommunicationsTest(
+                host,
+                username,
+                password,
+                expectedFingerprint,
+                args[1],
+                args[2],
+                args[3]);
+            break;
+        case "inspect-sandbox-communications-message":
+            if (args.Length < 3)
+            {
+                throw new ArgumentException(
+                    "The inspect-sandbox-communications-message command requires the Admin sandbox directory and message ID.");
+            }
+            InspectSandboxCommunicationsMessage(
                 host,
                 username,
                 password,
@@ -584,6 +678,7 @@ static void Publish(
         .Where(path => !path.EndsWith("README.md", StringComparison.OrdinalIgnoreCase))
         .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.vite{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
         .Where(path => !IsServerOwnedPrivateFile(localDirectory, path))
+        .Where(path => !IsGeneratedReleaseDownload(localDirectory, path))
         .Order(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
@@ -1035,20 +1130,74 @@ static void ConfigureCommunications(SftpClient client, string remoteDirectory)
         <?php
         declare(strict_types=1);
 
-        if (PHP_SAPI !== 'cli') {
+        $scheduledInvocation = getenv('PPE_COMMUNICATIONS_CRON') === '1';
+        if (PHP_SAPI !== 'cli' && !$scheduledInvocation) {
             http_response_code(404);
             exit;
         }
-        require __DIR__ . '/../includes/bootstrap.php';
-        require __DIR__ . '/../includes/communications.php';
-        $pdo = database();
-        communication_schedule_lifecycle($pdo);
-        for ($index = 0; $index < 50; $index++) {
-            $result = communication_worker_process_one($pdo);
-            if ($result['status'] === 'idle') break;
+        $statusPath = __DIR__ . '/communications-cron-status.json';
+        $status = [
+            'version' => 1,
+            'started_at_utc' => gmdate('c'),
+            'completed_at_utc' => null,
+            'completed' => false,
+            'outcomes' => [],
+            'error_class' => null,
+        ];
+        $writeStatus = static function () use (&$status, $statusPath): void {
+            $encoded = json_encode($status, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            file_put_contents($statusPath, $encoded . PHP_EOL, LOCK_EX);
+        };
+        try {
+            $writeStatus();
+            require __DIR__ . '/../includes/bootstrap.php';
+            require __DIR__ . '/../includes/communications.php';
+            $pdo = database();
+            communication_schedule_lifecycle($pdo);
+            for ($index = 0; $index < 50; $index++) {
+                $result = communication_worker_process_one($pdo);
+                $outcome = (string)($result['status'] ?? 'unknown');
+                $status['outcomes'][$outcome] = ($status['outcomes'][$outcome] ?? 0) + 1;
+                if ($outcome === 'idle') break;
+            }
+            $status['completed'] = true;
+            $status['completed_at_utc'] = gmdate('c');
+            $writeStatus();
+        } catch (Throwable $exception) {
+            $status['completed_at_utc'] = gmdate('c');
+            $status['error_class'] = get_class($exception);
+            try {
+                $writeStatus();
+            } catch (Throwable) {
+                // Preserve the original failure for the scheduler exit code.
+            }
+            error_log('POS Printer Emulator communications cron failed: ' . get_class($exception));
+            exit(1);
         }
         """;
     UploadText(client, CombineRemote(privateDirectory, "communications-cron.php"), cron);
+    var cronLauncher = """
+        #!/bin/sh
+        set -eu
+        umask 077
+        private_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+        printf '{"version":1,"launched_at_utc":"%s"}\n' \
+          "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+          > "$private_dir/communications-cron-launch.json"
+        set +e
+        PPE_COMMUNICATIONS_CRON=1 \
+          /usr/local/bin/php8.4 -f "$private_dir/communications-cron.php" >/dev/null 2>/dev/null
+        exit_code=$?
+        set -e
+        printf '{"version":1,"launched_at_utc":"%s","php_exit_code":%s}\n' \
+          "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$exit_code" \
+          > "$private_dir/communications-cron-launch.json"
+        exit "$exit_code"
+        """;
+    UploadText(
+        client,
+        CombineRemote(privateDirectory, "communications-cron.sh"),
+        cronLauncher);
 
     Console.WriteLine("Uploaded protected Brevo communications configuration. Provider credentials were not displayed.");
     Console.WriteLine($"Saved encrypted webhook recovery metadata to {recoveryPath}.");
@@ -1300,6 +1449,18 @@ static void ConfigureCustomerPortalFromAdmin(
     }
 }
 
+static bool IsGeneratedReleaseDownload(string localRoot, string path)
+{
+    var relative = Path.GetRelativePath(localRoot, path).Replace('\\', '/');
+    if (!relative.StartsWith("downloads/", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    return relative.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+           relative.EndsWith(".exe.sha256", StringComparison.OrdinalIgnoreCase);
+}
+
 static void ConfigurePurchaseIntegration(
     SftpClient client,
     string adminRemoteDirectory,
@@ -1333,6 +1494,7 @@ static void ConfigurePurchaseIntegration(
         PayPalBaseUrlVariable);
     var paypalClientId = RequiredEnvironmentVariable(PayPalClientIdVariable);
     var paypalSecret = RequiredEnvironmentVariable(PayPalSecretVariable);
+    var paypalWebhookId = RequiredEnvironmentVariable(PayPalWebhookIdVariable);
     var adminToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
         .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     var maintenanceToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
@@ -1380,6 +1542,7 @@ static void ConfigurePurchaseIntegration(
             'paypal' => [
                 'client_id' => {PhpString(paypalClientId)},
                 'secret' => {PhpString(paypalSecret)},
+                'webhook_id' => {PhpString(paypalWebhookId)},
                 'base_url' => {PhpString(paypalBaseUrl)},
             ],
             'admin_api_token' => {PhpString(adminToken)},
@@ -1434,6 +1597,91 @@ static async Task MigrateSelfServiceCommerceAsync(Uri migrationUri)
     var serviceToken = RecoverCrmServiceToken();
     await RunProtectedMigrationAsync(migrationUri, serviceToken, "self-service commerce");
     Console.WriteLine("Protected self-service commerce migration completed successfully.");
+}
+
+static async Task ReconcileSandboxPayPalReversalAsync(
+    Uri adminUri,
+    string eventId,
+    string eventType,
+    string reversalType,
+    string providerOrderId,
+    string providerCaptureId)
+{
+    if (!adminUri.Host.Contains("sandbox", StringComparison.OrdinalIgnoreCase) &&
+        !adminUri.Host.Contains("staging", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "PayPal event replay is restricted to a sandbox or staging Admin hostname.");
+    }
+    if (!DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase) &&
+        !DeploymentProfile().Equals("staging", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "PayPal event replay requires a sandbox or staging deployment profile.");
+    }
+    var token = RecoverPurchaseMaintenanceToken();
+    using var request = new HttpRequestMessage(
+        HttpMethod.Post,
+        new Uri(adminUri, "/api/v1/portal-commerce.php"));
+    request.Headers.Add("X-PPE-Admin-Token", token);
+    request.Content = new StringContent(
+        JsonSerializer.Serialize(new
+        {
+            action = "record-provider-reversal",
+            eventId,
+            eventType,
+            reversalType,
+            providerOrderId,
+            providerCaptureId,
+            reason = "Verified PayPal Sandbox event replayed by the release-certification operator."
+        }),
+        System.Text.Encoding.UTF8,
+        "application/json");
+    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    using var response = await client.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(
+            $"Sandbox PayPal reconciliation failed with HTTP {(int)response.StatusCode}.");
+    }
+    using var result = JsonDocument.Parse(body);
+    var root = result.RootElement;
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        ok = root.TryGetProperty("ok", out var ok) && ok.GetBoolean(),
+        state = root.TryGetProperty("state", out var state) ? state.GetString() : null,
+        idempotent = root.TryGetProperty("idempotent", out var idempotent) && idempotent.GetBoolean(),
+        reviewRequired = root.TryGetProperty("reviewRequired", out var review) && review.GetBoolean()
+    }));
+}
+
+static string RecoverPurchaseMaintenanceToken()
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        throw new PlatformNotSupportedException(
+            "Purchase-integration recovery uses Windows data protection.");
+    }
+    var recoveryPath = DeploymentRecoveryPath("purchase-integration.secrets.bin");
+    if (!File.Exists(recoveryPath))
+    {
+        throw new FileNotFoundException(
+            "The protected purchase-integration recovery file is unavailable.",
+            recoveryPath);
+    }
+    var recovery = ProtectedData.Unprotect(
+        File.ReadAllBytes(recoveryPath),
+        null,
+        DataProtectionScope.CurrentUser);
+    using var document = JsonDocument.Parse(recovery);
+    var token = document.RootElement.GetProperty("maintenanceToken").GetString();
+    if (string.IsNullOrWhiteSpace(token) || token.Length < 32)
+    {
+        throw new InvalidDataException(
+            "The protected purchase-integration maintenance token is unavailable.");
+    }
+    return token;
 }
 
 static async Task MigrateSchemaWithRecoveredAdminAsync(Uri setupUri)
@@ -2062,6 +2310,512 @@ static void FetchSandboxRelease(
     }
     Console.WriteLine(
         $"Sandbox host fetched and checksum-verified {Path.GetFileName(remoteFile)} ({size:N0} bytes).");
+}
+
+static void RunSandboxCommunicationsCron(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "The communications cron diagnostic is restricted to the Admin sandbox directory.");
+    }
+    if (!DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "The communications cron diagnostic requires PPE_DEPLOYMENT_PROFILE=sandbox.");
+    }
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        const string diagnosticScript = """
+            <?php
+            declare(strict_types=1);
+            require 'includes/bootstrap.php';
+            require 'includes/communications.php';
+            $pdo = database();
+            $snapshot = static function (PDO $pdo): array {
+                $row = $pdo->query(
+                    "SELECT
+                        SUM(state='Pending') AS pending_count,
+                        SUM(state='Deferred') AS deferred_count,
+                        SUM(state IN ('Pending','Deferred') AND available_at<=UTC_TIMESTAMP(6)) AS due_count,
+                        SUM(state='Sent') AS sent_count
+                     FROM communication_outbox"
+                )->fetch();
+                return [
+                    'pending' => (int)($row['pending_count'] ?? 0),
+                    'deferred' => (int)($row['deferred_count'] ?? 0),
+                    'due' => (int)($row['due_count'] ?? 0),
+                    'sent' => (int)($row['sent_count'] ?? 0),
+                ];
+            };
+            $before = $snapshot($pdo);
+            $outcomes = [];
+            for ($index = 0; $index < 50; $index++) {
+                $result = communication_worker_process_one($pdo);
+                $status = (string)($result['status'] ?? 'unknown');
+                $outcomes[$status] = ($outcomes[$status] ?? 0) + 1;
+                if ($status === 'idle') break;
+            }
+            echo json_encode([
+                'before' => $before,
+                'outcomes' => $outcomes,
+                'after' => $snapshot($pdo),
+            ], JSON_THROW_ON_ERROR);
+            """;
+        var encodedScript = Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes(diagnosticScript));
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            "test -f private/communications-cron.php && " +
+            $"printf '%s' '{encodedScript}' | base64 -d | /usr/bin/php8.4");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox communications cron failed with exit status {command.ExitStatus}.");
+        }
+        var jsonOffset = command.Result.IndexOf(
+            "{\"before\"",
+            StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox communications cron did not return its privacy-safe diagnostic result.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(
+            "Sandbox communications cron completed successfully through the verified SSH host: " +
+            JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void QueueSandboxCommunicationsTest(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string customerId,
+    string templateKey)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Communications test enqueue is restricted to the Admin sandbox directory.");
+    }
+    if (!System.Text.RegularExpressions.Regex.IsMatch(
+            customerId,
+            @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            templateKey,
+            @"^[a-z][a-z0-9_]{1,63}$"))
+    {
+        throw new ArgumentException("The customer ID or communication template key is invalid.");
+    }
+
+    var php = $$"""
+        <?php
+        declare(strict_types=1);
+        require 'includes/bootstrap.php';
+        require 'includes/communications.php';
+        $pdo = database();
+        $customerId = '{{customerId.ToLowerInvariant()}}';
+        $templateKey = '{{templateKey}}';
+        $customer = $pdo->prepare(
+            'SELECT display_name FROM customers WHERE customer_id=:id LIMIT 1'
+        );
+        $customer->execute(['id' => $customerId]);
+        $name = $customer->fetchColumn();
+        if (!is_string($name) || $name === '') {
+            throw new RuntimeException('Certification customer was not found.');
+        }
+        $messageId = communication_enqueue(
+            $pdo,
+            $customerId,
+            $templateKey,
+            communication_test_parameters($templateKey, $name),
+            'cron-certification:' . $templateKey . ':' . $customerId . ':' . gmdate('YmdHis'),
+            null,
+            false
+        );
+        echo json_encode(['message_id' => $messageId], JSON_THROW_ON_ERROR);
+        """;
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(php));
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            $"printf '%s' '{encoded}' | base64 -d | /usr/bin/php8.4");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox communications test could not be queued (exit {command.ExitStatus}).");
+        }
+        var jsonOffset = command.Result.IndexOf("{\"message_id\"", StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox communications test did not return a message identifier.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(
+            "Queued sandbox communications test for automatic Cron delivery: " +
+            result.RootElement.GetProperty("message_id").GetString());
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void DiagnoseSandboxCommunicationsCron(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Communications Cron diagnostics are restricted to the Admin sandbox directory.");
+    }
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"root=$(pwd); target=$(readlink -f '{normalizedDirectory}/private/communications-cron.php'); " +
+            "phpbin=$(command -v php8.4); " +
+            "/usr/local/bin/php8.4 -l \"$target\" >/dev/null 2>/dev/null; syntax=$?; " +
+            "printf '{\"working_directory\":\"%s\",\"script_path\":\"%s\",\"php_path\":\"%s\",\"script_readable\":%s,\"syntax_exit_code\":%s}\\n' " +
+            "\"$root\" \"$target\" \"$phpbin\" \"$(test -r \"$target\" && printf true || printf false)\" \"$syntax\"");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox Cron path diagnostic failed (exit {command.ExitStatus}).");
+        }
+        using var result = JsonDocument.Parse(command.Result.Trim());
+        Console.WriteLine(JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void InspectSandboxCommunicationsMessage(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string messageId)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals(
+            "admin_sandbox_posprinteremulator",
+            StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            messageId,
+            @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Communications message inspection is restricted to a valid Admin sandbox record.");
+    }
+
+    var php = $$"""
+        <?php
+        declare(strict_types=1);
+        require 'includes/bootstrap.php';
+        $pdo = database();
+        $statement = $pdo->prepare(
+            "SELECT state,attempts,
+                    provider_message_id IS NOT NULL AS provider_id_present
+             FROM communication_outbox WHERE message_id=:id LIMIT 1"
+        );
+        $statement->execute(['id' => '{{messageId.ToLowerInvariant()}}']);
+        $row = $statement->fetch();
+        if (!$row) throw new RuntimeException('Certification message was not found.');
+        $events = $pdo->prepare(
+            'SELECT COUNT(*) FROM communication_delivery_events WHERE message_id=:id'
+        );
+        $events->execute(['id' => '{{messageId.ToLowerInvariant()}}']);
+        echo json_encode([
+            'state' => (string)$row['state'],
+            'attempt_count' => (int)$row['attempts'],
+            'provider_id_present' => (bool)$row['provider_id_present'],
+            'delivery_event_count' => (int)$events->fetchColumn(),
+        ], JSON_THROW_ON_ERROR);
+        """;
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(php));
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            $"printf '%s' '{encoded}' | base64 -d | /usr/local/bin/php8.4");
+        if (command.ExitStatus != 0)
+        {
+            throw new InvalidOperationException(
+                $"The sandbox message inspection failed (exit {command.ExitStatus}).");
+        }
+        var jsonOffset = command.Result.IndexOf("{\"state\"", StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox message inspection returned no privacy-safe result.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
+}
+
+static void SetSandboxMaintenanceExpiration(
+    string host,
+    string username,
+    string password,
+    string expectedFingerprint,
+    string remoteDirectory,
+    string licenseId,
+    string expirationDate)
+{
+    var normalizedDirectory = remoteDirectory.Trim().Trim('/');
+    if (!normalizedDirectory.Equals("admin_sandbox_posprinteremulator", StringComparison.Ordinal) ||
+        !DeploymentProfile().Equals("sandbox", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Maintenance date certification is restricted to the Admin sandbox directory.");
+    }
+    if (!Guid.TryParse(licenseId, out var parsedLicenseId) ||
+        !DateTime.TryParseExact(
+            expirationDate,
+            ["yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm:ss"],
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal |
+            System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var parsedExpiration))
+    {
+        throw new ArgumentException(
+            "A license UUID and yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss UTC expiration are required.");
+    }
+
+    var earliest = DateTime.UtcNow.Date.AddDays(-7);
+    var latest = DateTime.UtcNow.Date.AddYears(2).AddDays(1).AddTicks(-1);
+    if (parsedExpiration < earliest || parsedExpiration > latest)
+    {
+        throw new InvalidOperationException(
+            $"Certification maintenance dates must be between {earliest:yyyy-MM-dd} and {latest:yyyy-MM-dd}.");
+    }
+
+    var expectedDatabaseHost = RequiredEnvironmentVariable("PPE_CERT_DB_HOST").Trim();
+    var expectedDatabaseName = RequiredEnvironmentVariable("PPE_CERT_DB_NAME").Trim();
+    var stagingDatabaseLabel = RequiredEnvironmentVariable("PPE_STAGING_DATABASE_LABEL").Trim();
+    var stagingAllowedHost = RequiredEnvironmentVariable("PPE_STAGING_ALLOWED_HOST").Trim();
+    if (!RequiredEnvironmentVariable("PPE_ENVIRONMENT").Equals(
+            "staging",
+            StringComparison.OrdinalIgnoreCase) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            stagingDatabaseLabel,
+            @"(^|[_-])(staging|sandbox)([_-]|$)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+        !stagingAllowedHost.Equals(expectedDatabaseHost, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "The certification database safety variables do not identify the approved sandbox.");
+    }
+
+    var php = $$"""
+        <?php
+        declare(strict_types=1);
+        require 'includes/bootstrap.php';
+        $licenseId = '{{parsedLicenseId:D}}';
+        $newExpiration = '{{(expirationDate.Length == 10 ? parsedExpiration.Date.AddDays(1).AddSeconds(-1) : parsedExpiration):yyyy-MM-dd HH:mm:ss}}.000000';
+        $expectedDatabaseHost = {{PhpString(expectedDatabaseHost)}};
+        $expectedDatabaseName = {{PhpString(expectedDatabaseName)}};
+        $pdo = null;
+        try {
+            $config = private_config();
+            $configuredDatabaseHost = trim((string)($config['database']['host'] ?? ''));
+            if (!hash_equals(strtolower($expectedDatabaseHost), strtolower($configuredDatabaseHost))) {
+                throw new RuntimeException('The remote database host does not match the approved sandbox host.');
+            }
+            $pdo = database();
+            $databaseName = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+            if (!hash_equals($expectedDatabaseName, $databaseName)) {
+                throw new RuntimeException('The selected database does not match the approved sandbox database.');
+            }
+            $pdo->beginTransaction();
+            $find = $pdo->prepare(
+                "SELECT control_state,maintenance_expires_at
+                 FROM issued_licenses WHERE license_id=:license_id FOR UPDATE"
+            );
+            $find->execute(['license_id' => $licenseId]);
+            $license = $find->fetch();
+            if (!is_array($license) || (string)$license['control_state'] !== 'Enabled') {
+                throw new RuntimeException('An enabled sandbox license was not found.');
+            }
+            $previousExpiration = $license['maintenance_expires_at'];
+            $update = $pdo->prepare(
+                "UPDATE issued_licenses
+                 SET maintenance_expires_at=:expiration,maintenance_revoked_at=NULL,
+                     row_version=row_version+1,entitlement_revision=entitlement_revision+1
+                 WHERE license_id=:license_id"
+            );
+            $update->execute(['expiration' => $newExpiration, 'license_id' => $licenseId]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('The sandbox maintenance date was not updated.');
+            }
+            $installations = $pdo->prepare(
+                "UPDATE installations
+                 SET maintenance_status=IF(:expiration>=UTC_TIMESTAMP(6),'Active','Expired'),
+                     maintenance_expires_at=:expiration_2
+                 WHERE license_id=:license_id AND portal_deactivated_at IS NULL"
+            );
+            $installations->execute([
+                'expiration' => $newExpiration,
+                'expiration_2' => $newExpiration,
+                'license_id' => $licenseId,
+            ]);
+            $audit = $pdo->prepare(
+                "INSERT INTO license_maintenance_events
+                    (license_id,event_type,previous_expires_at,new_expires_at,source_reference,
+                     reason,performed_by,admin_ip)
+                 VALUES
+                    (:license_id,'CERTIFICATION_EXPIRATION_SET',:previous_expiration,:new_expiration,
+                     :source_reference,
+                     'Temporary sandbox date used for the Maintenance and Support release gate.',
+                     'certification-tool',NULL)"
+            );
+            $audit->execute([
+                'license_id' => $licenseId,
+                'previous_expiration' => $previousExpiration,
+                'new_expiration' => $newExpiration,
+                'source_reference' => 'certification-date:' . gmdate('YmdHisv'),
+            ]);
+            $pdo->commit();
+            echo json_encode([
+                'licenseId' => $licenseId,
+                'previousExpiration' => $previousExpiration,
+                'newExpiration' => $newExpiration,
+                'linkedInstallations' => $installations->rowCount(),
+            ], JSON_THROW_ON_ERROR);
+        } catch (Throwable $exception) {
+            if ($pdo instanceof PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            echo 'CERTIFICATION_ERROR:' . $exception->getMessage();
+            exit(3);
+        }
+        """;
+    var encodedScript = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(php));
+
+    using var ssh = new SshClient(host, 22, username, password);
+    ssh.HostKeyReceived += (_, eventArgs) =>
+    {
+        var actual = "SHA256:" +
+                     Convert.ToBase64String(SHA256.HashData(eventArgs.HostKey)).TrimEnd('=');
+        eventArgs.CanTrust = CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(actual),
+            System.Text.Encoding.ASCII.GetBytes(expectedFingerprint));
+    };
+    ssh.Connect();
+    try
+    {
+        var command = ssh.RunCommand(
+            $"cd '{normalizedDirectory}' && " +
+            $"printf '%s' '{encodedScript}' | base64 -d | " +
+            $"/usr/bin/php8.4 -d display_errors=stderr -d display_startup_errors=1");
+        if (command.ExitStatus != 0)
+        {
+            var diagnostic = (command.Error + " " + command.Result)
+                .Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Trim();
+            throw new InvalidOperationException(
+                $"The sandbox maintenance date change failed (exit {command.ExitStatus})" +
+                (diagnostic.Length > 0 ? $": {diagnostic}" : "."));
+        }
+        var jsonOffset = command.Result.IndexOf("{\"licenseId\"", StringComparison.Ordinal);
+        if (jsonOffset < 0)
+        {
+            throw new InvalidDataException(
+                "The sandbox maintenance date change returned no verification result.");
+        }
+        using var result = JsonDocument.Parse(command.Result[jsonOffset..]);
+        Console.WriteLine(JsonSerializer.Serialize(result.RootElement));
+    }
+    finally
+    {
+        ssh.Disconnect();
+    }
 }
 
 static void ResetSandboxCheckoutRate(

@@ -116,6 +116,7 @@ try {
         }
     }
     $migration->execute(['migration_key' => $senderMigrationKey]);
+    $receiptRecovery = communication_recover_recent_purchase_confirmations($pdo);
     $summary = communication_dashboard_summary($pdo);
     communications_migration_response([
         'ok' => true,
@@ -127,6 +128,7 @@ try {
             'service' => 'info@buy.posprinteremulator.com',
             'sales' => 'sales@buy.posprinteremulator.com',
         ],
+        'purchaseReceiptRecovery' => $receiptRecovery,
         'providerConfigured' => $summary['provider_configured'],
         'deliveryPaused' => $summary['emergency_stop'],
         'marketingPaused' => $summary['marketing_pause'],

@@ -275,7 +275,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        WHEN :maintenance_expires_2>=UTC_TIMESTAMP(6) THEN \'Active\'
                        ELSE \'Expired\'
                      END,
-                     maintenance_expires_at=:maintenance_expires_3,portal_deactivated_at=NULL
+                     maintenance_expires_at=:maintenance_expires_3,portal_deactivated_at=NULL,
+                     license_last_sync_at=UTC_TIMESTAMP(6),license_last_sync_status=\'Active\',
+                     license_last_sync_error=NULL
                  WHERE id=:installation_id'
             );
             $updateInstallation->execute([
@@ -463,7 +465,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new DomainException('The selected license is invalid.');
                 }
                 $find = $pdo->prepare(
-                    "SELECT license_id,license_tier,control_state,license_expires_at,
+                    "SELECT license_id,license_tier,control_state,license_source,license_expires_at,
                             maintenance_expires_at,maintenance_revoked_at
                      FROM issued_licenses
                      WHERE license_id=:license_id AND customer_id=:customer_id
@@ -478,6 +480,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if (!empty($license['maintenance_revoked_at'])) {
                     throw new DomainException('Maintenance access was administratively revoked. Contact support before purchasing.');
+                }
+                if ($orderType === 'MAINTENANCE' &&
+                    !portal_license_can_purchase_maintenance($license)) {
+                    throw new DomainException('Only an eligible paid license can purchase Maintenance and Support.');
                 }
                 $currentTier = (string)$license['license_tier'];
                 $previousMaintenance = $license['maintenance_expires_at'];
@@ -802,11 +808,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $snapshot = portal_customer_snapshot($customerId);
 $licenses = $snapshot['licenses'];
-$primaryActiveLicense = portal_primary_active_license($licenses);
-$primaryLicense = $primaryActiveLicense ?? ($licenses[0] ?? null);
-$maintenanceReminder = portal_maintenance_reminder(
-    is_array($primaryLicense) ? (string)($primaryLicense['maintenance_expires_at'] ?? '') : null
-);
 $installations = $snapshot['installations'];
 $pendingComputerLink = null;
 if ($computerLinkCode !== '') {
@@ -826,6 +827,17 @@ if ($computerLinkCode !== '') {
     }
 }
 $primaryInstallation = portal_primary_installation($installations);
+$primaryActiveLicense = portal_active_license_for_installation($licenses, $primaryInstallation)
+    ?? portal_primary_active_license($licenses);
+$primaryLicense = $primaryActiveLicense ?? ($licenses[0] ?? null);
+$maintenanceReminder = portal_maintenance_reminder(
+    is_array($primaryLicense) ? (string)($primaryLicense['maintenance_expires_at'] ?? '') : null
+);
+$maintenanceLicenses = array_values(array_filter(
+    $licenses,
+    static fn(mixed $license): bool => is_array($license) &&
+        portal_license_can_purchase_maintenance($license)
+));
 $latestRelease = portal_latest_release();
 $versionStatus = portal_version_status(
     is_array($primaryInstallation) ? (string)($primaryInstallation['app_version'] ?? '') : null,
@@ -1009,7 +1021,39 @@ function portal_nav_icon(string $name): string
     </div>
     <section class="maintenance-panel" id="maintenance-renewal">
       <div><span class="plan-kicker">Optional annual coverage</span><h2>Application Maintenance &amp; Support</h2><p>Renewing adds one year of updates and technical support. The software and purchased features remain permanent if coverage expires.</p></div>
-      <?php if (is_array($primaryLicense)): ?><div class="maintenance-action"><span>Maintenance and Support Until: <strong><?= portal_e(portal_long_date($primaryLicense['maintenance_expires_at'])) ?></strong></span><form method="post"><input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>"><input type="hidden" name="action" value="prepare-checkout"><input type="hidden" name="order_type" value="MAINTENANCE"><input type="hidden" name="target_tier" value="<?= portal_e((string)$primaryLicense['license_tier']) ?>"><input type="hidden" name="license_id" value="<?= portal_e((string)$primaryLicense['license_id']) ?>"><button class="button primary" type="submit">Renew Maintenance and Support</button></form></div><?php else: ?><p>Maintenance is included when you purchase a license.</p><?php endif; ?>
+      <?php if ($maintenanceLicenses !== []): ?>
+        <div class="maintenance-license-list">
+          <?php foreach ($maintenanceLicenses as $maintenanceLicense): ?>
+            <?php
+              $maintenanceLicenseId = (string)$maintenanceLicense['license_id'];
+              $assignedComputer = null;
+              foreach ($installations as $candidateInstallation) {
+                  if (is_array($candidateInstallation) &&
+                      empty($candidateInstallation['portal_deactivated_at']) &&
+                      hash_equals((string)($candidateInstallation['license_id'] ?? ''), $maintenanceLicenseId)) {
+                      $assignedComputer = $candidateInstallation;
+                      break;
+                  }
+              }
+            ?>
+            <article class="maintenance-license">
+              <div>
+                <span class="plan-kicker"><?= portal_e((string)$maintenanceLicense['license_tier']) ?> license · <?= portal_e(portal_masked_license($maintenanceLicense)) ?></span>
+                <strong>Maintenance and Support Until: <?= portal_e(portal_long_date($maintenanceLicense['maintenance_expires_at'])) ?></strong>
+                <small><?= is_array($assignedComputer) ? 'Assigned to ' . portal_e((string)$assignedComputer['device_label']) : 'Available license · no active computer assignment' ?></small>
+              </div>
+              <form method="post">
+                <input type="hidden" name="csrf" value="<?= portal_e(portal_csrf_token()) ?>">
+                <input type="hidden" name="action" value="prepare-checkout">
+                <input type="hidden" name="order_type" value="MAINTENANCE">
+                <input type="hidden" name="target_tier" value="<?= portal_e((string)$maintenanceLicense['license_tier']) ?>">
+                <input type="hidden" name="license_id" value="<?= portal_e($maintenanceLicenseId) ?>">
+                <button class="button primary" type="submit">Renew <?= portal_e((string)$maintenanceLicense['license_tier']) ?> Coverage</button>
+              </form>
+            </article>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?><p>Maintenance is included when you purchase an eligible paid license.</p><?php endif; ?>
     </section>
     <?php if (is_array($promotionDelivery)): ?>
       <section class="promotion-delivery" role="status">
@@ -1056,7 +1100,7 @@ function portal_nav_icon(string $name): string
               <td><?= portal_e(portal_datetime($purchase['paid_at'] ?? $purchase['updated_at'])) ?></td>
               <td><strong><?= portal_e(portal_purchase_type_label($purchase)) ?></strong><small class="block"><?= portal_e((string)$purchase['license_tier']) ?> edition</small></td>
               <td><?= portal_e(portal_purchase_license_label($purchase)) ?><?php if (!empty($purchase['license_control_state'])): ?><small class="block"><?= portal_e(portal_license_status_label((string)$purchase['license_control_state'])) ?></small><?php endif; ?></td>
-              <td><span class="payment-status <?= portal_e(strtolower($purchaseStatus)) ?>"><?= portal_e($purchaseStatus) ?></span></td>
+              <td><span class="payment-status <?= portal_e(portal_purchase_status_class((string)$purchase['purchase_status'])) ?>"><?= portal_e($purchaseStatus) ?></span></td>
               <td><strong><?= portal_e((string)$purchase['currency']) ?> <?= number_format((float)$purchase['amount'], 2) ?></strong></td>
               <td><code><?= portal_e(portal_purchase_display_reference($purchase)) ?></code></td>
               <td><div class="billing-documents"><a class="button secondary compact" href="/receipt.php?reference=<?= rawurlencode((string)$purchase['purchase_reference']) ?>">View receipt</a></div></td>

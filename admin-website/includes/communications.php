@@ -21,7 +21,8 @@ const COMMUNICATION_PARAMETER_KEYS = [
     'feature_summary', 'preview_text', 'documentation_url', 'help_center_url',
     'support_request_url', 'no_reply_notice', 'invoice_number', 'invoice_date',
     'invoice_description', 'invoice_amount', 'invoice_currency', 'payment_status',
-    'transaction_reference',
+    'transaction_reference', 'order_label', 'confirmation_headline',
+    'confirmation_intro', 'confirmation_detail', 'confirmation_button_label',
 ];
 const COMMUNICATION_FORBIDDEN_REPLY_LANGUAGE = [
     'reply to this email',
@@ -310,6 +311,7 @@ function ensure_communication_schema(PDO $pdo): void
                 ('support_request_url','https://www.posprinteremulator.com/how-to-submit-a-support-request','system'),
                 ('no_reply_notice','Please do not reply to this email. This inbox is not monitored.','system')"
         );
+        communication_apply_transactional_receipt_policy($pdo);
         communication_seed_template_tags($pdo);
         communication_backfill_pending_invoice_parameters($pdo);
         $ready = true;
@@ -355,6 +357,47 @@ function communication_backfill_pending_invoice_parameters(PDO $pdo): void
              '$.invoice_currency',UPPER(i.currency),
              '$.payment_status','Paid',
              '$.transaction_reference',i.provider_capture_id
+             ,'$.order_label',
+               CASE i.order_type
+                 WHEN 'MAINTENANCE' THEN 'maintenance renewal'
+                 WHEN 'UPGRADE' THEN 'license upgrade'
+                 ELSE 'license purchase'
+               END
+             ,'$.confirmation_headline',
+               CASE i.order_type
+                 WHEN 'MAINTENANCE' THEN 'Maintenance and Support renewed'
+                 WHEN 'UPGRADE' THEN CONCAT('Your ',i.target_tier,' upgrade is confirmed')
+                 ELSE 'Thank you for your purchase'
+               END
+             ,'$.confirmation_intro',
+               CASE i.order_type
+                 WHEN 'MAINTENANCE' THEN CONCAT(
+                   'Your ',i.target_tier,
+                   ' Maintenance and Support renewal is confirmed.'
+                 )
+                 WHEN 'UPGRADE' THEN CONCAT(
+                   'Your POS Printer Emulator upgrade to the ',i.target_tier,
+                   ' License is confirmed.'
+                 )
+                 ELSE CONCAT(
+                   'Your ',i.target_tier,' License purchase is confirmed.'
+                 )
+               END
+             ,'$.confirmation_detail',
+               CASE i.order_type
+                 WHEN 'MAINTENANCE' THEN
+                   'Your updated coverage is available in the Customer Portal. The attached paid receipt includes the transaction details for your records.'
+                 WHEN 'UPGRADE' THEN
+                   'The upgraded entitlement is associated with your verified account and will synchronize with your linked computer automatically. The attached paid receipt includes the transaction details.'
+                 ELSE
+                   'The license is associated with your verified account. Open the Customer Portal to link a computer and apply the entitlement automatically. The attached paid receipt includes the transaction details.'
+               END
+             ,'$.confirmation_button_label',
+               CASE i.order_type
+                 WHEN 'MAINTENANCE' THEN 'View coverage and receipt'
+                 WHEN 'UPGRADE' THEN 'View upgraded license'
+                 ELSE 'View license and computers'
+               END
          )
          WHERE o.template_key='purchase_confirmation'
            AND o.state IN ('Pending','Deferred')
@@ -364,6 +407,95 @@ function communication_backfill_pending_invoice_parameters(PDO $pdo): void
            AND JSON_VALID(o.parameters_json)=1
            AND JSON_EXTRACT(o.parameters_json,'$.invoice_number') IS NULL"
     );
+}
+
+/**
+ * Recover recent paid transactions whose receipt enqueue was interrupted after
+ * fulfillment. The unique outbox idempotency key makes repeated migrations safe.
+ *
+ * @return array{queued:int,skipped:int,failed:int}
+ */
+function communication_recover_recent_purchase_confirmations(PDO $pdo): array
+{
+    ensure_communication_schema($pdo);
+    $table = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema=DATABASE() AND table_name='portal_checkout_intents'"
+    );
+    $table->execute();
+    if ((int)$table->fetchColumn() !== 1) {
+        return ['queued' => 0, 'skipped' => 0, 'failed' => 0];
+    }
+    $query = $pdo->query(
+        "SELECT i.intent_id,i.customer_id,i.target_tier,i.order_type,i.amount,i.currency,
+                i.captured_at,i.provider_capture_id,i.journey_correlation_id,c.display_name
+         FROM portal_checkout_intents i
+         INNER JOIN customers c ON c.customer_id=i.customer_id
+         LEFT JOIN communication_outbox o
+           ON o.idempotency_key=CONCAT('purchase:portal:',i.intent_id)
+         WHERE i.state='Fulfilled'
+           AND i.captured_at >= DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 48 HOUR)
+           AND i.provider_capture_id IS NOT NULL
+           AND o.message_id IS NULL
+         ORDER BY i.captured_at"
+    );
+    $queued = 0;
+    $skipped = 0;
+    $failed = 0;
+    $sandbox = str_contains(strtolower((string)($_SERVER['HTTP_HOST'] ?? '')), 'sandbox');
+    $portalUrl = $sandbox
+        ? 'https://userportal-sandbox.posprinteremulator.com/'
+        : 'https://userportal.posprinteremulator.com/';
+    foreach ($query->fetchAll() as $intent) {
+        try {
+            $capturedAt = new DateTimeImmutable(
+                (string)$intent['captured_at'],
+                new DateTimeZone('UTC')
+            );
+            $description = match ((string)$intent['order_type']) {
+                'MAINTENANCE' => 'POS Printer Emulator ' . (string)$intent['target_tier'] .
+                    ' Annual Maintenance and Support Renewal',
+                'UPGRADE' => 'POS Printer Emulator ' . (string)$intent['target_tier'] . ' License Upgrade',
+                default => 'POS Printer Emulator ' . (string)$intent['target_tier'] . ' License',
+            };
+            $intentId = strtolower((string)$intent['intent_id']);
+            $confirmationParameters = communication_purchase_confirmation_parameters(
+                (string)$intent['order_type'],
+                (string)$intent['target_tier'],
+                $portalUrl
+            );
+            communication_enqueue(
+                $pdo,
+                (string)$intent['customer_id'],
+                'purchase_confirmation',
+                array_merge([
+                    'customer_name' => (string)$intent['display_name'],
+                    'license_tier' => (string)$intent['target_tier'],
+                    'invoice_number' => 'PPE-INV-' . $capturedAt->format('Ymd') . '-' .
+                        strtoupper(substr(hash('sha256', 'portal:' . $intentId), 0, 10)),
+                    'invoice_date' => $capturedAt->format('F j, Y'),
+                    'invoice_description' => $description,
+                    'invoice_amount' => number_format((float)$intent['amount'], 2, '.', ''),
+                    'invoice_currency' => strtoupper((string)$intent['currency']),
+                    'payment_status' => 'Paid',
+                    'transaction_reference' => (string)$intent['provider_capture_id'],
+                ], $confirmationParameters),
+                'purchase:portal:' . $intentId,
+                null,
+                false,
+                null,
+                (string)$intent['journey_correlation_id']
+            );
+            $queued++;
+        } catch (DomainException $exception) {
+            $skipped++;
+            error_log('POS Printer Emulator receipt recovery skipped: ' . get_class($exception));
+        } catch (Throwable $exception) {
+            $failed++;
+            error_log('POS Printer Emulator receipt recovery failed: ' . get_class($exception));
+        }
+    }
+    return ['queued' => $queued, 'skipped' => $skipped, 'failed' => $failed];
 }
 
 function communication_seed_template_tags(PDO $pdo): void
@@ -639,6 +771,30 @@ function communication_seed_managed_lifecycle_mappings(PDO $pdo): void
     $setting->execute();
 }
 
+/**
+ * Purchase confirmations are transactional receipts, not lifecycle messages.
+ * The outbox idempotency key already guarantees one message per purchase, so a
+ * customer-level time cap would incorrectly suppress a valid second purchase.
+ */
+function communication_apply_transactional_receipt_policy(PDO $pdo): void
+{
+    if ((int)communication_setting($pdo, 'transactional_receipt_policy_version', '0') >= 1) {
+        return;
+    }
+    $pdo->exec(
+        "UPDATE communication_templates
+         SET frequency_cap_hours=0,updated_by='managed-migration'
+         WHERE template_key='purchase_confirmation'"
+    );
+    $statement = $pdo->prepare(
+        "INSERT INTO communication_settings(setting_key,setting_value,updated_by)
+         VALUES('transactional_receipt_policy_version','1','managed-migration')
+         ON DUPLICATE KEY UPDATE
+            setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)"
+    );
+    $statement->execute();
+}
+
 function communication_seed_templates(PDO $pdo): void
 {
     $templates = [
@@ -646,7 +802,7 @@ function communication_seed_templates(PDO $pdo): void
         ['password_recovery', 'Password recovery', 'Service', 1, 1, 'Sends a secure, expiring password-reset link when a verified Customer Portal user requests account recovery.'],
         ['mfa_disabled_notification', 'Two-factor authentication disabled', 'Service', 1, 1, 'Notifies a customer after they disable two-factor authentication and every Customer Portal session is revoked.'],
         ['mfa_admin_reset_notification', 'Two-factor authentication administrator reset', 'Service', 1, 1, 'Notifies a customer after an authorized administrator resets MFA, revokes sessions, and requires enrollment at next sign-in.'],
-        ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 1, 'Confirms a completed purchase and directs the customer to the secure portal for automatic account and computer licensing.'],
+        ['purchase_confirmation', 'Purchase confirmation', 'Service', 1, 0, 'Confirms every completed purchase and directs the customer to the secure portal for automatic account and computer licensing.'],
         ['activation_ready', 'License ready', 'Service', 1, 1, 'Notifies the customer that their approved account license is ready and directs them to secure computer linking.'],
         ['support_confirmation', 'Support request confirmation', 'Service', 1, 1, 'Acknowledges a submitted support request and provides its reference number and secure tracking link.'],
         ['maintenance_reminder', 'Maintenance reminder', 'Service', 0, 168, 'Reminds an eligible paid customer before maintenance coverage ends and links to optional renewal without implying the permanent license expires.'],
@@ -854,6 +1010,43 @@ function communication_setup_url(string $licenseTier): string
     return 'https://www.posprinteremulator.com/documentation?license=' . rawurlencode($tier);
 }
 
+function communication_purchase_confirmation_parameters(
+    string $orderType,
+    string $licenseTier,
+    string $portalUrl
+): array {
+    $tier = ucfirst(strtolower(trim($licenseTier)));
+    if (!in_array($tier, ['Lite', 'Pro', 'Enterprise'], true)) {
+        throw new InvalidArgumentException('A paid license tier is required for a purchase confirmation.');
+    }
+    return match (strtoupper(trim($orderType))) {
+        'MAINTENANCE' => [
+            'order_label' => 'maintenance renewal',
+            'confirmation_headline' => 'Maintenance and Support renewed',
+            'confirmation_intro' => 'Your ' . $tier . ' Maintenance and Support renewal is confirmed.',
+            'confirmation_detail' => 'Your updated coverage is available in the Customer Portal. The attached paid receipt includes the transaction details for your records.',
+            'confirmation_button_label' => 'View coverage and receipt',
+            'portal_url' => rtrim($portalUrl, '/') . '/portal.php?page=billing',
+        ],
+        'UPGRADE' => [
+            'order_label' => 'license upgrade',
+            'confirmation_headline' => 'Your ' . $tier . ' upgrade is confirmed',
+            'confirmation_intro' => 'Your POS Printer Emulator upgrade to the ' . $tier . ' License is confirmed.',
+            'confirmation_detail' => 'The upgraded entitlement is associated with your verified account and will synchronize with your linked computer automatically. The attached paid receipt includes the transaction details.',
+            'confirmation_button_label' => 'View upgraded license',
+            'portal_url' => rtrim($portalUrl, '/') . '/portal.php?page=licenses',
+        ],
+        default => [
+            'order_label' => 'license purchase',
+            'confirmation_headline' => 'Thank you for your purchase',
+            'confirmation_intro' => 'Your ' . $tier . ' License purchase is confirmed.',
+            'confirmation_detail' => 'The license is associated with your verified account. Open the Customer Portal to link a computer and apply the entitlement automatically. The attached paid receipt includes the transaction details.',
+            'confirmation_button_label' => 'View license and computers',
+            'portal_url' => rtrim($portalUrl, '/') . '/portal.php?page=licenses',
+        ],
+    };
+}
+
 function communication_test_parameters(string $templateKey, string $customerName): array
 {
     $portal = 'https://userportal.posprinteremulator.com/';
@@ -867,7 +1060,10 @@ function communication_test_parameters(string $templateKey, string $customerName
             'customer_name' => $customerName, 'event_label' => 'reset by an authorized administrator',
             'portal_url' => $portal,
         ],
-        'purchase_confirmation', 'activation_ready' => [
+        'purchase_confirmation' => array_merge([
+            'customer_name' => $customerName, 'license_tier' => 'Pro', 'portal_url' => $portal,
+        ], communication_purchase_confirmation_parameters('MAINTENANCE', 'Pro', $portal)),
+        'activation_ready' => [
             'customer_name' => $customerName, 'license_tier' => 'Pro', 'portal_url' => $portal,
         ],
         'support_confirmation' => [
@@ -945,12 +1141,12 @@ function communication_template_blueprint(string $templateKey): array
             'button_url' => '{{ params.portal_url }}',
         ],
         'purchase_confirmation' => [
-            'subject' => 'Your POS Printer Emulator purchase is confirmed',
-            'headline' => 'Thank you for your purchase',
-            'intro' => 'Hello {{ params.customer_name }}, your {{ params.license_tier }} License purchase is confirmed.',
-            'detail' => 'Open POS Printer Emulator and select Settings → License → Link This Computer. Then sign in to the Customer Portal, review the computer, choose this license, and approve the link. Licensing is applied automatically.',
-            'button' => 'Open setup guide',
-            'button_url' => 'https://www.posprinteremulator.com/user-portal-guide#computers',
+            'subject' => 'Your POS Printer Emulator {{ params.order_label }} is confirmed',
+            'headline' => '{{ params.confirmation_headline }}',
+            'intro' => 'Hello {{ params.customer_name }}, {{ params.confirmation_intro }}',
+            'detail' => '{{ params.confirmation_detail }}',
+            'button' => '{{ params.confirmation_button_label }}',
+            'button_url' => '{{ params.portal_url }}',
         ],
         'activation_ready' => [
             'subject' => 'Your POS Printer Emulator license is ready',

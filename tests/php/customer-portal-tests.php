@@ -139,6 +139,8 @@ $contains("'/index.php?return=' . rawurlencode(\$portalReturn)", $read('customer
 $contains("portal_purchase_type_label", $portal, 'Purchase history must distinguish licenses, upgrades, and maintenance renewals.');
 $contains("portal_purchase_license_label", $portal, 'Purchase history must associate transactions with masked licenses.');
 $contains("portal_purchase_status_label", $portal, 'Purchase history must display normalized payment status.');
+$contains("portal_purchase_status_class", $portal, 'Purchase status styling must use a safe normalized CSS class.');
+$contains("'CHARGEBACK_REVIEW' => 'Payment under review'", $data, 'Chargebacks must display a clear customer-facing review status.');
 $contains("/receipt.php?reference=", $portal, 'Each purchase must provide an authenticated receipt action.');
 $notContains("/invoice.php?reference=", $portal, 'Billing must provide one clear receipt action instead of a duplicate invoice action.');
 $contains("portal_purchase_record", $receipt, 'Receipt downloads must resolve purchases through canonical ownership.');
@@ -146,6 +148,8 @@ $contains("portal_require_account", $receipt, 'Receipt downloads must require an
 $contains("portal_purchase_invoice_number", $receipt, 'Receipts must display the stable invoice number.');
 $contains("portal_purchase_payment_approval_reference", $receipt, 'Receipts must display the verified PayPal capture reference.');
 $contains("Content-Disposition: attachment", $receipt, 'Receipts must support a direct download.');
+$contains('/assets/product-icon.png', $receipt, 'Receipts must visibly include the POS Printer Emulator logo.');
+$contains('alt="POS Printer Emulator logo"', $receipt, 'The receipt logo must have meaningful alternative text.');
 $contains("Payment and account credentials are intentionally excluded", $receipt, 'Receipts must explain their sensitive-data boundary.');
 $notContains("paypal.secret", $receipt, 'Receipt rendering must never contain PayPal credentials.');
 $notContains("activation_key,", $receipt, 'Receipt rendering must never retrieve complete activation keys.');
@@ -189,6 +193,16 @@ $notContains(
     'Computer-link approval must not reject canonical license identifiers that do not carry RFC UUID version bits.'
 );
 $contains("license_device_bindings", $portal, 'Computer activation and deactivation must update authoritative license-device bindings.');
+$contains(
+    "license_last_sync_status=\\'Active\\'",
+    $portal,
+    'Computer-link approval must immediately replace stale Unlinked status in the Customer Portal.'
+);
+$contains(
+    "license_last_sync_error=NULL",
+    $portal,
+    'Computer-link approval must clear stale synchronization errors after assigning an eligible license.'
+);
 $notContains("ACTIVATION_KEY_CLAIMED", $portal, 'The portal must not retain a backup-key claim workflow.');
 $contains("binding_state=\\'Active\\'", $portal, 'The portal must enforce active device assignments.');
 $contains("request_token_hash", $accountLinkApi, 'The public account-link API must store only a digest of the request token.');
@@ -233,6 +247,8 @@ $contains(
 );
 $contains("issue_device_entitlement", $deviceEntitlementBackend, 'The protected backend must issue a signed, device-bound entitlement.');
 $contains("entitlement_revision", $deviceEntitlementBackend, 'Device entitlement responses must include the current revision.');
+$contains("maintenance_revoked_at", $deviceEntitlementBackend, 'Device entitlement synchronization must retrieve administrative maintenance revocation.');
+$contains("'maintenanceStatus'", $deviceEntitlementBackend, 'Device entitlement responses must include the authoritative maintenance status.');
 $notContains("activationKey']", $portal, 'The browser-facing portal must never retrieve an activation key.');
 $contains("['MAINTENANCE', 'UPGRADE', 'LICENSE']", $portal, 'Portal commerce must allow a distinct new-license purchase.');
 $contains("Buy Additional", $portal, 'Owned customers must receive an explicitly labeled additional-license option.');
@@ -294,6 +310,21 @@ $contains("ProtectedData.Protect", $publisher, 'Publisher must protect the persi
 $contains("migrate-customer-portal", $publisher, 'Publisher must support an authenticated Customer Portal migration.');
 $contains('adminBaseUrl + "/api/v1/portal-promotion.php"', $publisher, 'Publisher must configure the protected promotion endpoint from the deployment-specific Admin URL.');
 $contains('adminBaseUrl + "/api/v1/communications-worker.php?max=5"', $publisher, 'Publisher must configure the protected communication-worker handoff from the deployment-specific Admin URL.');
+$contains(
+    'sandbox-set-maintenance-expiration',
+    $publisher,
+    'Publisher must support an audited sandbox-only maintenance expiration certification command.'
+);
+$contains(
+    'PPE_CERT_DB_HOST',
+    $publisher,
+    'Maintenance expiration certification must bind to the approved sandbox database host.'
+);
+$contains(
+    'CERTIFICATION_EXPIRATION_SET',
+    $publisher,
+    'Temporary maintenance expiration changes must be recorded in the maintenance audit history.'
+);
 $contains("https://userportal.posprinteremulator.com/", $mainWebsite, 'The main website must link customers to the Customer Portal.');
 
 $portalFiles = new RecursiveIteratorIterator(
@@ -350,6 +381,36 @@ $selectedLicense = portal_primary_active_license([
     ['control_state' => 'Enabled', 'license_id' => 'permanent-license', 'license_expires_at' => null],
 ]);
 $expect(($selectedLicense['license_id'] ?? '') === 'permanent-license', 'Expired complimentary licenses must not be eligible for activation or updates.');
+$linkedLicense = portal_active_license_for_installation([
+    ['control_state' => 'Enabled', 'license_id' => 'newer-enterprise', 'license_expires_at' => null],
+    ['control_state' => 'Enabled', 'license_id' => 'linked-pro', 'license_expires_at' => null],
+], ['license_id' => 'linked-pro']);
+$expect(
+    ($linkedLicense['license_id'] ?? '') === 'linked-pro',
+    'Maintenance and download eligibility must follow the license assigned to the active computer.'
+);
+$expect(
+    portal_license_can_purchase_maintenance([
+        'control_state' => 'Enabled',
+        'license_id' => 'paid-pro',
+        'license_tier' => 'Pro',
+        'license_source' => 'Purchase',
+        'license_expires_at' => null,
+        'maintenance_revoked_at' => null,
+    ]),
+    'An active paid license must be eligible for a Maintenance and Support purchase.'
+);
+$expect(
+    !portal_license_can_purchase_maintenance([
+        'control_state' => 'Enabled',
+        'license_id' => 'complimentary-enterprise',
+        'license_tier' => 'Enterprise',
+        'license_source' => 'Complimentary',
+        'license_expires_at' => null,
+        'maintenance_revoked_at' => null,
+    ]),
+    'Complimentary entitlements must remain outside paid maintenance commerce.'
+);
 $expect(
     portal_license_display_status([
         'control_state' => 'Enabled',
@@ -376,8 +437,32 @@ $expect($reminderBeforeWindow['state'] === 'current', 'Maintenance reminder must
 $reminderInWindow = portal_maintenance_reminder('2026-10-23', new DateTimeImmutable('2026-07-23', new DateTimeZone('UTC')));
 $expect($reminderInWindow['state'] === 'expiring', 'Maintenance reminder must begin exactly three calendar months before expiration.');
 $expect($reminderInWindow['daysRemaining'] === 92, 'Maintenance reminder must calculate calendar days remaining.');
+$certificationReminder = portal_maintenance_reminder(
+    '2026-10-29 23:59:59.000000',
+    new DateTimeImmutable('2026-08-01', new DateTimeZone('UTC'))
+);
+$expect(
+    $certificationReminder === [
+        'state' => 'expiring',
+        'daysRemaining' => 89,
+        'expirationDate' => 'October 29, 2026',
+    ],
+    'The v0.3.55 sandbox certification date must render the expected 89-day reminder.'
+);
 $reminderExpired = portal_maintenance_reminder('2026-10-23', new DateTimeImmutable('2026-10-24', new DateTimeZone('UTC')));
 $expect($reminderExpired['state'] === 'expired', 'Maintenance reminder must switch to expired after the coverage date.');
+$certificationExpiredReminder = portal_maintenance_reminder(
+    '2026-07-31 23:59:59.000000',
+    new DateTimeImmutable('2026-08-01', new DateTimeZone('UTC'))
+);
+$expect(
+    $certificationExpiredReminder === [
+        'state' => 'expired',
+        'daysRemaining' => -1,
+        'expirationDate' => 'July 31, 2026',
+    ],
+    'The v0.3.55 sandbox certification date must render the expected expired-coverage notice.'
+);
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_write_close();
 }

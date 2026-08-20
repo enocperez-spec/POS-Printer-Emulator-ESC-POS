@@ -208,10 +208,16 @@ function portal_purchase_status_label(string $status): string
     return match (strtoupper(trim($status))) {
         'FULFILLED', 'COMPLETED', 'PAID' => 'Paid',
         'REFUNDED' => 'Refunded',
+        'CHARGEBACK_REVIEW' => 'Payment under review',
         'CANCELED', 'CANCELLED' => 'Canceled',
         'FAILED' => 'Failed',
         default => ucfirst(strtolower(trim($status))) ?: 'Pending',
     };
+}
+
+function portal_purchase_status_class(string $status): string
+{
+    return strtolower((string)preg_replace('/[^A-Za-z0-9]+/', '-', portal_purchase_status_label($status)));
 }
 
 function portal_purchase_display_reference(array $purchase): string
@@ -315,6 +321,33 @@ function portal_primary_active_license(array $licenses): ?array
         }
     }
     return null;
+}
+
+function portal_active_license_for_installation(array $licenses, ?array $installation): ?array
+{
+    $assignedLicenseId = trim((string)($installation['license_id'] ?? ''));
+    if ($assignedLicenseId === '') {
+        return null;
+    }
+    foreach ($licenses as $license) {
+        if (is_array($license) &&
+            hash_equals((string)($license['license_id'] ?? ''), $assignedLicenseId) &&
+            strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') === 0 &&
+            !portal_license_expired($license)) {
+            return $license;
+        }
+    }
+    return null;
+}
+
+function portal_license_can_purchase_maintenance(array $license): bool
+{
+    $tier = ucfirst(strtolower(trim((string)($license['license_tier'] ?? ''))));
+    return in_array($tier, ['Lite', 'Pro', 'Enterprise'], true) &&
+        strcasecmp((string)($license['control_state'] ?? ''), 'Enabled') === 0 &&
+        strcasecmp((string)($license['license_source'] ?? ''), 'Complimentary') !== 0 &&
+        empty($license['maintenance_revoked_at']) &&
+        !portal_license_expired($license);
 }
 
 function portal_license_expired(array $license, ?DateTimeImmutable $now = null): bool
