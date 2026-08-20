@@ -12,15 +12,15 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 
 ## Current release
 
-**Current public release: v0.3.55 — released 2026-07-25**
+**Current public release: v0.3.56 — released 2026-08-19**
 
-**Current development: v0.3.56 — Character and Code-Page Assistant**
+**Current development: v0.3.57 — Offline Enterprise Update Packages**
 
-**Next release after v0.3.55: v0.3.56 — Character and Code-Page Assistant**
+**Next release after v0.3.56: v0.3.57 — Offline Enterprise Update Packages**
 
-**Future scheduled sequence: v0.3.50 through v0.3.59**
+**Future scheduled sequence: v0.3.57 through v0.3.63**
 
-**Most recently completed: v0.3.55 — Reliable Account License Synchronization**
+**Most recently completed: v0.3.56 — Windows Test Page Graphics Compatibility**
 
 ### v0.3.32 — Updater installer-asset validation
 
@@ -96,10 +96,23 @@ Feature releases use `v0.MINOR.FEATURE`, with a two-digit feature number. The fe
 | v0.3.53 | Released | Account-Based License Registration |
 | v0.3.54 | Released | Keyless Account and Device Licensing |
 | v0.3.55 | Released | Reliable Account License Synchronization |
+| v0.3.56 | Released | Windows Test Page Graphics Compatibility |
 
 ## Scheduled releases
 
-The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49 provides direct receipt-image sharing; v0.3.50-v0.3.51 deliver the reusable advanced and standard diagnostic-report engine; v0.3.52-v0.3.57 improve recovery, organization, privacy, background awareness, international text compatibility, and restricted-network deployment; v0.3.58 delivers receipt comparison and automated validation; and v0.3.59 makes public update awareness available to every license and maintenance state.
+The scheduled order is customer-support driven: v0.3.25 establishes the four-tier commercial boundary and listener allowances; v0.3.26 adds maintenance without turning permanent licenses into subscriptions; v0.3.30-v0.3.32 complete security and updater work; v0.3.33 provides safe diagnostics; v0.3.34-v0.3.35 protect and clarify backups; v0.3.36 adds privacy-preserving adoption analytics; v0.3.37 introduces Trial onboarding; v0.3.38 corrects its visibility and listener clarity; v0.3.39 closes the in-application update lifecycle; v0.3.40 adds Simple and Expert modes; v0.3.41 corrects installer branding; v0.3.42-v0.3.45 establish customer identity and consent, a secure Customer Portal, self-service commercial workflows, and consent-aware lifecycle communications; v0.3.46 establishes accessibility and keyboard usability; v0.3.47 completes the server-authorized Five-Day Promotional Trial experience; v0.3.48 makes troubleshooting screenshots and evaluation activation clearer; v0.3.49 provides direct receipt-image sharing; v0.3.50-v0.3.51 deliver the reusable advanced and standard diagnostic-report engine; v0.3.52-v0.3.55 improve recovery and account licensing; v0.3.56 restores Windows Test Page graphics compatibility; v0.3.57 supports restricted-network deployment; v0.3.58 delivers receipt comparison and automated validation; v0.3.59 makes public update awareness available to every license and maintenance state; v0.3.60-v0.3.62 add restore points, privacy-safe masking, and background health; and v0.3.63 delivers the character and code-page assistant.
+
+### v0.3.56 — Windows Test Page Graphics Compatibility
+
+**Status:** Released — 2026-08-19
+
+**Purpose:** Render graphics emitted by the Epson Windows printer driver correctly while preserving existing POS receipt behavior.
+
+**Released scope:** Epson `GS 8 L` buffered-raster storage, `GS ( L` buffered-graphics printing, safe handling of unknown length-prefixed graphics functions, recognition of common Epson driver preamble commands, and alignment that respects the selected printer profile.
+
+**Complete when:** The captured 82,332-byte Windows Test Page renders its seven raster strips with no binary image payload displayed as text, existing 576-dot receipts remain unchanged, malformed commands fail safely, and the complete automated suite passes.
+
+**Completion verification:** Parser regression tests cover the Windows-driver command sequence, buffered graphics, alignment, malformed data, and unsupported length-prefixed functions; the captured Windows Test Page produces seven raster images and only three harmless unsupported `GS ( J` commands instead of 71,326 unsupported bytes.
 
 ### v0.3.55 — Reliable Account License Synchronization
 
@@ -954,7 +967,7 @@ The scheduled order is customer-support driven: v0.3.25 establishes the four-tie
 
 **Complete when:** A background listener fault produces one actionable privacy-safe notification, the tray shows the correct state, and both clear automatically after verified recovery.
 
-### v0.3.56 — Character and code-page assistant
+### v0.3.63 — Character and code-page assistant
 
 **Status:** Planned
 
