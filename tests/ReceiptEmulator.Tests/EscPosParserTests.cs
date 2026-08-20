@@ -196,6 +196,96 @@ public sealed class EscPosParserTests
     }
 
     [Fact]
+    public void RendersExtendedEpsonGraphicsBufferWithoutTreatingBitmapBytesAsText()
+    {
+        var bytes = new byte[]
+        {
+            0x1B, 0x24, 0x58, 0x00,
+            0x1D, 0x38, 0x4C, 0x0C, 0x00, 0x00, 0x00,
+            0x30, 0x70, 0x30, 0x01, 0x01, 0x31, 0x08, 0x00, 0x02, 0x00,
+            0xAA, 0x55,
+            0x1D, 0x28, 0x4C, 0x02, 0x00, 0x30, 0x32
+        };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        var image = Assert.Single(receipt.Lines);
+        Assert.Equal("image", image.Kind);
+        Assert.Equal("raster-v1:8:2:1:1:qlU=", image.Data);
+        Assert.True(string.IsNullOrWhiteSpace(receipt.PlainText));
+        Assert.Contains(receipt.Commands, command => command.Name == "Store raster image" && command.Supported);
+        Assert.Contains(receipt.Commands, command => command.Name == "Print raster image" && command.Supported);
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
+
+    [Fact]
+    public void RendersAllWindowsTestPageGraphicStripsAndRecognizesCenteredPlacement()
+    {
+        var bytes = Enumerable.Range(0, 7)
+            .SelectMany(index => ExtendedRasterStrip(336, 2, 88, (byte)(0x80 >> index)))
+            .ToArray();
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.Equal(7, receipt.Lines.Count);
+        Assert.All(receipt.Lines, line =>
+        {
+            Assert.Equal("image", line.Kind);
+            Assert.Equal("center", line.Alignment);
+            Assert.StartsWith("raster-v1:336:2:1:1:", line.Data);
+        });
+        Assert.True(string.IsNullOrWhiteSpace(receipt.PlainText));
+        Assert.Equal(7, receipt.Commands.Count(command => command.Name == "Store raster image"));
+        Assert.Equal(7, receipt.Commands.Count(command => command.Name == "Print raster image"));
+        Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
+
+    [Fact]
+    public void ConsumesTruncatedExtendedGraphicsPayloadWithoutDecodingBinaryAsText()
+    {
+        var bytes = new byte[]
+        {
+            0x1D, 0x38, 0x4C, 0x64, 0x00, 0x00, 0x00,
+            0x30, 0x70, 0x30, 0x01, 0x01, 0x31, 0x08, 0x00, 0x02, 0x00,
+            0x41, 0x42, 0x43, 0x44
+        };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        var unsupported = Assert.Single(receipt.Commands, command => !command.Supported);
+        Assert.Contains("Truncated extended graphics command", unsupported.Details);
+        Assert.Empty(receipt.Lines);
+        Assert.Empty(receipt.PlainText);
+    }
+
+    [Fact]
+    public void ConsumesWindowsEpsonDriverPreambleWithoutLeakingCommandParametersIntoText()
+    {
+        var bytes = new byte[]
+        {
+            0x1B, 0x3D, 0x01,
+            0x1D, 0x28, 0x4A, 0x02, 0x00, 0x01, 0x00,
+            0x1D, 0x28, 0x4A, 0x02, 0x00, 0x02, 0x00,
+            0x1D, 0x28, 0x4A, 0x02, 0x00, 0x03, 0x00,
+            0x1B, 0x63, 0x30, 0x02,
+            0x1B, 0x63, 0x31, 0x02,
+            0x1B, 0x63, 0x33, 0x00,
+            0x1B, 0x32,
+            0x1B, 0x52, 0x00,
+            0x1B, 0x74, 0x10,
+            0x1D, 0x62, 0x01
+        };
+
+        var receipt = new EscPosParser().Parse(bytes);
+
+        Assert.Empty(receipt.Lines);
+        Assert.Empty(receipt.PlainText);
+        Assert.Equal(3, receipt.Commands.Count(command => !command.Supported));
+        Assert.All(receipt.Commands.Where(command => !command.Supported), command =>
+            Assert.Equal("Unsupported length-prefixed GS command", command.Name));
+    }
+
+    [Fact]
     public void RecognizesShortDrawerPulseAsControlOnlyTraffic()
     {
         var bytes = new byte[] { 0x1B, 0x40, 0x1B, 0x70, 0x00, 0x1B, 0x40 };
@@ -205,5 +295,25 @@ public sealed class EscPosParserTests
         Assert.False(receipt.HasPrintableContent);
         Assert.Contains(receipt.Commands, command => command.Name == "Generate drawer pulse");
         Assert.DoesNotContain(receipt.Commands, command => !command.Supported);
+    }
+
+    private static byte[] ExtendedRasterStrip(int widthDots, int heightDots, int horizontalOffsetDots, byte fill)
+    {
+        var rowBytes = (widthDots + 7) / 8;
+        var raster = Enumerable.Repeat(fill, rowBytes * heightDots).ToArray();
+        var bodyLength = 10 + raster.Length;
+        return new byte[]
+            {
+                0x1B, 0x24, (byte)(horizontalOffsetDots & 0xFF), (byte)(horizontalOffsetDots >> 8),
+                0x1D, 0x38, 0x4C,
+                (byte)(bodyLength & 0xFF), (byte)((bodyLength >> 8) & 0xFF),
+                (byte)((bodyLength >> 16) & 0xFF), (byte)((bodyLength >> 24) & 0xFF),
+                0x30, 0x70, 0x30, 0x01, 0x01, 0x31,
+                (byte)(widthDots & 0xFF), (byte)(widthDots >> 8),
+                (byte)(heightDots & 0xFF), (byte)(heightDots >> 8)
+            }
+            .Concat(raster)
+            .Concat(new byte[] { 0x1D, 0x28, 0x4C, 0x02, 0x00, 0x30, 0x32 })
+            .ToArray();
     }
 }
